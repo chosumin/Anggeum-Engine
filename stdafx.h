@@ -1,0 +1,39 @@
+#pragma once
+
+#define VK_USE_PLATFORM_WIN32_KHR
+#define GLFW_INCLUDE_VULKAN
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <chrono>
+#include <iostream>
+#include <fstream>
+#include <cassert>
+#include <vector>
+#include <memory>
+#include <string>
+#include <stdexcept>
+#include <map>
+#include <optional>
+#include <set>
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <array>
+
+using namespace std;
+using namespace glm;
+
+#include "Device.h"
+#include "Window.h"
+
+const int MAX_FRAMES_IN_FLIGHT = 2;

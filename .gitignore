@@ -1,0 +1,6 @@
+x64/
+Vulkan.vcxproj.filters
+Vulkan.vcxproj.user
+*.hint
+.vs/
+VulkanSDK/
