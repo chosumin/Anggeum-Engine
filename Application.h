@@ -7,6 +7,7 @@ namespace Core
 	class SwapChain;
 	class CommandBuffer;
 	class UniformBuffer;
+	class Texture;
 }
 
 class Application
@@ -24,5 +25,6 @@ private:
 
 	class Triangle* _triangle;
 	Core::UniformBuffer* _mvpBuffer;
+	Core::Texture* _texture;
 };
 

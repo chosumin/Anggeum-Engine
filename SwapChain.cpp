@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SwapChain.h"
+#include "Utility.h"
 
 Core::SwapChain::SwapChain()
 {
@@ -16,7 +17,7 @@ Core::SwapChain::~SwapChain()
 
 void Core::SwapChain::CreateSwapChain()
 {
-    SwapChainSupportDetails swapChainSupport = Device::GetInstance().GetSwapChainSupport();
+    SwapChainSupportDetails swapChainSupport = Device::Instance().GetSwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
     VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.PresentModes);
@@ -31,7 +32,7 @@ void Core::SwapChain::CreateSwapChain()
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = Device::GetInstance().GetSurface();
+    createInfo.surface = Device::Instance().GetSurface();
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -39,7 +40,7 @@ void Core::SwapChain::CreateSwapChain()
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = Device::GetInstance().FindQueueFamilies();
+    QueueFamilyIndices indices = Device::Instance().FindQueueFamilies();
     uint32_t queueFamilyIndices[] = { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
 
     if (indices.GraphicsFamily != indices.PresentFamily)
@@ -61,7 +62,7 @@ void Core::SwapChain::CreateSwapChain()
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
 
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &_swapChain) != VK_SUCCESS)
         throw std::runtime_error("failed to create swap chain!");
@@ -81,7 +82,7 @@ VkExtent2D Core::SwapChain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& cap
     else
     {
         int width, height;
-        Window::GetInstance().GetWidthAndHeight(width, height);
+        Window::Instance().GetWidthAndHeight(width, height);
 
         VkExtent2D actualExtent =
         {
@@ -129,26 +130,8 @@ void Core::SwapChain::CreateImageViews()
 
     for (size_t i = 0; i < _swapChainImages.size(); i++)
     {
-        VkImageViewCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image = _swapChainImages[i];
-
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = _swapChainImageFormat;
-
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        if (vkCreateImageView(Device::GetInstance().GetDevice(), &createInfo, nullptr, &_swapChainImageViews[i]) != VK_SUCCESS)
-            throw std::runtime_error("failed to create image views!");
+        _swapChainImageViews[i] = 
+            Utility::CreateImageView(_swapChainImages[i], _swapChainImageFormat);
     }
 }
 
@@ -190,7 +173,7 @@ void Core::SwapChain::CreateRenderPass()
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
     if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
         throw std::runtime_error("failed to create render pass!");
 }
@@ -212,7 +195,7 @@ void Core::SwapChain::CreateFramebuffers()
         framebufferInfo.height = _swapChainExtent.height;
         framebufferInfo.layers = 1;
 
-        if (vkCreateFramebuffer(Device::GetInstance().GetDevice(), &framebufferInfo, nullptr, &_swapChainFramebuffers[i]) != VK_SUCCESS)
+        if (vkCreateFramebuffer(Device::Instance().GetDevice(), &framebufferInfo, nullptr, &_swapChainFramebuffers[i]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create framebuffer!");
         }
@@ -222,13 +205,13 @@ void Core::SwapChain::CreateFramebuffers()
 void Core::SwapChain::RecreateSwapChain()
 {
     int width = 0, height = 0;
-    glfwGetFramebufferSize(Window::GetInstance().GetWindow(), &width, &height);
+    glfwGetFramebufferSize(Window::Instance().GetWindow(), &width, &height);
     while (width == 0 || height == 0) {
-        glfwGetFramebufferSize(Window::GetInstance().GetWindow(), &width, &height);
+        glfwGetFramebufferSize(Window::Instance().GetWindow(), &width, &height);
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(Device::GetInstance().GetDevice());
+    vkDeviceWaitIdle(Device::Instance().GetDevice());
 
     CleanupSwapChain();
 
@@ -268,7 +251,7 @@ void Core::SwapChain::GetViewportAndScissor(VkViewport& viewport, VkRect2D& scis
 
 void Core::SwapChain::CleanupSwapChain()
 {
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
 
     for (auto framebuffer : _swapChainFramebuffers)
         vkDestroyFramebuffer(device, framebuffer, nullptr);

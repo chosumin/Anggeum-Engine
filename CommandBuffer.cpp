@@ -13,7 +13,7 @@ Core::CommandBuffer::CommandBuffer()
 
 Core::CommandBuffer::~CommandBuffer()
 {
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -25,9 +25,10 @@ Core::CommandBuffer::~CommandBuffer()
     vkDestroyCommandPool(device, _commandPool, nullptr);
 }
 
-void Core::CommandBuffer::WaitForFences(SwapChain& swapChain)
+void Core::CommandBuffer::RecordCommandBuffer(
+    Pipeline& pipeline, SwapChain& swapChain)
 {
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
 
     vkWaitForFences(device, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -42,12 +43,6 @@ void Core::CommandBuffer::WaitForFences(SwapChain& swapChain)
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw runtime_error("failed to acquire swap chain image!");
-}
-
-void Core::CommandBuffer::RecordCommandBuffer(
-    Pipeline& pipeline, SwapChain& swapChain)
-{
-    auto device = Device::GetInstance().GetDevice();
 
     vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 
@@ -75,7 +70,7 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(Device::GetInstance().GetGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS)
+    if (vkQueueSubmit(Device::Instance().GetGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS)
         throw runtime_error("failed to submit draw command buffer!");
 
     VkPresentInfoKHR presentInfo{};
@@ -90,7 +85,7 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
     presentInfo.pImageIndices = &_imageIndex;
     presentInfo.pResults = nullptr; // Optional
 
-    VkResult result = vkQueuePresentKHR(Device::GetInstance().GetPresentQueue(), &presentInfo);
+    VkResult result = vkQueuePresentKHR(Device::Instance().GetPresentQueue(), &presentInfo);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
     {
@@ -105,14 +100,14 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
 
 void Core::CommandBuffer::CreateCommandPool()
 {
-    QueueFamilyIndices queueFamilyIndices = Device::GetInstance().FindQueueFamilies();
+    QueueFamilyIndices queueFamilyIndices = Device::Instance().FindQueueFamilies();
 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
 
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
     if (vkCreateCommandPool(device, &poolInfo, nullptr, &_commandPool) != VK_SUCCESS)
         throw runtime_error("failed to create command pool!");
 }
@@ -127,7 +122,7 @@ void Core::CommandBuffer::CreateCommandBuffers()
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
 
-    if (vkAllocateCommandBuffers(Device::GetInstance().GetDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS)
+    if (vkAllocateCommandBuffers(Device::Instance().GetDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS)
         throw runtime_error("failed to allocate command buffers!");
 }
 
@@ -154,6 +149,11 @@ void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uin
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    vkCmdBindDescriptorSets(
+        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline.GetPipelineLayout(), 0, 1,
+        pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)
@@ -177,7 +177,7 @@ void Core::CommandBuffer::CreateSyncObjects()
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    auto device = Device::GetInstance().GetDevice();
+    auto device = Device::Instance().GetDevice();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {

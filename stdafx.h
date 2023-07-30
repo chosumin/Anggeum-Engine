@@ -13,6 +13,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+using namespace glm;
 
 #include <chrono>
 #include <iostream>
@@ -31,7 +32,6 @@
 #include <array>
 
 using namespace std;
-using namespace glm;
 
 #include "Device.h"
 #include "Window.h"

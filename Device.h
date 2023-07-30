@@ -21,7 +21,7 @@ namespace Core
 	class Device
 	{
 	public:
-		static Core::Device& GetInstance()
+		static Core::Device& Instance()
 		{
 			static Core::Device instance;
 			return instance;
@@ -44,6 +44,7 @@ namespace Core
 		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
 		VkQueue GetPresentQueue() { return _presentQueue; }
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
+		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	private:
 		Device();
 		~Device();

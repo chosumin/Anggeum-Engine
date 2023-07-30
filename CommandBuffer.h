@@ -10,7 +10,6 @@ namespace Core
 		CommandBuffer();
 		~CommandBuffer();
 
-		void WaitForFences(SwapChain& swapChain);
 		void RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain);
 		void EndFrame(Pipeline& pipeline, SwapChain& swapChain);
 		VkCommandPool GetCommandPool() { return _commandPool; }

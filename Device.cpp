@@ -49,6 +49,23 @@ void Core::Device::Delete()
     vkDestroyInstance(_instance, nullptr);
 }
 
+uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(_physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
 Core::Device::Device()
     :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface()
 {
@@ -276,7 +293,11 @@ bool Core::Device::IsDeviceSuitable(VkPhysicalDevice device)
             !swapChainSupport.PresentModes.empty();
     }
 
-    return indices.IsComplete() && extensionsSupported && swapChainAdequate;
+    VkPhysicalDeviceFeatures supportedFeatures;
+    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+    return indices.IsComplete() && extensionsSupported && swapChainAdequate &&
+        supportedFeatures.samplerAnisotropy;
 }
 
 bool Core::Device::CheckDeviceExtensionSupport(VkPhysicalDevice device)
@@ -317,6 +338,7 @@ void Core::Device::CreateLogicalDevice()
     }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

@@ -1,21 +1,27 @@
 #include "stdafx.h"
 #include "Pipeline.h"
 #include "Vertex.h"
+#include "IDescriptor.h"
 
-Core::Pipeline::Pipeline(VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout,
-	const string& vertFilePath, const string& fragFilePath)
+Core::Pipeline::Pipeline(VkRenderPass renderPass,
+	const string& vertFilePath, const string& fragFilePath,
+	vector<IDescriptor*> descriptors)
 {
-	auto vkDevice = Device::GetInstance().GetDevice();
+	auto vkDevice = Device::Instance().GetDevice();
 
-	CreateGraphicsPipeline(vkDevice, renderPass, descriptorSetLayout,
+	CreateDescriptors(descriptors);
+	CreateGraphicsPipeline(vkDevice, renderPass,
 		vertFilePath, fragFilePath);
 }
 
 Core::Pipeline::~Pipeline()
 {
-	auto device = Device::GetInstance().GetDevice();
+	auto device = Device::Instance().GetDevice();
 	vkDestroyPipeline(device, _graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, _pipelineLayout, nullptr);
+
+	vkDestroyDescriptorPool(device, _descriptorPool, nullptr);
+	vkDestroyDescriptorSetLayout(device, _descriptorSetLayout, nullptr);
 }
 
 vector<char> Core::Pipeline::ReadFile(const string& filePath)
@@ -36,7 +42,7 @@ vector<char> Core::Pipeline::ReadFile(const string& filePath)
 }
 
 void Core::Pipeline::CreateGraphicsPipeline(
-	VkDevice& device, VkRenderPass& renderPass, VkDescriptorSetLayout& descriptorSetLayout,
+	VkDevice& device, VkRenderPass& renderPass,
 	const string& vertFilePath, const string& fragFilePath)
 {
 	auto vertShaderCode = ReadFile(vertFilePath);
@@ -146,7 +152,7 @@ void Core::Pipeline::CreateGraphicsPipeline(
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout; // Optional
+	pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
 	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
 	pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
 
@@ -192,4 +198,95 @@ VkShaderModule Core::Pipeline::CreateShaderModule(VkDevice& device, const vector
 	}
 
 	return shaderModule;
+}
+
+void Core::Pipeline::CreateDescriptors(vector<IDescriptor*> descriptors)
+{
+	CreateDescriptorSetLayout(descriptors);
+	CreateDescriptorPool(descriptors);
+	CreateDescriptorSets(descriptors);
+}
+
+void Core::Pipeline::CreateDescriptorSetLayout(vector<IDescriptor*> descriptors)
+{
+	size_t size = descriptors.size();
+
+	vector<VkDescriptorSetLayoutBinding> bindings(size);
+	for (size_t i = 0; i < size; i++)
+	{
+		bindings[i] = (descriptors[i]->CreateDescriptorSetLayoutBinding());
+	}
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(
+		Device::Instance().GetDevice(),
+		&layoutInfo, nullptr, &_descriptorSetLayout) != VK_SUCCESS)
+	{
+		throw runtime_error("failed to create descriptor set layout!");
+	}
+}
+
+void Core::Pipeline::CreateDescriptorPool(vector<IDescriptor*> descriptors)
+{
+	size_t size = descriptors.size();
+
+	vector<VkDescriptorPoolSize> poolSizes(size);
+	for (size_t i = 0; i < size; i++)
+	{
+		poolSizes[i].type = descriptors[i]->GetDescriptorType();
+		poolSizes[i].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	}
+
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	poolInfo.pPoolSizes = poolSizes.data();
+	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+	if (vkCreateDescriptorPool(Device::Instance().GetDevice(),
+		&poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS)
+	{
+		throw runtime_error("failed to create descriptor pool!");
+	}
+}
+
+void Core::Pipeline::CreateDescriptorSets(vector<IDescriptor*> descriptors)
+{
+	size_t size = descriptors.size();
+
+	vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = _descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	allocInfo.pSetLayouts = layouts.data();
+
+	_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+	if (vkAllocateDescriptorSets(Device::Instance().GetDevice(),
+		&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
+	{
+		throw runtime_error("failed to allocate descriptor sets!");
+	}
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		vector<VkWriteDescriptorSet> descriptorWrites(size);
+		for (size_t j = 0; j < size; j++)
+		{
+			auto writeDescriptorSet =
+				descriptors[j]->CreateWriteDescriptorSet(i);
+
+			descriptorWrites[j] = writeDescriptorSet;
+			descriptorWrites[j].dstSet = _descriptorSets[i];
+		}
+
+		vkUpdateDescriptorSets(
+			Device::Instance().GetDevice(),
+			static_cast<uint32_t>(descriptorWrites.size()),
+			descriptorWrites.data(), 0, nullptr);
+	}
 }

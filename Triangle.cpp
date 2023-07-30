@@ -6,10 +6,10 @@
 
 Triangle::Triangle(VkCommandPool commandPool)
 {
-    _vertices.push_back({ {-0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f } });
-    _vertices.push_back({ {0.5f, -0.5f}, {0.0f, 1.0f, 0.0f} });
-    _vertices.push_back({ {0.5f, 0.5f}, {0.0f, 0.0f, 1.0f} });
-	_vertices.push_back({ {-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f} });
+    _vertices.push_back({ {-0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f} });
+    _vertices.push_back({ {0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} });
+    _vertices.push_back({ {0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} });
+	_vertices.push_back({ {-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} });
 
 	CreateVertexBuffer(commandPool);
 	CreateIndexBuffer(commandPool);

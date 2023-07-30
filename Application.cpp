@@ -5,11 +5,12 @@
 #include "CommandBuffer.h"
 #include "Triangle.h"
 #include "MVPUniformBuffer.h"
+#include "Texture.h"
 
 Application::Application()
 {
-	Core::Window::GetInstance().Initialize(800, 600, "Hello Vulkan");
-	Core::Device::GetInstance().Initialize(Core::Window::GetInstance());
+	Core::Window::Instance().Initialize(800, 600, "Hello Vulkan");
+	Core::Device::Instance().Initialize(Core::Window::Instance());
 
 	_swapChain = new Core::SwapChain();
 	_commandBuffer = new Core::CommandBuffer();
@@ -19,15 +20,20 @@ Application::Application()
 
 	_triangle = new Triangle(_commandBuffer->GetCommandPool());
 
+	_texture = new Core::Texture(_commandBuffer->GetCommandPool(),
+		"Textures/Anggeum.jpg", Core::TextureFormat::Rgb_alpha);
+
 	_pipeline = new Core::Pipeline(
-		_swapChain->GetRenderPass(), 
-		_mvpBuffer->GetDescriptorSetLayout(),
-		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv");
+		_swapChain->GetRenderPass(),
+		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv",
+		{ _mvpBuffer, _texture });
 }
 
 Application::~Application()
 {
 	delete(_pipeline);
+
+	delete(_texture);
 
 	delete(_mvpBuffer);
 	delete(_triangle);
@@ -35,25 +41,24 @@ Application::~Application()
 	delete(_swapChain);
 	delete(_commandBuffer);
 
-	Core::Device::GetInstance().Delete();
-	Core::Window::GetInstance().Delete();
+	Core::Device::Instance().Delete();
+	Core::Window::Instance().Delete();
 }
 
 void Application::DrawFrame()
 {
-	_commandBuffer->WaitForFences(*_swapChain);
 	_commandBuffer->RecordCommandBuffer(*_pipeline, *_swapChain);
+	{
+		_mvpBuffer->Update(
+			_commandBuffer->GetCommandBuffer(),
+			_commandBuffer->GetCurrentFrame());
 
-	_mvpBuffer->Update(
-		_commandBuffer->GetCommandBuffer(),
-		_commandBuffer->GetCurrentFrame(),
-		_pipeline->GetPipelineLayout());
-
-	_triangle->DrawFrame(_commandBuffer->GetCommandBuffer());
+		_triangle->DrawFrame(_commandBuffer->GetCommandBuffer());
+	}
 	_commandBuffer->EndFrame(*_pipeline, *_swapChain);
 }
 
 void Application::WaitIdle()
 {
-	vkDeviceWaitIdle(Core::Device::GetInstance().GetDevice());
+	vkDeviceWaitIdle(Core::Device::Instance().GetDevice());
 }

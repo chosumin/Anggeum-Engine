@@ -11,7 +11,7 @@ int main()
 {
 	Application application;
 
-	while (Core::Window::GetInstance().IsClosed() == false)
+	while (Core::Window::Instance().IsClosed() == false)
 	{
 		glfwPollEvents();
 		application.DrawFrame();

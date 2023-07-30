@@ -5,7 +5,7 @@ namespace Core
 	class Window
 	{
 	public:
-		static Core::Window& GetInstance()
+		static Core::Window& Instance()
 		{
 			static Core::Window instance;
 			return instance;
