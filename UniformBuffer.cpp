@@ -13,7 +13,7 @@ Core::UniformBuffer::~UniformBuffer()
 {
 }
 
-void Core::UniformBuffer::Update(VkCommandBuffer commandBuffer, uint32_t currentImage)
+void Core::UniformBuffer::Update(uint32_t currentImage)
 {
 	MapBufferMemory(_uniformBuffersMapped[currentImage]);
 }

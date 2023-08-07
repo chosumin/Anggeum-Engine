@@ -6,11 +6,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-//todo : https://developer.nvidia.com/vulkan-memory-management
-//todo : https://en.wikipedia.org/wiki/Memory-mapped_I/O_and_port-mapped_I/O
-//todo : https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chap7.html#VkPipelineStageFlagBits
-//todo : https://en.wikipedia.org/wiki/Anisotropic_filtering
-
 Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat format)
 {
 	int texWidth, texHeight, texChannels;
@@ -30,14 +25,14 @@ Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat
 
 	stbi_image_free(pixels);
 
-	CreateImage(texWidth, texHeight,
+	Utility::CreateImage(texWidth, texHeight,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		_textureImage, _textureImageMemory);
 
-	TransitionImageLayout(commandPool,
+	Utility::TransitionImageLayout(commandPool,
 		_textureImage,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -49,7 +44,7 @@ Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat
 		static_cast<uint32_t>(texWidth),
 		static_cast<uint32_t>(texHeight));
 
-	TransitionImageLayout(commandPool, 
+	Utility::TransitionImageLayout(commandPool, 
 		_textureImage, 
 		VK_FORMAT_R8G8B8A8_SRGB, 
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
@@ -103,116 +98,6 @@ VkDescriptorType Core::Texture::GetDescriptorType()
 	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 }
 
-void Core::Texture::CreateImage(
-	uint32_t width, uint32_t height, VkFormat format, 
-	VkImageTiling tiling, VkImageUsageFlags usage, 
-	VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
-{
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = width;
-	imageInfo.extent.height = height;
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.format = format;
-	imageInfo.tiling = tiling;
-
-	//VK_IMAGE_LAYOUT_PREINITIALIZED, the first transition will preserve the texels.
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = usage;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	//only relevant for images that will be used as attachments.
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-
-	//related to sparse images, such as 3D texture for a voxel terrain.
-	imageInfo.flags = 0;
-
-	auto device = Device::Instance().GetDevice();
-
-	if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to create image!");
-	}
-
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex =
-		Device::Instance().FindMemoryType(memRequirements.memoryTypeBits, properties);
-
-	if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to allocate image memory!");
-	}
-
-	vkBindImageMemory(device, image, imageMemory, 0);
-}
-
-void Core::Texture::TransitionImageLayout(
-	VkCommandPool commandPool, VkImage image, VkFormat format,
-	VkImageLayout oldLayout, VkImageLayout newLayout)
-{
-	VkCommandBuffer commandBuffer = Utility::BeginSingleTimeCommands(commandPool);
-
-	VkImageMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = oldLayout;
-	barrier.newLayout = newLayout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.srcAccessMask = 0; // TODO
-	barrier.dstAccessMask = 0; // TODO
-
-	VkPipelineStageFlags sourceStage;
-	VkPipelineStageFlags destinationStage;
-
-	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && 
-		newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
-	{
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && 
-		newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
-	{
-		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	}
-	else 
-	{
-		throw invalid_argument("unsupported layout transition!");
-	}
-
-	vkCmdPipelineBarrier(
-		commandBuffer,
-		sourceStage, destinationStage,
-		0,
-		0, nullptr,
-		0, nullptr,
-		1, &barrier
-	);
-
-	Utility::EndSingleTimeCommands(commandPool, commandBuffer);
-}
-
 void Core::Texture::CopyBufferToImage(VkCommandPool commandPool, 
 	VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
 {
@@ -245,7 +130,8 @@ void Core::Texture::CopyBufferToImage(VkCommandPool commandPool,
 
 void Core::Texture::CreateTextureImageView()
 {
-	_textureImageView = Utility::CreateImageView(_textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+	_textureImageView = Utility::CreateImageView(
+		_textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void Core::Texture::CreateTextureSampler()

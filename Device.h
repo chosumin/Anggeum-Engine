@@ -50,7 +50,6 @@ namespace Core
 		~Device();
 	private:
 		void CreateInstance();
-		void CheckExtensionProperties();
 		bool CheckValidationLayerSupport();
 		vector<const char*> GetRequiredExtensions();
 		void SetupDebugMessenger();

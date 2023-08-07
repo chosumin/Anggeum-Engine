@@ -8,6 +8,7 @@ namespace Core
 	class CommandBuffer;
 	class UniformBuffer;
 	class Texture;
+	class Polygon;
 }
 
 class Application
@@ -23,7 +24,8 @@ private:
 	Core::SwapChain* _swapChain;
 	Core::CommandBuffer* _commandBuffer;
 
-	class Triangle* _triangle;
+	Core::Polygon* _polygon;
+
 	Core::UniformBuffer* _mvpBuffer;
 	Core::Texture* _texture;
 };

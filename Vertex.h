@@ -2,7 +2,7 @@
 
 struct Vertex 
 {
-    vec2 Pos;
+    vec3 Pos;
     vec3 Color;
     vec2 TexCoord;
 
@@ -20,7 +20,7 @@ struct Vertex
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, Pos);
 
         attributeDescriptions[1].binding = 0;

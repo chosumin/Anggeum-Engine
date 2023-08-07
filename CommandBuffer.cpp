@@ -2,7 +2,8 @@
 #include "CommandBuffer.h"
 #include "Pipeline.h"
 #include "SwapChain.h"
-#include "Triangle.h"
+#include "UniformBuffer.h"
+#include "Polygon.h"
 
 Core::CommandBuffer::CommandBuffer()
 {
@@ -26,7 +27,7 @@ Core::CommandBuffer::~CommandBuffer()
 }
 
 void Core::CommandBuffer::RecordCommandBuffer(
-    Pipeline& pipeline, SwapChain& swapChain)
+    Pipeline& pipeline, SwapChain& swapChain, UniformBuffer& uniformBuffer, Polygon& polygon)
 {
     auto device = Device::Instance().GetDevice();
 
@@ -44,11 +45,14 @@ void Core::CommandBuffer::RecordCommandBuffer(
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw runtime_error("failed to acquire swap chain image!");
 
+    //hack : updateUniformBuffer(currentFrame);
+    uniformBuffer.Update(_currentFrame);
+
     vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 
     vkResetCommandBuffer(_commandBuffers[_currentFrame], 0);
 
-    RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain);
+    RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain, polygon);
 }
 
 void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
@@ -83,7 +87,6 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &_imageIndex;
-    presentInfo.pResults = nullptr; // Optional
 
     VkResult result = vkQueuePresentKHR(Device::Instance().GetPresentQueue(), &presentInfo);
 
@@ -127,12 +130,10 @@ void Core::CommandBuffer::CreateCommandBuffers()
 }
 
 void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-    Pipeline& pipeline, SwapChain& swapChain)
+    Pipeline& pipeline, SwapChain& swapChain, Polygon& polygon)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0; // Optional
-    beginInfo.pInheritanceInfo = nullptr; // Optional
 
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
         throw std::runtime_error("failed to begin recording command buffer!");
@@ -150,10 +151,16 @@ void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uin
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+    //hack : bind vertexbuffers
+    //hack : bind indexbuffers
+    polygon.BindBuffers(commandBuffer);
+
     vkCmdBindDescriptorSets(
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline.GetPipelineLayout(), 0, 1,
         pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);
+
+    polygon.DrawFrame(commandBuffer);
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)

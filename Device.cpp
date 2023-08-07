@@ -30,7 +30,6 @@ void DestroyDebugUtilsMessengerEXT(
 
 void Core::Device::Initialize(Window& window)
 {
-    CheckExtensionProperties();
     CreateInstance();
     SetupDebugMessenger();
     window.CreateSurface(_instance, &_surface);
@@ -116,21 +115,6 @@ void Core::Device::CreateInstance()
 
     if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS)
         throw runtime_error("failed to create instance!");
-}
-
-void Core::Device::CheckExtensionProperties()
-{
-    uint32_t extensionCount = 0;
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-    std::cout << "available extensions:\n";
-
-    for (const auto& extension : extensions) {
-        std::cout << '\t' << extension.extensionName << '\n';
-    }
-
-    //todo : write verifying code for glfwGetRequiredInstanceExtensions
 }
 
 bool Core::Device::CheckValidationLayerSupport()

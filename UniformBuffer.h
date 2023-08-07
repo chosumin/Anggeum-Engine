@@ -10,7 +10,7 @@ namespace Core
 		UniformBuffer(VkDeviceSize bufferSize);
 		~UniformBuffer();
 
-		void Update(VkCommandBuffer commandBuffer, uint32_t currentImage);
+		void Update(uint32_t currentImage);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);

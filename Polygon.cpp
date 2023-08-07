@@ -1,40 +1,52 @@
 #include "stdafx.h"
-#include "Triangle.h"
+#include "Polygon.h"
 #include "Vertex.h"
 #include "CommandBuffer.h"
 #include "Buffer.h"
+#include "Transform.h"
 
-Triangle::Triangle(VkCommandPool commandPool)
+Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position)
 {
-    _vertices.push_back({ {-0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f} });
-    _vertices.push_back({ {0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} });
-    _vertices.push_back({ {0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} });
-	_vertices.push_back({ {-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} });
+	_transform = make_unique<Transform>();
+	_transform->Position = position;
+
+	_vertices.push_back({ {-0.5f, -0.5f, 0.0f}, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f} });
+	_vertices.push_back({ {0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} });
+	_vertices.push_back({ {0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} });
+	_vertices.push_back({ {-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} });
+
+	_vertices.push_back({ {-0.5f, -0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } });
+	_vertices.push_back({ {0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f} });
+	_vertices.push_back({ {0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} });
+	_vertices.push_back({ {-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f} });
 
 	CreateVertexBuffer(commandPool);
 	CreateIndexBuffer(commandPool);
 }
 
-Triangle::~Triangle()
+Core::Polygon::~Polygon()
 {
 	delete(_indexBuffer);
 	delete(_vertexBuffer);
 }
 
-void Triangle::DrawFrame(VkCommandBuffer commandBuffer) const
+void Core::Polygon::BindBuffers(VkCommandBuffer commandBuffer) const
 {
-    VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer()};
-    VkDeviceSize offsets[] = { 0 };
+	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
+	VkDeviceSize offsets[] = { 0 };
 
 	//hack : optimizable with https://developer.nvidia.com/vulkan-memory-management
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-	
-	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
+	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
+}
+
+void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer) const
+{
 	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 }
 
-void Triangle::CreateVertexBuffer(VkCommandPool commandPool)
+void Core::Polygon::CreateVertexBuffer(VkCommandPool commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_vertices[0]) * _vertices.size();
 
@@ -51,7 +63,7 @@ void Triangle::CreateVertexBuffer(VkCommandPool commandPool)
 	_vertexBuffer->CopyBuffer(commandPool, stagingBuffer.GetBuffer(), bufferSize);
 }
 
-void Triangle::CreateIndexBuffer(VkCommandPool commandPool)
+void Core::Polygon::CreateIndexBuffer(VkCommandPool commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_indices[0]) * _indices.size();
 

@@ -3,6 +3,21 @@
 
 namespace Core
 {
+	struct ModelBufferObject
+	{
+		alignas(16) mat4 Model;
+	};
+
+	class ModelUniformBuffer : public UniformBuffer
+	{
+	public:
+		ModelUniformBuffer();
+	protected:
+		void MapBufferMemory(void* uniformBufferMapped) override;
+	private:
+		ModelBufferObject _bufferObject;
+	};
+
 	struct MVPBufferObject
 	{
 		alignas(16) mat4 Model;
