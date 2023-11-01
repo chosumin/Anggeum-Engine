@@ -4,15 +4,13 @@ namespace Core
 {
 	class Pipeline;
 	class SwapChain;
-	class UniformBuffer;
-	class Polygon;
 	class CommandBuffer
 	{
 	public:
 		CommandBuffer();
 		~CommandBuffer();
 
-		void RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain, UniformBuffer& uniformBuffer, Polygon& polygon);
+		void RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain);
 		void EndFrame(Pipeline& pipeline, SwapChain& swapChain);
 		VkCommandPool GetCommandPool() { return _commandPool; }
 		uint32_t GetCurrentFrame() { return _currentFrame; }
@@ -21,7 +19,7 @@ namespace Core
 		void CreateCommandPool();
 		void CreateCommandBuffers();
 		void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-			Pipeline& pipeline, SwapChain& swapChain, Polygon& polygon);
+			Pipeline& pipeline, SwapChain& swapChain);
 		void EndCommandBuffer(VkCommandBuffer commandBuffer);
 		void CreateSyncObjects();
 	private:

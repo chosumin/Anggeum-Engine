@@ -143,12 +143,12 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="CommandBuffer.cpp" />
     <ClCompile Include="IDescriptor.cpp" />
+    <ClCompile Include="Polygon.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MVPUniformBuffer.cpp" />
     <ClCompile Include="Texture.cpp" />
-    <ClCompile Include="Triangle.cpp" />
     <ClCompile Include="Pipeline.cpp" />
     <ClCompile Include="SwapChain.cpp" />
     <ClCompile Include="UniformBuffer.cpp" />
@@ -160,12 +160,12 @@
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="CommandBuffer.h" />
     <ClInclude Include="IDescriptor.h" />
+    <ClInclude Include="Polygon.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="MVPUniformBuffer.h" />
     <ClInclude Include="Texture.h" />
-    <ClInclude Include="Triangle.h" />
     <ClInclude Include="Pipeline.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SwapChain.h" />

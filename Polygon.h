@@ -5,14 +5,13 @@ struct Vertex;
 namespace Core
 {
 	class Buffer;
-	class Transform;
+	struct Transform;
 	class Polygon
 	{
 	public:
 		Polygon(VkCommandPool commandPool, vec3 position);
 		~Polygon();
 
-		void BindBuffers(VkCommandBuffer commandBuffer) const;
 		void DrawFrame(VkCommandBuffer commandBuffer) const;
 	private:
 		void CreateVertexBuffer(VkCommandPool commandPool);

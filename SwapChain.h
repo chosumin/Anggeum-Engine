@@ -40,6 +40,7 @@ namespace Core
 		VkImage _depthImage;
 		VkDeviceMemory _depthImageMemory;
 		VkImageView _depthImageView;
+		array<VkClearValue, 2> _clearValues{};
 	};
 }
 

@@ -2,8 +2,6 @@
 #include "CommandBuffer.h"
 #include "Pipeline.h"
 #include "SwapChain.h"
-#include "UniformBuffer.h"
-#include "Polygon.h"
 
 Core::CommandBuffer::CommandBuffer()
 {
@@ -26,8 +24,7 @@ Core::CommandBuffer::~CommandBuffer()
     vkDestroyCommandPool(device, _commandPool, nullptr);
 }
 
-void Core::CommandBuffer::RecordCommandBuffer(
-    Pipeline& pipeline, SwapChain& swapChain, UniformBuffer& uniformBuffer, Polygon& polygon)
+void Core::CommandBuffer::RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain)
 {
     auto device = Device::Instance().GetDevice();
 
@@ -45,14 +42,11 @@ void Core::CommandBuffer::RecordCommandBuffer(
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw runtime_error("failed to acquire swap chain image!");
 
-    //hack : updateUniformBuffer(currentFrame);
-    uniformBuffer.Update(_currentFrame);
-
     vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 
     vkResetCommandBuffer(_commandBuffers[_currentFrame], 0);
 
-    RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain, polygon);
+    RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain);
 }
 
 void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
@@ -130,7 +124,7 @@ void Core::CommandBuffer::CreateCommandBuffers()
 }
 
 void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-    Pipeline& pipeline, SwapChain& swapChain, Polygon& polygon)
+    Pipeline& pipeline, SwapChain& swapChain)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -151,16 +145,10 @@ void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uin
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    //hack : bind vertexbuffers
-    //hack : bind indexbuffers
-    polygon.BindBuffers(commandBuffer);
-
     vkCmdBindDescriptorSets(
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline.GetPipelineLayout(), 0, 1,
         pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);
-
-    polygon.DrawFrame(commandBuffer);
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)

@@ -45,11 +45,11 @@ Application::~Application()
 
 void Application::DrawFrame()
 {
-	_commandBuffer->RecordCommandBuffer(*_pipeline, *_swapChain, *_mvpBuffer, *_polygon);
+	_commandBuffer->RecordCommandBuffer(*_pipeline, *_swapChain);
 	{
-		/*_mvpBuffer->Update(_commandBuffer->GetCurrentFrame());
+		_mvpBuffer->Update(_commandBuffer->GetCurrentFrame());
 
-		_polygon->DrawFrame(_commandBuffer->GetCommandBuffer());*/
+		_polygon->DrawFrame(_commandBuffer->GetCommandBuffer());
 	}
 	_commandBuffer->EndFrame(*_pipeline, *_swapChain);
 }

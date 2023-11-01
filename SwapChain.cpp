@@ -253,12 +253,11 @@ VkRenderPassBeginInfo Core::SwapChain::CreateRenderPassBeginInfo(uint32_t imageI
     renderPassInfo.renderArea.offset = { 0, 0 };
     renderPassInfo.renderArea.extent = _swapChainExtent;
 
-    array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-    clearValues[1].depthStencil = { 1.0f, 0 };
+    _clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    _clearValues[1].depthStencil = { 1.0f, 0 };
 
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(_clearValues.size());
+    renderPassInfo.pClearValues = _clearValues.data();
 
     return renderPassInfo;
 }

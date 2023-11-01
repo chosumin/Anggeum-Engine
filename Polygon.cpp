@@ -30,7 +30,7 @@ Core::Polygon::~Polygon()
 	delete(_vertexBuffer);
 }
 
-void Core::Polygon::BindBuffers(VkCommandBuffer commandBuffer) const
+void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer) const
 {
 	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
 	VkDeviceSize offsets[] = { 0 };
@@ -39,10 +39,7 @@ void Core::Polygon::BindBuffers(VkCommandBuffer commandBuffer) const
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
 	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
-}
 
-void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer) const
-{
 	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 }
 
