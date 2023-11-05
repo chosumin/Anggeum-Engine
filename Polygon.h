@@ -9,21 +9,18 @@ namespace Core
 	class Polygon
 	{
 	public:
-		Polygon(VkCommandPool commandPool, vec3 position);
+		Polygon(VkCommandPool commandPool, vec3 position, string modelPath);
 		~Polygon();
 
 		void DrawFrame(VkCommandBuffer commandBuffer) const;
 	private:
+		void LoadModel(const string& modelPath);
 		void CreateVertexBuffer(VkCommandPool commandPool);
 		void CreateIndexBuffer(VkCommandPool commandPool);
 	private:
 		//clockwise.
 		vector<Vertex> _vertices;
-		vector<uint16_t> _indices = 
-		{ 
-			0, 1, 2, 2, 3, 0, 
-			4, 5, 6, 6, 7, 4
-		};
+		vector<uint32_t> _indices;
 
 		Core::Buffer* _vertexBuffer;
 		Core::Buffer* _indexBuffer;

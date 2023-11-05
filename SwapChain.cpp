@@ -229,7 +229,7 @@ void Core::SwapChain::CreateFramebuffers()
 void Core::SwapChain::RecreateSwapChain()
 {
     int width = 0, height = 0;
-    glfwGetFramebufferSize(Window::Instance().GetWindow(), &width, &height);
+
     while (width == 0 || height == 0) {
         glfwGetFramebufferSize(Window::Instance().GetWindow(), &width, &height);
         glfwWaitEvents();
@@ -241,6 +241,7 @@ void Core::SwapChain::RecreateSwapChain()
 
     CreateSwapChain();
     CreateImageViews();
+    CreateDepthResources();
     CreateFramebuffers();
 }
 

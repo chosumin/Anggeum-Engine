@@ -9,6 +9,8 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
@@ -30,7 +32,7 @@ using namespace glm;
 #include <cstdint>
 #include <limits>
 #include <array>
-
+#include <unordered_map>
 using namespace std;
 
 #include "Device.h"

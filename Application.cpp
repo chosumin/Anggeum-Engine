@@ -20,14 +20,14 @@ Application::Application()
 	_commandBuffer = new Core::CommandBuffer();
 
 	_texture = new Core::Texture(_commandBuffer->GetCommandPool(),
-		"Textures/Anggeum.jpg", Core::TextureFormat::Rgb_alpha);
+		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha);
 
 	_pipeline = new Core::Pipeline(
 		_swapChain->GetRenderPass(),
 		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv",
 		{ _mvpBuffer, _texture });
 
-	_polygon = new Core::Polygon(_commandBuffer->GetCommandPool(), vec3());
+	_polygon = new Core::Polygon(_commandBuffer->GetCommandPool(), vec3(), "Models/viking_room.obj");
 }
 
 Application::~Application()

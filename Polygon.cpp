@@ -5,20 +5,15 @@
 #include "Buffer.h"
 #include "Transform.h"
 
-Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position)
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position, string modelPath)
 {
 	_transform = make_unique<Transform>();
 	_transform->Position = position;
 
-	_vertices.push_back({ {-0.5f, -0.5f, 0.0f}, { 1.0f, 0.0f, 0.0f }, {1.0f, 0.0f} });
-	_vertices.push_back({ {0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f} });
-	_vertices.push_back({ {0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} });
-	_vertices.push_back({ {-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f} });
-
-	_vertices.push_back({ {-0.5f, -0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } });
-	_vertices.push_back({ {0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f} });
-	_vertices.push_back({ {0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} });
-	_vertices.push_back({ {-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f} });
+	LoadModel(modelPath);
 
 	CreateVertexBuffer(commandPool);
 	CreateIndexBuffer(commandPool);
@@ -38,9 +33,53 @@ void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer) const
 	//hack : optimizable with https://developer.nvidia.com/vulkan-memory-management
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
+}
+
+void Core::Polygon::LoadModel(const string& modelPath)
+{
+	tinyobj::attrib_t attrib;
+	vector<tinyobj::shape_t> shapes;
+	vector<tinyobj::material_t> materials;
+	string warn, err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, modelPath.c_str()))
+		throw runtime_error(warn + err);
+
+	unordered_map<Vertex, uint32_t> uniqueVertices;
+
+	for (const auto& shape : shapes)
+	{
+		for (const auto& index : shape.mesh.indices)
+		{
+			Vertex vertex{};
+
+			vertex.Pos =
+			{
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.TexCoord =
+			{
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.Color = { 1.0f, 1.0f, 1.0f };
+
+			if (uniqueVertices.count(vertex) == 0)
+			{
+				uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
+				_vertices.push_back(vertex);
+			}
+
+			_indices.push_back(uniqueVertices[vertex]);
+		}
+	}
 }
 
 void Core::Polygon::CreateVertexBuffer(VkCommandPool commandPool)

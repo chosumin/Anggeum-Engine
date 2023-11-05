@@ -20,7 +20,7 @@ Core::MVPUniformBuffer::MVPUniformBuffer(float width, float height)
 
 void Core::MVPUniformBuffer::MapBufferMemory(void* uniformBufferMapped)
 {
-	static auto startTime = chrono::high_resolution_clock::now();
+	/*static auto startTime = chrono::high_resolution_clock::now();
 
 	auto currentTime = chrono::high_resolution_clock::now();
 	float time = chrono::duration<float, chrono::seconds::period>(currentTime - startTime).count();
@@ -28,7 +28,7 @@ void Core::MVPUniformBuffer::MapBufferMemory(void* uniformBufferMapped)
 	_bufferObject.Model = glm::rotate(
 		glm::mat4(1.0f),
 		time * glm::radians(90.0f),
-		glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::vec3(0.0f, 0.0f, 1.0f));*/
 
 	//copy the buffer to the buffer memory
 	memcpy(uniformBufferMapped, &_bufferObject, sizeof(_bufferObject));
