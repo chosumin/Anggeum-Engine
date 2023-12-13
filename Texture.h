@@ -26,12 +26,15 @@ namespace Core
 			VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 		void CreateTextureImageView();
 		void CreateTextureSampler();
+		void GenerateMipmaps(VkCommandPool commandPool,
+			VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 	private:
 		VkImage _textureImage;
 		VkDeviceMemory _textureImageMemory;
 		VkImageView _textureImageView;
 		VkSampler _textureSampler;
 		VkDescriptorImageInfo _imageInfo;
+		uint32_t _mipLevels;
 	};
 }
 

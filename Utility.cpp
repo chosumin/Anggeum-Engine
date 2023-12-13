@@ -42,7 +42,7 @@ void Core::Utility::EndSingleTimeCommands(
 }
 
 VkImageView Core::Utility::CreateImageView(
-    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
 {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -51,7 +51,7 @@ VkImageView Core::Utility::CreateImageView(
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.levelCount = mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
@@ -92,7 +92,7 @@ bool Core::Utility::HasStencilComponent(VkFormat format)
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-void Core::Utility::CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+void Core::Utility::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -100,7 +100,7 @@ void Core::Utility::CreateImage(uint32_t width, uint32_t height, VkFormat format
     imageInfo.extent.width = width;
     imageInfo.extent.height = height;
     imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
+    imageInfo.mipLevels = mipLevels;
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
@@ -140,10 +140,11 @@ void Core::Utility::CreateImage(uint32_t width, uint32_t height, VkFormat format
     vkBindImageMemory(device, image, imageMemory, 0);
 }
 
-void Core::Utility::TransitionImageLayout(VkCommandPool commandPool, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+void Core::Utility::TransitionImageLayout(VkCommandPool commandPool, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
 {
     VkCommandBuffer commandBuffer = Utility::BeginSingleTimeCommands(commandPool);
 
+    //모든 밉맵 이미지에 같은 레이아웃을 적용.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
@@ -153,15 +154,14 @@ void Core::Utility::TransitionImageLayout(VkCommandPool commandPool, VkImage ima
     barrier.image = image;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = 0; // TODO
-    barrier.dstAccessMask = 0; // TODO
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
+    //tranfer writes that don't need to wait on anything.
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
         newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
