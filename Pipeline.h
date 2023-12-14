@@ -3,10 +3,11 @@
 namespace Core
 {
 	class IDescriptor;
+	class SwapChain;
 	class Pipeline
 	{
 	public:
-		Pipeline(VkRenderPass renderPass, 
+		Pipeline(const SwapChain& swapChain,
 			const string& vertFilePath, const string& fragFilePath,
 			vector<IDescriptor*> descriptors);
 		~Pipeline();
@@ -18,9 +19,9 @@ namespace Core
 		static vector<char> ReadFile(const string& filePath);
 
 		void CreateGraphicsPipeline(
-			VkDevice& device, VkRenderPass& renderPass, 
+			VkDevice& device, VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples,
 			const string& vertFilePath, const string& fragFilePath);
-		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code);
+		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code) const;
 
 		void CreateDescriptors(vector<IDescriptor*> descriptors);
 		void CreateDescriptorSetLayout(vector<IDescriptor*> descriptors);

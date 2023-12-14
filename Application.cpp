@@ -23,7 +23,7 @@ Application::Application()
 		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha);
 
 	_pipeline = new Core::Pipeline(
-		_swapChain->GetRenderPass(),
+		*_swapChain,
 		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv",
 		{ _mvpBuffer, _texture });
 

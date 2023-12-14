@@ -1,16 +1,17 @@
 #include "stdafx.h"
 #include "Pipeline.h"
+#include "SwapChain.h"
 #include "Vertex.h"
 #include "IDescriptor.h"
 
-Core::Pipeline::Pipeline(VkRenderPass renderPass,
+Core::Pipeline::Pipeline(const SwapChain& swapChain,
 	const string& vertFilePath, const string& fragFilePath,
 	vector<IDescriptor*> descriptors)
 {
 	auto vkDevice = Device::Instance().GetDevice();
 
 	CreateDescriptors(descriptors);
-	CreateGraphicsPipeline(vkDevice, renderPass,
+	CreateGraphicsPipeline(vkDevice, swapChain.GetRenderPass(), swapChain.GetMSAASamples(),
 		vertFilePath, fragFilePath);
 }
 
@@ -42,7 +43,7 @@ vector<char> Core::Pipeline::ReadFile(const string& filePath)
 }
 
 void Core::Pipeline::CreateGraphicsPipeline(
-	VkDevice& device, VkRenderPass& renderPass,
+	VkDevice& device, VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples,
 	const string& vertFilePath, const string& fragFilePath)
 {
 	auto vertShaderCode = ReadFile(vertFilePath);
@@ -101,9 +102,9 @@ void Core::Pipeline::CreateGraphicsPipeline(
 
 	VkPipelineMultisampleStateCreateInfo multisampling{};
 	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisampling.minSampleShading = 1.0f; // Optional
+	multisampling.sampleShadingEnable = VK_TRUE;
+	multisampling.rasterizationSamples = msaaSamples;
+	multisampling.minSampleShading = 0.2f;
 	multisampling.pSampleMask = nullptr; // Optional
 	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
 	multisampling.alphaToOneEnable = VK_FALSE; // Optional
@@ -192,7 +193,7 @@ void Core::Pipeline::CreateGraphicsPipeline(
 	vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
-VkShaderModule Core::Pipeline::CreateShaderModule(VkDevice& device, const vector<char>& code)
+VkShaderModule Core::Pipeline::CreateShaderModule(VkDevice& device, const vector<char>& code) const
 {
 	VkShaderModuleCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

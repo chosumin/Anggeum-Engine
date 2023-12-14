@@ -92,7 +92,10 @@ bool Core::Utility::HasStencilComponent(VkFormat format)
     return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-void Core::Utility::CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+void Core::Utility::CreateImage(
+    uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
+    VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
+    VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -104,14 +107,12 @@ void Core::Utility::CreateImage(uint32_t width, uint32_t height, uint32_t mipLev
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
+    imageInfo.samples = numSamples;
 
     //VK_IMAGE_LAYOUT_PREINITIALIZED, the first transition will preserve the texels.
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = usage;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    //only relevant for images that will be used as attachments.
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
     //related to sparse images, such as 3D texture for a voxel terrain.
     imageInfo.flags = 0;
