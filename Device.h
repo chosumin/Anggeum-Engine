@@ -11,10 +11,10 @@ namespace Core
 
 	struct QueueFamilyIndices
 	{
-		optional<uint32_t> GraphicsFamily;
+		optional<uint32_t> GraphicsAndComputeFamily;
 		optional<uint32_t> PresentFamily;
 
-		bool IsComplete() { return GraphicsFamily.has_value() && PresentFamily.has_value(); }
+		bool IsComplete() { return GraphicsAndComputeFamily.has_value() && PresentFamily.has_value(); }
 	};
 
 	class Window;
@@ -77,6 +77,7 @@ namespace Core
 		VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 		VkDevice _device;
 		VkQueue _graphicsQueue;
+		VkQueue _computeQueue;
 		VkQueue _presentQueue;
 		VkSurfaceKHR _surface;
 

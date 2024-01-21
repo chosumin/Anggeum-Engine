@@ -12,7 +12,7 @@ namespace Core
 		}
 		static bool FramebufferResized;
 	public:
-		void Initialize(int width, int height, const string& windowName);
+		void Initialize(int width, int height, const string& windowName, void* application);
 		void Delete();
 
 		bool IsClosed();
@@ -28,8 +28,6 @@ namespace Core
 		Window();
 		~Window();
 	private:
-		void InitWindow();
-
 		static void FramebufferResizeCallback(GLFWwindow* window, int width, int height)
 		{
 			FramebufferResized = true;

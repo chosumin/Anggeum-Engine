@@ -141,9 +141,18 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CommandBuffer.cpp" />
+    <ClCompile Include="Component.cpp" />
+    <ClCompile Include="DebugInfo.cpp" />
+    <ClCompile Include="FreeCamera.cpp" />
     <ClCompile Include="IDescriptor.cpp" />
+    <ClCompile Include="InputEvents.cpp" />
+    <ClCompile Include="Object.cpp" />
+    <ClCompile Include="PerspectiveCamera.cpp" />
     <ClCompile Include="Polygon.cpp" />
+    <ClCompile Include="timer.cpp" />
+    <ClCompile Include="Transform.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="main.cpp" />
@@ -158,9 +167,19 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="Buffer.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="CommandBuffer.h" />
+    <ClInclude Include="Component.h" />
+    <ClInclude Include="DebugInfo.h" />
+    <ClInclude Include="FreeCamera.h" />
     <ClInclude Include="IDescriptor.h" />
+    <ClInclude Include="InputEvents.h" />
+    <ClInclude Include="Keycodes.h" />
+    <ClInclude Include="Object.h" />
+    <ClInclude Include="PerspectiveCamera.h" />
     <ClInclude Include="Polygon.h" />
+    <ClInclude Include="timer.h" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="main.h" />

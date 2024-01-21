@@ -66,7 +66,8 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
 }
 
 Core::Device::Device()
-    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface()
+    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(),
+    _computeQueue()
 {
 }
 
@@ -247,8 +248,9 @@ Core::QueueFamilyIndices Core::Device::FindQueueFamilies(VkPhysicalDevice device
         if (indices.IsComplete())
             break;
 
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            indices.GraphicsFamily = i;
+        if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+            (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+            indices.GraphicsAndComputeFamily = i;
 
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
@@ -308,7 +310,7 @@ void Core::Device::CreateLogicalDevice()
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = 
-        { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
+        { indices.GraphicsAndComputeFamily.value(), indices.PresentFamily.value() };
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) 
@@ -346,7 +348,8 @@ void Core::Device::CreateLogicalDevice()
         throw std::runtime_error("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(_device, indices.GraphicsFamily.value(), 0, &_graphicsQueue);
+    vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_graphicsQueue);
+    vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_computeQueue);
     vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
 }
 

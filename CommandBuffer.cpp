@@ -102,7 +102,7 @@ void Core::CommandBuffer::CreateCommandPool()
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
+    poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsAndComputeFamily.value();
 
     auto device = Device::Instance().GetDevice();
     if (vkCreateCommandPool(device, &poolInfo, nullptr, &_commandPool) != VK_SUCCESS)

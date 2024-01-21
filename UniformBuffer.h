@@ -7,7 +7,7 @@ namespace Core
 	class UniformBuffer : public IDescriptor
 	{
 	public:
-		UniformBuffer(VkDeviceSize bufferSize);
+		UniformBuffer(VkDeviceSize bufferSize, uint32_t binding);
 		~UniformBuffer();
 
 		void Update(uint32_t currentImage);
@@ -24,6 +24,7 @@ namespace Core
 		vector<void*> _uniformBuffersMapped;
 		vector<unique_ptr<Buffer>> _buffers;
 		VkDescriptorBufferInfo _bufferInfo;
+		uint32_t _binding;
 	};
 }
 

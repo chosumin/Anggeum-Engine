@@ -15,6 +15,9 @@
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 using namespace glm;
 
 #include <chrono>
@@ -33,9 +36,12 @@ using namespace glm;
 #include <limits>
 #include <array>
 #include <unordered_map>
+#include <typeindex>
+#include <typeinfo>
 using namespace std;
 
 #include "Device.h"
 #include "Window.h"
+#include "InputEvents.h"
 
 const int MAX_FRAMES_IN_FLIGHT = 2;

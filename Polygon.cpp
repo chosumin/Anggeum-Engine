@@ -4,14 +4,17 @@
 #include "CommandBuffer.h"
 #include "Buffer.h"
 #include "Transform.h"
+#include "MVPUniformBuffer.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position, string modelPath)
+Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position, string modelPath, ModelUniformBuffer* buffer)
 {
+	_buffer = buffer;
+
 	_transform = make_unique<Transform>();
-	_transform->Position = position;
+	_transform->SetTranslation(position);
 
 	LoadModel(modelPath);
 
@@ -25,8 +28,11 @@ Core::Polygon::~Polygon()
 	delete(_vertexBuffer);
 }
 
-void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer) const
+void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const
 {
+	_buffer->BufferObject = _transform->GetMatrix();
+	_buffer->Update(index);
+
 	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
 	VkDeviceSize offsets[] = { 0 };
 
@@ -91,6 +97,7 @@ void Core::Polygon::CreateVertexBuffer(VkCommandPool commandPool)
 
 	stagingBuffer.CopyBuffer(_vertices.data(), bufferSize);
 
+	//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
 	_vertexBuffer = new Core::Buffer(bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);

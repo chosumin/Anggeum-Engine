@@ -3,8 +3,8 @@
 #include "SwapChain.h"
 #include "Buffer.h"
 
-Core::UniformBuffer::UniformBuffer(VkDeviceSize bufferSize)
-	:_bufferSize(bufferSize)
+Core::UniformBuffer::UniformBuffer(VkDeviceSize bufferSize, uint32_t binding)
+	:_bufferSize(bufferSize), _binding(binding)
 {
 	CreateUniformBuffer();
 }
@@ -21,7 +21,7 @@ void Core::UniformBuffer::Update(uint32_t currentImage)
 VkDescriptorSetLayoutBinding Core::UniformBuffer::CreateDescriptorSetLayoutBinding()
 {
 	VkDescriptorSetLayoutBinding uboLayoutBinding{};
-	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.binding = _binding;
 	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uboLayoutBinding.descriptorCount = 1;
 	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -38,7 +38,7 @@ VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)
 
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstBinding = _binding;
 	descriptorWrite.dstArrayElement = 0;
 	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorWrite.descriptorCount = 1;

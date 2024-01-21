@@ -5,14 +5,15 @@ struct Vertex;
 namespace Core
 {
 	class Buffer;
-	struct Transform;
+	class Transform;
+	class ModelUniformBuffer;
 	class Polygon
 	{
 	public:
-		Polygon(VkCommandPool commandPool, vec3 position, string modelPath);
+		Polygon(VkCommandPool commandPool, vec3 position, string modelPath, ModelUniformBuffer* buffer);
 		~Polygon();
 
-		void DrawFrame(VkCommandBuffer commandBuffer) const;
+		void DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const;
 	private:
 		void LoadModel(const string& modelPath);
 		void CreateVertexBuffer(VkCommandPool commandPool);
@@ -26,5 +27,6 @@ namespace Core
 		Core::Buffer* _indexBuffer;
 
 		unique_ptr<Transform> _transform;
+		ModelUniformBuffer* _buffer;
 	};
 }
