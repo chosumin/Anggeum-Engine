@@ -1,15 +1,18 @@
 #pragma once
 #include "UniformBuffer.h"
+#include "Component.h"
 
 namespace Core
 {
-	class Transform;
-	class PerspectiveCamera : public UniformBuffer
+	class PerspectiveCamera : public UniformBuffer, public Component
 	{
 	public:
-		PerspectiveCamera(const std::string& name, 
-			float width, float height, weak_ptr<Transform> transform);
+		PerspectiveCamera(Entity& entity, float width, float height);
 		virtual ~PerspectiveCamera() = default;
+
+		virtual type_index GetType() override;
+		virtual void UpdateFrame(float deltaTime) override;
+		virtual void Resize(uint32_t width, uint32_t height) override;
 
 		void SetAspectRatio(float aspectRatio);
 		void SetFieldOfView(float fov);
@@ -38,8 +41,6 @@ namespace Core
 		float _nearPlane{ 0.1f };
 
 		glm::mat4 _preRotation{ 1.0f };
-
-		weak_ptr<Transform> _transform;
 	};
 }
 

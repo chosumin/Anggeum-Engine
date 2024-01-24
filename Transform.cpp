@@ -2,7 +2,8 @@
 #include "Transform.h"
 #include <glm/gtx/matrix_decompose.hpp>
 
-Core::Transform::Transform()
+Core::Transform::Transform(Entity& entity)
+	:Component(entity)
 {
 }
 
@@ -69,6 +70,14 @@ glm::mat4 Core::Transform::GetMatrix() const
 void Core::Transform::InvalidateWorldMatrix()
 {
 	_updateWorldMatrix = true;
+}
+
+void Core::Transform::Resize(uint32_t width, uint32_t height)
+{
+}
+
+void Core::Transform::UpdateFrame(float deltaTime)
+{
 }
 
 //void Core::Transform::UpdateWorldTransform()

@@ -9,11 +9,11 @@ namespace Core
 	class SwapChain;
 	class CommandBuffer;
 	class Texture;
-	class Polygon;
-	class Camera;
+	class Mesh;
 	class Timer;
 	class Window;
 	class ModelUniformBuffer;
+	class Scene;
 }
 
 struct ApplicationOptions
@@ -28,10 +28,9 @@ public:
 	Application();
 	~Application();
 
-	virtual bool Prepare(const ApplicationOptions& options);
-	virtual void Update();
-	virtual void Finish();
-	virtual void InputEvent(const Core::InputEvent& inputEvent);
+	bool Prepare(const ApplicationOptions& options);
+	void Update();
+	void Finish();
 	void DrawFrame();
 	void WaitIdle();
 protected:
@@ -51,13 +50,11 @@ private:
 	//todo : stats
 
 	unique_ptr<Core::Timer> _timer;
-	Core::Camera* _camera;
+	//Core::Camera* _camera;
 	Core::Pipeline* _pipeline;
 	Core::SwapChain* _swapChain;
 	Core::CommandBuffer* _commandBuffer;
 
-	Core::Polygon* _polygon;
-	Core::Polygon* _polygon2;
-	Core::ModelUniformBuffer* _buffer;
-	Core::Texture* _texture;
+	Core::Scene* _scene;
+	Core::Mesh* _Mesh;
 };

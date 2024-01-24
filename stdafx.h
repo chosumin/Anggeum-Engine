@@ -38,6 +38,8 @@ using namespace glm;
 #include <unordered_map>
 #include <typeindex>
 #include <typeinfo>
+#include <assert.h>
+#include <queue>
 using namespace std;
 
 #include "Device.h"

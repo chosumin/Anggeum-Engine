@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Window.h"
 #include "Application.h"
+#include "InputEvents.h"
 
 #define KeyCode Core::KeyCode
 #define KeyAction Core::KeyAction
@@ -174,29 +175,46 @@ void key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int
 	KeyCode   key_code = translate_key_code(key);
 	KeyAction key_action = translate_key_action(action);
 
-	if (auto application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
-	{
-		application->InputEvent(Core::KeyInputEvent{ key_code, key_action });
-	}
+	Core::Input::InputEvent(Core::KeyInputEvent{ key_code, key_action });
+	//if (auto application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
+	//{
+	//	application->InputEvent(Core::KeyInputEvent{ key_code, key_action });
+	//}
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
+	Core::Input::InputEvent(Core::MouseButtonInputEvent{
+			MouseButton::Unknown,
+			MouseAction::Move,
+			static_cast<float>(xpos),
+			static_cast<float>(ypos) });
+
+	/*if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
 	{
 		application->InputEvent(Core::MouseButtonInputEvent{
 			MouseButton::Unknown,
 			MouseAction::Move,
 			static_cast<float>(xpos),
 			static_cast<float>(ypos) });
-	}
+	}*/
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int /*mods*/)
 {
 	MouseAction mouse_action = translate_mouse_action(action);
 
-	if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos);
+
+	Core::Input::InputEvent(Core::MouseButtonInputEvent{
+			translate_mouse_button(button),
+			mouse_action,
+			static_cast<float>(xpos),
+			static_cast<float>(ypos) });
+
+
+	/*if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
 	{
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
@@ -206,7 +224,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int /*mod
 			mouse_action,
 			static_cast<float>(xpos),
 			static_cast<float>(ypos) });
-	}
+	}*/
 }
 
 Core::Window::Window()

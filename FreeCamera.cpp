@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "FreeCamera.h"
 #include "Transform.h"
+#include "InputEvents.h"
+#include "Entity.h"
+using namespace Core;
 
 const float Core::FreeCamera::TOUCH_DOWN_MOVE_FORWARD_WAIT_TIME = 2.0f;
 const float Core::FreeCamera::ROTATION_MOVE_WEIGHT = 1.0f;
@@ -9,9 +12,9 @@ const float Core::FreeCamera::TRANSLATION_MOVE_WEIGHT = 3.0f;
 const float Core::FreeCamera::TRANSLATION_MOVE_STEP = 5.0f;
 const uint32_t Core::FreeCamera::TRANSLATION_MOVE_SPEED = 3;
 
-Core::FreeCamera::FreeCamera(weak_ptr<Transform> transform)
+Core::FreeCamera::FreeCamera(Entity& entity)
+	:Component(entity)
 {
-	_transform = transform;
 }
 
 void Core::FreeCamera::UpdateFrame(float deltaTime)
@@ -21,69 +24,72 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 
 	float mulTranslation = _speedMultiplier;
 
-	if (_keyPressed[KeyCode::W])
+	auto& keyPressed = Core::Input::KeyPressed;
+	if (keyPressed[KeyCode::W])
 	{
 		deltaTranslation.z -= TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::S])
+	if (keyPressed[KeyCode::S])
 	{
 		deltaTranslation.z += TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::A])
+	if (keyPressed[KeyCode::A])
 	{
 		deltaTranslation.x -= TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::D])
+	if (keyPressed[KeyCode::D])
 	{
 		deltaTranslation.x += TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::Q])
+	if (keyPressed[KeyCode::Q])
 	{
 		deltaTranslation.y -= TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::E])
+	if (keyPressed[KeyCode::E])
 	{
 		deltaTranslation.y += TRANSLATION_MOVE_STEP;
 	}
-	if (_keyPressed[KeyCode::LeftControl])
+	if (keyPressed[KeyCode::LeftControl])
 	{
 		mulTranslation *= (1.0f * TRANSLATION_MOVE_SPEED);
 	}
-	if (_keyPressed[KeyCode::LeftShift])
+	if (keyPressed[KeyCode::LeftShift])
 	{
 		mulTranslation *= (1.0f / TRANSLATION_MOVE_SPEED);
 	}
 
-	if (_keyPressed[KeyCode::I])
+	if (keyPressed[KeyCode::I])
 	{
 		deltaRotation.x += KEY_ROTATION_MOVE_WEIGHT;
 	}
-	if (_keyPressed[KeyCode::K])
+	if (keyPressed[KeyCode::K])
 	{
 		deltaRotation.x -= KEY_ROTATION_MOVE_WEIGHT;
 	}
-	if (_keyPressed[KeyCode::J])
+	if (keyPressed[KeyCode::J])
 	{
 		deltaRotation.y += KEY_ROTATION_MOVE_WEIGHT;
 	}
-	if (_keyPressed[KeyCode::L])
+	if (keyPressed[KeyCode::L])
 	{
 		deltaRotation.y -= KEY_ROTATION_MOVE_WEIGHT;
 	}
 
-	if (_mouseButtonPressed[MouseButton::Left] && _mouseButtonPressed[MouseButton::Right])
+	auto& mouseButtonPressed = Core::Input::MouseButtonPressed;
+	auto& mouseMoveDelta = Core::Input::MouseMoveDelta;
+	if (mouseButtonPressed[MouseButton::Left] && mouseButtonPressed[MouseButton::Right])
 	{
-		deltaRotation.z += TRANSLATION_MOVE_WEIGHT * _mouseMoveDelta.x;
+		deltaRotation.z += TRANSLATION_MOVE_WEIGHT * mouseMoveDelta.x;
 	}
-	else if (_mouseButtonPressed[MouseButton::Right])
+	else if (mouseButtonPressed[MouseButton::Right])
 	{
-		deltaRotation.x -= ROTATION_MOVE_WEIGHT * _mouseMoveDelta.y;
-		deltaRotation.y -= ROTATION_MOVE_WEIGHT * _mouseMoveDelta.x;
+		deltaRotation.x -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.y;
+		deltaRotation.y -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.x;
 	}
-	else if (_mouseButtonPressed[MouseButton::Left])
+	else if (mouseButtonPressed[MouseButton::Left])
 	{
-		deltaTranslation.x += TRANSLATION_MOVE_WEIGHT * _mouseMoveDelta.x;
-		deltaTranslation.y += TRANSLATION_MOVE_WEIGHT * -_mouseMoveDelta.y;
+		deltaTranslation.x += TRANSLATION_MOVE_WEIGHT * mouseMoveDelta.x;
+		deltaTranslation.y += TRANSLATION_MOVE_WEIGHT * -mouseMoveDelta.y;
 	}
 
 	deltaTranslation *= mulTranslation * deltaTime;
@@ -92,58 +98,15 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 	// Only re-calculate the transform if it's changed
 	if (deltaRotation != glm::vec3(0.0f, 0.0f, 0.0f) || deltaTranslation != glm::vec3(0.0f, 0.0f, 0.0f))
 	{
-		//auto& transform = get_node().get_component<Transform>();
-		auto transform = _transform.lock();
-
+		auto& transform = _entity.GetComponent<Transform>();
+		
 		glm::quat qx = glm::angleAxis(deltaRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
 		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
 
-		glm::quat orientation = glm::normalize(qy * transform->GetRotation() * qx);
+		glm::quat orientation = glm::normalize(qy * transform.GetRotation() * qx);
 
-		transform->SetTranslation(transform->GetTranslation() + deltaTranslation * glm::conjugate(orientation));
-		transform->SetRotation(orientation);
-	}
-
-	_mouseMoveDelta = {};
-}
-
-void Core::FreeCamera::InputEvent(const Core::InputEvent& inputEvent)
-{
-	if (inputEvent.GetSource() == EventSource::Keyboard)
-	{
-		const auto& key_event = static_cast<const KeyInputEvent&>(inputEvent);
-
-		if (key_event.GetAction() == KeyAction::Down ||
-			key_event.GetAction() == KeyAction::Repeat)
-		{
-			_keyPressed[key_event.GetCode()] = true;
-		}
-		else
-		{
-			_keyPressed[key_event.GetCode()] = false;
-		}
-	}
-	else if (inputEvent.GetSource() == EventSource::Mouse)
-	{
-		const auto& mouse_button = static_cast<const MouseButtonInputEvent&>(inputEvent);
-
-		glm::vec2 mouse_pos{ floor(mouse_button.GetPosX()), floor(mouse_button.GetPosY()) };
-
-		if (mouse_button.GetAction() == MouseAction::Down)
-		{
-			_mouseButtonPressed[mouse_button.GetButton()] = true;
-		}
-
-		if (mouse_button.GetAction() == MouseAction::Up)
-		{
-			_mouseButtonPressed[mouse_button.GetButton()] = false;
-		}
-
-		if (mouse_button.GetAction() == MouseAction::Move)
-		{
-			_mouseMoveDelta = mouse_pos - _mouseLastPos;
-			_mouseLastPos = mouse_pos;
-		}
+		transform.SetTranslation(transform.GetTranslation() + deltaTranslation * glm::conjugate(orientation));
+		transform.SetRotation(orientation);
 	}
 }
 
@@ -158,4 +121,9 @@ void Core::FreeCamera::Resize(uint32_t width, uint32_t height)
 			camera->set_aspect_ratio(static_cast<float>(width) / height);
 		}
 	}*/
+}
+
+type_index Core::FreeCamera::GetType()
+{
+	return typeid(FreeCamera);
 }

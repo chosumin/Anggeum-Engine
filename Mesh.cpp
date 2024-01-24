@@ -1,20 +1,25 @@
 #include "stdafx.h"
-#include "Polygon.h"
+#include "Mesh.h"
 #include "Vertex.h"
 #include "CommandBuffer.h"
 #include "Buffer.h"
 #include "Transform.h"
 #include "MVPUniformBuffer.h"
+#include "InputEvents.h"
+#include "Texture.h"
+#include "IDescriptor.h"
+#include "Entity.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position, string modelPath, ModelUniformBuffer* buffer)
+Core::Mesh::Mesh(Entity& entity, VkCommandPool commandPool, string modelPath)
+	:Component(entity)
 {
-	_buffer = buffer;
+	_buffer = new Core::ModelUniformBuffer();
 
-	_transform = make_unique<Transform>();
-	_transform->SetTranslation(position);
+	_texture = new Core::Texture(commandPool,
+		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha);
 
 	LoadModel(modelPath);
 
@@ -22,15 +27,48 @@ Core::Polygon::Polygon(VkCommandPool commandPool, vec3 position, string modelPat
 	CreateIndexBuffer(commandPool);
 }
 
-Core::Polygon::~Polygon()
+Core::Mesh::~Mesh()
 {
 	delete(_indexBuffer);
 	delete(_vertexBuffer);
+	delete(_texture);
+	delete(_buffer);
 }
 
-void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const
+void Core::Mesh::UpdateFrame(float deltaTime)
 {
-	_buffer->BufferObject = _transform->GetMatrix();
+	auto& transform = _entity.GetComponent<Transform>();
+	if (Core::Input::KeyPressed[KeyCode::B])
+	{
+		_type = _type == 0 ? 1 : 0;
+		quat q = quat();
+		transform.SetRotation(q);
+	}
+
+	if (_type == 0)
+	{
+		vec3 deltaRotation(0.0f, 0.0f, 0.0f);
+		deltaRotation.y -= 1.0f;
+		deltaRotation *= deltaTime;
+		glm::quat qx = glm::angleAxis(deltaRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::quat orientation = glm::normalize(qy * transform.GetRotation() * qx);
+		transform.SetRotation(orientation);
+	}
+	else
+	{
+		auto& rot = transform.GetRotation();
+		auto euler = eulerAngles(rot);
+		float angle = euler.y - deltaTime;
+		auto a = rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
+		transform.SetMatrix(a);
+	}
+
+	_buffer->BufferObject = transform.GetMatrix();
+}
+
+void Core::Mesh::DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const
+{
 	_buffer->Update(index);
 
 	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
@@ -44,7 +82,15 @@ void Core::Polygon::DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) con
 	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 }
 
-void Core::Polygon::LoadModel(const string& modelPath)
+vector<Core::IDescriptor*> Core::Mesh::GetDescriptors() const
+{
+	vector<Core::IDescriptor*> vec;
+	vec.push_back(_buffer);
+	vec.push_back(_texture);
+	return vec;
+}
+
+void Core::Mesh::LoadModel(const string& modelPath)
 {
 	tinyobj::attrib_t attrib;
 	vector<tinyobj::shape_t> shapes;
@@ -88,7 +134,7 @@ void Core::Polygon::LoadModel(const string& modelPath)
 	}
 }
 
-void Core::Polygon::CreateVertexBuffer(VkCommandPool commandPool)
+void Core::Mesh::CreateVertexBuffer(VkCommandPool commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_vertices[0]) * _vertices.size();
 
@@ -106,7 +152,7 @@ void Core::Polygon::CreateVertexBuffer(VkCommandPool commandPool)
 	_vertexBuffer->CopyBuffer(commandPool, stagingBuffer.GetBuffer(), bufferSize);
 }
 
-void Core::Polygon::CreateIndexBuffer(VkCommandPool commandPool)
+void Core::Mesh::CreateIndexBuffer(VkCommandPool commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_indices[0]) * _indices.size();
 
@@ -121,4 +167,13 @@ void Core::Polygon::CreateIndexBuffer(VkCommandPool commandPool)
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	_indexBuffer->CopyBuffer(commandPool, stagingBuffer.GetBuffer(), bufferSize);
+}
+
+std::type_index Core::Mesh::GetType()
+{
+	return typeid(Mesh);
+}
+
+void Core::Mesh::Resize(uint32_t width, uint32_t height)
+{
 }

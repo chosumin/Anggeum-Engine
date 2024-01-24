@@ -5,8 +5,6 @@
 
 namespace Core
 {
-	class Platform;
-
 	enum class EventSource
 	{
 		Keyboard,
@@ -181,5 +179,16 @@ namespace Core
 		MouseAction action;
 		float pos_x;
 		float pos_y;
+	};
+
+	class Input
+	{
+	public:
+		static unordered_map<KeyCode, bool> KeyPressed;
+		static unordered_map<MouseButton, bool> MouseButtonPressed;
+		static vec2 MouseMoveDelta;
+		static vec2 MouseLastPos;
+
+		static void InputEvent(const Core::InputEvent& inputEvent);
 	};
 }

@@ -1,10 +1,11 @@
 #include "stdafx.h"
 #include "PerspectiveCamera.h"
 #include "Transform.h"
+#include "Entity.h"
 
-Core::PerspectiveCamera::PerspectiveCamera(const std::string& name,
-	float width, float height, weak_ptr<Transform> transform)
-	:UniformBuffer(sizeof(VPBufferObject), 0)
+Core::PerspectiveCamera::PerspectiveCamera(
+	Entity& entity, float width, float height)
+	:UniformBuffer(sizeof(VPBufferObject), 0), Component(entity)
 {
 	_matrices.View = lookAt(
 		vec3(2.0f, 2.0f, 2.0f),
@@ -12,13 +13,18 @@ Core::PerspectiveCamera::PerspectiveCamera(const std::string& name,
 		vec3(0.0f, 0.0f, 1.0f));
 
 	_matrices.Perspective = perspective(
-		radians(45.0f),
+		radians(60.0f),
 		width / height,
 		0.1f, 10.0f);
 	_matrices.Perspective[1][1] *= -1;
 
-	_transform = transform;
-	_transform.lock()->SetMatrix(_matrices.View);
+	auto& transform = entity.GetComponent<Transform>();
+	transform.SetMatrix(_matrices.View);
+}
+
+type_index Core::PerspectiveCamera::GetType()
+{
+	return typeid(PerspectiveCamera);
 }
 
 void Core::PerspectiveCamera::SetAspectRatio(float aspectRatio)
@@ -83,7 +89,15 @@ void Core::PerspectiveCamera::SetPreRotation(const glm::mat4& pre_rotation)
 
 void Core::PerspectiveCamera::MapBufferMemory(void* uniformBufferMapped)
 {
-	auto transform = *_transform.lock();
+	auto& transform = _entity.GetComponent<Transform>();
 	_matrices.View = transform.GetMatrix();
 	memcpy(uniformBufferMapped, &_matrices, sizeof(_matrices));
+}
+
+void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
+{
+}
+
+void Core::PerspectiveCamera::Resize(uint32_t width, uint32_t height)
+{
 }
