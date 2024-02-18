@@ -9,6 +9,7 @@
 #include "Texture.h"
 #include "IDescriptor.h"
 #include "Entity.h"
+#include "Pipeline.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -37,7 +38,7 @@ Core::Mesh::~Mesh()
 
 void Core::Mesh::UpdateFrame(float deltaTime)
 {
-	auto& transform = _entity.GetComponent<Transform>();
+	/*auto& transform = _entity.GetComponent<Transform>();
 	if (Core::Input::KeyPressed[KeyCode::B])
 	{
 		_type = _type == 0 ? 1 : 0;
@@ -64,22 +65,52 @@ void Core::Mesh::UpdateFrame(float deltaTime)
 		transform.SetMatrix(a);
 	}
 
-	_buffer->BufferObject = transform.GetMatrix();
+	_buffer->BufferObject = transform.GetMatrix();*/
 }
 
-void Core::Mesh::DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const
+void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const
 {
-	_buffer->Update(index);
+	auto cmd = commandBuffer.GetCommandBuffer();
 
 	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
 	VkDeviceSize offsets[] = { 0 };
 
 	//hack : optimizable with https://developer.nvidia.com/vulkan-memory-management
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+	vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
-	vkCmdBindIndexBuffer(commandBuffer, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+	vkCmdBindIndexBuffer(cmd, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
+	auto& transform = _entity.GetComponent<Transform>();
+
+	transform.SetTranslation(vec3());
+	_buffer->BufferObject = transform.GetMatrix();
+	{
+		uint32_t index = commandBuffer.GetCurrentFrame();
+
+		_buffer->Update(index);
+
+		vkCmdBindDescriptorSets(
+			cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipeline.GetPipelineLayout(), 0, 1,
+			pipeline.GetDescriptorSet(index), 0, nullptr);
+
+		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
+	}
+
+	transform.SetTranslation(vec3(1.0f, 0.0f, 0.0f));
+	_buffer->BufferObject = transform.GetMatrix();
+	{
+		uint32_t index = commandBuffer.GetCurrentFrame();
+
+		_buffer->Update(index);
+
+		vkCmdBindDescriptorSets(
+			cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipeline.GetPipelineLayout(), 0, 1,
+			pipeline.GetDescriptorSet(index), 0, nullptr);
+
+		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
+	}
 }
 
 vector<Core::IDescriptor*> Core::Mesh::GetDescriptors() const

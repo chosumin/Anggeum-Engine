@@ -57,7 +57,19 @@ namespace Core
 		vector<T*> GetComponents() const
 		{
 			vector<T*> result;
-			if (HasComponent(typeid(T)))
+
+			if (typeid(T) == typeid(Component))
+			{
+				for (auto& components : _components)
+				{
+					auto& scene_components = components.second;
+					for (auto& sceneComponent : scene_components)
+					{
+						result.push_back(dynamic_cast<T*>(sceneComponent.get()));
+					}
+				}
+			}
+			else if (HasComponent(typeid(T)))
 			{
 				auto& scene_components = GetComponents(typeid(T));
 

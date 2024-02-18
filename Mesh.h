@@ -9,6 +9,8 @@ namespace Core
 	class ModelUniformBuffer;
 	class Texture;
 	class IDescriptor;
+	class Pipeline;
+	class CommandBuffer;
 	class Mesh : public Component
 	{
 	public:
@@ -19,7 +21,7 @@ namespace Core
 		virtual std::type_index GetType() override;
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
-		void DrawFrame(VkCommandBuffer commandBuffer, uint32_t index) const;
+		void DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const;
 
 		vector<IDescriptor*> GetDescriptors() const;
 	private:

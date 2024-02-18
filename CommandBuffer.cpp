@@ -144,11 +144,6 @@ void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uin
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    vkCmdBindDescriptorSets(
-        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipeline.GetPipelineLayout(), 0, 1,
-        pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)

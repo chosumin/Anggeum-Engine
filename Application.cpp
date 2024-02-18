@@ -92,11 +92,6 @@ Application::~Application()
 	Core::Window::Instance().Delete();
 }
 
-//DebugInfo& Core::Application::GetDebugInfo()
-//{
-//	
-//}
-
 void Application::DrawFrame()
 {
 	auto cameras = _scene->GetComponents<Core::PerspectiveCamera>();
@@ -111,7 +106,7 @@ void Application::DrawFrame()
 		auto meshes = _scene->GetComponents<Core::Mesh>();
 
 		for(auto mesh : meshes)
-			mesh->DrawFrame(_commandBuffer->GetCommandBuffer(), _commandBuffer->GetCurrentFrame());
+			mesh->DrawFrame(*_commandBuffer, *_pipeline);
 	}
 	_commandBuffer->EndFrame(*_pipeline, *_swapChain);
 }
