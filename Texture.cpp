@@ -6,7 +6,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat format)
+Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat format, uint32_t binding)
+	:_binding(binding)
 {
 	int texWidth, texHeight, texChannels;
 
@@ -68,7 +69,7 @@ Core::Texture::~Texture()
 VkDescriptorSetLayoutBinding Core::Texture::CreateDescriptorSetLayoutBinding()
 {
 	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-	samplerLayoutBinding.binding = 2;
+	samplerLayoutBinding.binding = _binding;
 	samplerLayoutBinding.descriptorCount = 1;
 	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	samplerLayoutBinding.pImmutableSamplers = nullptr;
@@ -85,7 +86,7 @@ VkWriteDescriptorSet Core::Texture::CreateWriteDescriptorSet(size_t index)
 
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstBinding = 2;
+	descriptorWrite.dstBinding = _binding;
 	descriptorWrite.dstArrayElement = 0;
 	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	descriptorWrite.descriptorCount = 1;

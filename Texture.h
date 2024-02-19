@@ -15,7 +15,7 @@ namespace Core
 	class Texture : public IDescriptor
 	{
 	public:
-		Texture(VkCommandPool commandPool, string fileName, TextureFormat format);
+		Texture(VkCommandPool commandPool, string fileName, TextureFormat format, uint32_t binding);
 		~Texture();
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
@@ -35,6 +35,7 @@ namespace Core
 		VkSampler _textureSampler;
 		VkDescriptorImageInfo _imageInfo;
 		uint32_t _mipLevels;
+		uint32_t _binding;
 	};
 }
 

@@ -4,12 +4,12 @@
 #include "CommandBuffer.h"
 #include "Buffer.h"
 #include "Transform.h"
-#include "MVPUniformBuffer.h"
 #include "InputEvents.h"
 #include "Texture.h"
 #include "IDescriptor.h"
 #include "Entity.h"
 #include "Pipeline.h"
+#include "IPushConstant.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -17,10 +17,10 @@
 Core::Mesh::Mesh(Entity& entity, VkCommandPool commandPool, string modelPath)
 	:Component(entity)
 {
-	_buffer = new Core::ModelUniformBuffer();
+	_modelPushConstant = new Core::ModelPushConstant();
 
 	_texture = new Core::Texture(commandPool,
-		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha);
+		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
 
 	LoadModel(modelPath);
 
@@ -33,39 +33,11 @@ Core::Mesh::~Mesh()
 	delete(_indexBuffer);
 	delete(_vertexBuffer);
 	delete(_texture);
-	delete(_buffer);
+	delete(_modelPushConstant);
 }
 
 void Core::Mesh::UpdateFrame(float deltaTime)
 {
-	/*auto& transform = _entity.GetComponent<Transform>();
-	if (Core::Input::KeyPressed[KeyCode::B])
-	{
-		_type = _type == 0 ? 1 : 0;
-		quat q = quat();
-		transform.SetRotation(q);
-	}
-
-	if (_type == 0)
-	{
-		vec3 deltaRotation(0.0f, 0.0f, 0.0f);
-		deltaRotation.y -= 1.0f;
-		deltaRotation *= deltaTime;
-		glm::quat qx = glm::angleAxis(deltaRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-		glm::quat orientation = glm::normalize(qy * transform.GetRotation() * qx);
-		transform.SetRotation(orientation);
-	}
-	else
-	{
-		auto& rot = transform.GetRotation();
-		auto euler = eulerAngles(rot);
-		float angle = euler.y - deltaTime;
-		auto a = rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
-		transform.SetMatrix(a);
-	}
-
-	_buffer->BufferObject = transform.GetMatrix();*/
 }
 
 void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const
@@ -82,43 +54,35 @@ void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) con
 
 	auto& transform = _entity.GetComponent<Transform>();
 
-	transform.SetTranslation(vec3());
-	_buffer->BufferObject = transform.GetMatrix();
+	/*transform.SetTranslation(vec3());
+	_modelPushConstant->Matrix = transform.GetMatrix();
 	{
 		uint32_t index = commandBuffer.GetCurrentFrame();
 
-		_buffer->Update(index);
-
-		vkCmdBindDescriptorSets(
-			cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline.GetPipelineLayout(), 0, 1,
-			pipeline.GetDescriptorSet(index), 0, nullptr);
+		vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), _modelPushConstant);
 
 		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
-	}
+	}*/
 
 	transform.SetTranslation(vec3(1.0f, 0.0f, 0.0f));
-	_buffer->BufferObject = transform.GetMatrix();
+	_modelPushConstant->Matrix = transform.GetMatrix();
 	{
 		uint32_t index = commandBuffer.GetCurrentFrame();
 
-		_buffer->Update(index);
-
-		vkCmdBindDescriptorSets(
-			cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline.GetPipelineLayout(), 0, 1,
-			pipeline.GetDescriptorSet(index), 0, nullptr);
+		vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), _modelPushConstant);
 
 		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 	}
 }
 
-vector<Core::IDescriptor*> Core::Mesh::GetDescriptors() const
+Core::IDescriptor* Core::Mesh::GetDescriptor() const
 {
-	vector<Core::IDescriptor*> vec;
-	vec.push_back(_buffer);
-	vec.push_back(_texture);
-	return vec;
+	return _texture;
+}
+
+Core::ModelPushConstant* Core::Mesh::GetPushConstant() const
+{
+	return _modelPushConstant;
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)

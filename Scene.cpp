@@ -33,7 +33,7 @@ void Core::Scene::AddComponent(unique_ptr<Component>&& component)
 {
 	if (component)
 	{
-		_components[component->GetType()].push_back(std::move(component));
+		_components[component->GetType()].push_back(move(component));
 	}
 }
 
@@ -47,14 +47,28 @@ void Core::Scene::AddComponent(unique_ptr<Component>&& component, Entity& entity
 	}
 }
 
-void Core::Scene::SetComponents(const type_index& type_info, vector<unique_ptr<Component>>&& components)
+void Core::Scene::SetComponents(const type_index& typeInfo, vector<unique_ptr<Component>>&& components)
 {
-	_components[type_info] = std::move(components);
+	_components[typeInfo] = std::move(components);
 }
 
-const vector<unique_ptr<Core::Component>>& Core::Scene::GetComponents(const type_index& type_info) const
+const vector<unique_ptr<Core::Component>>& Core::Scene::GetComponents(const type_index& typeInfo) const
 {
-	return _components.at(type_info);
+	if (typeInfo == typeid(Component))
+	{
+		/*vector<unique_ptr<Component>> sceneComponents;
+
+		for (auto& components : _components)
+		{
+			auto& comps = components.second;
+			sceneComponents.insert(sceneComponents.end(), 
+				comps.begin(), comps.end());
+		}
+
+		return sceneComponents;*/
+	}
+
+	return _components.at(typeInfo);
 }
 
 bool Core::Scene::HasComponent(const type_index& type_info) const

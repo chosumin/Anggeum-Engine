@@ -4,12 +4,14 @@ namespace Core
 {
 	class IDescriptor;
 	class SwapChain;
+	class IPushConstant;
 	class Pipeline
 	{
 	public:
 		Pipeline(const SwapChain& swapChain,
 			const string& vertFilePath, const string& fragFilePath,
-			vector<IDescriptor*> descriptors);
+			vector<IDescriptor*> descriptors,
+			vector<IPushConstant*> pushConstants);
 		~Pipeline();
 
 		VkPipeline GetGraphicsPipeline() { return _graphicsPipeline; }
@@ -27,12 +29,15 @@ namespace Core
 		void CreateDescriptorSetLayout(vector<IDescriptor*> descriptors);
 		void CreateDescriptorPool(vector<IDescriptor*> descriptors);
 		void CreateDescriptorSets(vector<IDescriptor*> descriptors);
+
+		void CreatePushConstants(vector<IPushConstant*> pushConstants);
 	private:
 		VkPipelineLayout _pipelineLayout;
 		VkPipeline _graphicsPipeline;
 		VkDescriptorSetLayout _descriptorSetLayout;
 		VkDescriptorPool _descriptorPool;
 		vector<VkDescriptorSet> _descriptorSets;
+		vector<VkPushConstantRange> _pushConstants;
 	};
 }
 

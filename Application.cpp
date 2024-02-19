@@ -6,7 +6,7 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "timer.h"
-#include "MVPUniformBuffer.h"
+#include "IPushConstant.h"
 #include "SampleScene.h"
 #include "Component.h"
 #include "PerspectiveCamera.h"
@@ -30,18 +30,23 @@ Application::Application()
 	auto meshes = _scene->GetComponents<Core::Mesh>();
 
 	vector<Core::IDescriptor*> descriptors{};
+	vector<Core::IPushConstant*> pushConstants{};
+
 	for (auto cam : cams)
 		descriptors.push_back(cam);
+
 	for (auto mesh : meshes)
 	{
-		auto descs = mesh->GetDescriptors();
-		descriptors.insert(descriptors.end(), descs.begin(), descs.end());
+		auto desc = mesh->GetDescriptor();
+		descriptors.push_back(desc);
+
+		pushConstants.push_back(mesh->GetPushConstant());
 	}
 
 	_pipeline = new Core::Pipeline(
 		*_swapChain,
 		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv",
-		descriptors);
+		descriptors, pushConstants);
 }
 
 bool Application::Prepare(const ApplicationOptions& options)

@@ -3,14 +3,17 @@
 #include "SwapChain.h"
 #include "Vertex.h"
 #include "IDescriptor.h"
+#include "IPushConstant.h"
 
 Core::Pipeline::Pipeline(const SwapChain& swapChain,
 	const string& vertFilePath, const string& fragFilePath,
-	vector<IDescriptor*> descriptors)
+	vector<IDescriptor*> descriptors,
+	vector<IPushConstant*> pushConstants)
 {
 	auto vkDevice = Device::Instance().GetDevice();
 
 	CreateDescriptors(descriptors);
+	CreatePushConstants(pushConstants);
 	CreateGraphicsPipeline(vkDevice, swapChain.GetRenderPass(), swapChain.GetMSAASamples(),
 		vertFilePath, fragFilePath);
 }
@@ -162,8 +165,10 @@ void Core::Pipeline::CreateGraphicsPipeline(
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-	pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+
+	pipelineLayoutInfo.pushConstantRangeCount = 
+		static_cast<uint32_t>(_pushConstants.size());
+	pipelineLayoutInfo.pPushConstantRanges = _pushConstants.data();
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) 
 		throw std::runtime_error("failed to create pipeline layout!");
@@ -297,5 +302,16 @@ void Core::Pipeline::CreateDescriptorSets(vector<IDescriptor*> descriptors)
 			Device::Instance().GetDevice(),
 			static_cast<uint32_t>(descriptorWrites.size()),
 			descriptorWrites.data(), 0, nullptr);
+	}
+}
+
+void Core::Pipeline::CreatePushConstants(
+	vector <Core::IPushConstant* > pushConstants)
+{
+	uint32_t offset = 0;
+	for (auto& pushConstant : pushConstants)
+	{
+		pushConstant->SetOffset(offset);
+		_pushConstants.push_back(pushConstant->GetPushConstantRange());
 	}
 }

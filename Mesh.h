@@ -6,9 +6,10 @@ struct Vertex;
 namespace Core
 {
 	class Buffer;
-	class ModelUniformBuffer;
+	class ModelPushConstants;
 	class Texture;
 	class IDescriptor;
+	class ModelPushConstant;
 	class Pipeline;
 	class CommandBuffer;
 	class Mesh : public Component
@@ -23,7 +24,8 @@ namespace Core
 
 		void DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const;
 
-		vector<IDescriptor*> GetDescriptors() const;
+		IDescriptor* GetDescriptor() const;
+		ModelPushConstant* GetPushConstant() const;
 	private:
 		void LoadModel(const string& modelPath);
 		void CreateVertexBuffer(VkCommandPool commandPool);
@@ -33,12 +35,10 @@ namespace Core
 		vector<Vertex> _vertices;
 		vector<uint32_t> _indices;
 
-		Core::Buffer* _vertexBuffer;
-		Core::Buffer* _indexBuffer;
+		Buffer* _vertexBuffer;
+		Buffer* _indexBuffer;
 
-		ModelUniformBuffer* _buffer;
-		Core::Texture* _texture;
-
-		int _type = 0;
+		ModelPushConstant* _modelPushConstant;
+		Texture* _texture;
 	};
 }

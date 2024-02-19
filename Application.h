@@ -12,7 +12,6 @@ namespace Core
 	class Mesh;
 	class Timer;
 	class Window;
-	class ModelUniformBuffer;
 	class Scene;
 }
 
