@@ -160,7 +160,6 @@
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="IPushConstant.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Pipeline.cpp" />
     <ClCompile Include="SwapChain.cpp" />

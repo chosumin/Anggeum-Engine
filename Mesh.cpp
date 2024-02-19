@@ -14,6 +14,36 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+Core::ModelPushConstant::ModelPushConstant()
+	:Buffer(), _offset(0)
+{
+}
+
+uint32_t Core::ModelPushConstant::GetSize() const
+{
+	return sizeof(ModelWorld);
+}
+
+VkPushConstantRange Core::ModelPushConstant::GetPushConstantRange() const
+{
+	VkPushConstantRange pushConstant;
+	pushConstant.offset = _offset;
+	pushConstant.size = GetSize();
+	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	return pushConstant;
+}
+
+uint32_t Core::ModelPushConstant::GetOffset() const
+{
+	return _offset;
+}
+
+void Core::ModelPushConstant::SetOffset(uint32_t offset)
+{
+	_offset = offset;
+}
+
 Core::Mesh::Mesh(Entity& entity, VkCommandPool commandPool, string modelPath)
 	:Component(entity)
 {
@@ -47,32 +77,19 @@ void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) con
 	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
 	VkDeviceSize offsets[] = { 0 };
 
+	auto& transform = _entity.GetComponent<Transform>();
+	_modelPushConstant->Buffer.World = transform.GetMatrix();
+
+	uint32_t index = commandBuffer.GetCurrentFrame();
+
 	//hack : optimizable with https://developer.nvidia.com/vulkan-memory-management
 	vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
 	vkCmdBindIndexBuffer(cmd, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-	auto& transform = _entity.GetComponent<Transform>();
+	vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), &_modelPushConstant->Buffer);
 
-	/*transform.SetTranslation(vec3());
-	_modelPushConstant->Matrix = transform.GetMatrix();
-	{
-		uint32_t index = commandBuffer.GetCurrentFrame();
-
-		vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), _modelPushConstant);
-
-		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
-	}*/
-
-	transform.SetTranslation(vec3(1.0f, 0.0f, 0.0f));
-	_modelPushConstant->Matrix = transform.GetMatrix();
-	{
-		uint32_t index = commandBuffer.GetCurrentFrame();
-
-		vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), _modelPushConstant);
-
-		vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
-	}
+	vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 }
 
 Core::IDescriptor* Core::Mesh::GetDescriptor() const

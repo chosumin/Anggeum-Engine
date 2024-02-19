@@ -27,19 +27,19 @@ namespace Core
 		 */
 		void SetComponents(const type_index& type_info, vector<unique_ptr<Component>>&& components);
 
-		///**
-		// * @brief Set list of components casted from the given template type
-		// */
-		//template <class T>
-		//void SetComponents(vector<unique_ptr<T>>&& components)
-		//{
-		//	vector<unique_ptr<Component>> result(components.size());
-		//	transform(components.begin(), components.end(), result.begin(),
-		//		[](unique_ptr<T>& component) -> unique_ptr<Component> {
-		//			return unique_ptr<Component>(move(component));
-		//		});
-		//	SetComponents(typeid(T), move(result));
-		//}
+		/**
+		 * @brief Set list of components casted from the given template type
+		 */
+		template <class T>
+		void SetComponents(vector<unique_ptr<T>>&& components)
+		{
+			vector<unique_ptr<Component>> result(components.size());
+			transform(components.begin(), components.end(), result.begin(),
+				[](unique_ptr<T>& component) -> unique_ptr<Component> {
+					return unique_ptr<Component>(move(component));
+				});
+			SetComponents(typeid(T), move(result));
+		}
 
 		/**
 		 * @brief Clears a list of components

@@ -1,5 +1,6 @@
 #pragma once
 #include "Component.h"
+#include "IPushConstant.h"
 
 struct Vertex;
 
@@ -12,6 +13,27 @@ namespace Core
 	class ModelPushConstant;
 	class Pipeline;
 	class CommandBuffer;
+
+	struct ModelWorld
+	{
+		alignas(16) mat4 World;
+	};
+
+	class ModelPushConstant : public IPushConstant
+	{
+	public:
+		ModelPushConstant();
+
+		virtual uint32_t GetSize() const;
+		virtual VkPushConstantRange GetPushConstantRange() const override;
+		virtual uint32_t GetOffset() const;
+		virtual void SetOffset(uint32_t offset);
+	public:
+		ModelWorld Buffer;
+	private:
+		uint32_t _offset;
+	};
+
 	class Mesh : public Component
 	{
 	public:

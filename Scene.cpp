@@ -54,20 +54,6 @@ void Core::Scene::SetComponents(const type_index& typeInfo, vector<unique_ptr<Co
 
 const vector<unique_ptr<Core::Component>>& Core::Scene::GetComponents(const type_index& typeInfo) const
 {
-	if (typeInfo == typeid(Component))
-	{
-		/*vector<unique_ptr<Component>> sceneComponents;
-
-		for (auto& components : _components)
-		{
-			auto& comps = components.second;
-			sceneComponents.insert(sceneComponents.end(), 
-				comps.begin(), comps.end());
-		}
-
-		return sceneComponents;*/
-	}
-
 	return _components.at(typeInfo);
 }
 
