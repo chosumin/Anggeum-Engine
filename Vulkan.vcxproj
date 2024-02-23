@@ -145,13 +145,16 @@
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="FreeCamera.cpp" />
     <ClCompile Include="IDescriptor.cpp" />
     <ClCompile Include="InputEvents.cpp" />
     <ClCompile Include="PerspectiveCamera.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="RenderContext.cpp" />
+    <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="RenderTarget.cpp" />
+    <ClCompile Include="SampleRenderPass.cpp" />
     <ClCompile Include="SampleScene.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneFactory.cpp" />
@@ -174,6 +177,7 @@
     <ClInclude Include="Component.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Entity.h" />
+    <ClInclude Include="Framebuffer.h" />
     <ClInclude Include="FreeCamera.h" />
     <ClInclude Include="IDescriptor.h" />
     <ClInclude Include="InputEvents.h" />
@@ -181,7 +185,9 @@
     <ClInclude Include="PerspectiveCamera.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="RenderContext.h" />
+    <ClInclude Include="RenderPass.h" />
     <ClInclude Include="RenderTarget.h" />
+    <ClInclude Include="SampleRenderPass.h" />
     <ClInclude Include="SampleScene.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneFactory.h" />

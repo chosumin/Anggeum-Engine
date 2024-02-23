@@ -13,6 +13,8 @@ namespace Core
 	class Timer;
 	class Window;
 	class Scene;
+	class RenderPass;
+	class Framebuffer;
 }
 
 struct ApplicationOptions
@@ -53,7 +55,8 @@ private:
 	Core::Pipeline* _pipeline;
 	Core::SwapChain* _swapChain;
 	Core::CommandBuffer* _commandBuffer;
-
+	Core::RenderPass* _renderPass;
+	Core::Framebuffer* _framebuffer;
 	Core::Scene* _scene;
 	Core::Mesh* _Mesh;
 };

@@ -1,0 +1,242 @@
+#include "stdafx.h"
+#include "RenderPass.h"
+#include "Utility.h"
+#include "SwapChain.h"
+
+namespace Core
+{
+	RenderPass::RenderPass(Device& device)
+        :_device{device}
+	{
+        _msaaSamples = GetMaxUsableSampleCount();
+	}
+
+	RenderPass::~RenderPass()
+	{
+        Cleanup();
+	}
+
+    void RenderPass::Cleanup()
+	{
+        auto device = _device.GetDevice();
+		for (size_t i = 0; i < _renderTargets.size(); ++i)
+		{
+			vkDestroyImageView(device, _renderTargets[i]->ImageView, nullptr);
+			vkDestroyImage(device, _renderTargets[i]->Image, nullptr);
+			vkFreeMemory(device, _renderTargets[i]->ImageMemory, nullptr);
+		}
+
+        vkDestroyRenderPass(device, _renderPass, nullptr);
+    }
+
+    void RenderPass::Resize(SwapChain& swapChain)
+    {
+        VkExtent2D extent = swapChain.GetSwapChainExtent();
+
+        if (_color != nullptr)
+        {
+            CreateColorRenderTarget(extent, _color->Format);
+        }
+
+        if (_depth != nullptr)
+        {
+            CreateDepthRenderTarget(extent);
+        }
+
+        for (auto& renderTarget : _renderTargets)
+        {
+            CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout);
+        }
+    }
+
+    void RenderPass::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout)
+    {
+        VkImage image;
+        VkImageView imageView;
+        VkDeviceMemory memory;
+
+        Utility::CreateImage(extent.width, extent.height, 1,
+            _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+
+        imageView = Utility::CreateImageView(image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+
+        auto renderTarget = make_unique<RenderTarget>();
+        renderTarget->Format = format;
+        renderTarget->Layout = layout;
+        renderTarget->Image = image;
+        renderTarget->ImageMemory = memory;
+        renderTarget->ImageView = imageView;
+
+		_renderTargets.emplace_back(move(renderTarget));
+	}
+
+	void RenderPass::CreateDepthRenderTarget(VkExtent2D extent)
+	{
+        VkImage image;
+        VkImageView imageView;
+        VkDeviceMemory memory;
+
+		auto depthFormat = Utility::FindSupportedFormat(
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+		Utility::CreateImage(extent.width, extent.height, 1,
+            _msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+
+        imageView = Utility::CreateImageView(image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+
+        _depth = make_unique<RenderTarget>();
+        _depth->Format = depthFormat;
+        _depth->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        _depth->Image = image;
+        _depth->ImageMemory = memory;
+        _depth->ImageView = imageView;
+    }
+
+    void RenderPass::CreateColorRenderTarget(VkExtent2D extent, VkFormat format)
+    {
+        VkImage image;
+        VkImageView imageView;
+        VkDeviceMemory memory;
+
+        //VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
+        //프레임버퍼에 사용되며, 싱글 렌더 패스 동안에만 존재함.
+        Utility::CreateImage(extent.width, extent.height, 1,
+            _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+
+        imageView = Utility::CreateImageView(
+            image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+        _color = make_unique<RenderTarget>();
+        _color->Format = format;
+        _color->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        _color->Image = image;
+        _color->ImageMemory = memory;
+        _color->ImageView = imageView;
+    }
+
+    void RenderPass::CreateRenderPass()
+	{
+        vector<VkAttachmentDescription> attachments;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+        if (_color != nullptr)
+        {
+            VkAttachmentDescription colorAttachment{};
+            colorAttachment.format = _color->Format;
+            colorAttachment.samples = _msaaSamples;
+            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            colorAttachment.finalLayout = _color->Layout;
+
+            attachments.push_back(colorAttachment);
+
+            VkAttachmentReference colorAttachmentRef{};
+            colorAttachmentRef.attachment = attachments.size() - 1;
+            colorAttachmentRef.layout = _color->Layout;
+
+            VkAttachmentDescription colorAttachmentResolve{};
+            colorAttachmentResolve.format = _color->Format;
+            colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+            colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            attachments.push_back(colorAttachmentResolve);
+
+            VkAttachmentReference colorAttachmentResolveRef{};
+            colorAttachmentResolveRef.attachment = attachments.size() - 1;
+            colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &colorAttachmentRef;
+            subpass.pResolveAttachments = &colorAttachmentResolveRef;
+        }
+
+        if (_depth != nullptr)
+        {
+            VkAttachmentDescription depthAttachment{};
+            depthAttachment.format = _depth->Format;
+            depthAttachment.samples = _msaaSamples;
+            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            depthAttachment.finalLayout = _depth->Layout;
+
+            attachments.push_back(depthAttachment);
+
+            VkAttachmentReference depthAttachmentRef{};
+            depthAttachmentRef.attachment = attachments.size() - 1;
+            depthAttachmentRef.layout = _depth->Layout;
+
+            subpass.pDepthStencilAttachment = &depthAttachmentRef;
+        }
+
+        //todo : add render targets.
+
+        VkSubpassDependency dependency{};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstStageMask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.dstAccessMask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+		auto device = Device::Instance().GetDevice();
+		if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
+			throw std::runtime_error("failed to create render pass!");
+	}
+
+    VkSampleCountFlagBits RenderPass::GetMaxUsableSampleCount()
+    {
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(
+            Device::Instance().GetPhysicalDevice(),
+            &physicalDeviceProperties);
+
+        VkSampleCountFlags counts =
+            physicalDeviceProperties.limits.framebufferColorSampleCounts &
+            physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+        if (counts & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+        if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+        if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+        if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+        if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+        if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+}

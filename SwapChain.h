@@ -8,7 +8,7 @@ namespace Core
 		SwapChain();
 		~SwapChain();
 
-		VkRenderPass GetRenderPass() const { return _renderPass; }
+		//VkRenderPass GetRenderPass() const { return _renderPass; }
 
 		VkSwapchainKHR GetSwapChain() const { return _swapChain; }
 		void RecreateSwapChain();
@@ -17,22 +17,19 @@ namespace Core
 		void GetViewportAndScissor(VkViewport& viewport, VkRect2D& scissor);
 		VkExtent2D GetSwapChainExtent() { return _swapChainExtent; }
 
-		VkSampleCountFlagBits GetMSAASamples() const { return _msaaSamples; }
+		size_t GetSwapChainCount() const { return _swapChainImages.size(); }
 	private:
 		void CreateSwapChain();
 		VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 		VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const vector<VkSurfaceFormatKHR>& availableFormats);
 		VkPresentModeKHR ChooseSwapPresentMode(const vector<VkPresentModeKHR>& availablePresentModes);
 
-		void CreateDepthResources();
-		void CreateFramebuffers();
-		void CreateColorResources();
+		//void CreateDepthResources();
+		//void CreateFramebuffers();
+		//void CreateColorResources();
 
 		void CreateImageViews();
-		void CreateRenderPass();
 		void CleanupSwapChain();
-		VkFormat FindDepthFormat();
-		VkSampleCountFlagBits GetMaxUsableSampleCount();
 	private:
 		VkSwapchainKHR _swapChain;
 		vector<VkImage> _swapChainImages;
@@ -40,19 +37,16 @@ namespace Core
 		VkExtent2D _swapChainExtent;
 		vector<VkImageView> _swapChainImageViews;
 		vector<VkFramebuffer> _swapChainFramebuffers;
-		VkRenderPass _renderPass;
 
-		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-
-		VkImage _depthImage;
+		/*VkImage _depthImage;
 		VkDeviceMemory _depthImageMemory;
 		VkImageView _depthImageView;
 
 		VkImage _colorImage;
 		VkDeviceMemory _colorImageMemory;
-		VkImageView _colorImageView;
+		VkImageView _colorImageView;*/
 
-		array<VkClearValue, 2> _clearValues{};
+		//array<VkClearValue, 2> _clearValues{};
 	};
 }
 

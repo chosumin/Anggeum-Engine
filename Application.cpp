@@ -10,6 +10,8 @@
 #include "SampleScene.h"
 #include "Component.h"
 #include "PerspectiveCamera.h"
+#include "RenderPass.h"
+#include "Framebuffer.h"
 
 Application::Application()
 {
@@ -19,9 +21,9 @@ Application::Application()
 	Core::Device::Instance().Initialize(Core::Window::Instance());
 
 	_swapChain = new Core::SwapChain();
-
 	auto swapCahinExtent = _swapChain->GetSwapChainExtent();
 
+	_renderPass = new Core::RenderPass(Core::Device::Instance());
 	_commandBuffer = new Core::CommandBuffer();
 
 	_scene = new SampleScene((float)swapCahinExtent.width, (float)swapCahinExtent.height, _commandBuffer->GetCommandPool());

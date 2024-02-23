@@ -37,6 +37,7 @@ void Core::CommandBuffer::RecordCommandBuffer(Pipeline& pipeline, SwapChain& swa
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         swapChain.RecreateSwapChain();
+        //todo : renderPass.Resize();
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -87,6 +88,8 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
     {
         Window::FramebufferResized = false;
+
+        //todo : renderPass.Resize();
         swapChain.RecreateSwapChain();
     }
     else if (result != VK_SUCCESS)

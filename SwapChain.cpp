@@ -4,7 +4,6 @@
 
 Core::SwapChain::SwapChain()
 {
-    _msaaSamples = GetMaxUsableSampleCount();
     CreateSwapChain();
     CreateImageViews();
     CreateColorResources();
@@ -339,18 +338,18 @@ void Core::SwapChain::CleanupSwapChain()
 {
     auto device = Device::Instance().GetDevice();
 
-    vkDestroyImageView(device, _depthImageView, nullptr);
-    vkDestroyImage(device, _depthImage, nullptr);
-    vkFreeMemory(device, _depthImageMemory, nullptr);
+    //vkDestroyImageView(device, _depthImageView, nullptr);
+    //vkDestroyImage(device, _depthImage, nullptr);
+    //vkFreeMemory(device, _depthImageMemory, nullptr);
 
-    vkDestroyImageView(device, _colorImageView, nullptr);
-    vkDestroyImage(device, _colorImage, nullptr);
-    vkFreeMemory(device, _colorImageMemory, nullptr);
+    //vkDestroyImageView(device, _colorImageView, nullptr);
+    //vkDestroyImage(device, _colorImage, nullptr);
+    //vkFreeMemory(device, _colorImageMemory, nullptr);
 
     for (auto framebuffer : _swapChainFramebuffers)
         vkDestroyFramebuffer(device, framebuffer, nullptr);
 
-    vkDestroyRenderPass(device, _renderPass, nullptr);
+    //vkDestroyRenderPass(device, _renderPass, nullptr);
 
     for (auto imageView : _swapChainImageViews)
         vkDestroyImageView(device, imageView, nullptr);
@@ -368,12 +367,4 @@ void Core::SwapChain::CreateDepthResources()
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage, _depthImageMemory);
 
     _depthImageView = Utility::CreateImageView(_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-}
-
-VkFormat Core::SwapChain::FindDepthFormat()
-{
-    return Utility::FindSupportedFormat(
-        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
