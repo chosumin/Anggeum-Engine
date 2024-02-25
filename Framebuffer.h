@@ -11,6 +11,11 @@ namespace Core
 		Framebuffer(Device& device, SwapChain& swapChain, RenderPass& renderPass);
 		virtual ~Framebuffer();
 
+		VkFramebuffer GetHandle(size_t imageIndex) const 
+		{
+			return _framebuffers[imageIndex];
+		}
+
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 	private:

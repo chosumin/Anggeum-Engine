@@ -2,18 +2,24 @@
 #include "Framebuffer.h"
 #include "RenderPass.h"
 #include "SwapChain.h"
+#include "CommandBuffer.h"
 
 Core::Framebuffer::Framebuffer(Device& device, SwapChain& swapChain, RenderPass& renderPass)
 	:_device{device}, _renderPass(renderPass)
 {
-    //todo : attachments
     //todo : renderPass
     CreateFramebuffers(swapChain);
+
+    auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
+    Core::CommandBuffer::AddResizeCallback(a);
 }
 
 Core::Framebuffer::~Framebuffer()
 {
     Cleanup();
+
+    auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
+    Core::CommandBuffer::RemoveResizeCallback(a);
 }
 
 void Core::Framebuffer::Cleanup()
@@ -24,17 +30,20 @@ void Core::Framebuffer::Cleanup()
 
 void Core::Framebuffer::Resize(SwapChain& swapChain)
 {
+    Cleanup();
     CreateFramebuffers(swapChain);
 }
 
 void Core::Framebuffer::CreateFramebuffers(SwapChain& swapChain)
 {
-    auto attachments = _renderPass.GetAttachments();
     VkExtent2D extent = swapChain.GetSwapChainExtent();
     _framebuffers.resize(swapChain.GetSwapChainCount());
 
     for (size_t i = 0; i < _framebuffers.size(); i++)
     {
+        auto attachments = 
+            _renderPass.GetAttachments(swapChain.GetImageView(i));
+
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = _renderPass.GetHandle();

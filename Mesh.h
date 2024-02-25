@@ -11,7 +11,7 @@ namespace Core
 	class Texture;
 	class IDescriptor;
 	class ModelPushConstant;
-	class Pipeline;
+	class Shader;
 	class CommandBuffer;
 
 	struct ModelWorld
@@ -44,7 +44,7 @@ namespace Core
 		virtual std::type_index GetType() override;
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
-		void DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const;
+		void DrawFrame(CommandBuffer& commandBuffer, Shader& shader) const;
 
 		IDescriptor* GetDescriptor() const;
 		ModelPushConstant* GetPushConstant() const;

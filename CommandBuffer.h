@@ -7,14 +7,29 @@ namespace Core
 	class CommandBuffer
 	{
 	public:
+		static void AddResizeCallback(function<void(SwapChain&)>);
+		static void RemoveResizeCallback(function<void(SwapChain&)>);
+	public:
 		CommandBuffer();
 		~CommandBuffer();
 
-		void RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain);
-		void EndFrame(Pipeline& pipeline, SwapChain& swapChain);
+		void BeginCommandBuffer();
+		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
+		void BindPipeline(VkPipelineBindPoint pipelineBindPoint,
+			VkPipeline pipeline);
+		void SetViewportAndScissor(VkViewport viewport, VkRect2D scissor);
+		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint,
+			VkPipelineLayout pipelineLayout, VkDescriptorSet* descriptorSet);
+		void RecordCommandBuffer(SwapChain& swapChain);
+		void EndFrame(SwapChain& swapChain);
 		VkCommandPool GetCommandPool() { return _commandPool; }
 		uint32_t GetCurrentFrame() { return _currentFrame; }
 		VkCommandBuffer GetCommandBuffer() { return _commandBuffers[_currentFrame]; }
+
+		uint32_t GetImageIndex() const 
+		{
+			return _imageIndex;
+		}
 	private:
 		void CreateCommandPool();
 		void CreateCommandBuffers();
@@ -22,6 +37,8 @@ namespace Core
 			Pipeline& pipeline, SwapChain& swapChain);
 		void EndCommandBuffer(VkCommandBuffer commandBuffer);
 		void CreateSyncObjects();
+	private:
+		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	private:
 		VkCommandPool _commandPool;
 		vector<VkCommandBuffer> _commandBuffers;

@@ -1,10 +1,12 @@
 #include "stdafx.h"
 #include "SampleRenderPass.h"
 
-Core::SampleRenderPass::SampleRenderPass(Device& device)
+Core::SampleRenderPass::SampleRenderPass(Device& device, VkExtent2D extent, VkFormat colorFormat)
 	:RenderPass(device)
 {
-	CreateColorRenderTarget
+	CreateColorRenderTarget(extent, colorFormat);
+	CreateDepthRenderTarget(extent);
+	CreateRenderPass();
 }
 
 Core::SampleRenderPass::~SampleRenderPass()

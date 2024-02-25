@@ -3,6 +3,30 @@
 #include "Pipeline.h"
 #include "SwapChain.h"
 
+vector<function<void(Core::SwapChain&)>> Core::CommandBuffer::_resizeCallbacks;
+
+void Core::CommandBuffer::AddResizeCallback(
+    function<void(SwapChain&)> callback)
+{
+    _resizeCallbacks.push_back(callback);
+}
+
+void Core::CommandBuffer::RemoveResizeCallback(
+    function<void(SwapChain&)> callback)
+{
+	for (auto it = _resizeCallbacks.begin();
+		it != _resizeCallbacks.end(); ++it) {
+		bool isSame = is_same<
+            decltype(*it), decltype(callback)>::value;
+
+        if (isSame)
+        {
+            _resizeCallbacks.erase(it);
+            return;
+        }
+    }
+}
+
 Core::CommandBuffer::CommandBuffer()
 {
     CreateCommandPool();
@@ -24,7 +48,40 @@ Core::CommandBuffer::~CommandBuffer()
     vkDestroyCommandPool(device, _commandPool, nullptr);
 }
 
-void Core::CommandBuffer::RecordCommandBuffer(Pipeline& pipeline, SwapChain& swapChain)
+void Core::CommandBuffer::BeginCommandBuffer()
+{
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(_commandBuffers[_currentFrame], &beginInfo) != VK_SUCCESS)
+        throw std::runtime_error("failed to begin recording command buffer!");
+}
+
+void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)
+{
+    vkCmdBeginRenderPass(_commandBuffers[_currentFrame], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void Core::CommandBuffer::BindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
+{
+    vkCmdBindPipeline(_commandBuffers[_currentFrame], pipelineBindPoint, pipeline);
+}
+
+void Core::CommandBuffer::SetViewportAndScissor(VkViewport viewport, VkRect2D scissor)
+{
+    vkCmdSetViewport(_commandBuffers[_currentFrame], 0, 1, &viewport);
+    vkCmdSetScissor(_commandBuffers[_currentFrame], 0, 1, &scissor);
+}
+
+void Core::CommandBuffer::BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout pipelineLayout, VkDescriptorSet* descriptorSet)
+{
+    vkCmdBindDescriptorSets(
+        _commandBuffers[_currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipelineLayout, 0, 1,
+        descriptorSet, 0, nullptr);
+}
+
+void Core::CommandBuffer::RecordCommandBuffer(SwapChain& swapChain)
 {
     auto device = Device::Instance().GetDevice();
 
@@ -37,7 +94,11 @@ void Core::CommandBuffer::RecordCommandBuffer(Pipeline& pipeline, SwapChain& swa
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         swapChain.RecreateSwapChain();
-        //todo : renderPass.Resize();
+
+        for (auto& resize : _resizeCallbacks)
+        {
+            resize(swapChain);
+        }
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -47,10 +108,10 @@ void Core::CommandBuffer::RecordCommandBuffer(Pipeline& pipeline, SwapChain& swa
 
     vkResetCommandBuffer(_commandBuffers[_currentFrame], 0);
 
-    RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain);
+    /*RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain);*/
 }
 
-void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
+void Core::CommandBuffer::EndFrame(SwapChain& swapChain)
 {
     EndCommandBuffer(_commandBuffers[_currentFrame]);
 
@@ -89,8 +150,11 @@ void Core::CommandBuffer::EndFrame(Pipeline& pipeline, SwapChain& swapChain)
     {
         Window::FramebufferResized = false;
 
-        //todo : renderPass.Resize();
         swapChain.RecreateSwapChain();
+        for (auto& resize : _resizeCallbacks)
+        {
+            resize(swapChain);
+        }
     }
     else if (result != VK_SUCCESS)
         throw runtime_error("failed to present swap chain image!");
@@ -129,29 +193,29 @@ void Core::CommandBuffer::CreateCommandBuffers()
 void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
     Pipeline& pipeline, SwapChain& swapChain)
 {
-    VkCommandBufferBeginInfo beginInfo{};
+    /*VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-        throw std::runtime_error("failed to begin recording command buffer!");
+        throw std::runtime_error("failed to begin recording command buffer!");*/
 
-    VkRenderPassBeginInfo renderPassInfo = swapChain.CreateRenderPassBeginInfo(imageIndex);
+    /*VkRenderPassBeginInfo renderPassInfo = swapChain.CreateRenderPassBeginInfo(imageIndex);
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);*/
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetGraphicsPipeline());
+    /*vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetGraphicsPipeline());*/
 
-    VkViewport viewport{};
+    /*VkViewport viewport{};
     VkRect2D scissor{};
     swapChain.GetViewportAndScissor(viewport, scissor);
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);*/
 
-    vkCmdBindDescriptorSets(
+    /*vkCmdBindDescriptorSets(
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline.GetPipelineLayout(), 0, 1,
-        pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);
+        pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);*/
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)

@@ -8,7 +8,7 @@
 #include "Texture.h"
 #include "IDescriptor.h"
 #include "Entity.h"
-#include "Pipeline.h"
+#include "Shader.h"
 #include "IPushConstant.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -70,7 +70,7 @@ void Core::Mesh::UpdateFrame(float deltaTime)
 {
 }
 
-void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) const
+void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Shader& shader) const
 {
 	auto cmd = commandBuffer.GetCommandBuffer();
 
@@ -87,7 +87,10 @@ void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Pipeline& pipeline) con
 
 	vkCmdBindIndexBuffer(cmd, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-	vkCmdPushConstants(cmd, pipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), &_modelPushConstant->Buffer);
+	//todo : shader.SetPushConstants
+	//todo : cmdPushConstants
+
+	vkCmdPushConstants(cmd, shader.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), &_modelPushConstant->Buffer);
 
 	vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
 }

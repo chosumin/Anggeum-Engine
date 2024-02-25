@@ -5,7 +5,8 @@
 
 Core::PerspectiveCamera::PerspectiveCamera(
 	Entity& entity, float width, float height)
-	:UniformBuffer(sizeof(VPBufferObject), 0), Component(entity)
+	//:UniformBuffer(sizeof(VPBufferObject), 0), Component(entity)
+	:Component(entity)
 {
 	_matrices.View = lookAt(
 		vec3(2.0f, 2.0f, 2.0f),

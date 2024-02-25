@@ -10,6 +10,7 @@ namespace Core
 		VkDeviceMemory ImageMemory;
 		VkImageView ImageView;
 		VkImageLayout Layout;
+		VkImageUsageFlags UsageFlags;
 	};
 
 	class Device;
@@ -23,11 +24,12 @@ namespace Core
 		VkRenderPass GetHandle() const { return _renderPass; }
 		VkSampleCountFlagBits GetMSAASamples() const { return _msaaSamples; }
 
-		vector<VkImageView> GetAttachments() const;
+		VkRenderPassBeginInfo CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent);
+		vector<VkImageView> GetAttachments(VkImageView swapChainImageView) const;
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 	protected:
-		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout);
+		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags);
 		void CreateDepthRenderTarget(VkExtent2D extent);
 		void CreateColorRenderTarget(VkExtent2D extent, VkFormat format);
 		void CreateRenderPass();
@@ -42,6 +44,8 @@ namespace Core
 		unique_ptr<RenderTarget> _color;
 
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+
+		array<VkClearValue, 3> _clearValues{};
 	};
 }
 

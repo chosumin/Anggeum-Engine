@@ -2,6 +2,7 @@
 #include "RenderPass.h"
 #include "Utility.h"
 #include "SwapChain.h"
+#include "CommandBuffer.h"
 
 namespace Core
 {
@@ -9,12 +10,59 @@ namespace Core
         :_device{device}
 	{
         _msaaSamples = GetMaxUsableSampleCount();
+
+        auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
+        Core::CommandBuffer::AddResizeCallback(a);
 	}
 
 	RenderPass::~RenderPass()
 	{
         Cleanup();
+
+        auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
+        Core::CommandBuffer::RemoveResizeCallback(a);
 	}
+
+    VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent)
+    {
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = _renderPass;
+        renderPassInfo.framebuffer = framebuffer;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = swapChainExtent;
+
+        _clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+        _clearValues[2].depthStencil = { 1.0f, 0 };
+        
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(_clearValues.size());
+        renderPassInfo.pClearValues = _clearValues.data();
+
+        return renderPassInfo;
+    }
+
+    vector<VkImageView> RenderPass::GetAttachments(VkImageView swapChainImageView) const
+    {
+        vector<VkImageView> attachments;
+
+        if (_color != nullptr)
+        {
+            attachments.push_back(_color->ImageView);
+            attachments.push_back(swapChainImageView);
+        }
+
+        if (_depth != nullptr)
+        {
+            attachments.push_back(_depth->ImageView);
+        }
+
+        for (auto& renderTarget : _renderTargets)
+        {
+            attachments.push_back(renderTarget->ImageView);
+        }
+
+        return attachments;
+    }
 
     void RenderPass::Cleanup()
 	{
@@ -26,11 +74,27 @@ namespace Core
 			vkFreeMemory(device, _renderTargets[i]->ImageMemory, nullptr);
 		}
 
+        if (_color != nullptr)
+        {
+            vkDestroyImageView(device, _color->ImageView, nullptr);
+            vkDestroyImage(device, _color->Image, nullptr);
+            vkFreeMemory(device, _color->ImageMemory, nullptr);
+        }
+
+        if (_depth != nullptr)
+        {
+            vkDestroyImageView(device, _depth->ImageView, nullptr);
+            vkDestroyImage(device, _depth->Image, nullptr);
+            vkFreeMemory(device, _depth->ImageMemory, nullptr);
+        }
+
         vkDestroyRenderPass(device, _renderPass, nullptr);
     }
 
     void RenderPass::Resize(SwapChain& swapChain)
     {
+        Cleanup();
+
         VkExtent2D extent = swapChain.GetSwapChainExtent();
 
         if (_color != nullptr)
@@ -45,11 +109,11 @@ namespace Core
 
         for (auto& renderTarget : _renderTargets)
         {
-            CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout);
+            CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout, renderTarget->UsageFlags);
         }
     }
 
-    void RenderPass::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout)
+    void RenderPass::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
     {
         VkImage image;
         VkImageView imageView;
@@ -57,7 +121,7 @@ namespace Core
 
         Utility::CreateImage(extent.width, extent.height, 1,
             _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            usageFlags,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
         imageView = Utility::CreateImageView(image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
@@ -68,6 +132,7 @@ namespace Core
         renderTarget->Image = image;
         renderTarget->ImageMemory = memory;
         renderTarget->ImageView = imageView;
+        renderTarget->UsageFlags = usageFlags;
 
 		_renderTargets.emplace_back(move(renderTarget));
 	}
@@ -116,7 +181,7 @@ namespace Core
 
         _color = make_unique<RenderTarget>();
         _color->Format = format;
-        _color->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        _color->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         _color->Image = image;
         _color->ImageMemory = memory;
         _color->ImageView = imageView;
@@ -214,8 +279,7 @@ namespace Core
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &dependency;
 
-		auto device = Device::Instance().GetDevice();
-		if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
+		if (vkCreateRenderPass(_device.GetDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
 			throw std::runtime_error("failed to create render pass!");
 	}
 
@@ -223,7 +287,7 @@ namespace Core
     {
         VkPhysicalDeviceProperties physicalDeviceProperties;
         vkGetPhysicalDeviceProperties(
-            Device::Instance().GetPhysicalDevice(),
+            _device.GetPhysicalDevice(),
             &physicalDeviceProperties);
 
         VkSampleCountFlags counts =

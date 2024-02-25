@@ -13,11 +13,16 @@ namespace Core
 		VkSwapchainKHR GetSwapChain() const { return _swapChain; }
 		void RecreateSwapChain();
 
-		VkRenderPassBeginInfo CreateRenderPassBeginInfo(uint32_t imageIndex);
+		//VkRenderPassBeginInfo CreateRenderPassBeginInfo(uint32_t imageIndex);
 		void GetViewportAndScissor(VkViewport& viewport, VkRect2D& scissor);
 		VkExtent2D GetSwapChainExtent() { return _swapChainExtent; }
 
 		size_t GetSwapChainCount() const { return _swapChainImages.size(); }
+		VkImageView GetImageView(size_t swapChainIndex) const;
+		VkFormat GetImageFormat() const 
+		{
+			return _swapChainImageFormat;
+		}
 	private:
 		void CreateSwapChain();
 		VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
@@ -36,7 +41,7 @@ namespace Core
 		VkFormat _swapChainImageFormat;
 		VkExtent2D _swapChainExtent;
 		vector<VkImageView> _swapChainImageViews;
-		vector<VkFramebuffer> _swapChainFramebuffers;
+		//vector<VkFramebuffer> _swapChainFramebuffers;
 
 		/*VkImage _depthImage;
 		VkDeviceMemory _depthImageMemory;

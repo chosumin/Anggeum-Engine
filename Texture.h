@@ -12,7 +12,7 @@ namespace Core
 		Rgb_alpha = 4
 	};
 
-	class Texture : public IDescriptor
+	class Texture// : public IDescriptor
 	{
 	public:
 		Texture(VkCommandPool commandPool, string fileName, TextureFormat format, uint32_t binding);

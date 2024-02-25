@@ -10,8 +10,9 @@
 #include "SampleScene.h"
 #include "Component.h"
 #include "PerspectiveCamera.h"
-#include "RenderPass.h"
+#include "SampleRenderPass.h"
 #include "Framebuffer.h"
+#include "SampleShader.h"
 
 Application::Application()
 {
@@ -20,13 +21,16 @@ Application::Application()
 	Core::Window::Instance().Initialize(2000, 1000, "Hello Vulkan", this);
 	Core::Device::Instance().Initialize(Core::Window::Instance());
 
+	auto& device = Core::Device::Instance();
+
 	_swapChain = new Core::SwapChain();
-	auto swapCahinExtent = _swapChain->GetSwapChainExtent();
+	auto swapChainExtent = _swapChain->GetSwapChainExtent();
+	_renderPass = new Core::SampleRenderPass(device, swapChainExtent, _swapChain->GetImageFormat());
+	_framebuffer = new Core::Framebuffer(device, *_swapChain, *_renderPass);
 
-	_renderPass = new Core::RenderPass(Core::Device::Instance());
 	_commandBuffer = new Core::CommandBuffer();
-
-	_scene = new SampleScene((float)swapCahinExtent.width, (float)swapCahinExtent.height, _commandBuffer->GetCommandPool());
+	
+	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _commandBuffer->GetCommandPool());
 
 	auto cams = _scene->GetComponents<Core::PerspectiveCamera>();
 	auto meshes = _scene->GetComponents<Core::Mesh>();
@@ -37,6 +41,8 @@ Application::Application()
 	for (auto cam : cams)
 		descriptors.push_back(cam);
 
+	//todo : 기존에 없던 쉐이더라면 파이프라인 생성
+	//todo : 기존에 있는 쉐이더면 같은 배치로 이동
 	for (auto mesh : meshes)
 	{
 		auto desc = mesh->GetDescriptor();
@@ -45,10 +51,10 @@ Application::Application()
 		pushConstants.push_back(mesh->GetPushConstant());
 	}
 
-	_pipeline = new Core::Pipeline(
-		*_swapChain,
-		"shaders/simple_vs.vert.spv", "shaders/simple_fs.frag.spv",
-		descriptors, pushConstants);
+	_shader = new Core::SampleShader(device, descriptors, pushConstants);
+
+	_pipeline = new Core::Pipeline(device,
+		*_renderPass, *_shader);
 }
 
 bool Application::Prepare(const ApplicationOptions& options)
@@ -103,19 +109,39 @@ void Application::DrawFrame()
 {
 	auto cameras = _scene->GetComponents<Core::PerspectiveCamera>();
 
+	size_t currentFrame = _commandBuffer->GetCurrentFrame();
+
 	for (auto camera : cameras)
 	{
-		camera->Update(_commandBuffer->GetCurrentFrame());
+		camera->Update(currentFrame);
 	}
 
-	_commandBuffer->RecordCommandBuffer(*_pipeline, *_swapChain);
+	_commandBuffer->RecordCommandBuffer(*_swapChain);
+	_commandBuffer->BeginCommandBuffer();
+
+	auto framebuffer = _framebuffer->GetHandle(_commandBuffer->GetImageIndex());
+	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(framebuffer, _swapChain->GetSwapChainExtent());
+	_commandBuffer->BeginRenderPass(renderPassBeginInfo);
+	_commandBuffer->BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
+		_pipeline->GetGraphicsPipeline());
+
+	VkViewport viewport;
+	VkRect2D scissor;
+	_swapChain->GetViewportAndScissor(viewport, scissor);
+	_commandBuffer->SetViewportAndScissor(viewport, scissor);
+
+	auto descriptorLayout = _shader->GetPipelineLayout();
+	auto descriptorSet = _shader->GetDescriptorSet(currentFrame);
+	_commandBuffer->BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS,
+		descriptorLayout, descriptorSet);
+
 	{
 		auto meshes = _scene->GetComponents<Core::Mesh>();
 
 		for(auto mesh : meshes)
-			mesh->DrawFrame(*_commandBuffer, *_pipeline);
+			mesh->DrawFrame(*_commandBuffer, *_shader);
 	}
-	_commandBuffer->EndFrame(*_pipeline, *_swapChain);
+	_commandBuffer->EndFrame(*_swapChain);
 }
 
 void Application::WaitIdle()

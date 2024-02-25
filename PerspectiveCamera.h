@@ -4,7 +4,7 @@
 
 namespace Core
 {
-	class PerspectiveCamera : public UniformBuffer, public Component
+	class PerspectiveCamera : public Component
 	{
 	public:
 		PerspectiveCamera(Entity& entity, float width, float height);
@@ -29,11 +29,7 @@ namespace Core
 	private:
 		void MapBufferMemory(void* uniformBufferMapped) override;
 	private:
-		struct VPBufferObject
-		{
-			alignas(16) mat4 View;
-			alignas(16) mat4 Perspective;
-		} _matrices;
+		VPBufferObject _matrices;
 	private:
 		float _aspectRatio{ 1.0f };
 		float _fov{ glm::radians(60.0f) };
