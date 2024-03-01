@@ -13,9 +13,9 @@ Core::UniformBuffer::~UniformBuffer()
 {
 }
 
-void Core::UniformBuffer::Update(uint32_t currentImage)
+void Core::UniformBuffer::SetBuffer(uint32_t currentImage, void* data)
 {
-	MapBufferMemory(_uniformBuffersMapped[currentImage]);
+	memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
 }
 
 VkDescriptorSetLayoutBinding Core::UniformBuffer::CreateDescriptorSetLayoutBinding()

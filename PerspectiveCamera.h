@@ -1,9 +1,10 @@
 #pragma once
-#include "UniformBuffer.h"
 #include "Component.h"
+#include "CameraUniformBuffer.h"
 
 namespace Core
 {
+	struct VPBufferObject;
 	class PerspectiveCamera : public Component
 	{
 	public:
@@ -26,10 +27,8 @@ namespace Core
 		mat4 GetView();
 		const mat4 GetPreRotation();
 		void SetPreRotation(const glm::mat4& pre_rotation);
-	private:
-		void MapBufferMemory(void* uniformBufferMapped) override;
-	private:
-		VPBufferObject _matrices;
+	public:
+		VPBufferObject Matrices;
 	private:
 		float _aspectRatio{ 1.0f };
 		float _fov{ glm::radians(60.0f) };

@@ -153,6 +153,7 @@
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="PerspectiveCamera.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="PushConstant.cpp" />
     <ClCompile Include="RenderContext.cpp" />
     <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="RenderTarget.cpp" />
@@ -162,6 +163,7 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SceneFactory.cpp" />
     <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="TextureBuffer.cpp" />
     <ClCompile Include="timer.cpp" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="Utility.cpp" />
@@ -190,6 +192,7 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="PerspectiveCamera.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="PushConstant.h" />
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="RenderPass.h" />
     <ClInclude Include="RenderTarget.h" />
@@ -199,12 +202,12 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="SceneFactory.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="TextureBuffer.h" />
     <ClInclude Include="timer.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="main.h" />
-    <ClInclude Include="IPushConstant.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Pipeline.h" />
     <ClInclude Include="stdafx.h" />

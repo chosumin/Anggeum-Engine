@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include "Shader.h"
 #include "Vertex.h"
-#include "IDescriptor.h"
-#include "IPushConstant.h"
+#include "PushConstant.h"
+#include "UniformBuffer.h"
+#include "TextureBuffer.h"
 
 Core::Shader::Shader(Device& device, const string& vertFilePath, const string& fragFilePath)
 	:_device(device)
@@ -27,6 +28,18 @@ Core::Shader::~Shader()
 
 	vkDestroyDescriptorPool(vkDevice, _descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(vkDevice, _descriptorSetLayout, nullptr);
+
+	for (auto& uniformBuffer : _uniformBuffers)
+	{
+		delete(uniformBuffer.second);
+	}
+	_uniformBuffers.clear();
+
+	for (auto& textureBuffer : _textureBuffers)
+	{
+		delete(textureBuffer.second);
+	}
+	_textureBuffers.clear();
 }
 
 vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo() const
@@ -48,31 +61,34 @@ vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo()
 	return shaderStages;
 }
 
-VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo() const
+VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo()
 {
-	auto bindingDescription = Vertex::GetBindingDescription();
-	auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+	_vertexBinding = Vertex::GetBindingDescription();
+	_vertexAttribute = Vertex::GetAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(_vertexAttribute.size());
+	vertexInputInfo.pVertexBindingDescriptions = &_vertexBinding;
+	vertexInputInfo.pVertexAttributeDescriptions = _vertexAttribute.data();
 
 	return vertexInputInfo;
 }
 
-void Core::Shader::CreatePipelineLayout()
+void Core::Shader::CreatePipelineLayout(vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants)
 {
+	CreateDescriptors(descriptors);
+	CreatePushConstants(pushConstants);
+
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
 
 	pipelineLayoutInfo.pushConstantRangeCount =
-		static_cast<uint32_t>(_pushConstants.size());
-	pipelineLayoutInfo.pPushConstantRanges = _pushConstants.data();
+		static_cast<uint32_t>(_pushConstantRanges.size());
+	pipelineLayoutInfo.pPushConstantRanges = _pushConstantRanges.data();
 
 	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("failed to create pipeline layout!");
@@ -109,6 +125,71 @@ VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<c
 	}
 
 	return shaderModule;
+}
+
+VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage() const
+{
+	VkShaderStageFlags flags{};
+
+	for (auto& pushConstantRange : _pushConstantRanges)
+	{
+		flags |= pushConstantRange.stageFlags;
+	}
+
+	return flags;
+}
+
+vector<uint8_t>* Core::Shader::GetPushConstantsData()
+{
+	return &_pushConstants;
+}
+
+void Core::Shader::ClearPushConstantsCache()
+{
+	_pushConstants.clear();
+}
+
+void Core::Shader::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
+{
+	_uniformBuffers[binding]->SetBuffer(currentImage, data);
+}
+
+void Core::Shader::SetBuffer(uint32_t binding, VkDescriptorImageInfo& info)
+{
+	_textureBuffers[binding]->SetDescriptorImageInfo(info);
+}
+
+void Core::Shader::UpdateDescriptorSets()
+{
+	size_t size = _uniformBuffers.size() + _textureBuffers.size();
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		vector<VkWriteDescriptorSet> descriptorWrites(size);
+		for (size_t j = 0; j < size; j++)
+		{
+			VkWriteDescriptorSet writeDescriptorSet{};
+
+			if (_uniformBuffers.find(j) != _uniformBuffers.end())
+			{
+				writeDescriptorSet =
+					_uniformBuffers[j]->CreateWriteDescriptorSet(i);
+			}
+			else if (_textureBuffers.find(j) != _textureBuffers.end())
+			{
+				writeDescriptorSet =
+					_textureBuffers[j]->CreateWriteDescriptorSet(i);
+			}
+
+			descriptorWrites[j] = writeDescriptorSet;
+			descriptorWrites[j].dstSet = _descriptorSets[i];
+		}
+
+		vkUpdateDescriptorSets(
+			Device::Instance().GetDevice(),
+			static_cast<uint32_t>(descriptorWrites.size()),
+			descriptorWrites.data(), 0, nullptr);
+	}
 }
 
 void Core::Shader::CreateDescriptors(vector<IDescriptor*> descriptors)
@@ -167,8 +248,6 @@ void Core::Shader::CreateDescriptorPool(vector<IDescriptor*> descriptors)
 
 void Core::Shader::CreateDescriptorSets(vector<IDescriptor*> descriptors)
 {
-	size_t size = descriptors.size();
-
 	vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _descriptorSetLayout);
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -183,65 +262,22 @@ void Core::Shader::CreateDescriptorSets(vector<IDescriptor*> descriptors)
 		throw runtime_error("failed to allocate descriptor sets!");
 	}
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		vector<VkWriteDescriptorSet> descriptorWrites(size);
-		for (size_t j = 0; j < size; j++)
-		{
-			auto writeDescriptorSet =
-				descriptors[j]->CreateWriteDescriptorSet(i);
-
-			descriptorWrites[j] = writeDescriptorSet;
-			descriptorWrites[j].dstSet = _descriptorSets[i];
-		}
-
-		vkUpdateDescriptorSets(
-			Device::Instance().GetDevice(),
-			static_cast<uint32_t>(descriptorWrites.size()),
-			descriptorWrites.data(), 0, nullptr);
-	}
+	UpdateDescriptorSets();
 }
 
-void Core::Shader::CreatePushConstants(vector<IPushConstant*> pushConstants)
+void Core::Shader::CreatePushConstants(vector<PushConstant>& pushConstants)
 {
 	uint32_t offset = 0;
+
 	for (auto& pushConstant : pushConstants)
 	{
-		pushConstant->SetOffset(offset);
-		_pushConstants.push_back(pushConstant->GetPushConstantRange());
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.offset = offset;
+		pushConstantRange.stageFlags = pushConstant.StageFlags;
+		pushConstantRange.size += pushConstant.Size;
+
+		offset += pushConstant.Size;
+
+		_pushConstantRanges.emplace_back(pushConstantRange);
 	}
 }
-
-//VkDescriptorSetLayoutBinding Core::Shader::CreateDescriptorSetLayoutBinding()
-//{
-//	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-//	samplerLayoutBinding.binding = _binding;
-//	samplerLayoutBinding.descriptorCount = 1;
-//	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//	samplerLayoutBinding.pImmutableSamplers = nullptr;
-//	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-//
-//	return samplerLayoutBinding;
-//}
-//
-//VkWriteDescriptorSet Core::Shader::CreateWriteDescriptorSet(size_t index)
-//{
-//	_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-//	_imageInfo.imageView = _textureImageView;
-//	_imageInfo.sampler = _textureSampler;
-//
-//	VkWriteDescriptorSet descriptorWrite{};
-//	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//	descriptorWrite.dstBinding = _binding;
-//	descriptorWrite.dstArrayElement = 0;
-//	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//	descriptorWrite.descriptorCount = 1;
-//	descriptorWrite.pImageInfo = &_imageInfo;
-//
-//	return descriptorWrite;
-//}
-//
-//VkDescriptorType Core::Shader::GetDescriptorType()
-//{
-//	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//}

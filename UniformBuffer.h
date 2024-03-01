@@ -10,13 +10,11 @@ namespace Core
 		UniformBuffer(VkDeviceSize bufferSize, uint32_t binding);
 		~UniformBuffer();
 
-		void Update(uint32_t currentImage);
+		void SetBuffer(uint32_t currentImage, void* data);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);
 		VkDescriptorType GetDescriptorType();
-	protected:
-		virtual void MapBufferMemory(void* uniformBufferMapped) = 0;
 	private:
 		void CreateUniformBuffer();
 	private:

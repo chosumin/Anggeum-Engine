@@ -6,7 +6,6 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "timer.h"
-#include "IPushConstant.h"
 #include "SampleScene.h"
 #include "Component.h"
 #include "PerspectiveCamera.h"
@@ -32,26 +31,7 @@ Application::Application()
 	
 	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _commandBuffer->GetCommandPool());
 
-	auto cams = _scene->GetComponents<Core::PerspectiveCamera>();
-	auto meshes = _scene->GetComponents<Core::Mesh>();
-
-	vector<Core::IDescriptor*> descriptors{};
-	vector<Core::IPushConstant*> pushConstants{};
-
-	for (auto cam : cams)
-		descriptors.push_back(cam);
-
-	//todo : 기존에 없던 쉐이더라면 파이프라인 생성
-	//todo : 기존에 있는 쉐이더면 같은 배치로 이동
-	for (auto mesh : meshes)
-	{
-		auto desc = mesh->GetDescriptor();
-		descriptors.push_back(desc);
-
-		pushConstants.push_back(mesh->GetPushConstant());
-	}
-
-	_shader = new Core::SampleShader(device, descriptors, pushConstants);
+	_shader = new Core::SampleShader(device, *_commandBuffer);
 
 	_pipeline = new Core::Pipeline(device,
 		*_renderPass, *_shader);
@@ -96,9 +76,12 @@ void Application::Finish()
 
 Application::~Application()
 {
+	delete(_pipeline);
+	delete(_shader);
 	delete(_scene);
 	delete(_commandBuffer);
-	delete(_pipeline);
+	delete(_framebuffer);
+	delete(_renderPass);
 	delete(_swapChain);
 
 	Core::Device::Instance().Delete();
@@ -113,7 +96,7 @@ void Application::DrawFrame()
 
 	for (auto camera : cameras)
 	{
-		camera->Update(currentFrame);
+		_shader->SetBuffer(currentFrame, 0, &camera->Matrices);
 	}
 
 	_commandBuffer->RecordCommandBuffer(*_swapChain);
@@ -138,8 +121,14 @@ void Application::DrawFrame()
 	{
 		auto meshes = _scene->GetComponents<Core::Mesh>();
 
-		for(auto mesh : meshes)
+		for (auto mesh : meshes)
+		{
 			mesh->DrawFrame(*_commandBuffer, *_shader);
+			_commandBuffer->Flush(*_shader);
+			_commandBuffer->BindVertexBuffers(mesh->GetVertexBuffer());
+			_commandBuffer->BindIndexBuffer(mesh->GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
+			_commandBuffer->DrawIndexed(mesh->GetIndexCount(), 1);
+		}
 	}
 	_commandBuffer->EndFrame(*_swapChain);
 }

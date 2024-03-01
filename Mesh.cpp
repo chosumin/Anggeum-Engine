@@ -5,53 +5,16 @@
 #include "Buffer.h"
 #include "Transform.h"
 #include "InputEvents.h"
-#include "Texture.h"
 #include "IDescriptor.h"
 #include "Entity.h"
 #include "Shader.h"
-#include "IPushConstant.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::ModelPushConstant::ModelPushConstant()
-	:Buffer(), _offset(0)
-{
-}
-
-uint32_t Core::ModelPushConstant::GetSize() const
-{
-	return sizeof(ModelWorld);
-}
-
-VkPushConstantRange Core::ModelPushConstant::GetPushConstantRange() const
-{
-	VkPushConstantRange pushConstant;
-	pushConstant.offset = _offset;
-	pushConstant.size = GetSize();
-	pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-	return pushConstant;
-}
-
-uint32_t Core::ModelPushConstant::GetOffset() const
-{
-	return _offset;
-}
-
-void Core::ModelPushConstant::SetOffset(uint32_t offset)
-{
-	_offset = offset;
-}
-
 Core::Mesh::Mesh(Entity& entity, VkCommandPool commandPool, string modelPath)
 	:Component(entity)
 {
-	_modelPushConstant = new Core::ModelPushConstant();
-
-	_texture = new Core::Texture(commandPool,
-		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
-
 	LoadModel(modelPath);
 
 	CreateVertexBuffer(commandPool);
@@ -62,47 +25,18 @@ Core::Mesh::~Mesh()
 {
 	delete(_indexBuffer);
 	delete(_vertexBuffer);
-	delete(_texture);
-	delete(_modelPushConstant);
 }
 
 void Core::Mesh::UpdateFrame(float deltaTime)
 {
 }
 
-void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Shader& shader) const
+void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Shader& shader)
 {
-	auto cmd = commandBuffer.GetCommandBuffer();
-
-	VkBuffer vertexBuffers[] = { _vertexBuffer->GetBuffer() };
-	VkDeviceSize offsets[] = { 0 };
-
 	auto& transform = _entity.GetComponent<Transform>();
-	_modelPushConstant->Buffer.World = transform.GetMatrix();
+	_modelPushConstant.World = transform.GetMatrix();
 
-	uint32_t index = commandBuffer.GetCurrentFrame();
-
-	//hack : optimizable with https://developer.nvidia.com/vulkan-memory-management
-	vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
-
-	vkCmdBindIndexBuffer(cmd, _indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-	//todo : shader.SetPushConstants
-	//todo : cmdPushConstants
-
-	vkCmdPushConstants(cmd, shader.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, _modelPushConstant->GetOffset(), _modelPushConstant->GetSize(), &_modelPushConstant->Buffer);
-
-	vkCmdDrawIndexed(cmd, static_cast<uint32_t>(_indices.size()), 1, 0, 0, 0);
-}
-
-Core::IDescriptor* Core::Mesh::GetDescriptor() const
-{
-	return _texture;
-}
-
-Core::ModelPushConstant* Core::Mesh::GetPushConstant() const
-{
-	return _modelPushConstant;
+	shader.SetPushConstants(_modelPushConstant);
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)

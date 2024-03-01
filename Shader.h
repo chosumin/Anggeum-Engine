@@ -1,9 +1,11 @@
 #pragma once
+#include "PushConstant.h"
 
 namespace Core
 {
 	class UniformBuffer;
-	class IPushConstant;
+	class TextureBuffer;
+	class IDescriptor;
 	class Shader
 	{
 	public:
@@ -15,30 +17,49 @@ namespace Core
 		virtual std::type_index GetType() = 0;
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
-		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo() const;
+		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
 		VkPipelineLayout GetPipelineLayout() const
 		{
 			return _pipelineLayout;
 		}
+
 		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
+
+		VkShaderStageFlags GetPushConstantsShaderStage() const;
+		vector<uint8_t>* GetPushConstantsData();
+		void ClearPushConstantsCache();
+
+		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
+		void SetBuffer(uint32_t binding, VkDescriptorImageInfo& info);
+
+		template <typename T>
+		inline void SetPushConstants(const T& value)
+		{
+			vector<uint8_t> converted = 
+				vector<uint8_t>{reinterpret_cast<const uint8_t*>(&value),
+				reinterpret_cast<const uint8_t*>(&value) + sizeof(T)};
+
+			_pushConstants.insert(_pushConstants.end(), converted.begin(), converted.end());
+		}
+
+		void UpdateDescriptorSets();
 	protected:
+		void CreatePipelineLayout(
+			vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants);
+	private:
 		void CreateDescriptors(vector<IDescriptor*> descriptors);
 		void CreateDescriptorSetLayout(vector<IDescriptor*> descriptors);
 		void CreateDescriptorPool(vector<IDescriptor*> descriptors);
 		void CreateDescriptorSets(vector<IDescriptor*> descriptors);
-		void CreatePushConstants(vector<IPushConstant*> pushConstants);
-		void CreatePipelineLayout();
+		void CreatePushConstants(vector<PushConstant>& pushConstants);
 
-		/*VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);
-		VkDescriptorType GetDescriptorType();*/
-	private:
 		vector<char> ReadFile(const string& filePath);
 		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code) const;
 	protected:
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
-		//unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
-		//vector<IPushConstant*> _pushConstants;
+		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
+		vector<VkPushConstantRange> _pushConstantRanges;
+		vector<uint8_t> _pushConstants;
 	private:
 		Device& _device;
 
@@ -48,7 +69,9 @@ namespace Core
 		vector<VkDescriptorSet> _descriptorSets;
 		VkDescriptorPool _descriptorPool;
 		VkDescriptorSetLayout _descriptorSetLayout;
-		vector<VkPushConstantRange> _pushConstants;
 		VkPipelineLayout _pipelineLayout;
+
+		VkVertexInputBindingDescription _vertexBinding;
+		vector<VkVertexInputAttributeDescription> _vertexAttribute;
 	};
 }

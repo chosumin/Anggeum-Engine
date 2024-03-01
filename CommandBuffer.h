@@ -4,6 +4,8 @@ namespace Core
 {
 	class Pipeline;
 	class SwapChain;
+	class Shader;
+	class Buffer;
 	class CommandBuffer
 	{
 	public:
@@ -20,6 +22,10 @@ namespace Core
 		void SetViewportAndScissor(VkViewport viewport, VkRect2D scissor);
 		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint,
 			VkPipelineLayout pipelineLayout, VkDescriptorSet* descriptorSet);
+		void Flush(Shader& shader);
+		void BindVertexBuffers(Buffer& buffer);
+		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
+		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
 		void RecordCommandBuffer(SwapChain& swapChain);
 		void EndFrame(SwapChain& swapChain);
 		VkCommandPool GetCommandPool() { return _commandPool; }

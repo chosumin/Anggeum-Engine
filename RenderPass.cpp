@@ -32,6 +32,7 @@ namespace Core
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = swapChainExtent;
 
+        //todo : 렌더 타겟 개수만큼 초기화 해야 함.
         _clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
         _clearValues[2].depthStencil = { 1.0f, 0 };
         

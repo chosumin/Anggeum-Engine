@@ -4,12 +4,11 @@ namespace Core
 {
 	class IDescriptor;
 	class RenderPass;
-	class IPushConstant;
 	class Shader;
 	class Pipeline
 	{
 	public:
-		Pipeline(Device& device, const RenderPass& renderPass, const Shader& shader);
+		Pipeline(Device& device, const RenderPass& renderPass, Shader& shader);
 		~Pipeline();
 
 		VkPipeline GetGraphicsPipeline() { return _graphicsPipeline; }
@@ -40,6 +39,12 @@ namespace Core
 	private:
 		Device& _device;
 		VkPipeline _graphicsPipeline;
+
+		vector<VkDynamicState> _dynamicStates =
+		{
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR
+		};
 		//VkPipelineLayout _pipelineLayout;
 		//VkDescriptorSetLayout _descriptorSetLayout;
 		//VkDescriptorPool _descriptorPool;

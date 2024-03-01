@@ -59,5 +59,4 @@ private:
 	Core::RenderPass* _renderPass;
 	Core::Framebuffer* _framebuffer;
 	Core::Scene* _scene;
-	Core::Mesh* _Mesh;
 };

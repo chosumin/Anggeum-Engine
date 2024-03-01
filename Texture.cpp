@@ -54,6 +54,8 @@ Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat
 
 	CreateTextureImageView();
 	CreateTextureSampler();
+
+	SetDescriptorImageInfo();
 }
 
 Core::Texture::~Texture()
@@ -64,40 +66,6 @@ Core::Texture::~Texture()
 	vkDestroyImageView(device, _textureImageView, nullptr);
 	vkDestroyImage(device, _textureImage, nullptr);
 	vkFreeMemory(device, _textureImageMemory, nullptr);
-}
-
-VkDescriptorSetLayoutBinding Core::Texture::CreateDescriptorSetLayoutBinding()
-{
-	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-	samplerLayoutBinding.binding = _binding;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	return samplerLayoutBinding;
-}
-
-VkWriteDescriptorSet Core::Texture::CreateWriteDescriptorSet(size_t index)
-{
-	_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	_imageInfo.imageView = _textureImageView;
-	_imageInfo.sampler = _textureSampler;
-
-	VkWriteDescriptorSet descriptorWrite{};
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstBinding = _binding;
-	descriptorWrite.dstArrayElement = 0;
-	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrite.descriptorCount = 1;
-	descriptorWrite.pImageInfo = &_imageInfo;
-
-	return descriptorWrite;
-}
-
-VkDescriptorType Core::Texture::GetDescriptorType()
-{
-	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 }
 
 void Core::Texture::CopyBufferToImage(VkCommandPool commandPool, 
@@ -263,4 +231,11 @@ void Core::Texture::GenerateMipmaps(VkCommandPool commandPool,
 		1, &barrier);
 
 	Utility::EndSingleTimeCommands(commandPool, commandBuffer);
+}
+
+void Core::Texture::SetDescriptorImageInfo()
+{
+	_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	_imageInfo.imageView = _textureImageView;
+	_imageInfo.sampler = _textureSampler;
 }

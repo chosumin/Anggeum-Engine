@@ -8,19 +8,19 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	//:UniformBuffer(sizeof(VPBufferObject), 0), Component(entity)
 	:Component(entity)
 {
-	_matrices.View = lookAt(
+	Matrices.View = lookAt(
 		vec3(2.0f, 2.0f, 2.0f),
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(0.0f, 0.0f, 1.0f));
 
-	_matrices.Perspective = perspective(
+	Matrices.Perspective = perspective(
 		radians(60.0f),
 		width / height,
 		0.1f, 10.0f);
-	_matrices.Perspective[1][1] *= -1;
+	Matrices.Perspective[1][1] *= -1;
 
 	auto& transform = entity.GetComponent<Transform>();
-	transform.SetMatrix(_matrices.View);
+	transform.SetMatrix(Matrices.View);
 }
 
 type_index Core::PerspectiveCamera::GetType()
@@ -70,12 +70,12 @@ float Core::PerspectiveCamera::GetFieldOfView()
 
 mat4 Core::PerspectiveCamera::GetProjection()
 {
-	return _matrices.Perspective;
+	return Matrices.Perspective;
 }
 
 mat4 Core::PerspectiveCamera::GetView()
 {
-	return _matrices.View;
+	return Matrices.View;
 }
 
 const mat4 Core::PerspectiveCamera::GetPreRotation()
@@ -86,13 +86,6 @@ const mat4 Core::PerspectiveCamera::GetPreRotation()
 void Core::PerspectiveCamera::SetPreRotation(const glm::mat4& pre_rotation)
 {
 	_preRotation = pre_rotation;
-}
-
-void Core::PerspectiveCamera::MapBufferMemory(void* uniformBufferMapped)
-{
-	auto& transform = _entity.GetComponent<Transform>();
-	_matrices.View = transform.GetMatrix();
-	memcpy(uniformBufferMapped, &_matrices, sizeof(_matrices));
 }
 
 void Core::PerspectiveCamera::UpdateFrame(float deltaTime)

@@ -2,6 +2,8 @@
 #include "CommandBuffer.h"
 #include "Pipeline.h"
 #include "SwapChain.h"
+#include "Shader.h"
+#include "Buffer.h"
 
 vector<function<void(Core::SwapChain&)>> Core::CommandBuffer::_resizeCallbacks;
 
@@ -79,6 +81,36 @@ void Core::CommandBuffer::BindDescriptorSets(VkPipelineBindPoint pipelineBindPoi
         _commandBuffers[_currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipelineLayout, 0, 1,
         descriptorSet, 0, nullptr);
+}
+
+void Core::CommandBuffer::Flush(Shader& shader)
+{
+    auto pushConstants = shader.GetPushConstantsData();
+    auto shaderStageFlags = shader.GetPushConstantsShaderStage();
+    vkCmdPushConstants(_commandBuffers[_currentFrame], shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, pushConstants->size(), pushConstants->data());
+
+    auto descriptorLayout = shader.GetPipelineLayout();
+    auto descriptorSet = shader.GetDescriptorSet(_currentFrame);
+
+    shader.ClearPushConstantsCache();
+}
+
+void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer)
+{
+    VkBuffer vertexBuffers[] = { buffer.GetBuffer() };
+    VkDeviceSize offsets[] = { 0 };
+
+    vkCmdBindVertexBuffers(_commandBuffers[_currentFrame], 0, 1, vertexBuffers, offsets);
+}
+
+void Core::CommandBuffer::BindIndexBuffer(Buffer& buffer, VkIndexType indexType)
+{
+    vkCmdBindIndexBuffer(_commandBuffers[_currentFrame], buffer.GetBuffer(), 0, indexType);
+}
+
+void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount)
+{
+    vkCmdDrawIndexed(_commandBuffers[_currentFrame], indexCount, instanceCount, 0, 0, 0);
 }
 
 void Core::CommandBuffer::RecordCommandBuffer(SwapChain& swapChain)

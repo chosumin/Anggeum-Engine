@@ -3,11 +3,10 @@
 #include "RenderPass.h"
 #include "Vertex.h"
 #include "IDescriptor.h"
-#include "IPushConstant.h"
 #include "Shader.h"
 
 Core::Pipeline::Pipeline(Device& device, 
-	const RenderPass& renderPass, const Shader& shader)
+	const RenderPass& renderPass, Shader& shader)
 	:_device(device)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
@@ -331,16 +330,10 @@ VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo
 
 VkPipelineDynamicStateCreateInfo Core::Pipeline::GetDynamicStateCreateInfo()
 {
-	std::vector<VkDynamicState> dynamicStates =
-	{
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
-	};
-
 	VkPipelineDynamicStateCreateInfo dynamicState{};
 	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-	dynamicState.pDynamicStates = dynamicStates.data();
+	dynamicState.dynamicStateCount = static_cast<uint32_t>(_dynamicStates.size());
+	dynamicState.pDynamicStates = _dynamicStates.data();
 
 	return dynamicState;
 }
