@@ -92,7 +92,7 @@ void Application::DrawFrame()
 {
 	auto cameras = _scene->GetComponents<Core::PerspectiveCamera>();
 
-	size_t currentFrame = _commandBuffer->GetCurrentFrame();
+	uint32_t currentFrame = _commandBuffer->GetCurrentFrame();
 
 	for (auto camera : cameras)
 	{

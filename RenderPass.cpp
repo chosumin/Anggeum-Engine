@@ -210,7 +210,7 @@ namespace Core
             attachments.push_back(colorAttachment);
 
             VkAttachmentReference colorAttachmentRef{};
-            colorAttachmentRef.attachment = attachments.size() - 1;
+            colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
             colorAttachmentRef.layout = _color->Layout;
 
             VkAttachmentDescription colorAttachmentResolve{};
@@ -226,7 +226,7 @@ namespace Core
             attachments.push_back(colorAttachmentResolve);
 
             VkAttachmentReference colorAttachmentResolveRef{};
-            colorAttachmentResolveRef.attachment = attachments.size() - 1;
+            colorAttachmentResolveRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
             colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
             subpass.colorAttachmentCount = 1;
@@ -249,7 +249,7 @@ namespace Core
             attachments.push_back(depthAttachment);
 
             VkAttachmentReference depthAttachmentRef{};
-            depthAttachmentRef.attachment = attachments.size() - 1;
+            depthAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
             depthAttachmentRef.layout = _depth->Layout;
 
             subpass.pDepthStencilAttachment = &depthAttachmentRef;

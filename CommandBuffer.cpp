@@ -87,7 +87,7 @@ void Core::CommandBuffer::Flush(Shader& shader)
 {
     auto pushConstants = shader.GetPushConstantsData();
     auto shaderStageFlags = shader.GetPushConstantsShaderStage();
-    vkCmdPushConstants(_commandBuffers[_currentFrame], shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, pushConstants->size(), pushConstants->data());
+    vkCmdPushConstants(_commandBuffers[_currentFrame], shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
 
     auto descriptorLayout = shader.GetPipelineLayout();
     auto descriptorSet = shader.GetDescriptorSet(_currentFrame);

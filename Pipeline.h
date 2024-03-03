@@ -34,8 +34,9 @@ namespace Core
 		VkPipelineRasterizationStateCreateInfo GetRasterizationStateCreateInfo();
 		VkPipelineMultisampleStateCreateInfo GetMultisampleStateCreateInfo(VkSampleCountFlagBits sampleCount);
 		VkPipelineDepthStencilStateCreateInfo GetDepthStencilStateCreateInfo();
-		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo();
+		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
+		VkPipelineColorBlendAttachmentState GetColorBlendAttachmentState();
 	private:
 		Device& _device;
 		VkPipeline _graphicsPipeline;

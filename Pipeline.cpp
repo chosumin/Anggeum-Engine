@@ -19,7 +19,8 @@ Core::Pipeline::Pipeline(Device& device,
 		GetRasterizationStateCreateInfo();
 	auto multisampleState = GetMultisampleStateCreateInfo(renderPass.GetMSAASamples());
 	auto depthStencilState = GetDepthStencilStateCreateInfo();
-	auto colorBlendState = GetColorBlendStateCreateInfo();
+	auto colorBlendAttachment = GetColorBlendAttachmentState();
+	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);
 	auto dynamicState = GetDynamicStateCreateInfo();
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -293,27 +294,9 @@ VkPipelineDepthStencilStateCreateInfo Core::Pipeline::GetDepthStencilStateCreate
 	return depthStencil;
 }
 
-VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo()
+VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo(
+	VkPipelineColorBlendAttachmentState& colorBlendAttachment)
 {
-	//Pseudocode for color blend operation below.
-	//if (blendEnable) {
-	//	finalColor.rgb = (srcColorBlendFactor * newColor.rgb) < colorBlendOp > (dstColorBlendFactor * oldColor.rgb);
-	//	finalColor.a = (srcAlphaBlendFactor * newColor.a) < alphaBlendOp > (dstAlphaBlendFactor * oldColor.a);
-	//}
-	//else {
-	//	finalColor = newColor;
-	//}
-	//finalColor = finalColor & colorWriteMask;
-	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
-
 	VkPipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable = VK_FALSE;
@@ -336,6 +319,31 @@ VkPipelineDynamicStateCreateInfo Core::Pipeline::GetDynamicStateCreateInfo()
 	dynamicState.pDynamicStates = _dynamicStates.data();
 
 	return dynamicState;
+}
+
+VkPipelineColorBlendAttachmentState Core::Pipeline::GetColorBlendAttachmentState()
+{
+	//Pseudocode for color blend operation below.
+	//if (blendEnable) {
+	//	finalColor.rgb = (srcColorBlendFactor * newColor.rgb) < colorBlendOp > (dstColorBlendFactor * oldColor.rgb);
+	//	finalColor.a = (srcAlphaBlendFactor * newColor.a) < alphaBlendOp > (dstAlphaBlendFactor * oldColor.a);
+	//}
+	//else {
+	//	finalColor = newColor;
+	//}
+	//finalColor = finalColor & colorWriteMask;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+
+	return colorBlendAttachment;
 }
 
 //VkShaderModule Core::Pipeline::CreateShaderModule(VkDevice& device, const vector<char>& code) const

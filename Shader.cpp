@@ -161,12 +161,12 @@ void Core::Shader::SetBuffer(uint32_t binding, VkDescriptorImageInfo& info)
 
 void Core::Shader::UpdateDescriptorSets()
 {
-	size_t size = _uniformBuffers.size() + _textureBuffers.size();
+	uint32_t size = static_cast<uint32_t>(_uniformBuffers.size() + _textureBuffers.size());
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		vector<VkWriteDescriptorSet> descriptorWrites(size);
-		for (size_t j = 0; j < size; j++)
+		for (uint32_t j = 0; j < size; j++)
 		{
 			VkWriteDescriptorSet writeDescriptorSet{};
 
