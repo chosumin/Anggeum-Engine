@@ -15,7 +15,7 @@ namespace Core
 	class Scene;
 	class RenderPass;
 	class Framebuffer;
-	class Shader;
+	class Material;
 }
 
 struct ApplicationOptions
@@ -52,7 +52,7 @@ private:
 	//todo : stats
 
 	unique_ptr<Core::Timer> _timer;
-	Core::Shader* _shader;
+	Core::Material* _material;
 	Core::Pipeline* _pipeline;
 	Core::SwapChain* _swapChain;
 	Core::CommandBuffer* _commandBuffer;

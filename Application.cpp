@@ -11,7 +11,7 @@
 #include "PerspectiveCamera.h"
 #include "SampleRenderPass.h"
 #include "Framebuffer.h"
-#include "SampleShader.h"
+#include "Material.h"
 
 Application::Application()
 {
@@ -31,10 +31,10 @@ Application::Application()
 	
 	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _commandBuffer->GetCommandPool());
 
-	_shader = new Core::SampleShader(device, *_commandBuffer);
+	_material = new Core::Material(device, *_commandBuffer);
 
 	_pipeline = new Core::Pipeline(device,
-		*_renderPass, *_shader);
+		*_renderPass, _material->GetShader());
 }
 
 bool Application::Prepare(const ApplicationOptions& options)
@@ -77,7 +77,7 @@ void Application::Finish()
 Application::~Application()
 {
 	delete(_pipeline);
-	delete(_shader);
+	delete(_material);
 	delete(_scene);
 	delete(_commandBuffer);
 	delete(_framebuffer);
@@ -96,10 +96,10 @@ void Application::DrawFrame()
 
 	for (auto camera : cameras)
 	{
-		_shader->SetBuffer(currentFrame, 0, &camera->Matrices);
+		_material->SetBuffer(currentFrame, 0, &camera->Matrices);
 	}
 
-	_commandBuffer->RecordCommandBuffer(*_swapChain);
+	_commandBuffer->AcquireSwapChainAndResetCommandBuffer(*_swapChain);
 	_commandBuffer->BeginCommandBuffer();
 
 	auto framebuffer = _framebuffer->GetHandle(_commandBuffer->GetImageIndex());
@@ -113,18 +113,16 @@ void Application::DrawFrame()
 	_swapChain->GetViewportAndScissor(viewport, scissor);
 	_commandBuffer->SetViewportAndScissor(viewport, scissor);
 
-	auto descriptorLayout = _shader->GetPipelineLayout();
-	auto descriptorSet = _shader->GetDescriptorSet(currentFrame);
-	_commandBuffer->BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS,
-		descriptorLayout, descriptorSet);
+	_commandBuffer->BindDescriptorSets(
+		VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader());
 
 	{
 		auto meshes = _scene->GetComponents<Core::Mesh>();
 
 		for (auto mesh : meshes)
 		{
-			mesh->DrawFrame(*_commandBuffer, *_shader);
-			_commandBuffer->Flush(*_shader);
+			mesh->DrawFrame(*_commandBuffer, *_material);
+			_commandBuffer->Flush(*_material);
 			_commandBuffer->BindVertexBuffers(mesh->GetVertexBuffer());
 			_commandBuffer->BindIndexBuffer(mesh->GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 			_commandBuffer->DrawIndexed(mesh->GetIndexCount(), 1);

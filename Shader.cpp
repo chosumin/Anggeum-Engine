@@ -28,18 +28,6 @@ Core::Shader::~Shader()
 
 	vkDestroyDescriptorPool(vkDevice, _descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(vkDevice, _descriptorSetLayout, nullptr);
-
-	for (auto& uniformBuffer : _uniformBuffers)
-	{
-		delete(uniformBuffer.second);
-	}
-	_uniformBuffers.clear();
-
-	for (auto& textureBuffer : _textureBuffers)
-	{
-		delete(textureBuffer.second);
-	}
-	_textureBuffers.clear();
 }
 
 vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo() const
@@ -139,59 +127,6 @@ VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage() const
 	return flags;
 }
 
-vector<uint8_t>* Core::Shader::GetPushConstantsData()
-{
-	return &_pushConstants;
-}
-
-void Core::Shader::ClearPushConstantsCache()
-{
-	_pushConstants.clear();
-}
-
-void Core::Shader::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
-{
-	_uniformBuffers[binding]->SetBuffer(currentImage, data);
-}
-
-void Core::Shader::SetBuffer(uint32_t binding, VkDescriptorImageInfo& info)
-{
-	_textureBuffers[binding]->SetDescriptorImageInfo(info);
-}
-
-void Core::Shader::UpdateDescriptorSets()
-{
-	uint32_t size = static_cast<uint32_t>(_uniformBuffers.size() + _textureBuffers.size());
-
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		vector<VkWriteDescriptorSet> descriptorWrites(size);
-		for (uint32_t j = 0; j < size; j++)
-		{
-			VkWriteDescriptorSet writeDescriptorSet{};
-
-			if (_uniformBuffers.find(j) != _uniformBuffers.end())
-			{
-				writeDescriptorSet =
-					_uniformBuffers[j]->CreateWriteDescriptorSet(i);
-			}
-			else if (_textureBuffers.find(j) != _textureBuffers.end())
-			{
-				writeDescriptorSet =
-					_textureBuffers[j]->CreateWriteDescriptorSet(i);
-			}
-
-			descriptorWrites[j] = writeDescriptorSet;
-			descriptorWrites[j].dstSet = _descriptorSets[i];
-		}
-
-		vkUpdateDescriptorSets(
-			Device::Instance().GetDevice(),
-			static_cast<uint32_t>(descriptorWrites.size()),
-			descriptorWrites.data(), 0, nullptr);
-	}
-}
-
 void Core::Shader::CreateDescriptors(vector<IDescriptor*> descriptors)
 {
 	CreateDescriptorSetLayout(descriptors);
@@ -261,8 +196,6 @@ void Core::Shader::CreateDescriptorSets(vector<IDescriptor*> descriptors)
 	{
 		throw runtime_error("failed to allocate descriptor sets!");
 	}
-
-	UpdateDescriptorSets();
 }
 
 void Core::Shader::CreatePushConstants(vector<PushConstant>& pushConstants)

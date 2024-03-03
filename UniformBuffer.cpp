@@ -18,18 +18,6 @@ void Core::UniformBuffer::SetBuffer(uint32_t currentImage, void* data)
 	memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
 }
 
-VkDescriptorSetLayoutBinding Core::UniformBuffer::CreateDescriptorSetLayoutBinding()
-{
-	VkDescriptorSetLayoutBinding uboLayoutBinding{};
-	uboLayoutBinding.binding = _binding;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	uboLayoutBinding.pImmutableSamplers = nullptr;
-
-	return uboLayoutBinding;
-}
-
 VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)
 {
 	_bufferInfo.buffer = _buffers[index]->GetBuffer();
@@ -45,11 +33,6 @@ VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)
 	descriptorWrite.pBufferInfo = &_bufferInfo;
 
 	return descriptorWrite;
-}
-
-VkDescriptorType Core::UniformBuffer::GetDescriptorType()
-{
-	return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 }
 
 void Core::UniformBuffer::CreateUniformBuffer()
@@ -73,4 +56,26 @@ void Core::UniformBuffer::CreateUniformBuffer()
 			Device::Instance().GetDevice(), bufferMemory, 
 			0, bufferSize, 0, &_uniformBuffersMapped[i]);
 	}
+}
+
+Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding)
+	:_binding(binding)
+{
+}
+
+VkDescriptorSetLayoutBinding Core::UniformBufferLayoutBinding::CreateDescriptorSetLayoutBinding()
+{
+	VkDescriptorSetLayoutBinding uboLayoutBinding{};
+	uboLayoutBinding.binding = _binding;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+
+	return uboLayoutBinding;
+}
+
+VkDescriptorType Core::UniformBufferLayoutBinding::GetDescriptorType()
+{
+	return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 }

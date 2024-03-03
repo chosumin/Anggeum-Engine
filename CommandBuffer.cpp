@@ -4,6 +4,7 @@
 #include "SwapChain.h"
 #include "Shader.h"
 #include "Buffer.h"
+#include "Material.h"
 
 vector<function<void(Core::SwapChain&)>> Core::CommandBuffer::_resizeCallbacks;
 
@@ -75,24 +76,28 @@ void Core::CommandBuffer::SetViewportAndScissor(VkViewport viewport, VkRect2D sc
     vkCmdSetScissor(_commandBuffers[_currentFrame], 0, 1, &scissor);
 }
 
-void Core::CommandBuffer::BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout pipelineLayout, VkDescriptorSet* descriptorSet)
+void Core::CommandBuffer::BindDescriptorSets(
+    VkPipelineBindPoint pipelineBindPoint, Shader& shader)
 {
-    vkCmdBindDescriptorSets(
-        _commandBuffers[_currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipelineLayout, 0, 1,
-        descriptorSet, 0, nullptr);
-}
-
-void Core::CommandBuffer::Flush(Shader& shader)
-{
-    auto pushConstants = shader.GetPushConstantsData();
-    auto shaderStageFlags = shader.GetPushConstantsShaderStage();
-    vkCmdPushConstants(_commandBuffers[_currentFrame], shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
-
     auto descriptorLayout = shader.GetPipelineLayout();
     auto descriptorSet = shader.GetDescriptorSet(_currentFrame);
 
-    shader.ClearPushConstantsCache();
+    vkCmdBindDescriptorSets(
+        _commandBuffers[_currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
+        descriptorLayout, 0, 1,
+        descriptorSet, 0, nullptr);
+}
+
+void Core::CommandBuffer::Flush(Material& material)
+{
+    auto& shader = material.GetShader();
+
+    auto pushConstants = material.GetPushConstantsData();
+    auto shaderStageFlags = shader.GetPushConstantsShaderStage();
+
+    vkCmdPushConstants(_commandBuffers[_currentFrame], shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
+
+    material.ClearPushConstantsCache();
 }
 
 void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer)
@@ -113,7 +118,7 @@ void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCoun
     vkCmdDrawIndexed(_commandBuffers[_currentFrame], indexCount, instanceCount, 0, 0, 0);
 }
 
-void Core::CommandBuffer::RecordCommandBuffer(SwapChain& swapChain)
+void Core::CommandBuffer::AcquireSwapChainAndResetCommandBuffer(SwapChain& swapChain)
 {
     auto device = Device::Instance().GetDevice();
 
@@ -139,8 +144,6 @@ void Core::CommandBuffer::RecordCommandBuffer(SwapChain& swapChain)
     vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 
     vkResetCommandBuffer(_commandBuffers[_currentFrame], 0);
-
-    /*RecordCommandBuffer(_commandBuffers[_currentFrame], _imageIndex, pipeline, swapChain);*/
 }
 
 void Core::CommandBuffer::EndFrame(SwapChain& swapChain)
@@ -220,34 +223,6 @@ void Core::CommandBuffer::CreateCommandBuffers()
 
     if (vkAllocateCommandBuffers(Device::Instance().GetDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS)
         throw runtime_error("failed to allocate command buffers!");
-}
-
-void Core::CommandBuffer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-    Pipeline& pipeline, SwapChain& swapChain)
-{
-    /*VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-        throw std::runtime_error("failed to begin recording command buffer!");*/
-
-    /*VkRenderPassBeginInfo renderPassInfo = swapChain.CreateRenderPassBeginInfo(imageIndex);
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);*/
-
-    /*vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetGraphicsPipeline());*/
-
-    /*VkViewport viewport{};
-    VkRect2D scissor{};
-    swapChain.GetViewportAndScissor(viewport, scissor);
-
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);*/
-
-    /*vkCmdBindDescriptorSets(
-        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipeline.GetPipelineLayout(), 0, 1,
-        pipeline.GetDescriptorSet(_currentFrame), 0, nullptr);*/
 }
 
 void Core::CommandBuffer::EndCommandBuffer(VkCommandBuffer commandBuffer)

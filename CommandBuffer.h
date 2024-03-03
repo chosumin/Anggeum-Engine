@@ -6,6 +6,7 @@ namespace Core
 	class SwapChain;
 	class Shader;
 	class Buffer;
+	class Material;
 	class CommandBuffer
 	{
 	public:
@@ -20,13 +21,12 @@ namespace Core
 		void BindPipeline(VkPipelineBindPoint pipelineBindPoint,
 			VkPipeline pipeline);
 		void SetViewportAndScissor(VkViewport viewport, VkRect2D scissor);
-		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint,
-			VkPipelineLayout pipelineLayout, VkDescriptorSet* descriptorSet);
-		void Flush(Shader& shader);
+		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Shader& shader);
+		void Flush(Material& material);
 		void BindVertexBuffers(Buffer& buffer);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
-		void RecordCommandBuffer(SwapChain& swapChain);
+		void AcquireSwapChainAndResetCommandBuffer(SwapChain& swapChain);
 		void EndFrame(SwapChain& swapChain);
 		VkCommandPool GetCommandPool() { return _commandPool; }
 		uint32_t GetCurrentFrame() { return _currentFrame; }
@@ -39,8 +39,6 @@ namespace Core
 	private:
 		void CreateCommandPool();
 		void CreateCommandBuffers();
-		void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex,
-			Pipeline& pipeline, SwapChain& swapChain);
 		void EndCommandBuffer(VkCommandBuffer commandBuffer);
 		void CreateSyncObjects();
 	private:

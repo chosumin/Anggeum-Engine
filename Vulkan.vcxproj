@@ -148,7 +148,6 @@
     <ClCompile Include="Entity.cpp" />
     <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="FreeCamera.cpp" />
-    <ClCompile Include="IDescriptor.cpp" />
     <ClCompile Include="InputEvents.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="PerspectiveCamera.cpp" />

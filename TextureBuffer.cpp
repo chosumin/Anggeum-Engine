@@ -11,18 +11,6 @@ void Core::TextureBuffer::SetDescriptorImageInfo(VkDescriptorImageInfo& info)
 	_imageInfo = info;
 }
 
-VkDescriptorSetLayoutBinding Core::TextureBuffer::CreateDescriptorSetLayoutBinding()
-{
-	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-	samplerLayoutBinding.binding = _binding;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	return samplerLayoutBinding;
-}
-
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(size_t index)
 {
 	VkWriteDescriptorSet descriptorWrite{};
@@ -36,7 +24,24 @@ VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(size_t index)
 	return descriptorWrite;
 }
 
-VkDescriptorType Core::TextureBuffer::GetDescriptorType()
+Core::TextureBufferLayoutBinding::TextureBufferLayoutBinding(uint32_t binding)
+	:_binding(binding)
+{
+}
+
+VkDescriptorSetLayoutBinding Core::TextureBufferLayoutBinding::CreateDescriptorSetLayoutBinding()
+{
+	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+	samplerLayoutBinding.binding = _binding;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerLayoutBinding.pImmutableSamplers = nullptr;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	return samplerLayoutBinding;
+}
+
+VkDescriptorType Core::TextureBufferLayoutBinding::GetDescriptorType()
 {
 	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 }

@@ -6,7 +6,7 @@ struct Vertex;
 namespace Core
 {
 	class Buffer;
-	class Shader;
+	class Material;
 	class CommandBuffer;
 
 	struct ModelWorld
@@ -24,7 +24,7 @@ namespace Core
 		virtual std::type_index GetType() override;
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
-		void DrawFrame(CommandBuffer& commandBuffer, Shader& shader);
+		void DrawFrame(CommandBuffer& commandBuffer, Material& material);
 
 		uint32_t GetIndexCount() const 
 		{

@@ -1,28 +1,19 @@
 #include "stdafx.h"
 #include "SampleShader.h"
-#include "CameraUniformBuffer.h"
 #include "TextureBuffer.h"
 #include "Mesh.h"
-#include "Texture.h"
-#include "CommandBuffer.h"
+#include "UniformBuffer.h"
 
 namespace Core
 {
-	SampleShader::SampleShader(Device& device, CommandBuffer& commandBuffer)
+	SampleShader::SampleShader(Device& device)
 		:Shader(device,
 			"shaders/simple_vs.vert.spv",
 			"shaders/simple_fs.frag.spv")
 	{
-		auto cameraBuffer = 
-			new UniformBuffer(sizeof(VPBufferObject), 0);
-		_uniformBuffers.insert({ 0, cameraBuffer });
+		auto cameraBuffer = new UniformBufferLayoutBinding(0);
 
-		auto textureBuffer = new TextureBuffer(1);
-		_textureBuffers.insert({ 1, textureBuffer });
-
-		_texture = new Core::Texture(commandBuffer.GetCommandPool(),
-			"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
-		SetBuffer(1, _texture->GetDescriptorImageInfo());
+		auto textureBuffer = new TextureBufferLayoutBinding(1);
 
 		vector<PushConstant> pushConstants = 
 		{ 
@@ -30,11 +21,13 @@ namespace Core
 		};
 
 		CreatePipelineLayout({ cameraBuffer, textureBuffer }, pushConstants);
+
+		delete(cameraBuffer);
+		delete(textureBuffer);
 	}
 
 	SampleShader::~SampleShader()
 	{
-		delete(_texture);
 	}
 
 	type_index SampleShader::GetType()

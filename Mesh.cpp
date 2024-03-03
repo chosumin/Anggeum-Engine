@@ -5,9 +5,8 @@
 #include "Buffer.h"
 #include "Transform.h"
 #include "InputEvents.h"
-#include "IDescriptor.h"
 #include "Entity.h"
-#include "Shader.h"
+#include "Material.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -31,12 +30,12 @@ void Core::Mesh::UpdateFrame(float deltaTime)
 {
 }
 
-void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Shader& shader)
+void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Material& material)
 {
 	auto& transform = _entity.GetComponent<Transform>();
 	_modelPushConstant.World = transform.GetMatrix();
 
-	shader.SetPushConstants(_modelPushConstant);
+	material.SetPushConstants(_modelPushConstant);
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)

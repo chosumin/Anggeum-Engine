@@ -3,18 +3,14 @@
 
 namespace Core
 {
-	class Texture;
 	class CommandBuffer;
 	class SampleShader : public Shader
 	{
 	public:
-		SampleShader(Device& device, CommandBuffer& commandBuffer);
+		SampleShader(Device& device);
 		virtual ~SampleShader() override;
 
 		virtual type_index GetType() override;
-
-	private:
-		Texture* _texture;
 	};
 }
 
