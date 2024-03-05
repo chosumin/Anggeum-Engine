@@ -156,7 +156,7 @@
     <ClCompile Include="RenderContext.cpp" />
     <ClCompile Include="RenderPass.cpp" />
     <ClCompile Include="RenderTarget.cpp" />
-    <ClCompile Include="SampleRenderPass.cpp" />
+    <ClCompile Include="GeometryRenderPass.cpp" />
     <ClCompile Include="SampleScene.cpp" />
     <ClCompile Include="SampleShader.cpp" />
     <ClCompile Include="Scene.cpp" />
@@ -195,7 +195,7 @@
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="RenderPass.h" />
     <ClInclude Include="RenderTarget.h" />
-    <ClInclude Include="SampleRenderPass.h" />
+    <ClInclude Include="GeometryRenderPass.h" />
     <ClInclude Include="SampleScene.h" />
     <ClInclude Include="SampleShader.h" />
     <ClInclude Include="Scene.h" />
