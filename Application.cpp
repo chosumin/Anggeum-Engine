@@ -9,7 +9,7 @@
 #include "SampleScene.h"
 #include "Component.h"
 #include "PerspectiveCamera.h"
-#include "SampleRenderPass.h"
+#include "GeometryRenderPass.h"
 #include "Framebuffer.h"
 #include "Material.h"
 
@@ -22,14 +22,16 @@ Application::Application()
 
 	auto& device = Core::Device::Instance();
 
+	_commandBuffer = new Core::CommandBuffer();
+
 	_swapChain = new Core::SwapChain();
 	auto swapChainExtent = _swapChain->GetSwapChainExtent();
-	_renderPass = new Core::SampleRenderPass(device, swapChainExtent, _swapChain->GetImageFormat());
+
+	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _commandBuffer->GetCommandPool());
+
+	_renderPass = new Core::GeometryRenderPass(device, swapChainExtent, _swapChain->GetImageFormat(), *_scene);
 	_framebuffer = new Core::Framebuffer(device, *_swapChain, *_renderPass);
 
-	_commandBuffer = new Core::CommandBuffer();
-	
-	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _commandBuffer->GetCommandPool());
 
 	_material = new Core::Material(device, *_commandBuffer);
 

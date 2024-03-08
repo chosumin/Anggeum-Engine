@@ -38,8 +38,9 @@ namespace Core
 		void CreateRenderPass();
 	private:
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
-	private:
+	protected:
 		Device& _device;
+	private:
 		VkRenderPass _renderPass;
 
 		vector<unique_ptr<RenderTarget>> _renderTargets;
