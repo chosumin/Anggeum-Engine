@@ -9,7 +9,12 @@
 
 int main()
 {
-	Application application;
+	Core::Window::Instance().Initialize(2000, 1000, "Vulkan");
+
+	ApplicationOptions options{ false, &Core::Window::Instance() };
+	Application application(options);
+	
+	application.Prepare();
 
 	while (Core::Window::Instance().IsClosed() == false)
 	{

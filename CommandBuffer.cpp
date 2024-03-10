@@ -124,8 +124,9 @@ void Core::CommandBuffer::AcquireSwapChainAndResetCommandBuffer(SwapChain& swapC
 
     vkWaitForFences(device, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
 
+    auto swapChainHandle = swapChain.GetSwapChain();
     VkResult result = vkAcquireNextImageKHR(
-        device, swapChain.GetSwapChain(), UINT64_MAX,
+        device, swapChainHandle, UINT64_MAX,
         _imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &_imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)

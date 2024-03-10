@@ -176,10 +176,6 @@ void key_callback(GLFWwindow* window, int key, int /*scancode*/, int action, int
 	KeyAction key_action = translate_key_action(action);
 
 	Core::Input::InputEvent(Core::KeyInputEvent{ key_code, key_action });
-	//if (auto application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
-	//{
-	//	application->InputEvent(Core::KeyInputEvent{ key_code, key_action });
-	//}
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
@@ -189,15 +185,6 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 			MouseAction::Move,
 			static_cast<float>(xpos),
 			static_cast<float>(ypos) });
-
-	/*if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
-	{
-		application->InputEvent(Core::MouseButtonInputEvent{
-			MouseButton::Unknown,
-			MouseAction::Move,
-			static_cast<float>(xpos),
-			static_cast<float>(ypos) });
-	}*/
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int /*mods*/)
@@ -212,19 +199,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int /*mod
 			mouse_action,
 			static_cast<float>(xpos),
 			static_cast<float>(ypos) });
-
-
-	/*if (auto* application = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window)))
-	{
-		double xpos, ypos;
-		glfwGetCursorPos(window, &xpos, &ypos);
-
-		application->InputEvent(Core::MouseButtonInputEvent{
-			translate_mouse_button(button),
-			mouse_action,
-			static_cast<float>(xpos),
-			static_cast<float>(ypos) });
-	}*/
 }
 
 Core::Window::Window()
@@ -236,7 +210,7 @@ Core::Window::~Window()
 {
 }
 
-void Core::Window::Initialize(int width, int height, const string& windowName, void* application)
+void Core::Window::Initialize(int width, int height, const string& windowName)
 {
 	_width = width;
 	_height = height;
@@ -250,7 +224,6 @@ void Core::Window::Initialize(int width, int height, const string& windowName, v
 	_window = glfwCreateWindow(_width, _height, _windowName.c_str(), nullptr, nullptr);
 	glfwSetFramebufferSizeCallback(_window, Window::FramebufferResizeCallback);
 
-	glfwSetWindowUserPointer(_window, application);
 	glfwSetKeyCallback(_window, key_callback);
 	glfwSetCursorPosCallback(_window, cursor_position_callback);
 	glfwSetMouseButtonCallback(_window, mouse_button_callback);

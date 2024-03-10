@@ -3,7 +3,7 @@
 
 namespace Core
 {
-	//class Entity;
+	class PerspectiveCamera;
 	class Component;
 	class Scene
 	{
@@ -20,16 +20,12 @@ namespace Core
 		void AddComponent(unique_ptr<Component>&& component);
 		void AddComponent(unique_ptr<Component>&& component, Entity& entity);
 
-		/**
-		 * @brief Set list of components for the given type
-		 * @param type_info The type of the component
-		 * @param components The list of components (retained)
-		 */
+		//Set list of components for the given type
+		//@param type_info The type of the component
+		//@param components The list of components (retained)
 		void SetComponents(const type_index& type_info, vector<unique_ptr<Component>>&& components);
 
-		/**
-		 * @brief Set list of components casted from the given template type
-		 */
+		//Set list of components casted from the given template type
 		template <class T>
 		void SetComponents(vector<unique_ptr<T>>&& components)
 		{
@@ -41,18 +37,14 @@ namespace Core
 			SetComponents(typeid(T), move(result));
 		}
 
-		/**
-		 * @brief Clears a list of components
-		 */
+		//Clear a list of components
 		template <class T>
 		void ClearComponents()
 		{
 			SetComponents(typeid(T), {});
 		}
 
-		/**
-		 * @return List of pointers to components casted to the given template type
-		 */
+		//Return list of pointers to components casted to the given template type
 		template <class T>
 		vector<T*> GetComponents() const
 		{
@@ -82,10 +74,8 @@ namespace Core
 
 			return result;
 		}
-
-		/**
-		 * @return List of components for the given type
-		 */
+		
+		//Return list of components for the given type
 		const vector<unique_ptr<Component>>& GetComponents(const type_index& type_info) const;
 
 		template <class T>
@@ -100,6 +90,7 @@ namespace Core
 		void SetRootEntity(Entity& entity);
 		Entity& GetRootEntity();
 
+		PerspectiveCamera& GetMainCamera() const;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;

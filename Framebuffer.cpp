@@ -7,7 +7,7 @@
 Core::Framebuffer::Framebuffer(Device& device, SwapChain& swapChain, RenderPass& renderPass)
 	:_device{device}, _renderPass(renderPass)
 {
-    //todo : renderPass
+    _extent = swapChain.GetSwapChainExtent();
     CreateFramebuffers(swapChain);
 
     auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
@@ -31,6 +31,8 @@ void Core::Framebuffer::Cleanup()
 void Core::Framebuffer::Resize(SwapChain& swapChain)
 {
     Cleanup();
+
+    _extent = swapChain.GetSwapChainExtent();
     CreateFramebuffers(swapChain);
 }
 

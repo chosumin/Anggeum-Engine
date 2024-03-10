@@ -12,7 +12,7 @@ namespace Core
 		}
 		static bool FramebufferResized;
 	public:
-		void Initialize(int width, int height, const string& windowName, void* application);
+		void Initialize(int width, int height, const string& windowName);
 		void Delete();
 
 		bool IsClosed();

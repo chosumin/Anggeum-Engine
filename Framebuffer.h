@@ -16,6 +16,11 @@ namespace Core
 			return _framebuffers[imageIndex];
 		}
 
+		VkExtent2D GetExtent() const
+		{
+			return _extent;
+		}
+
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 	private:
@@ -23,6 +28,7 @@ namespace Core
 	private:
 		Device& _device;
 		RenderPass& _renderPass;
+		VkExtent2D _extent;
 		vector<VkFramebuffer> _framebuffers;
 	};
 }

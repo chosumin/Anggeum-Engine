@@ -15,6 +15,7 @@ namespace Core
 
 	class Device;
 	class SwapChain;
+	class CommandBuffer;
 	class RenderPass
 	{
 	public:
@@ -29,8 +30,8 @@ namespace Core
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 
-		virtual void Prepare() = 0;
-		virtual void Draw() = 0;
+		virtual void Prepare(CommandBuffer& commandBuffer) = 0;
+		virtual void Draw(CommandBuffer& commandBuffer) = 0;
 	protected:
 		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags);
 		void CreateDepthRenderTarget(VkExtent2D extent);
