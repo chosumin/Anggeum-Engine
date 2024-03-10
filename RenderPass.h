@@ -31,7 +31,8 @@ namespace Core
 		void Resize(SwapChain& swapChain);
 
 		virtual void Prepare(CommandBuffer& commandBuffer) = 0;
-		virtual void Draw(CommandBuffer& commandBuffer) = 0;
+		virtual void Draw(CommandBuffer& commandBuffer, 
+			uint32_t currentFrame) = 0;
 	protected:
 		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags);
 		void CreateDepthRenderTarget(VkExtent2D extent);
@@ -41,6 +42,7 @@ namespace Core
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
 	protected:
 		Device& _device;
+		Framebuffer* _framebuffer;
 	private:
 		VkRenderPass _renderPass;
 

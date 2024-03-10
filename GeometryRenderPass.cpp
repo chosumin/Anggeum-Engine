@@ -40,10 +40,10 @@ namespace Core
 			*this, _material->GetShader());
 	}
 
-	void GeometryRenderPass::Draw(CommandBuffer& commandBuffer)
+	void GeometryRenderPass::Draw(
+		CommandBuffer& commandBuffer, 
+		uint32_t currentFrame)
 	{
-		uint32_t currentFrame = commandBuffer.GetCurrentFrame();
-
 		PerspectiveCamera& camera = _scene.GetMainCamera();
 
 		//todo : sort

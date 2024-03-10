@@ -18,12 +18,11 @@ namespace Core
 		virtual ~GeometryRenderPass() override;
 
 		virtual void Prepare(CommandBuffer& commandBuffer) override;
-		virtual void Draw(CommandBuffer& commandBuffer) override;
+		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame) override;
 	private:
 		Scene& _scene;
 		Material* _material;
 		Pipeline* _pipeline;
-		Framebuffer* _framebuffer;
 	};
 }
 

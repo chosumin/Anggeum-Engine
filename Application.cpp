@@ -29,7 +29,7 @@ bool Application::Prepare()
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
-	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext->GetCommandBuffer().GetCommandPool());
+	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext->GetCommandPool());
 
 	_renderPass = new Core::GeometryRenderPass(device, swapChainExtent, *_scene, swapChain);
 	_renderPass->Prepare(_renderContext->GetCommandBuffer());

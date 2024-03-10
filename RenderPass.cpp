@@ -3,6 +3,7 @@
 #include "Utility.h"
 #include "SwapChain.h"
 #include "CommandBuffer.h"
+#include "RenderContext.h"
 
 namespace Core
 {
@@ -12,7 +13,7 @@ namespace Core
         _msaaSamples = GetMaxUsableSampleCount();
 
         auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
-        Core::CommandBuffer::AddResizeCallback(a);
+        Core::RenderContext::AddResizeCallback(a);
 	}
 
 	RenderPass::~RenderPass()
@@ -20,7 +21,7 @@ namespace Core
         Cleanup();
 
         auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
-        Core::CommandBuffer::RemoveResizeCallback(a);
+        Core::RenderContext::RemoveResizeCallback(a);
 	}
 
     VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent)
