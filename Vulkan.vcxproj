@@ -143,6 +143,7 @@
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="CameraUniformBuffer.cpp" />
     <ClCompile Include="CommandBuffer.cpp" />
+    <ClCompile Include="CommandPool.cpp" />
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Entity.cpp" />
@@ -180,6 +181,7 @@
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="CameraUniformBuffer.h" />
     <ClInclude Include="CommandBuffer.h" />
+    <ClInclude Include="CommandPool.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Entity.h" />

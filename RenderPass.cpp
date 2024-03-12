@@ -4,6 +4,7 @@
 #include "SwapChain.h"
 #include "CommandBuffer.h"
 #include "RenderContext.h"
+#include "Framebuffer.h"
 
 namespace Core
 {

@@ -32,7 +32,7 @@ bool Application::Prepare()
 	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext->GetCommandPool());
 
 	_renderPass = new Core::GeometryRenderPass(device, swapChainExtent, *_scene, swapChain);
-	_renderPass->Prepare(_renderContext->GetCommandBuffer());
+	_renderPass->Prepare(_renderContext->GetCommandPool());
 
 	return true;
 }
@@ -73,7 +73,9 @@ void Application::DrawFrame()
 {
 	auto& commandBuffer = _renderContext->Begin();
 
-	_renderPass->Draw(commandBuffer);
+	_renderPass->Draw(commandBuffer, 
+		_renderContext->GetCurrentFrame(), 
+		_renderContext->GetImageIndex());
 
 	_renderContext->Submit(commandBuffer);
 }

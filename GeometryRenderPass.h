@@ -17,8 +17,8 @@ namespace Core
 			Scene& scene, SwapChain& swapChain);
 		virtual ~GeometryRenderPass() override;
 
-		virtual void Prepare(CommandBuffer& commandBuffer) override;
-		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame) override;
+		virtual void Prepare(VkCommandPool commandPool) override;
+		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 	private:
 		Scene& _scene;
 		Material* _material;

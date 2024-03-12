@@ -2,7 +2,7 @@
 #include "Framebuffer.h"
 #include "RenderPass.h"
 #include "SwapChain.h"
-#include "CommandBuffer.h"
+#include "RenderContext.h"
 
 Core::Framebuffer::Framebuffer(Device& device, SwapChain& swapChain, RenderPass& renderPass)
 	:_device{device}, _renderPass(renderPass)
@@ -11,7 +11,7 @@ Core::Framebuffer::Framebuffer(Device& device, SwapChain& swapChain, RenderPass&
     CreateFramebuffers(swapChain);
 
     auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
-    Core::CommandBuffer::AddResizeCallback(a);
+    Core::RenderContext::AddResizeCallback(a);
 }
 
 Core::Framebuffer::~Framebuffer()
@@ -19,7 +19,7 @@ Core::Framebuffer::~Framebuffer()
     Cleanup();
 
     auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
-    Core::CommandBuffer::RemoveResizeCallback(a);
+    Core::RenderContext::RemoveResizeCallback(a);
 }
 
 void Core::Framebuffer::Cleanup()

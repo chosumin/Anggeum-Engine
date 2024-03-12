@@ -16,6 +16,7 @@ namespace Core
 	class Device;
 	class SwapChain;
 	class CommandBuffer;
+	class Framebuffer;
 	class RenderPass
 	{
 	public:
@@ -30,9 +31,9 @@ namespace Core
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 
-		virtual void Prepare(CommandBuffer& commandBuffer) = 0;
+		virtual void Prepare(VkCommandPool commandPool) = 0;
 		virtual void Draw(CommandBuffer& commandBuffer, 
-			uint32_t currentFrame) = 0;
+			uint32_t currentFrame, uint32_t imageIndex) = 0;
 	protected:
 		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags);
 		void CreateDepthRenderTarget(VkExtent2D extent);

@@ -5,10 +5,19 @@
 #include "Shader.h"
 #include "Buffer.h"
 #include "Material.h"
+#include "CommandPool.h"
 
-Core::CommandBuffer::CommandBuffer(VkCommandBuffer commandBuffer)
-    :_commandBuffer(commandBuffer)
+Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool)
+    :_device(device)
 {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool.GetHandle();
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(_device.GetDevice(), &allocInfo, &_commandBuffer) != VK_SUCCESS)
+        throw runtime_error("failed to allocate command buffers!");
 }
 
 void Core::CommandBuffer::ResetCommandBuffer()

@@ -4,6 +4,7 @@ namespace Core
 {
 	class CommandBuffer;
 	class SwapChain;
+	class CommandPool;
 	class RenderContext
 	{
 	public:
@@ -27,10 +28,6 @@ namespace Core
 		void RecreateSwapChain();
 
 		CommandBuffer& Begin();
-		CommandBuffer& GetCommandBuffer() 
-		{
-			return *_commandBuffers[_currentFrame];
-		}
 
 		void Submit(CommandBuffer& commandBuffer);
 		void Submit(const vector<CommandBuffer*>& commandBuffers);
@@ -41,7 +38,7 @@ namespace Core
 		VkExtent2D GetSurfaceExtent() const;
 		uint32_t GetCurrentFrame() { return _currentFrame; }
 
-		VkCommandPool GetCommandPool() { return _commandPool; }
+		CommandPool& GetCommandPool() { return *_commandPool; }
 
 		uint32_t GetImageIndex() const { return _imageIndex; }
 		//RenderFrame& GetActiveFrame();
@@ -54,11 +51,9 @@ namespace Core
 
 		//VkSemaphore ConsumeAcquiredSemaphore();
 	private:
-		void CreateCommandPool();
-		void CreateCommandBuffers();
 		void CreateSyncObjects();
 
-		void AcquireSwapChainAndResetCommandBuffer(SwapChain& swapChain);
+		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
 		void EndFrame(SwapChain& swapChain);
 	private:
 		Device& _device;
@@ -66,12 +61,10 @@ namespace Core
 		SwapChain* _swapChain;
 		//vector<unique_ptr<RenderFrame>> _frames;
 		uint32_t _currentFrame = 0;
-		bool _frameActive{ false };
 
 		size_t _threadCount{ 1 };
 
-		VkCommandPool _commandPool;
-		vector<CommandBuffer*> _commandBuffers;
+		CommandPool* _commandPool;
 
 		uint32_t _imageIndex;
 		vector<VkSemaphore> _imageAvailableSemaphores;

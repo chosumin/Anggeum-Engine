@@ -2,6 +2,7 @@
 #include "RenderContext.h"
 #include "SwapChain.h"
 #include "CommandBuffer.h"
+#include "CommandPool.h"
 
 namespace Core
 {
@@ -34,8 +35,10 @@ namespace Core
 	{
 		_swapChain = new SwapChain();
 
-		CreateCommandPool();
-		CreateCommandBuffers();
+		auto queueFamilyIndices = device.FindQueueFamilies();
+		_commandPool = new CommandPool(device,
+			queueFamilyIndices.GraphicsAndComputeFamily.value());
+
 		CreateSyncObjects();
 	}
 
@@ -51,13 +54,7 @@ namespace Core
 		}
 
 		delete(_swapChain);
-
-		for (auto commandBuffer : _commandBuffers)
-		{
-			delete(commandBuffer);
-		}
-
-		vkDestroyCommandPool(device, _commandPool, nullptr);
+		delete(_commandPool);
 	}
 
 	void RenderContext::Prepare(size_t threadCount)
@@ -76,7 +73,17 @@ namespace Core
 	CommandBuffer& RenderContext::Begin()
 	{
 		BeginFrame();
-		return *_commandBuffers[_currentFrame];
+
+		auto& commandBuffer = _commandPool->RequestCommandBuffer();
+		commandBuffer.BeginCommandBuffer();
+
+		VkViewport viewport;
+		VkRect2D scissor;
+		_swapChain->GetViewportAndScissor(viewport, scissor);
+
+		commandBuffer.SetViewportAndScissor(viewport, scissor);
+
+		return _commandPool->RequestCommandBuffer();
 	}
 
 	void RenderContext::Submit(CommandBuffer& commandBuffer)
@@ -95,14 +102,9 @@ namespace Core
 
 	void RenderContext::BeginFrame()
 	{
-		AcquireSwapChainAndResetCommandBuffer(*_swapChain);
+		AcquireSwapChainAndResetFence(*_swapChain);
 
-		_commandBuffers[_currentFrame]->BeginCommandBuffer();
-
-		VkViewport viewport;
-		VkRect2D scissor;
-		_swapChain->GetViewportAndScissor(viewport, scissor);
-		_commandBuffers[_currentFrame]->SetViewportAndScissor(viewport, scissor);
+		_commandPool->ResetCommandBuffers();
 	}
 
 	SwapChain& RenderContext::GetSwapChain() const
@@ -113,41 +115,6 @@ namespace Core
 	VkExtent2D RenderContext::GetSurfaceExtent() const
 	{
 		return _swapChain->GetSwapChainExtent();
-	}
-
-	void RenderContext::CreateCommandPool()
-	{
-		QueueFamilyIndices queueFamilyIndices = Device::Instance().FindQueueFamilies();
-
-		VkCommandPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsAndComputeFamily.value();
-
-		auto device = Device::Instance().GetDevice();
-		if (vkCreateCommandPool(device, &poolInfo, nullptr, &_commandPool) != VK_SUCCESS)
-			throw runtime_error("failed to create command pool!");
-	}
-
-	void RenderContext::CreateCommandBuffers()
-	{
-		vector<VkCommandBuffer> commandBuffers(MAX_FRAMES_IN_FLIGHT);
-
-		VkCommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandPool = _commandPool;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
-
-		if (vkAllocateCommandBuffers(Device::Instance().GetDevice(), &allocInfo, commandBuffers.data()) != VK_SUCCESS)
-			throw runtime_error("failed to allocate command buffers!");
-
-		_commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-		for (size_t i = 0; i < _commandBuffers.size(); ++i)
-		{
-			_commandBuffers[i] = 
-				new CommandBuffer(commandBuffers[i]);
-		}
 	}
 
 	void RenderContext::CreateSyncObjects()
@@ -174,7 +141,7 @@ namespace Core
 		}
 	}
 
-	void RenderContext::AcquireSwapChainAndResetCommandBuffer(SwapChain& swapChain)
+	void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	{
 		auto device = Device::Instance().GetDevice();
 
@@ -194,8 +161,6 @@ namespace Core
 			throw runtime_error("failed to acquire swap chain image!");
 
 		vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
-
-		_commandBuffers[_currentFrame]->ResetCommandBuffer();
 	}
 
 	void RenderContext::EndFrame(SwapChain& swapChain)

@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "Material.h"
 #include "Texture.h"
-#include "CommandBuffer.h"
 #include "SampleShader.h"
 #include "UniformBuffer.h"
 #include "CameraUniformBuffer.h"
@@ -9,12 +8,12 @@
 
 namespace Core
 {
-	Material::Material(Device& device, CommandBuffer& commandBuffer)
+	Material::Material(Device& device, VkCommandPool& commandPool)
 		:_device(device)
 	{
-		_shader = new Core::SampleShader(device);
+		_shader = new SampleShader(device);
 
-		_texture = new Core::Texture(commandBuffer.GetCommandPool(),
+		_texture = new Texture(commandPool,
 			"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
 		
 		//hack : binding duplication declaration.

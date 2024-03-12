@@ -29,12 +29,12 @@ namespace Core
 		delete(_framebuffer);
 	}
 
-	void GeometryRenderPass::Prepare(CommandBuffer& commandBuffer)
+	void GeometryRenderPass::Prepare(VkCommandPool commandPool)
 	{
 		//todo : collect meshes.
 		//todo : push back materials.
 
-		_material = new Core::Material(_device, commandBuffer);
+		_material = new Core::Material(_device, commandPool);
 
 		_pipeline = new Core::Pipeline(_device,
 			*this, _material->GetShader());
@@ -42,13 +42,13 @@ namespace Core
 
 	void GeometryRenderPass::Draw(
 		CommandBuffer& commandBuffer, 
-		uint32_t currentFrame)
+		uint32_t currentFrame, uint32_t imageIndex)
 	{
 		PerspectiveCamera& camera = _scene.GetMainCamera();
 
 		//todo : sort
 
-		auto framebuffer = _framebuffer->GetHandle(commandBuffer.GetImageIndex());
+		auto framebuffer = _framebuffer->GetHandle(imageIndex);
 		auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 		commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -57,7 +57,7 @@ namespace Core
 		_material->SetBuffer(currentFrame, 0, &camera.Matrices);
 
 		commandBuffer.BindDescriptorSets(
-			VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader());
+			VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader(), currentFrame);
 
 		auto meshes = _scene.GetComponents<Core::Mesh>();
 		for (auto mesh : meshes)
