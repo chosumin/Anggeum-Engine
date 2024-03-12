@@ -74,7 +74,7 @@ namespace Core
 	{
 		BeginFrame();
 
-		auto& commandBuffer = _commandPool->RequestCommandBuffer();
+		auto& commandBuffer = _commandPool->RequestCommandBuffer(_currentFrame);
 		commandBuffer.BeginCommandBuffer();
 
 		VkViewport viewport;
@@ -83,7 +83,7 @@ namespace Core
 
 		commandBuffer.SetViewportAndScissor(viewport, scissor);
 
-		return _commandPool->RequestCommandBuffer();
+		return commandBuffer;
 	}
 
 	void RenderContext::Submit(CommandBuffer& commandBuffer)
@@ -93,18 +93,37 @@ namespace Core
 
 	void RenderContext::Submit(const vector<CommandBuffer*>& commandBuffers)
 	{
-		for (auto commandBuffer : commandBuffers)
-		{
-			commandBuffer->EndCommandBuffer();
-			EndFrame(*_swapChain);
-		}
+		std::vector<VkCommandBuffer> cmdHandles(commandBuffers.size(), VK_NULL_HANDLE);
+		std::transform(commandBuffers.begin(), commandBuffers.end(),
+			cmdHandles.begin(), [](const CommandBuffer* cmd) { return cmd->GetHandle(); });
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = waitSemaphores;
+		submitInfo.pWaitDstStageMask = waitStages;
+
+		submitInfo.commandBufferCount = static_cast<uint32_t>(cmdHandles.size());
+		submitInfo.pCommandBuffers = cmdHandles.data();
+
+		VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = signalSemaphores;
+
+		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS)
+			throw runtime_error("failed to submit draw command buffer!");
+
+		EndFrame(signalSemaphores);
 	}
 
 	void RenderContext::BeginFrame()
 	{
 		AcquireSwapChainAndResetFence(*_swapChain);
 
-		_commandPool->ResetCommandBuffers();
+		_commandPool->ResetCommandBuffers(_currentFrame);
 	}
 
 	SwapChain& RenderContext::GetSwapChain() const
@@ -163,35 +182,15 @@ namespace Core
 		vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 	}
 
-	void RenderContext::EndFrame(SwapChain& swapChain)
+	void RenderContext::EndFrame(VkSemaphore* semaphore)
 	{
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
-
-		//todo : handle multi thread 
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &_commandBuffers[_currentFrame]->GetHandle();
-
-		VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = signalSemaphores;
-
-		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS)
-			throw runtime_error("failed to submit draw command buffer!");
-
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = signalSemaphores;
+		presentInfo.pWaitSemaphores = semaphore;
 
-		VkSwapchainKHR swapChains[] = { swapChain.GetSwapChain() };
+		VkSwapchainKHR swapChains[] = { _swapChain->GetSwapChain() };
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
 		presentInfo.pImageIndices = &_imageIndex;

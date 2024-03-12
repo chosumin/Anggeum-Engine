@@ -30,7 +30,8 @@ void Core::CommandBuffer::BeginCommandBuffer()
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    if (vkBeginCommandBuffer(_commandBuffer, &beginInfo) != VK_SUCCESS)
+    auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+    if (result != VK_SUCCESS)
         throw std::runtime_error("failed to begin recording command buffer!");
 }
 
@@ -92,10 +93,13 @@ void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCoun
     vkCmdDrawIndexed(_commandBuffer, indexCount, instanceCount, 0, 0, 0);
 }
 
-void Core::CommandBuffer::EndCommandBuffer()
+void Core::CommandBuffer::EndRenderPass()
 {
     vkCmdEndRenderPass(_commandBuffer);
+}
 
+void Core::CommandBuffer::EndCommandBuffer()
+{
     if (vkEndCommandBuffer(_commandBuffer) != VK_SUCCESS)
         throw std::runtime_error("failed to record command buffer!");
 }

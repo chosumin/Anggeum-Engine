@@ -8,12 +8,13 @@
 #include "CommandBuffer.h"
 #include "Framebuffer.h"
 #include "SwapChain.h"
+#include "CommandPool.h"
 
 namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, 
 		VkExtent2D extent, Scene& scene, SwapChain& swapChain)
-		:RenderPass(device), _scene(scene)
+		:RenderPass(device), _scene(scene), _material(nullptr), _pipeline(nullptr)
 	{
 		CreateColorRenderTarget(extent, swapChain.GetImageFormat());
 		CreateDepthRenderTarget(extent);
@@ -29,7 +30,7 @@ namespace Core
 		delete(_framebuffer);
 	}
 
-	void GeometryRenderPass::Prepare(VkCommandPool commandPool)
+	void GeometryRenderPass::Prepare(CommandPool& commandPool)
 	{
 		//todo : collect meshes.
 		//todo : push back materials.
@@ -68,5 +69,7 @@ namespace Core
 			commandBuffer.BindIndexBuffer(mesh->GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 			commandBuffer.DrawIndexed(mesh->GetIndexCount(), 1);
 		}
+
+		commandBuffer.EndRenderPass();
 	}
 }

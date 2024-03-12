@@ -7,11 +7,12 @@
 #include "InputEvents.h"
 #include "Entity.h"
 #include "Material.h"
+#include "CommandPool.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::Mesh::Mesh(Entity& entity, VkCommandPool commandPool, string modelPath)
+Core::Mesh::Mesh(Entity& entity, CommandPool& commandPool, string modelPath)
 	:Component(entity)
 {
 	LoadModel(modelPath);
@@ -82,7 +83,7 @@ void Core::Mesh::LoadModel(const string& modelPath)
 	}
 }
 
-void Core::Mesh::CreateVertexBuffer(VkCommandPool commandPool)
+void Core::Mesh::CreateVertexBuffer(CommandPool& commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_vertices[0]) * _vertices.size();
 
@@ -97,10 +98,10 @@ void Core::Mesh::CreateVertexBuffer(VkCommandPool commandPool)
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	//vertex memory is moved from CPU to GPU
-	_vertexBuffer->CopyBuffer(commandPool, stagingBuffer.GetBuffer(), bufferSize);
+	_vertexBuffer->CopyBuffer(commandPool.GetHandle(), stagingBuffer.GetBuffer(), bufferSize);
 }
 
-void Core::Mesh::CreateIndexBuffer(VkCommandPool commandPool)
+void Core::Mesh::CreateIndexBuffer(CommandPool& commandPool)
 {
 	VkDeviceSize bufferSize = sizeof(_indices[0]) * _indices.size();
 
@@ -114,7 +115,7 @@ void Core::Mesh::CreateIndexBuffer(VkCommandPool commandPool)
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	_indexBuffer->CopyBuffer(commandPool, stagingBuffer.GetBuffer(), bufferSize);
+	_indexBuffer->CopyBuffer(commandPool.GetHandle(), stagingBuffer.GetBuffer(), bufferSize);
 }
 
 std::type_index Core::Mesh::GetType()

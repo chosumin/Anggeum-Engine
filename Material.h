@@ -7,10 +7,11 @@ namespace Core
 	class Texture;
 	class UniformBuffer;
 	class TextureBuffer;
+	class CommandPool;
 	class Material
 	{
 	public:
-		Material(Device& device, VkCommandPool& commandPool);
+		Material(Device& device, CommandPool& commandPool);
 		virtual ~Material();
 
 		Shader& GetShader() const;

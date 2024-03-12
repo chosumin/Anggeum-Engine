@@ -1,10 +1,14 @@
 #pragma once
 #include "Component.h"
-#include "CameraUniformBuffer.h"
 
 namespace Core
 {
-	struct VPBufferObject;
+	struct VPBufferObject
+	{
+		alignas(16) mat4 View;
+		alignas(16) mat4 Perspective;
+	};
+
 	class PerspectiveCamera : public Component
 	{
 	public:

@@ -15,7 +15,7 @@ namespace Core
 		CommandBuffer(Device& device, CommandPool& commandPool);
 		~CommandBuffer() = default;
 
-		VkCommandBuffer& GetHandle() { return _commandBuffer; }
+		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
 
 		void ResetCommandBuffer();
 		void BeginCommandBuffer();
@@ -28,6 +28,7 @@ namespace Core
 		void BindVertexBuffers(Buffer& buffer);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
+		void EndRenderPass();
 		void EndCommandBuffer();
 	private:
 		Device& _device;

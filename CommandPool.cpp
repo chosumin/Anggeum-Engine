@@ -6,7 +6,7 @@ namespace Core
 {
 	CommandPool::CommandPool(Device& device,
 		uint32_t queueFamilyIndex,
-		size_t threadIndex = 0)
+		size_t threadIndex)
 		:_device(device), _queueFamilyIndex(queueFamilyIndex),
 		_threadIndex(threadIndex)
 	{
@@ -15,7 +15,6 @@ namespace Core
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		poolInfo.queueFamilyIndex = queueFamilyIndex;
 
-		auto device = Device::Instance().GetDevice();
 		if (vkCreateCommandPool(device.GetDevice(), &poolInfo, nullptr, &_commandPool) != VK_SUCCESS)
 			throw runtime_error("failed to create command pool!");
 	}
@@ -27,30 +26,21 @@ namespace Core
 		vkDestroyCommandPool(_device.GetDevice(), _commandPool, nullptr);
 	}
 
-	CommandBuffer& CommandPool::RequestCommandBuffer()
+	CommandBuffer& CommandPool::RequestCommandBuffer(uint32_t currentFrame)
 	{
-		if (activeCommandBufferCount < _commandBuffers.size())
+		if (currentFrame < _commandBuffers.size())
 		{
-			return *_commandBuffers[activeCommandBufferCount++];
+			return *_commandBuffers[currentFrame];
 		}
 
-		//todo : use MAX_FRAMES_IN_FLIGHT;
-		_commandBuffers.emplace_back(make_unique<CommandBuffer>(*this));
-
-		activeCommandBufferCount++;
+		_commandBuffers.emplace_back(make_unique<CommandBuffer>(_device, *this));
 
 		return *_commandBuffers.back();
 	}
 
-	void CommandPool::ResetCommandBuffers()
+	void CommandPool::ResetCommandBuffers(uint32_t currentFrame)
 	{
-		VkResult result = VK_SUCCESS;
-
-		for (auto& commandBuffer : _commandBuffers)
-		{
-			commandBuffer->ResetCommandBuffer();
-		}
-
-		activeCommandBufferCount = 0;
+		if (currentFrame < _commandBuffers.size())
+			_commandBuffers[currentFrame]->ResetCommandBuffer();
 	}
 }

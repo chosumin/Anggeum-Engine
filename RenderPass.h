@@ -17,6 +17,7 @@ namespace Core
 	class SwapChain;
 	class CommandBuffer;
 	class Framebuffer;
+	class CommandPool;
 	class RenderPass
 	{
 	public:
@@ -31,7 +32,7 @@ namespace Core
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 
-		virtual void Prepare(VkCommandPool commandPool) = 0;
+		virtual void Prepare(CommandPool& commandPool) = 0;
 		virtual void Draw(CommandBuffer& commandBuffer, 
 			uint32_t currentFrame, uint32_t imageIndex) = 0;
 	protected:

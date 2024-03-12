@@ -8,6 +8,7 @@ namespace Core
 	class Buffer;
 	class Material;
 	class CommandBuffer;
+	class CommandPool;
 
 	struct ModelWorld
 	{
@@ -17,7 +18,7 @@ namespace Core
 	class Mesh : public Component
 	{
 	public:
-		Mesh(Entity& entity, VkCommandPool commandPool, string modelPath);
+		Mesh(Entity& entity, CommandPool& commandPool, string modelPath);
 		~Mesh();
 
 		virtual void UpdateFrame(float deltaTime) override;
@@ -35,8 +36,8 @@ namespace Core
 		Buffer& GetIndexBuffer() { return *_indexBuffer; }
 	private:
 		void LoadModel(const string& modelPath);
-		void CreateVertexBuffer(VkCommandPool commandPool);
-		void CreateIndexBuffer(VkCommandPool commandPool);
+		void CreateVertexBuffer(CommandPool& commandPool);
+		void CreateIndexBuffer(CommandPool& commandPool);
 	private:
 		//clockwise.
 		vector<Vertex> _vertices;

@@ -3,12 +3,12 @@
 #include "Texture.h"
 #include "SampleShader.h"
 #include "UniformBuffer.h"
-#include "CameraUniformBuffer.h"
 #include "TextureBuffer.h"
-
+#include "PerspectiveCamera.h"
+#include "CommandPool.h"
 namespace Core
 {
-	Material::Material(Device& device, VkCommandPool& commandPool)
+	Material::Material(Device& device, CommandPool& commandPool)
 		:_device(device)
 	{
 		_shader = new SampleShader(device);

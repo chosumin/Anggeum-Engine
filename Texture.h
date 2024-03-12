@@ -12,10 +12,11 @@ namespace Core
 		Rgb_alpha = 4
 	};
 
+	class CommandPool;
 	class Texture
 	{
 	public:
-		Texture(VkCommandPool commandPool, string fileName, TextureFormat format, uint32_t binding);
+		Texture(CommandPool& commandPool, string fileName, TextureFormat format, uint32_t binding);
 		~Texture();
 
 		VkDescriptorImageInfo& GetDescriptorImageInfo() 

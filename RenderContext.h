@@ -30,7 +30,6 @@ namespace Core
 		CommandBuffer& Begin();
 
 		void Submit(CommandBuffer& commandBuffer);
-		void Submit(const vector<CommandBuffer*>& commandBuffers);
 
 		void BeginFrame();
 
@@ -54,7 +53,8 @@ namespace Core
 		void CreateSyncObjects();
 
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
-		void EndFrame(SwapChain& swapChain);
+		void Submit(const vector<CommandBuffer*>& commandBuffers);
+		void EndFrame(VkSemaphore* semaphore);
 	private:
 		Device& _device;
 

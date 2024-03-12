@@ -5,9 +5,10 @@
 #include "PerspectiveCamera.h"
 #include "FreeCamera.h"
 #include "Mesh.h"
+#include "CommandPool.h"
 using namespace Core;
 
-SampleScene::SampleScene(float width, float height, VkCommandPool commandPool)
+SampleScene::SampleScene(float width, float height, CommandPool& commandPool)
 {
 	auto rootEntity = make_unique<Entity>(0, "root");
 	

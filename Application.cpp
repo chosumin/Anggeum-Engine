@@ -77,6 +77,8 @@ void Application::DrawFrame()
 		_renderContext->GetCurrentFrame(), 
 		_renderContext->GetImageIndex());
 
+	commandBuffer.EndCommandBuffer();
+
 	_renderContext->Submit(commandBuffer);
 }
 

@@ -16,17 +16,16 @@ namespace Core
 
 		size_t GetThreadIndex() const { return _threadIndex; }
 
-		CommandBuffer& RequestCommandBuffer();
-		void ResetCommandBuffers();
+		CommandBuffer& RequestCommandBuffer(uint32_t currentFrame);
+		void ResetCommandBuffers(uint32_t currentFrame);
 	private:
 	private:
 		Device& _device;
 		VkCommandPool _commandPool;
 
 		uint32_t _queueFamilyIndex;
-		size_t _threadIndex = 0;
+		size_t _threadIndex;
 
-		uint32_t activeCommandBufferCount = 0;
 		vector<unique_ptr<CommandBuffer>> _commandBuffers;
 	};
 }

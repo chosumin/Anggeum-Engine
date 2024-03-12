@@ -2,11 +2,12 @@
 #include "Texture.h"
 #include "Buffer.h"
 #include "Utility.h"
+#include "CommandPool.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat format, uint32_t binding)
+Core::Texture::Texture(CommandPool& commandPool, string fileName, TextureFormat format, uint32_t binding)
 	:_binding(binding)
 {
 	int texWidth, texHeight, texChannels;
@@ -36,20 +37,20 @@ Core::Texture::Texture(VkCommandPool commandPool, string fileName, TextureFormat
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		_textureImage, _textureImageMemory);
 
-	Utility::TransitionImageLayout(commandPool,
+	Utility::TransitionImageLayout(commandPool.GetHandle(),
 		_textureImage,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _mipLevels);
 
-	CopyBufferToImage(commandPool,
+	CopyBufferToImage(commandPool.GetHandle(),
 		stagingBuffer.GetBuffer(),
 		_textureImage,
 		static_cast<uint32_t>(texWidth),
 		static_cast<uint32_t>(texHeight));
 
 	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
-	GenerateMipmaps(commandPool, _textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+	GenerateMipmaps(commandPool.GetHandle(), _textureImage, VK_FORMAT_R8G8B8A8_SRGB,
 		texWidth, texHeight, _mipLevels);
 
 	CreateTextureImageView();
