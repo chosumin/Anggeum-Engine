@@ -122,12 +122,12 @@ namespace Core
         VkImageView imageView;
         VkDeviceMemory memory;
 
-        Utility::CreateImage(extent.width, extent.height, 1,
+        Utility::CreateImage(_device, extent.width, extent.height, 1,
             _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
             usageFlags,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
-        imageView = Utility::CreateImageView(image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+        imageView = Utility::CreateImageView(_device, image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
         auto renderTarget = make_unique<RenderTarget>();
         renderTarget->Format = format;
@@ -146,17 +146,18 @@ namespace Core
         VkImageView imageView;
         VkDeviceMemory memory;
 
-		auto depthFormat = Utility::FindSupportedFormat(
+		auto depthFormat = _device.FindSupportedFormat(
 			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-		Utility::CreateImage(extent.width, extent.height, 1,
+		Utility::CreateImage(_device, extent.width, extent.height, 1,
             _msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
-        imageView = Utility::CreateImageView(image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+        imageView = Utility::CreateImageView(_device, 
+            image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
         _depth = make_unique<RenderTarget>();
         _depth->Format = depthFormat;
@@ -174,12 +175,12 @@ namespace Core
 
         //VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
         //프레임버퍼에 사용되며, 싱글 렌더 패스 동안에만 존재함.
-        Utility::CreateImage(extent.width, extent.height, 1,
+        Utility::CreateImage(_device, extent.width, extent.height, 1,
             _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
-        imageView = Utility::CreateImageView(
+        imageView = Utility::CreateImageView(_device, 
             image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 
         _color = make_unique<RenderTarget>();

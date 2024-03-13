@@ -32,7 +32,7 @@ namespace Core
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
 
-		virtual void Prepare(CommandPool& commandPool) = 0;
+		virtual void Prepare() = 0;
 		virtual void Draw(CommandBuffer& commandBuffer, 
 			uint32_t currentFrame, uint32_t imageIndex) = 0;
 	protected:

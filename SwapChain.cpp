@@ -2,7 +2,8 @@
 #include "SwapChain.h"
 #include "Utility.h"
 
-Core::SwapChain::SwapChain()
+Core::SwapChain::SwapChain(Device& device)
+    :_device(device)
 {
     CreateSwapChain();
     CreateImageViews();
@@ -20,7 +21,7 @@ VkImageView Core::SwapChain::GetImageView(size_t swapChainIndex) const
 
 void Core::SwapChain::CreateSwapChain()
 {
-    SwapChainSupportDetails swapChainSupport = Device::Instance().GetSwapChainSupport();
+    SwapChainSupportDetails swapChainSupport = _device.GetSwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
     VkPresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.PresentModes);
@@ -35,7 +36,7 @@ void Core::SwapChain::CreateSwapChain()
 
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = Device::Instance().GetSurface();
+    createInfo.surface = _device.GetSurface();
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -43,7 +44,7 @@ void Core::SwapChain::CreateSwapChain()
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = Device::Instance().FindQueueFamilies();
+    QueueFamilyIndices indices = _device.FindQueueFamilies();
     uint32_t queueFamilyIndices[] = { indices.GraphicsAndComputeFamily.value(), indices.PresentFamily.value() };
 
     if (indices.GraphicsAndComputeFamily != indices.PresentFamily)
@@ -65,7 +66,7 @@ void Core::SwapChain::CreateSwapChain()
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    auto device = Device::Instance().GetDevice();
+    auto device = _device.GetDevice();
 
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &_swapChain) != VK_SUCCESS)
         throw std::runtime_error("failed to create swap chain!");
@@ -134,7 +135,9 @@ void Core::SwapChain::CreateImageViews()
     for (size_t i = 0; i < _swapChainImages.size(); i++)
     {
         _swapChainImageViews[i] = Utility::CreateImageView(
-                _swapChainImages[i], _swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+            _device, 
+            _swapChainImages[i], _swapChainImageFormat, 
+            VK_IMAGE_ASPECT_COLOR_BIT, 1);
     }
 }
 
@@ -147,7 +150,7 @@ void Core::SwapChain::RecreateSwapChain()
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(Device::Instance().GetDevice());
+    vkDeviceWaitIdle(_device.GetDevice());
 
     CleanupSwapChain();
 
@@ -170,7 +173,7 @@ void Core::SwapChain::GetViewportAndScissor(VkViewport& viewport, VkRect2D& scis
 
 void Core::SwapChain::CleanupSwapChain()
 {
-    auto device = Device::Instance().GetDevice();
+    auto device = _device.GetDevice();
 
     for (auto imageView : _swapChainImageViews)
         vkDestroyImageView(device, imageView, nullptr);

@@ -5,7 +5,7 @@ namespace Core
 	class SwapChain
 	{
 	public:
-		SwapChain();
+		SwapChain(Device& device);
 		~SwapChain();
 
 		VkSwapchainKHR GetSwapChain() const { return _swapChain; }
@@ -29,6 +29,8 @@ namespace Core
 		void CreateImageViews();
 		void CleanupSwapChain();
 	private:
+		Device& _device;
+
 		VkSwapchainKHR _swapChain;
 		vector<VkImage> _swapChainImages;
 		VkFormat _swapChainImageFormat;

@@ -13,11 +13,10 @@ namespace Core
 	{
 	public:
 		GeometryRenderPass(Device& device, 
-			VkExtent2D extent,
 			Scene& scene, SwapChain& swapChain);
 		virtual ~GeometryRenderPass() override;
 
-		virtual void Prepare(CommandPool& commandPool) override;
+		virtual void Prepare() override;
 		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 	private:
 		Scene& _scene;

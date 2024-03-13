@@ -5,10 +5,10 @@
 #include "PerspectiveCamera.h"
 #include "FreeCamera.h"
 #include "Mesh.h"
-#include "CommandPool.h"
 using namespace Core;
 
-SampleScene::SampleScene(float width, float height, CommandPool& commandPool)
+SampleScene::SampleScene(Core::Device& device, 
+	float width, float height)
 {
 	auto rootEntity = make_unique<Entity>(0, "root");
 	
@@ -28,7 +28,7 @@ SampleScene::SampleScene(float width, float height, CommandPool& commandPool)
 		auto& transform = meshEntity->GetTransform();
 		vec3 position = vec3(i, 0, 0);
 		transform.SetTranslation(position);
-		auto mesh = make_unique<Mesh>(*meshEntity, commandPool, "Models/viking_room.obj");
+		auto mesh = make_unique<Mesh>(device, *meshEntity, "Models/viking_room.obj");
 		AddComponent(move(mesh), *meshEntity);
 		AddEntity(move(meshEntity));
 	}

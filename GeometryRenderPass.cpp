@@ -13,9 +13,10 @@
 namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, 
-		VkExtent2D extent, Scene& scene, SwapChain& swapChain)
+		Scene& scene, SwapChain& swapChain)
 		:RenderPass(device), _scene(scene), _material(nullptr), _pipeline(nullptr)
 	{
+		auto extent = swapChain.GetSwapChainExtent();
 		CreateColorRenderTarget(extent, swapChain.GetImageFormat());
 		CreateDepthRenderTarget(extent);
 		CreateRenderPass();
@@ -30,12 +31,12 @@ namespace Core
 		delete(_framebuffer);
 	}
 
-	void GeometryRenderPass::Prepare(CommandPool& commandPool)
+	void GeometryRenderPass::Prepare()
 	{
 		//todo : collect meshes.
 		//todo : push back materials.
 
-		_material = new Core::Material(_device, commandPool);
+		_material = new Core::Material(_device);
 
 		_pipeline = new Core::Pipeline(_device,
 			*this, _material->GetShader());

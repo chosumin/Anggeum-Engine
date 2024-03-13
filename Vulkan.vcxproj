@@ -146,6 +146,7 @@
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="ForwardRenderPipeline.cpp" />
     <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="FreeCamera.cpp" />
     <ClCompile Include="InputEvents.cpp" />
@@ -183,6 +184,7 @@
     <ClInclude Include="Component.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Entity.h" />
+    <ClInclude Include="ForwardRenderPipeline.h" />
     <ClInclude Include="Framebuffer.h" />
     <ClInclude Include="FreeCamera.h" />
     <ClInclude Include="IDescriptor.h" />
@@ -194,6 +196,7 @@
     <ClInclude Include="PushConstant.h" />
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="RenderPass.h" />
+    <ClInclude Include="IRenderPipeline.h" />
     <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="GeometryRenderPass.h" />
     <ClInclude Include="SampleScene.h" />

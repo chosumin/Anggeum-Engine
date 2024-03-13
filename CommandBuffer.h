@@ -18,7 +18,7 @@ namespace Core
 		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
 
 		void ResetCommandBuffer();
-		void BeginCommandBuffer();
+		void BeginCommandBuffer(bool isSingleTime = false);
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
 		void BindPipeline(VkPipelineBindPoint pipelineBindPoint,
 			VkPipeline pipeline);

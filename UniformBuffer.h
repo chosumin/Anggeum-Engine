@@ -7,7 +7,7 @@ namespace Core
 	class UniformBuffer
 	{
 	public:
-		UniformBuffer(VkDeviceSize bufferSize, uint32_t binding);
+		UniformBuffer(Device& device, VkDeviceSize bufferSize, uint32_t binding);
 		~UniformBuffer();
 
 		void SetBuffer(uint32_t currentImage, void* data);
@@ -16,6 +16,7 @@ namespace Core
 	private:
 		void CreateUniformBuffer();
 	private:
+		Device& _device;
 		VkDeviceSize _bufferSize;
 		vector<void*> _uniformBuffersMapped;
 		vector<unique_ptr<Buffer>> _buffers;

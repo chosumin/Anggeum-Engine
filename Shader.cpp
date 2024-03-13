@@ -150,7 +150,7 @@ void Core::Shader::CreateDescriptorSetLayout(vector<IDescriptor*> descriptors)
 	layoutInfo.pBindings = bindings.data();
 
 	if (vkCreateDescriptorSetLayout(
-		Device::Instance().GetDevice(),
+		_device.GetDevice(),
 		&layoutInfo, nullptr, &_descriptorSetLayout) != VK_SUCCESS)
 	{
 		throw runtime_error("failed to create descriptor set layout!");
@@ -174,7 +174,7 @@ void Core::Shader::CreateDescriptorPool(vector<IDescriptor*> descriptors)
 	poolInfo.pPoolSizes = poolSizes.data();
 	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-	if (vkCreateDescriptorPool(Device::Instance().GetDevice(),
+	if (vkCreateDescriptorPool(_device.GetDevice(),
 		&poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS)
 	{
 		throw runtime_error("failed to create descriptor pool!");
@@ -191,7 +191,7 @@ void Core::Shader::CreateDescriptorSets(vector<IDescriptor*> descriptors)
 	allocInfo.pSetLayouts = layouts.data();
 
 	_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	if (vkAllocateDescriptorSets(Device::Instance().GetDevice(),
+	if (vkAllocateDescriptorSets(_device.GetDevice(),
 		&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
 	{
 		throw runtime_error("failed to allocate descriptor sets!");

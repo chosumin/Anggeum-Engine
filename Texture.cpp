@@ -2,13 +2,14 @@
 #include "Texture.h"
 #include "Buffer.h"
 #include "Utility.h"
-#include "CommandPool.h"
+#include "CommandBuffer.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-Core::Texture::Texture(CommandPool& commandPool, string fileName, TextureFormat format, uint32_t binding)
-	:_binding(binding)
+Core::Texture::Texture(Device& device, string fileName, 
+	TextureFormat format, uint32_t binding)
+	:_binding(binding), _device(device)
 {
 	int texWidth, texHeight, texChannels;
 
@@ -22,14 +23,14 @@ Core::Texture::Texture(CommandPool& commandPool, string fileName, TextureFormat 
 	if (pixels == nullptr)
 		throw runtime_error("failed to load texture image!");
 
-	Buffer stagingBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	Buffer stagingBuffer(_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	stagingBuffer.CopyBuffer(pixels, imageSize);
 
 	stbi_image_free(pixels);
 
-	Utility::CreateImage(texWidth, texHeight, _mipLevels,
+	Utility::CreateImage(device, texWidth, texHeight, _mipLevels,
 		VK_SAMPLE_COUNT_1_BIT,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
@@ -37,20 +38,18 @@ Core::Texture::Texture(CommandPool& commandPool, string fileName, TextureFormat 
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		_textureImage, _textureImageMemory);
 
-	Utility::TransitionImageLayout(commandPool.GetHandle(),
-		_textureImage,
+	TransitionImageLayout(_textureImage,
 		VK_FORMAT_R8G8B8A8_SRGB,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _mipLevels);
 
-	CopyBufferToImage(commandPool.GetHandle(),
-		stagingBuffer.GetBuffer(),
+	CopyBufferToImage(stagingBuffer.GetBuffer(),
 		_textureImage,
 		static_cast<uint32_t>(texWidth),
 		static_cast<uint32_t>(texHeight));
 
 	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
-	GenerateMipmaps(commandPool.GetHandle(), _textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+	GenerateMipmaps(_textureImage, VK_FORMAT_R8G8B8A8_SRGB,
 		texWidth, texHeight, _mipLevels);
 
 	CreateTextureImageView();
@@ -61,7 +60,7 @@ Core::Texture::Texture(CommandPool& commandPool, string fileName, TextureFormat 
 
 Core::Texture::~Texture()
 {
-	auto device = Device::Instance().GetDevice();
+	auto device = _device.GetDevice();
 
 	vkDestroySampler(device, _textureSampler, nullptr);
 	vkDestroyImageView(device, _textureImageView, nullptr);
@@ -69,10 +68,9 @@ Core::Texture::~Texture()
 	vkFreeMemory(device, _textureImageMemory, nullptr);
 }
 
-void Core::Texture::CopyBufferToImage(VkCommandPool commandPool, 
-	VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+void Core::Texture::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
 {
-	VkCommandBuffer commandBuffer = Utility::BeginSingleTimeCommands(commandPool);
+	auto& commandBuffer = _device.BeginSingleTimeCommands();
 
 	VkBufferImageCopy region{};
 	region.bufferOffset = 0;
@@ -89,7 +87,7 @@ void Core::Texture::CopyBufferToImage(VkCommandPool commandPool,
 
 	//dstImageLayout >> 현재 사용 중인 레이아웃, 이 명령 이전에 이 레이아웃으로 트랜지션 되어야 함.
 	vkCmdCopyBufferToImage(
-		commandBuffer,
+		commandBuffer.GetHandle(),
 		buffer,
 		image,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -97,13 +95,13 @@ void Core::Texture::CopyBufferToImage(VkCommandPool commandPool,
 		&region
 	);
 
-	Utility::EndSingleTimeCommands(commandPool, commandBuffer);
+	_device.EndSingleTimeCommands(commandBuffer);
 }
 
 void Core::Texture::CreateTextureImageView()
 {
 	_textureImageView = Utility::CreateImageView(
-		_textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, _mipLevels);
+		_device, _textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, _mipLevels);
 }
 
 void Core::Texture::CreateTextureSampler()
@@ -117,7 +115,7 @@ void Core::Texture::CreateTextureSampler()
 	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(Device::Instance().GetPhysicalDevice(), &properties);
+	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
 
 	samplerInfo.anisotropyEnable = VK_TRUE;
 	//lower value results in better performance, but lower quality results.
@@ -132,24 +130,23 @@ void Core::Texture::CreateTextureSampler()
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = static_cast<float>(_mipLevels);
 
-	if (vkCreateSampler(Device::Instance().GetDevice(), &samplerInfo, nullptr, &_textureSampler) != VK_SUCCESS)
+	if (vkCreateSampler(_device.GetDevice(), &samplerInfo, nullptr, &_textureSampler) != VK_SUCCESS)
 	{
 		throw runtime_error("failed to create texture sampler!");
 	}
 }
 
-void Core::Texture::GenerateMipmaps(VkCommandPool commandPool, 
-	VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
+void Core::Texture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
 {
 	VkFormatProperties formatProperties;
 	vkGetPhysicalDeviceFormatProperties(
-		Device::Instance().GetPhysicalDevice(), imageFormat, &formatProperties);
+		_device.GetPhysicalDevice(), imageFormat, &formatProperties);
 
 	if (!(formatProperties.optimalTilingFeatures & 
 		VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
 		throw runtime_error("texture image format doesn't support linear blitting!");
 
-	VkCommandBuffer commandBuffer = Utility::BeginSingleTimeCommands(commandPool);
+	auto& commandBuffer = _device.BeginSingleTimeCommands();
 
 	VkImageMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -174,7 +171,7 @@ void Core::Texture::GenerateMipmaps(VkCommandPool commandPool,
 
 		//DST에서 SRC로 레이아웃 변경.
 		//Tranfer를 기다린 후 Tranfer에서 실행 >> 이전 Tranfer 스테이지의 커맨드를 모두 수행한 후 이 루프를 실행 함. 
-		vkCmdPipelineBarrier(commandBuffer,
+		vkCmdPipelineBarrier(commandBuffer.GetHandle(),
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
 			0, nullptr,
 			0, nullptr,
@@ -195,7 +192,7 @@ void Core::Texture::GenerateMipmaps(VkCommandPool commandPool,
 		blit.dstSubresource.layerCount = 1;
 
 		//both the src and dst are the same image, because of blitting between different levels of the same image.
-		vkCmdBlitImage(commandBuffer,
+		vkCmdBlitImage(commandBuffer.GetHandle(),
 			image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1, & blit, VK_FILTER_LINEAR);
@@ -207,7 +204,7 @@ void Core::Texture::GenerateMipmaps(VkCommandPool commandPool,
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 		//This transition waits on the current blit command to finish.
-		vkCmdPipelineBarrier(commandBuffer,
+		vkCmdPipelineBarrier(commandBuffer.GetHandle(),
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
 			0, nullptr,
 			0, nullptr,
@@ -225,13 +222,13 @@ void Core::Texture::GenerateMipmaps(VkCommandPool commandPool,
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	vkCmdPipelineBarrier(commandBuffer,
+	vkCmdPipelineBarrier(commandBuffer.GetHandle(),
 		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
 		0, nullptr,
 		0, nullptr,
 		1, &barrier);
 
-	Utility::EndSingleTimeCommands(commandPool, commandBuffer);
+	_device.EndSingleTimeCommands(commandBuffer);
 }
 
 void Core::Texture::SetDescriptorImageInfo()
@@ -239,4 +236,61 @@ void Core::Texture::SetDescriptorImageInfo()
 	_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	_imageInfo.imageView = _textureImageView;
 	_imageInfo.sampler = _textureSampler;
+}
+
+void Core::Texture::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
+{
+	auto& commandBuffer = _device.BeginSingleTimeCommands();
+
+	//모든 밉맵 이미지에 같은 레이아웃을 적용.
+	VkImageMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = mipLevels;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	VkPipelineStageFlags sourceStage;
+	VkPipelineStageFlags destinationStage;
+
+	//tranfer writes that don't need to wait on anything.
+	if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+		newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else
+	{
+		throw invalid_argument("unsupported layout transition!");
+	}
+
+	vkCmdPipelineBarrier(
+		commandBuffer.GetHandle(),
+		sourceStage, destinationStage,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
+
+	_device.EndSingleTimeCommands(commandBuffer);
 }

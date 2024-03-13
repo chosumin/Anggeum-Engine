@@ -11,7 +11,7 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, CommandPool& commandPool);
+		Material(Device& device);
 		virtual ~Material();
 
 		Shader& GetShader() const;

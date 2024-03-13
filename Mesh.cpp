@@ -4,21 +4,19 @@
 #include "CommandBuffer.h"
 #include "Buffer.h"
 #include "Transform.h"
-#include "InputEvents.h"
 #include "Entity.h"
 #include "Material.h"
-#include "CommandPool.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::Mesh::Mesh(Entity& entity, CommandPool& commandPool, string modelPath)
-	:Component(entity)
+Core::Mesh::Mesh(Device& device, Entity& entity, string modelPath)
+	:Component(entity), _device(device)
 {
 	LoadModel(modelPath);
 
-	CreateVertexBuffer(commandPool);
-	CreateIndexBuffer(commandPool);
+	CreateVertexBuffer();
+	CreateIndexBuffer();
 }
 
 Core::Mesh::~Mesh()
@@ -83,39 +81,39 @@ void Core::Mesh::LoadModel(const string& modelPath)
 	}
 }
 
-void Core::Mesh::CreateVertexBuffer(CommandPool& commandPool)
+void Core::Mesh::CreateVertexBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(_vertices[0]) * _vertices.size();
 
-	Core::Buffer stagingBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	Core::Buffer stagingBuffer(_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	stagingBuffer.CopyBuffer(_vertices.data(), bufferSize);
 
 	//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
-	_vertexBuffer = new Core::Buffer(bufferSize,
+	_vertexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	//vertex memory is moved from CPU to GPU
-	_vertexBuffer->CopyBuffer(commandPool.GetHandle(), stagingBuffer.GetBuffer(), bufferSize);
+	_vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
 }
 
-void Core::Mesh::CreateIndexBuffer(CommandPool& commandPool)
+void Core::Mesh::CreateIndexBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(_indices[0]) * _indices.size();
 
-	Core::Buffer stagingBuffer(bufferSize,
+	Core::Buffer stagingBuffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	stagingBuffer.CopyBuffer(_indices.data(), bufferSize);
 
-	_indexBuffer = new Core::Buffer(bufferSize,
+	_indexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	_indexBuffer->CopyBuffer(commandPool.GetHandle(), stagingBuffer.GetBuffer(), bufferSize);
+	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
 }
 
 std::type_index Core::Mesh::GetType()

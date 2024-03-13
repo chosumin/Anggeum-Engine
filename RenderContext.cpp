@@ -33,7 +33,7 @@ namespace Core
 	RenderContext::RenderContext(Device& device)
 		:_device(device)
 	{
-		_swapChain = new SwapChain();
+		_swapChain = new SwapChain(device);
 
 		auto queueFamilyIndices = device.FindQueueFamilies();
 		_commandPool = new CommandPool(device,
@@ -149,7 +149,7 @@ namespace Core
 		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		auto device = Device::Instance().GetDevice();
+		auto device = _device.GetDevice();
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -162,7 +162,7 @@ namespace Core
 
 	void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	{
-		auto device = Device::Instance().GetDevice();
+		auto device = _device.GetDevice();
 
 		vkWaitForFences(device, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -195,7 +195,7 @@ namespace Core
 		presentInfo.pSwapchains = swapChains;
 		presentInfo.pImageIndices = &_imageIndex;
 
-		VkResult result = vkQueuePresentKHR(Device::Instance().GetPresentQueue(), &presentInfo);
+		VkResult result = vkQueuePresentKHR(_device.GetPresentQueue(), &presentInfo);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
 		{

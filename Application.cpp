@@ -1,12 +1,10 @@
 #include "stdafx.h"
 #include "Application.h"
-#include "Pipeline.h"
 #include "SwapChain.h"
 #include "CommandBuffer.h"
 #include "timer.h"
 #include "SampleScene.h"
-#include "GeometryRenderPass.h"
-#include "Material.h"
+#include "ForwardRenderPipeline.h"
 #include "RenderContext.h"
 
 Application::Application(const ApplicationOptions& options)
@@ -17,22 +15,20 @@ Application::Application(const ApplicationOptions& options)
 
 	_timer = make_unique<Core::Timer>();
 
-	Core::Device::Instance().Initialize(*options.window);
+	_device = new Core::Device(*options.window);
 }
 
 bool Application::Prepare()
 {
-	auto& device = Core::Device::Instance();
-
-	_renderContext = new Core::RenderContext(device);
+	_renderContext = new Core::RenderContext(*_device);
 
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
-	_scene = new SampleScene((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext->GetCommandPool());
+	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height);
 
-	_renderPass = new Core::GeometryRenderPass(device, swapChainExtent, *_scene, swapChain);
-	_renderPass->Prepare(_renderContext->GetCommandPool());
+	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
+	_renderPipeline->Prepare();
 
 	return true;
 }
@@ -61,11 +57,11 @@ void Application::Finish()
 
 Application::~Application()
 {
-	delete(_renderPass);
+	delete(_renderPipeline);
 	delete(_scene);
 	delete(_renderContext);
+	delete(_device);
 
-	Core::Device::Instance().Delete();
 	Core::Window::Instance().Delete();
 }
 
@@ -73,7 +69,7 @@ void Application::DrawFrame()
 {
 	auto& commandBuffer = _renderContext->Begin();
 
-	_renderPass->Draw(commandBuffer, 
+	_renderPipeline->Draw(commandBuffer,
 		_renderContext->GetCurrentFrame(), 
 		_renderContext->GetImageIndex());
 
@@ -84,5 +80,5 @@ void Application::DrawFrame()
 
 void Application::WaitIdle()
 {
-	vkDeviceWaitIdle(Core::Device::Instance().GetDevice());
+	vkDeviceWaitIdle(_device->GetDevice());
 }

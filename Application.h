@@ -11,9 +11,8 @@ namespace Core
 	class Timer;
 	class Window;
 	class Scene;
-	class RenderPass;
-	class Material;
 	class RenderContext;
+	class IRenderPipeline;
 }
 
 struct ApplicationOptions
@@ -45,7 +44,8 @@ private:
 	//todo : stats
 
 	unique_ptr<Core::Timer> _timer;
-	Core::RenderPass* _renderPass;
+	Core::Device* _device;
+	Core::IRenderPipeline* _renderPipeline;
 	Core::RenderContext* _renderContext;
 	Core::Scene* _scene;
 };

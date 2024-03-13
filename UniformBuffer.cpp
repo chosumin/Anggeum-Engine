@@ -3,8 +3,9 @@
 #include "SwapChain.h"
 #include "Buffer.h"
 
-Core::UniformBuffer::UniformBuffer(VkDeviceSize bufferSize, uint32_t binding)
-	:_bufferSize(bufferSize), _binding(binding)
+Core::UniformBuffer::UniformBuffer(Device& device, 
+	VkDeviceSize bufferSize, uint32_t binding)
+	:_bufferSize(bufferSize), _binding(binding), _device(device)
 {
 	CreateUniformBuffer();
 }
@@ -44,7 +45,7 @@ void Core::UniformBuffer::CreateUniformBuffer()
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		_buffers[i] = make_unique<Buffer>(
+		_buffers[i] = make_unique<Buffer>(_device,
 			bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -53,7 +54,7 @@ void Core::UniformBuffer::CreateUniformBuffer()
 		//so the buffer containing it should only be destroyed when we stop rendering.
 		auto bufferMemory = _buffers[i]->GetBufferMemory();
 		vkMapMemory(
-			Device::Instance().GetDevice(), bufferMemory, 
+			_device.GetDevice(), bufferMemory,
 			0, bufferSize, 0, &_uniformBuffersMapped[i]);
 	}
 }

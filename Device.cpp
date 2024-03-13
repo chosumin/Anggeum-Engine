@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "Device.h"
+#include "CommandPool.h"
+#include "CommandBuffer.h"
 
 VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,
@@ -28,17 +30,25 @@ void DestroyDebugUtilsMessengerEXT(
         func(instance, debugMessenger, pAllocator);
 }
 
-void Core::Device::Initialize(Window& window)
+Core::Device::Device(Window& window)
+    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(),
+    _computeQueue()
 {
     CreateInstance();
     SetupDebugMessenger();
     window.CreateSurface(_instance, &_surface);
     PickPhysicalDevice();
     CreateLogicalDevice();
+
+    auto indices = FindQueueFamilies();
+    _commandPool = new CommandPool(*this, 
+        indices.GraphicsAndComputeFamily.value());
 }
 
-void Core::Device::Delete()
+Core::Device::~Device()
 {
+    delete(_commandPool);
+
     vkDestroyDevice(_device, nullptr);
 
     if (_enableValidationLayers)
@@ -65,14 +75,49 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-Core::Device::Device()
-    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(),
-    _computeQueue()
+Core::CommandBuffer& Core::Device::BeginSingleTimeCommands() const
 {
+    auto& commandBuffer = _commandPool->RequestCommandBuffer(0);
+    commandBuffer.BeginCommandBuffer(true);
+    return commandBuffer;
 }
 
-Core::Device::~Device()
+void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
 {
+    commandBuffer.EndCommandBuffer();
+    
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
+
+    vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+
+    //hack : optimizable with vkWaitForFences.
+    vkQueueWaitIdle(_graphicsQueue);
+}
+
+VkFormat Core::Device::FindSupportedFormat(
+    const vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+{
+    for (VkFormat format : candidates)
+    {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(_physicalDevice, format, &props);
+
+        if (tiling == VK_IMAGE_TILING_LINEAR &&
+            (props.linearTilingFeatures & features) == features)
+        {
+            return format;
+        }
+        else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
+            (props.optimalTilingFeatures & features) == features)
+        {
+            return format;
+        }
+    }
+
+    throw runtime_error("failed to find supported format!");
 }
 
 void Core::Device::CreateInstance()

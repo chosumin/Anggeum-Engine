@@ -8,16 +8,16 @@
 #include "CommandPool.h"
 namespace Core
 {
-	Material::Material(Device& device, CommandPool& commandPool)
+	Material::Material(Device& device)
 		:_device(device)
 	{
 		_shader = new SampleShader(device);
 
-		_texture = new Texture(commandPool,
+		_texture = new Texture(device,
 			"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
 		
 		//hack : binding duplication declaration.
-		auto cameraBuffer = new UniformBuffer(sizeof(VPBufferObject), 0);
+		auto cameraBuffer = new UniformBuffer(device, sizeof(VPBufferObject), 0);
 		_uniformBuffers.insert({ 0, cameraBuffer });
 
 		//hack : binding duplication declaration.
@@ -103,7 +103,7 @@ namespace Core
 			}
 
 			vkUpdateDescriptorSets(
-				Device::Instance().GetDevice(),
+				_device.GetDevice(),
 				static_cast<uint32_t>(descriptorWrites.size()),
 				descriptorWrites.data(), 0, nullptr);
 		}

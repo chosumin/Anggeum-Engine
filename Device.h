@@ -18,17 +18,13 @@ namespace Core
 	};
 
 	class Window;
+	class CommandPool;
+	class CommandBuffer;
 	class Device
 	{
 	public:
-		static Core::Device& Instance()
-		{
-			static Core::Device instance;
-			return instance;
-		}
-	public:
-		void Initialize(Window& window);
-		void Delete();
+		Device(Window& window);
+		~Device();
 
 		VkDevice GetDevice() { return _device; }
 		SwapChainSupportDetails GetSwapChainSupport() 
@@ -45,9 +41,14 @@ namespace Core
 		VkQueue GetPresentQueue() { return _presentQueue; }
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-	private:
-		Device();
-		~Device();
+
+		CommandBuffer& BeginSingleTimeCommands() const;
+		void EndSingleTimeCommands(CommandBuffer& commandBuffer) const;
+
+		VkFormat FindSupportedFormat(
+			const vector<VkFormat>& candidates,
+			VkImageTiling tiling,
+			VkFormatFeatureFlags features);
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -80,6 +81,8 @@ namespace Core
 		VkQueue _computeQueue;
 		VkQueue _presentQueue;
 		VkSurfaceKHR _surface;
+
+		CommandPool* _commandPool;
 
 		const vector<const char*> _validationLayers = 
 		{

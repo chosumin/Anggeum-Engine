@@ -25,10 +25,13 @@ void Core::CommandBuffer::ResetCommandBuffer()
     vkResetCommandBuffer(_commandBuffer, 0);
 }
 
-void Core::CommandBuffer::BeginCommandBuffer()
+void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
 {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+	if (isSingleTime)
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
     if (result != VK_SUCCESS)
