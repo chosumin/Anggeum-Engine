@@ -151,6 +151,7 @@
     <ClCompile Include="FreeCamera.cpp" />
     <ClCompile Include="InputEvents.cpp" />
     <ClCompile Include="Material.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
     <ClCompile Include="PerspectiveCamera.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="PushConstant.cpp" />
@@ -191,6 +192,7 @@
     <ClInclude Include="InputEvents.h" />
     <ClInclude Include="Keycodes.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="PerspectiveCamera.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="PushConstant.h" />

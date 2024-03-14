@@ -2,8 +2,6 @@
 #include "GeometryRenderPass.h"
 #include "Mesh.h"
 #include "Scene.h"
-#include "Material.h"
-#include "Pipeline.h"
 #include "PerspectiveCamera.h"
 #include "CommandBuffer.h"
 #include "Framebuffer.h"
@@ -14,7 +12,7 @@ namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, 
 		Scene& scene, SwapChain& swapChain)
-		:RenderPass(device), _scene(scene), _material(nullptr), _pipeline(nullptr)
+		:RenderPass(device), _scene(scene)
 	{
 		auto extent = swapChain.GetSwapChainExtent();
 		CreateColorRenderTarget(extent, swapChain.GetImageFormat());
@@ -26,8 +24,6 @@ namespace Core
 
 	GeometryRenderPass::~GeometryRenderPass()
 	{
-		delete(_pipeline);
-		delete(_material);
 		delete(_framebuffer);
 	}
 

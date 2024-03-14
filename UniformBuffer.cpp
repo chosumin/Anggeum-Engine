@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "UniformBuffer.h"
-#include "SwapChain.h"
 #include "Buffer.h"
 
 Core::UniformBuffer::UniformBuffer(Device& device, 

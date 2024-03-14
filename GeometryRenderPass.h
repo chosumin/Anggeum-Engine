@@ -5,7 +5,6 @@ namespace Core
 {
 	class Scene;
 	class Camera;
-	class Material;
 	class Pipeline;
 	class Framebuffer;
 	class SwapChain;
@@ -20,8 +19,6 @@ namespace Core
 		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 	private:
 		Scene& _scene;
-		Material* _material;
-		Pipeline* _pipeline;
 	};
 }
 
