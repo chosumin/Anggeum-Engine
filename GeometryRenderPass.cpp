@@ -1,12 +1,17 @@
 #include "stdafx.h"
 #include "GeometryRenderPass.h"
-#include "Mesh.h"
+#include "MeshRenderer.h"
 #include "Scene.h"
 #include "PerspectiveCamera.h"
 #include "CommandBuffer.h"
 #include "Framebuffer.h"
 #include "SwapChain.h"
 #include "CommandPool.h"
+#include "Pipeline.h"
+#include "Material.h"
+#include "Mesh.h"
+#include "Shader.h"
+#include "RendererBatch.h"
 
 namespace Core
 {
@@ -24,18 +29,34 @@ namespace Core
 
 	GeometryRenderPass::~GeometryRenderPass()
 	{
-		delete(_framebuffer);
+		for (auto&& batch : _batches)
+		{
+			delete(batch.second);
+		}
+
+		_batches.clear();
 	}
 
 	void GeometryRenderPass::Prepare()
 	{
-		//todo : collect meshes.
-		//todo : push back materials.
+		auto meshRenderers = _scene.GetComponents<Core::MeshRenderer>();
+		for (auto&& meshRenderer : meshRenderers)
+		{
+			auto& shader = meshRenderer->GetMaterial().GetShader();
 
-		_material = new Core::Material(_device);
+			if (shader.GetPass() == "Geometry")
+			{
+				auto key = shader.GetType();
+				auto batch = _batches[key];
+				if (batch == nullptr)
+				{
+					batch = new RendererBatch(_device, shader, *this);
+					_batches[key] = batch;
+				}
 
-		_pipeline = new Core::Pipeline(_device,
-			*this, _material->GetShader());
+				batch->Add(*meshRenderer);
+			}
+		}
 	}
 
 	void GeometryRenderPass::Draw(
@@ -44,29 +65,43 @@ namespace Core
 	{
 		PerspectiveCamera& camera = _scene.GetMainCamera();
 
-		//todo : sort
-
 		auto framebuffer = _framebuffer->GetHandle(imageIndex);
 		auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
-		commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
-			_pipeline->GetGraphicsPipeline());
 
-		_material->SetBuffer(currentFrame, 0, &camera.Matrices);
-
-		commandBuffer.BindDescriptorSets(
-			VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader(), currentFrame);
-
-		auto meshes = _scene.GetComponents<Core::Mesh>();
-		for (auto mesh : meshes)
+		for (auto&& batch : _batches)
 		{
-			mesh->DrawFrame(commandBuffer, *_material);
-			commandBuffer.Flush(*_material);
-			commandBuffer.BindVertexBuffers(mesh->GetVertexBuffer());
-			commandBuffer.BindIndexBuffer(mesh->GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
-			commandBuffer.DrawIndexed(mesh->GetIndexCount(), 1);
-		}
+			auto& pipeline = batch.second->Pipeline;
+			commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
+				pipeline->GetGraphicsPipeline());
 
+			auto& materials = batch.second->Materials;
+			for (auto&& material : materials)
+			{
+				material.second->SetBuffer(currentFrame, 0, &camera.Matrices);
+
+				commandBuffer.BindDescriptorSets(
+					VK_PIPELINE_BIND_POINT_GRAPHICS, material.second->GetShader(), currentFrame);
+
+				auto& meshRenderers = 
+					batch.second->MeshRenderers[material.first];
+
+				RendererBatch::Sort(material.first);
+
+				for (auto&& meshRenderer : meshRenderers)
+				{
+					meshRenderer->Draw();
+
+					commandBuffer.Flush(*material.second);
+
+					auto& mesh = meshRenderer->GetMesh();
+					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer());
+					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
+					commandBuffer.DrawIndexed(mesh.GetIndexCount(), 1);
+				}
+			}
+		}
+		
 		commandBuffer.EndRenderPass();
 	}
 }

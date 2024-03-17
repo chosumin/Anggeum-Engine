@@ -1,4 +1,7 @@
 #pragma once
+#include "UniformBuffer.h"
+#include "TextureBuffer.h"
+#include "Texture.h"
 
 namespace Core
 {
@@ -12,14 +15,17 @@ namespace Core
 	{
 	public:
 		Material(Device& device);
+		Material(const Material& other) = default;
 		virtual ~Material();
+
+		virtual type_index GetType() const = 0;
 
 		Shader& GetShader() const;
 		void SetShader(Shader& shader);
 
 		void SetTexture(uint32_t binding, Texture& texture);
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
-		void SetBuffer(uint32_t binding, VkDescriptorImageInfo& info);
+		void SetBuffer(uint32_t binding, Texture* texture);
 
 		void UpdateDescriptorSets();
 
@@ -34,10 +40,10 @@ namespace Core
 		}
 		vector<uint8_t>* GetPushConstantsData();
 		void ClearPushConstantsCache();
-	private:
+	protected:
 		Device& _device;
 		Shader* _shader;
-		Texture* _texture;
+		unordered_map<uint32_t, Texture*> _textures;
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;

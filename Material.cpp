@@ -1,36 +1,22 @@
 #include "stdafx.h"
 #include "Material.h"
-#include "Texture.h"
-#include "SampleShader.h"
-#include "UniformBuffer.h"
-#include "TextureBuffer.h"
-#include "PerspectiveCamera.h"
+#include "Shader.h"
 #include "CommandPool.h"
+
 namespace Core
 {
 	Material::Material(Device& device)
 		:_device(device)
 	{
-		_shader = new SampleShader(device);
-
-		_texture = new Texture(device,
-			"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
-		
-		//hack : binding duplication declaration.
-		auto cameraBuffer = new UniformBuffer(device, sizeof(VPBufferObject), 0);
-		_uniformBuffers.insert({ 0, cameraBuffer });
-
-		//hack : binding duplication declaration.
-		auto textureBuffer = new TextureBuffer(1);
-		_textureBuffers.insert({ 1, textureBuffer });
-
-		SetBuffer(1, _texture->GetDescriptorImageInfo());
-		UpdateDescriptorSets();
 	}
 
 	Core::Material::~Material()
 	{
-		delete(_texture);
+		for (auto& texture : _textures)
+		{
+			delete(texture.second);
+		}
+		_textures.clear();
 
 		for (auto& uniformBuffer : _uniformBuffers)
 		{
@@ -43,8 +29,6 @@ namespace Core
 			delete(textureBuffer.second);
 		}
 		_textureBuffers.clear();
-
-		delete(_shader);
 	}
 
 	Shader& Core::Material::GetShader() const
@@ -67,9 +51,10 @@ namespace Core
 		_uniformBuffers[binding]->SetBuffer(currentImage, data);
 	}
 
-	void Core::Material::SetBuffer(uint32_t binding, VkDescriptorImageInfo& info)
+	void Core::Material::SetBuffer(uint32_t binding, Texture* texture)
 	{
-		_textureBuffers[binding]->SetDescriptorImageInfo(info);
+		_textureBuffers[binding]->SetDescriptorImageInfo(texture->GetDescriptorImageInfo());
+		_textures[binding] = texture;
 	}
 
 	void Core::Material::UpdateDescriptorSets()

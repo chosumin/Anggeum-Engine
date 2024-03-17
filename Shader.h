@@ -13,17 +13,17 @@ namespace Core
 		virtual ~Shader();
 
 		virtual std::type_index GetType() = 0;
+		virtual string GetPass() = 0;
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
-		VkPipelineLayout GetPipelineLayout() const
-		{
-			return _pipelineLayout;
-		}
 
 		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
 
 		VkShaderStageFlags GetPushConstantsShaderStage() const;
+		vector<VkPushConstantRange>& GetPushConstantRanges() { return _pushConstantRanges; }
+		VkDescriptorSetLayout& GetDescriptorSetLayout() { return _descriptorSetLayout; }
+		VkPipelineLayout GetPipelineLayout() { return _pipelineLayout; }
 	protected:
 		void CreatePipelineLayout(
 			vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants);

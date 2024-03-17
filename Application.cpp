@@ -6,6 +6,8 @@
 #include "SampleScene.h"
 #include "ForwardRenderPipeline.h"
 #include "RenderContext.h"
+#include "MaterialFactory.h"
+#include "ShaderFactory.h"
 
 Application::Application(const ApplicationOptions& options)
 {
@@ -51,12 +53,11 @@ void Application::Update()
 	//todo : update stats
 }
 
-void Application::Finish()
-{
-}
-
 Application::~Application()
 {
+	Core::ShaderFactory::DeleteCache();
+	Core::MaterialFactory::DeleteCache();
+
 	delete(_renderPipeline);
 	delete(_scene);
 	delete(_renderContext);

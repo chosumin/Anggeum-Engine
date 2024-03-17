@@ -23,6 +23,7 @@ namespace Core
 		VkPipelineColorBlendAttachmentState GetColorBlendAttachmentState();
 	private:
 		Device& _device;
+
 		VkPipeline _graphicsPipeline;
 
 		vector<VkDynamicState> _dynamicStates =

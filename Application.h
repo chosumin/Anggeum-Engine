@@ -29,7 +29,6 @@ public:
 
 	bool Prepare();
 	void Update();
-	void Finish();
 	void DrawFrame();
 	void WaitIdle();
 protected:

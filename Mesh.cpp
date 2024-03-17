@@ -3,15 +3,12 @@
 #include "Vertex.h"
 #include "CommandBuffer.h"
 #include "Buffer.h"
-#include "Transform.h"
-#include "Entity.h"
-#include "Material.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-Core::Mesh::Mesh(Device& device, Entity& entity, string modelPath)
-	:Component(entity), _device(device)
+Core::Mesh::Mesh(Device& device, string modelPath)
+	:_device(device)
 {
 	LoadModel(modelPath);
 
@@ -23,18 +20,6 @@ Core::Mesh::~Mesh()
 {
 	delete(_indexBuffer);
 	delete(_vertexBuffer);
-}
-
-void Core::Mesh::UpdateFrame(float deltaTime)
-{
-}
-
-void Core::Mesh::DrawFrame(CommandBuffer& commandBuffer, Material& material)
-{
-	auto& transform = _entity.GetComponent<Transform>();
-	_modelPushConstant.World = transform.GetMatrix();
-
-	material.SetPushConstants(_modelPushConstant);
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)
@@ -114,13 +99,4 @@ void Core::Mesh::CreateIndexBuffer()
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
-}
-
-std::type_index Core::Mesh::GetType()
-{
-	return typeid(Mesh);
-}
-
-void Core::Mesh::Resize(uint32_t width, uint32_t height)
-{
 }

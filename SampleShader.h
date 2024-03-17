@@ -11,6 +11,7 @@ namespace Core
 		virtual ~SampleShader() override;
 
 		virtual type_index GetType() override;
+		virtual string GetPass() override;
 	};
 }
 

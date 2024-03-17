@@ -17,7 +17,7 @@ namespace Core
 
 		vector<PushConstant> pushConstants = 
 		{ 
-			{sizeof(ModelWorld), VK_SHADER_STAGE_VERTEX_BIT} 
+			{sizeof(MeshWorld), VK_SHADER_STAGE_VERTEX_BIT} 
 		};
 
 		CreatePipelineLayout({ cameraBuffer, textureBuffer }, pushConstants);
@@ -33,5 +33,10 @@ namespace Core
 	type_index SampleShader::GetType()
 	{
 		return typeid(SampleShader);
+	}
+
+	string SampleShader::GetPass()
+	{
+		return "Geometry";
 	}
 }

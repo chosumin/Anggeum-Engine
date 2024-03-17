@@ -4,7 +4,7 @@
 #include "Component.h"
 #include "PerspectiveCamera.h"
 #include "FreeCamera.h"
-#include "Mesh.h"
+#include "MeshRenderer.h"
 using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, 
@@ -28,8 +28,8 @@ SampleScene::SampleScene(Core::Device& device,
 		auto& transform = meshEntity->GetTransform();
 		vec3 position = vec3(i, 0, 0);
 		transform.SetTranslation(position);
-		auto mesh = make_unique<Mesh>(device, *meshEntity, "Models/viking_room.obj");
-		AddComponent(move(mesh), *meshEntity);
+		auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity, "Models/viking_room.obj");
+		AddComponent(move(meshRenderer), *meshEntity);
 		AddEntity(move(meshEntity));
 	}
 }

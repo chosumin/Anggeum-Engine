@@ -22,6 +22,7 @@ Core::Pipeline::Pipeline(Device& device,
 	auto colorBlendAttachment = GetColorBlendAttachmentState();
 	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);
 	auto dynamicState = GetDynamicStateCreateInfo();
+	auto pipelineLayout = shader.GetPipelineLayout();
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -35,7 +36,7 @@ Core::Pipeline::Pipeline(Device& device,
 	pipelineInfo.pDepthStencilState = &depthStencilState;
 	pipelineInfo.pColorBlendState = &colorBlendState;
 	pipelineInfo.pDynamicState = &dynamicState;
-	pipelineInfo.layout = shader.GetPipelineLayout();
+	pipelineInfo.layout = pipelineLayout;
 	pipelineInfo.renderPass = renderPass.GetHandle();
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
@@ -47,7 +48,8 @@ Core::Pipeline::Pipeline(Device& device,
 
 Core::Pipeline::~Pipeline()
 {
-	vkDestroyPipeline(_device.GetDevice(), _graphicsPipeline, nullptr);
+	auto device = _device.GetDevice();
+	vkDestroyPipeline(device, _graphicsPipeline, nullptr);
 }
 
 VkPipelineInputAssemblyStateCreateInfo Core::Pipeline::GetInputAssemblyStateCreateInfo()

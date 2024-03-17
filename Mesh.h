@@ -9,22 +9,16 @@ namespace Core
 	class Material;
 	class CommandBuffer;
 
-	struct ModelWorld
+	struct MeshWorld
 	{
 		alignas(16) mat4 World;
 	};
 
-	class Mesh : public Component
+	class Mesh
 	{
 	public:
-		Mesh(Device& device, Entity& entity, string modelPath);
+		Mesh(Device& device, string modelPath);
 		~Mesh();
-
-		virtual void UpdateFrame(float deltaTime) override;
-		virtual std::type_index GetType() override;
-		virtual void Resize(uint32_t width, uint32_t height) override;
-
-		void DrawFrame(CommandBuffer& commandBuffer, Material& material);
 
 		uint32_t GetIndexCount() const 
 		{
@@ -33,6 +27,8 @@ namespace Core
 
 		Buffer& GetVertexBuffer() { return *_vertexBuffer; }
 		Buffer& GetIndexBuffer() { return *_indexBuffer; }
+
+		MeshWorld& GetModelWorld() { return _modelPushConstant; }
 	private:
 		void LoadModel(const string& modelPath);
 		void CreateVertexBuffer();
@@ -47,6 +43,6 @@ namespace Core
 		Buffer* _vertexBuffer;
 		Buffer* _indexBuffer;
 
-		ModelWorld _modelPushConstant;
+		MeshWorld _modelPushConstant;
 	};
 }

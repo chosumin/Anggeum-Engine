@@ -23,6 +23,8 @@ namespace Core
 
         auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
         Core::RenderContext::RemoveResizeCallback(a);
+
+        delete(_framebuffer);
 	}
 
     VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent)

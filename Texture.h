@@ -1,5 +1,4 @@
 #pragma once
-#include "IDescriptor.h"
 
 namespace Core
 {
