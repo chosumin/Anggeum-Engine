@@ -12,6 +12,8 @@ namespace Core
 
 		virtual type_index GetType() override;
 		virtual string GetPass() override;
+
+		virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo() override;
 	};
 }
 

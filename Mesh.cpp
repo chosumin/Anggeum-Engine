@@ -8,7 +8,7 @@
 #include <tiny_obj_loader.h>
 
 Core::Mesh::Mesh(Device& device, string modelPath)
-	:_device(device)
+	:_device(device), _modelPath(modelPath)
 {
 	LoadModel(modelPath);
 

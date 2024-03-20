@@ -3,6 +3,8 @@
 #include "TextureBuffer.h"
 #include "Mesh.h"
 #include "UniformBuffer.h"
+#include "Vertex.h"
+#include "InstanceData.h"
 
 namespace Core
 {
@@ -15,12 +17,7 @@ namespace Core
 
 		auto textureBuffer = new TextureBufferLayoutBinding(1);
 
-		vector<PushConstant> pushConstants = 
-		{ 
-			{sizeof(MeshWorld), VK_SHADER_STAGE_VERTEX_BIT} 
-		};
-
-		CreatePipelineLayout({ cameraBuffer, textureBuffer }, pushConstants);
+		CreatePipelineLayout({ cameraBuffer, textureBuffer }, {});
 
 		delete(cameraBuffer);
 		delete(textureBuffer);
@@ -38,5 +35,39 @@ namespace Core
 	string SampleShader::GetPass()
 	{
 		return "Geometry";
+	}
+
+	VkPipelineVertexInputStateCreateInfo SampleShader::GetVertexInputStateCreateInfo()
+	{
+		_vertexBindings = {
+			Vertex::GetBindingDescription(
+		0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+			Vertex::GetBindingDescription(
+		1, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
+		};
+
+		_vertexAttributes = Vertex::GetAttributeDescriptions();
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			1, 3, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Position)));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			1, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Rotation)));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			1, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Scale)));
+
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.vertexBindingDescriptionCount = 
+			static_cast<uint32_t>(_vertexBindings.size());
+		vertexInputInfo.vertexAttributeDescriptionCount = 
+			static_cast<uint32_t>(_vertexAttributes.size());
+		vertexInputInfo.pVertexBindingDescriptions = _vertexBindings.data();
+		vertexInputInfo.pVertexAttributeDescriptions = _vertexAttributes.data();
+
+		return vertexInputInfo;
+	}
+
+	bool SampleShader::UseInstancing()
+	{
+		return true;
 	}
 }

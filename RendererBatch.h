@@ -21,7 +21,7 @@ namespace Core
 		Pipeline* Pipeline;
 		Shader& SharedShader;
 		unordered_map<type_index, Material*> Materials;
-		unordered_map<type_index, vector<MeshRenderer*>> MeshRenderers;
+		unordered_map<type_index, unordered_map<string, vector<MeshRenderer*>>> MeshBatches;
 	};
 }
 

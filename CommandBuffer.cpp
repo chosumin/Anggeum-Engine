@@ -78,12 +78,12 @@ void Core::CommandBuffer::Flush(Material& material)
     material.ClearPushConstantsCache();
 }
 
-void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer)
+void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer, uint32_t binding)
 {
     VkBuffer vertexBuffers[] = { buffer.GetBuffer() };
     VkDeviceSize offsets[] = { 0 };
 
-    vkCmdBindVertexBuffers(_commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindVertexBuffers(_commandBuffer, binding, 1, vertexBuffers, offsets);
 }
 
 void Core::CommandBuffer::BindIndexBuffer(Buffer& buffer, VkIndexType indexType)

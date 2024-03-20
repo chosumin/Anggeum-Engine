@@ -12,6 +12,7 @@
 #include "Mesh.h"
 #include "Shader.h"
 #include "RendererBatch.h"
+#include "Buffer.h"
 
 namespace Core
 {
@@ -83,20 +84,21 @@ namespace Core
 				commandBuffer.BindDescriptorSets(
 					VK_PIPELINE_BIND_POINT_GRAPHICS, material.second->GetShader(), currentFrame);
 
-				auto& meshRenderers = 
-					batch.second->MeshRenderers[material.first];
+				auto& meshBatches = 
+					batch.second->MeshBatches[material.first];
 
-				RendererBatch::Sort(material.first);
-
-				for (auto&& meshRenderer : meshRenderers)
+				for (auto&& meshBatch : meshBatches)
 				{
-					meshRenderer->Draw();
+					RendererBatch::Sort(material.first);
 
 					commandBuffer.Flush(*material.second);
 
-					auto& mesh = meshRenderer->GetMesh();
-					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer());
+					auto& mesh = meshBatch.second[0]->GetMesh();
+					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer(), 0);
+					commandBuffer.BindVertexBuffers(, 1);
 					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
+
+					//todo : draw instancing
 					commandBuffer.DrawIndexed(mesh.GetIndexCount(), 1);
 				}
 			}

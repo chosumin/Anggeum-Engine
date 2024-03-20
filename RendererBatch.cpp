@@ -30,7 +30,8 @@ void Core::RendererBatch::Add(MeshRenderer& meshRenderer)
 		Materials.insert(make_pair(matType, &meshRenderer.GetMaterial()));
 	}
 
-	MeshRenderers[matType].push_back(&meshRenderer);
+	auto& batch = MeshBatches[matType][meshRenderer.GetMesh().GetModelPath()];
+	batch.emplace_back(meshRenderer);
 }
 
 void Core::RendererBatch::Sort(type_index type)

@@ -150,6 +150,7 @@
     <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="FreeCamera.cpp" />
     <ClCompile Include="InputEvents.cpp" />
+    <ClCompile Include="InstanceData.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="MaterialFactory.cpp" />
     <ClCompile Include="MeshFactory.cpp" />
@@ -195,6 +196,7 @@
     <ClInclude Include="FreeCamera.h" />
     <ClInclude Include="IDescriptor.h" />
     <ClInclude Include="InputEvents.h" />
+    <ClInclude Include="InstanceData.h" />
     <ClInclude Include="Keycodes.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="MaterialFactory.h" />

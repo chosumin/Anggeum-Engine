@@ -9,11 +9,6 @@ namespace Core
 	class Material;
 	class CommandBuffer;
 
-	struct MeshWorld
-	{
-		alignas(16) mat4 World;
-	};
-
 	class Mesh
 	{
 	public:
@@ -28,12 +23,14 @@ namespace Core
 		Buffer& GetVertexBuffer() { return *_vertexBuffer; }
 		Buffer& GetIndexBuffer() { return *_indexBuffer; }
 
-		MeshWorld& GetModelWorld() { return _modelPushConstant; }
+		string GetModelPath() const { return _modelPath; }
 	private:
 		void LoadModel(const string& modelPath);
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
 	private:
+		string _modelPath;
+
 		Device& _device;
 
 		//clockwise.
@@ -42,7 +39,5 @@ namespace Core
 
 		Buffer* _vertexBuffer;
 		Buffer* _indexBuffer;
-
-		MeshWorld _modelPushConstant;
 	};
 }

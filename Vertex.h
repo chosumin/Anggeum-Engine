@@ -6,16 +6,31 @@ struct Vertex
     vec3 Color;
     vec2 TexCoord;
 
-    static VkVertexInputBindingDescription GetBindingDescription() 
+    static VkVertexInputBindingDescription GetBindingDescription(
+        uint32_t binding, uint32_t stride, VkVertexInputRate inputRate) 
     {
         VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        bindingDescription.binding = binding;
+        bindingDescription.stride = stride;
+        bindingDescription.inputRate = inputRate;
         return bindingDescription;
     }
 
-    static vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() {
+    static VkVertexInputAttributeDescription GetAttributeDescription(
+        uint32_t binding, uint32_t location, VkFormat format, uint32_t offset)
+    {
+        VkVertexInputAttributeDescription attributeDescription;
+
+        attributeDescription.binding = binding;
+        attributeDescription.location = location;
+        attributeDescription.format = format;
+        attributeDescription.offset = offset;
+
+        return attributeDescription;
+    }
+
+    static vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() 
+    {
         vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
 
         attributeDescriptions[0].binding = 0;

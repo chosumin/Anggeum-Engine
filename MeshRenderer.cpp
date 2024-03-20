@@ -34,16 +34,6 @@ void Core::MeshRenderer::SetMaterial(MaterialType type)
 	_material = MaterialFactory::CreateMaterial(_device, type);
 }
 
-void Core::MeshRenderer::Draw()
-{
-	auto& transform = _entity.GetComponent<Transform>();
-	auto& meshWorld = _mesh->GetModelWorld();
-
-	meshWorld.World = transform.GetMatrix();
-
-	_material->SetPushConstants(meshWorld);
-}
-
 void Core::MeshRenderer::UpdateFrame(float deltaTime)
 {
 }

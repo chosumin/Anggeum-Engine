@@ -14,9 +14,11 @@ namespace Core
 
 		virtual std::type_index GetType() = 0;
 		virtual string GetPass() = 0;
+		virtual bool UseInstancing() = 0;
 
+		virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
+		
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
-		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
 
 		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
 
@@ -38,6 +40,9 @@ namespace Core
 		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code) const;
 	protected:
 		vector<VkPushConstantRange> _pushConstantRanges;
+
+		vector<VkVertexInputBindingDescription> _vertexBindings;
+		vector<VkVertexInputAttributeDescription> _vertexAttributes;
 	private:
 		Device& _device;
 
@@ -48,8 +53,5 @@ namespace Core
 		VkDescriptorPool _descriptorPool;
 		VkDescriptorSetLayout _descriptorSetLayout;
 		VkPipelineLayout _pipelineLayout;
-
-		VkVertexInputBindingDescription _vertexBinding;
-		vector<VkVertexInputAttributeDescription> _vertexAttribute;
 	};
 }
