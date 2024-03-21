@@ -102,8 +102,8 @@ namespace Core
 					auto& meshRenderers = meshBatch.second;
 					for (size_t i = 0; i < meshRenderers.size(); ++i)
 					{
-						auto& transform = meshRenderers[i]->GetComponent<Transform>();
-						_instanceBuffer->SetBuffer(i, transform.GetMatrix());
+						auto& entity = meshRenderers[i]->GetEntity();
+						_instanceBuffer->SetBuffer(i, entity.GetTransform());
 					}
 					_instanceBuffer->Copy();
 

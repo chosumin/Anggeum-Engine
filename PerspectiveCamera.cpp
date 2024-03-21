@@ -89,6 +89,8 @@ void Core::PerspectiveCamera::SetPreRotation(const glm::mat4& pre_rotation)
 
 void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
 {
+	auto& transform = _entity.GetComponent<Transform>();
+	Matrices.View = transform.GetMatrix();
 }
 
 void Core::PerspectiveCamera::Resize(uint32_t width, uint32_t height)

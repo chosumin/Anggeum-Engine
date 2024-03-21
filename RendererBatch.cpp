@@ -31,7 +31,7 @@ void Core::RendererBatch::Add(MeshRenderer& meshRenderer)
 	}
 
 	auto& batch = MeshBatches[matType][meshRenderer.GetMesh().GetModelPath()];
-	batch.emplace_back(meshRenderer);
+	batch.push_back(&meshRenderer);
 }
 
 void Core::RendererBatch::Sort(type_index type)

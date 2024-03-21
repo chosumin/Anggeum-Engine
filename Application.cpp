@@ -8,6 +8,7 @@
 #include "RenderContext.h"
 #include "MaterialFactory.h"
 #include "ShaderFactory.h"
+#include "MeshFactory.h"
 
 Application::Application(const ApplicationOptions& options)
 {
@@ -57,6 +58,7 @@ Application::~Application()
 {
 	Core::ShaderFactory::DeleteCache();
 	Core::MaterialFactory::DeleteCache();
+	Core::MeshFactory::DeleteCache();
 
 	delete(_renderPipeline);
 	delete(_scene);

@@ -48,11 +48,13 @@ namespace Core
 
 		_vertexAttributes = Vertex::GetAttributeDescriptions();
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 3, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Position)));
+			1, 3, VK_FORMAT_R32G32B32A32_SFLOAT, 0));
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 4, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Rotation)));
+			1, 4, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 4));
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 5, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, Scale)));
+			1, 5, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			1, 6, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12));
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

@@ -8,6 +8,7 @@ namespace Core
 	};
 
 	class Buffer;
+	class Transform;
 	class InstanceBuffer
 	{
 	public:
@@ -16,7 +17,7 @@ namespace Core
 
 		Buffer& GetBuffer() { return *_instanceBuffer; }
 
-		void SetBuffer(uint32_t index, mat4 world);
+		void SetBuffer(size_t index, Transform& transform);
 		void Copy();
 	private:
 		Buffer* _instanceBuffer;

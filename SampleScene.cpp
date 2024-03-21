@@ -22,11 +22,11 @@ SampleScene::SampleScene(Core::Device& device,
 
 	AddEntity(move(cameraEntity));
 
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 10; ++i)
 	{
 		auto meshEntity = make_unique<Entity>(-1, "mesh");
 		auto& transform = meshEntity->GetTransform();
-		vec3 position = vec3(i, 0, 0);
+		vec3 position = vec3(0, 0, 0);
 		transform.SetTranslation(position);
 		auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity, "Models/viking_room.obj");
 		AddComponent(move(meshRenderer), *meshEntity);

@@ -75,14 +75,7 @@ void Core::Buffer::CopyBuffer(void* data, VkDeviceSize size)
 void Core::Buffer::MapMemory(void** data, VkDeviceSize size)
 {
 	//persistent mapping
-		//The uniform data will be used for all draw calls, 
-		//so the buffer containing it should only be destroyed when we stop rendering.
 	vkMapMemory(
 		_device.GetDevice(), _bufferMemory,
 		0, size, 0, data);
 }
-
-//void Core::Buffer::CopyInstanceBuffer(void* data, VkDeviceSize size)
-//{
-//	memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
-//}

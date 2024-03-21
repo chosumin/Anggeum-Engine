@@ -19,7 +19,7 @@ struct Vertex
     static VkVertexInputAttributeDescription GetAttributeDescription(
         uint32_t binding, uint32_t location, VkFormat format, uint32_t offset)
     {
-        VkVertexInputAttributeDescription attributeDescription;
+        VkVertexInputAttributeDescription attributeDescription{};
 
         attributeDescription.binding = binding;
         attributeDescription.location = location;

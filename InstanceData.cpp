@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "InstanceData.h"
 #include "Buffer.h"
+#include "Transform.h"
+using namespace Core;
 
 Core::InstanceBuffer::InstanceBuffer(Device& device)
 {
@@ -9,7 +11,7 @@ Core::InstanceBuffer::InstanceBuffer(Device& device)
 	_bufferSize = sizeof(_instanceData[0]) * _instanceData.size();
 
 	_instanceBuffer = new Core::Buffer(device, _bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	_instanceBuffer->MapMemory(&_instanceDataMapped, _bufferSize);
@@ -20,12 +22,14 @@ Core::InstanceBuffer::~InstanceBuffer()
 	delete(_instanceBuffer);
 }
 
-void Core::InstanceBuffer::SetBuffer(uint32_t index, mat4 world)
+void Core::InstanceBuffer::SetBuffer(size_t index, Transform& transform)
 {
-	_instanceData[index].World = world;
+	_instanceData[index].World = transform.GetMatrix();
 }
 
 void Core::InstanceBuffer::Copy()
 {
-	memcpy(_instanceDataMapped, &_instanceData, _bufferSize);
+	//_instanceBuffer->CopyBuffer(_instanceData.data(), _bufferSize);
+	
+	memcpy(_instanceDataMapped, _instanceData.data(), _bufferSize);
 }

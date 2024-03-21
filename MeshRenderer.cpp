@@ -3,6 +3,7 @@
 #include "Material.h"
 #include "MaterialFactory.h"
 #include "Mesh.h"
+#include "MeshFactory.h"
 #include "Entity.h"
 using namespace Core;
 
@@ -15,7 +16,6 @@ Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity, string modelPat
 
 Core::MeshRenderer::~MeshRenderer()
 {
-	delete(_mesh);
 }
 
 void Core::MeshRenderer::SetMesh(string modelPath)
@@ -23,7 +23,7 @@ void Core::MeshRenderer::SetMesh(string modelPath)
 	if (_mesh != nullptr)
 		delete(_mesh);
 
-	_mesh = new Mesh(_device, modelPath);
+	_mesh = MeshFactory::CreateMesh(_device, modelPath);
 }
 
 void Core::MeshRenderer::SetMaterial(MaterialType type)

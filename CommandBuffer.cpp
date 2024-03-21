@@ -71,6 +71,10 @@ void Core::CommandBuffer::Flush(Material& material)
     auto& shader = material.GetShader();
 
     auto pushConstants = material.GetPushConstantsData();
+
+    if (pushConstants->empty())
+        return;
+
     auto shaderStageFlags = shader.GetPushConstantsShaderStage();
 
     vkCmdPushConstants(_commandBuffer, shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
