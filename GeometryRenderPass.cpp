@@ -13,6 +13,8 @@
 #include "Shader.h"
 #include "RendererBatch.h"
 #include "Buffer.h"
+#include "InstanceData.h"
+#include "Component.h"
 
 namespace Core
 {
@@ -25,7 +27,9 @@ namespace Core
 		CreateDepthRenderTarget(extent);
 		CreateRenderPass();
 
-		_framebuffer = new Core::Framebuffer(device, swapChain, *this);
+		_framebuffer = new Framebuffer(device, swapChain, *this);
+
+		_instanceBuffer = new InstanceBuffer(device);
 	}
 
 	GeometryRenderPass::~GeometryRenderPass()
@@ -36,6 +40,8 @@ namespace Core
 		}
 
 		_batches.clear();
+
+		delete(_instanceBuffer);
 	}
 
 	void GeometryRenderPass::Prepare()
@@ -93,13 +99,22 @@ namespace Core
 
 					commandBuffer.Flush(*material.second);
 
+					auto& meshRenderers = meshBatch.second;
+					for (size_t i = 0; i < meshRenderers.size(); ++i)
+					{
+						auto& transform = meshRenderers[i]->GetComponent<Transform>();
+						_instanceBuffer->SetBuffer(i, transform.GetMatrix());
+					}
+					_instanceBuffer->Copy();
+
 					auto& mesh = meshBatch.second[0]->GetMesh();
 					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer(), 0);
-					commandBuffer.BindVertexBuffers(, 1);
+					commandBuffer.BindVertexBuffers(
+						_instanceBuffer->GetBuffer(), 1);
+
 					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 
-					//todo : draw instancing
-					commandBuffer.DrawIndexed(mesh.GetIndexCount(), 1);
+					commandBuffer.DrawIndexed(mesh.GetIndexCount(), static_cast<uint32_t>(meshRenderers.size()));
 				}
 			}
 		}

@@ -14,6 +14,12 @@ namespace Core
 		virtual void UpdateFrame(float deltaTime) = 0;
 		virtual std::type_index GetType() = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
+
+		template <class T>
+		inline T& GetComponent()
+		{
+			return _entity.GetComponent<T&>;
+		}
 	protected:
 		Entity& _entity;
 	};

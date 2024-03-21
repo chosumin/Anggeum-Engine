@@ -15,6 +15,8 @@ namespace Core
 
 		void CopyBuffer(VkBuffer srcBuffer, VkDeviceSize size);
 		void CopyBuffer(void* data, VkDeviceSize size);
+		void MapMemory(void** data, VkDeviceSize size);
+		//void CopyInstanceBuffer(void* data, VkDeviceSize size);
 	private:
 		void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 			VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
