@@ -22,7 +22,7 @@ SampleScene::SampleScene(Core::Device& device,
 
 	AddEntity(move(cameraEntity));
 
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < 500; ++i)
 	{
 		auto meshEntity = make_unique<Entity>(-1, "mesh");
 		auto& transform = meshEntity->GetTransform();

@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories);C:\Vulkan\imgui</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -124,7 +124,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories);C:\Vulkan\imgui</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -149,6 +149,35 @@
     <ClCompile Include="ForwardRenderPipeline.cpp" />
     <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="FreeCamera.cpp" />
+    <ClCompile Include="ImGuiManager.cpp" />
+    <ClCompile Include="imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="InputEvents.cpp" />
     <ClCompile Include="InstanceData.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -195,6 +224,12 @@
     <ClInclude Include="Framebuffer.h" />
     <ClInclude Include="FreeCamera.h" />
     <ClInclude Include="IDescriptor.h" />
+    <ClInclude Include="ImGuiManager.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="InputEvents.h" />
     <ClInclude Include="InstanceData.h" />
     <ClInclude Include="Keycodes.h" />
@@ -211,6 +246,7 @@
     <ClInclude Include="IRenderPipeline.h" />
     <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="GeometryRenderPass.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="SampleMaterial.h" />
     <ClInclude Include="SampleScene.h" />
     <ClInclude Include="SampleShader.h" />
@@ -234,10 +270,17 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="imgui\misc\debuggers\imgui.natstepfilter" />
     <None Include="Shaders\fs.frag" />
     <None Include="Shaders\simple_fs.frag.spv" />
     <None Include="Shaders\simple_vs.vert.spv" />
     <None Include="Shaders\vs.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Vulkan.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="imgui\misc\debuggers\imgui.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

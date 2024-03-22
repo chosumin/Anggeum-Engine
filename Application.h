@@ -13,6 +13,7 @@ namespace Core
 	class Scene;
 	class RenderContext;
 	class IRenderPipeline;
+	class ImGuiManager;
 }
 
 struct ApplicationOptions
@@ -29,7 +30,7 @@ public:
 
 	bool Prepare();
 	void Update();
-	void DrawFrame();
+	void Draw();
 	void WaitIdle();
 protected:
 	float _fps{ 0.0f };
@@ -39,7 +40,6 @@ protected:
 	bool _lockSimulationSpeed{ false };
 private:
 	//todo : render pipeline
-	//todo : gui
 	//todo : stats
 
 	unique_ptr<Core::Timer> _timer;
@@ -47,4 +47,5 @@ private:
 	Core::IRenderPipeline* _renderPipeline;
 	Core::RenderContext* _renderContext;
 	Core::Scene* _scene;
+	Core::ImGuiManager* _imgui;
 };

@@ -9,6 +9,7 @@
 #include "MaterialFactory.h"
 #include "ShaderFactory.h"
 #include "MeshFactory.h"
+#include "ImGuiManager.h"
 
 Application::Application(const ApplicationOptions& options)
 {
@@ -33,11 +34,15 @@ bool Application::Prepare()
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
 
+	_imgui = new Core::ImGuiManager(*_device, _renderPipeline->GetRenderPass(0));
+
 	return true;
 }
 
 void Application::Update()
 {
+	_imgui->Update();
+	
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
 
 	_fps = 1.0f / deltaTime;
@@ -50,12 +55,13 @@ void Application::Update()
 	}
 
 	//todo : update scene
-	//todo : update gui
 	//todo : update stats
 }
 
 Application::~Application()
 {
+	delete(_imgui);
+
 	Core::ShaderFactory::DeleteCache();
 	Core::MaterialFactory::DeleteCache();
 	Core::MeshFactory::DeleteCache();
@@ -68,7 +74,7 @@ Application::~Application()
 	Core::Window::Instance().Delete();
 }
 
-void Application::DrawFrame()
+void Application::Draw()
 {
 	auto& commandBuffer = _renderContext->Begin();
 

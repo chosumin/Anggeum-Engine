@@ -15,6 +15,7 @@ namespace Core
 
 		virtual void Prepare() override;
 		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual RenderPass& GetRenderPass(uint32_t index) override;
 	private:
 		void AddRenderPass(RenderPass* renderPass)
 		{

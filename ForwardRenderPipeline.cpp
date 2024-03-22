@@ -37,3 +37,8 @@ void ForwardRenderPipeline::Draw(CommandBuffer& commandBuffer, uint32_t currentF
 		renderPass->Draw(commandBuffer, currentFrame, imageIndex);
 	}
 }
+
+RenderPass& Core::ForwardRenderPipeline::GetRenderPass(uint32_t index)
+{
+	return *_renderPasses[index];
+}

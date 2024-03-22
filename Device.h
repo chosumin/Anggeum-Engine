@@ -49,6 +49,8 @@ namespace Core
 			const vector<VkFormat>& candidates,
 			VkImageTiling tiling,
 			VkFormatFeatureFlags features);
+
+		const VkInstance& GetInstance() const { return _instance; }
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();

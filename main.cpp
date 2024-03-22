@@ -20,7 +20,7 @@ int main()
 	{
 		glfwPollEvents();
 		application.Update();
-		application.DrawFrame();
+		application.Draw();
 	}
 
 	application.WaitIdle();

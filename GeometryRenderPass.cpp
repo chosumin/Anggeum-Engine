@@ -119,6 +119,10 @@ namespace Core
 			}
 		}
 		
+		ImGui::Render();
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+			commandBuffer.GetHandle());
+
 		commandBuffer.EndRenderPass();
 	}
 }
