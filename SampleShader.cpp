@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "SampleShader.h"
 #include "TextureBuffer.h"
-#include "Mesh.h"
 #include "UniformBuffer.h"
 #include "Vertex.h"
 #include "InstanceData.h"
@@ -21,10 +20,6 @@ namespace Core
 
 		delete(cameraBuffer);
 		delete(textureBuffer);
-	}
-
-	SampleShader::~SampleShader()
-	{
 	}
 
 	type_index SampleShader::GetType()
@@ -56,16 +51,7 @@ namespace Core
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
 			1, 6, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12));
 
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInputInfo.vertexBindingDescriptionCount = 
-			static_cast<uint32_t>(_vertexBindings.size());
-		vertexInputInfo.vertexAttributeDescriptionCount = 
-			static_cast<uint32_t>(_vertexAttributes.size());
-		vertexInputInfo.pVertexBindingDescriptions = _vertexBindings.data();
-		vertexInputInfo.pVertexAttributeDescriptions = _vertexAttributes.data();
-
-		return vertexInputInfo;
+		return Shader::GetVertexInputStateCreateInfo();
 	}
 
 	bool SampleShader::UseInstancing()

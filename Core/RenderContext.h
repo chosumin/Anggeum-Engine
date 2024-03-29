@@ -70,5 +70,7 @@ namespace Core
 		vector<VkSemaphore> _imageAvailableSemaphores;
 		vector<VkSemaphore> _renderFinishedSemaphores;
 		vector<VkFence> _inFlightFences;
+
+		//todo : render target
 	};
 }

@@ -36,10 +36,27 @@ namespace Core
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = swapChainExtent;
 
-        //todo : 렌더 타겟 개수만큼 초기화 해야 함.
-        _clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-        _clearValues[2].depthStencil = { 1.0f, 0 };
-        
+        if (_color != nullptr)
+        {
+            VkClearValue clearValue{};
+            clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+            _clearValues.push_back(clearValue);
+            _clearValues.push_back(clearValue);
+        }
+
+        if (_depth != nullptr)
+        {
+            VkClearValue clearValue{};
+            clearValue.depthStencil = { 1.0f, 0 };
+            _clearValues.emplace_back(clearValue);
+        }
+
+        for (auto& renderTarget : _inputRenderTargets)
+        {
+            VkClearValue clearValue{};
+            _clearValues.emplace_back(clearValue);
+        }
+
         renderPassInfo.clearValueCount = static_cast<uint32_t>(_clearValues.size());
         renderPassInfo.pClearValues = _clearValues.data();
 
@@ -61,7 +78,7 @@ namespace Core
             attachments.push_back(_depth->ImageView);
         }
 
-        for (auto& renderTarget : _renderTargets)
+        for (auto& renderTarget : _inputRenderTargets)
         {
             attachments.push_back(renderTarget->ImageView);
         }
@@ -72,11 +89,11 @@ namespace Core
     void RenderPass::Cleanup()
 	{
         auto device = _device.GetDevice();
-		for (size_t i = 0; i < _renderTargets.size(); ++i)
+		for (size_t i = 0; i < _inputRenderTargets.size(); ++i)
 		{
-			vkDestroyImageView(device, _renderTargets[i]->ImageView, nullptr);
-			vkDestroyImage(device, _renderTargets[i]->Image, nullptr);
-			vkFreeMemory(device, _renderTargets[i]->ImageMemory, nullptr);
+			vkDestroyImageView(device, _inputRenderTargets[i]->ImageView, nullptr);
+			vkDestroyImage(device, _inputRenderTargets[i]->Image, nullptr);
+			vkFreeMemory(device, _inputRenderTargets[i]->ImageMemory, nullptr);
 		}
 
         if (_color != nullptr)
@@ -112,7 +129,7 @@ namespace Core
             CreateDepthRenderTarget(extent);
         }
 
-        for (auto& renderTarget : _renderTargets)
+        for (auto& renderTarget : _inputRenderTargets)
         {
             CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout, renderTarget->UsageFlags);
         }
@@ -139,7 +156,7 @@ namespace Core
         renderTarget->ImageView = imageView;
         renderTarget->UsageFlags = usageFlags;
 
-		_renderTargets.emplace_back(move(renderTarget));
+		_inputRenderTargets.emplace_back(move(renderTarget));
 	}
 
 	void RenderPass::CreateDepthRenderTarget(VkExtent2D extent)
@@ -260,7 +277,30 @@ namespace Core
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
 
-        //todo : add render targets.
+        vector<VkAttachmentDescription> inputDescs(_inputRenderTargets.size());
+        vector<VkAttachmentReference> inputRefs(_inputRenderTargets.size());
+		for (size_t i = 0; i < _inputRenderTargets.size(); ++i)
+		{
+			VkAttachmentDescription inputAttachment{};
+			inputAttachment.format = _inputRenderTargets[i]->Format;
+			inputAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+			inputAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			inputAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			inputAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			inputAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			inputAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			inputAttachment.finalLayout = _inputRenderTargets[i]->Layout;
+
+            attachments.push_back(inputAttachment);
+
+            inputDescs[i] = inputAttachment;
+            inputRefs[i].attachment = static_cast<uint32_t>(attachments.size() - 1);
+            inputRefs[i].layout = _inputRenderTargets[i]->Layout;
+		}
+
+        subpass.inputAttachmentCount = static_cast<uint32_t>(inputDescs.size());
+        subpass.pInputAttachments = subpass.inputAttachmentCount <= 0 ? 
+            nullptr : inputRefs.data();
 
         VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;

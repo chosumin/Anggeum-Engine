@@ -2,6 +2,7 @@
 #include "ForwardRenderPipeline.h"
 #include "RenderPass.h"
 #include "GeometryRenderPass.h"
+#include "ShadowRenderPass.h"
 #include "Scene.h"
 #include "SwapChain.h"
 using namespace Core;
@@ -9,6 +10,10 @@ using namespace Core;
 Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	Device& device, Scene& scene, SwapChain& swapChain)
 {
+	auto shadowRenderPass = new ShadowRenderPass(
+		device, scene, swapChain);
+	AddRenderPass(shadowRenderPass);
+
 	auto geometryRenderPass = new GeometryRenderPass(
 		device, scene, swapChain);
 	AddRenderPass(geometryRenderPass);

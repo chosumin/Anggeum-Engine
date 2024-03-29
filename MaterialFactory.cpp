@@ -2,6 +2,7 @@
 #include "MaterialFactory.h"
 #include "Material.h"
 #include "SampleMaterial.h"
+#include "ShadowMaterial.h"
 using namespace Core;
 
 mutex _materialMutex;
@@ -41,6 +42,8 @@ Material* Core::MaterialFactory::CreateMaterialInternal(Device& device, Material
 	{
 		case Core::MaterialType::SAMPLE:
 			return new SampleMaterial(device);
+		case Core::MaterialType::SHADOW:
+			return new ShadowMaterial(device);
 		default:
 			return new SampleMaterial(device);
 	}

@@ -6,11 +6,7 @@ class InstanceData;
 namespace Core
 {
 	class Scene;
-	class Camera;
-	class Pipeline;
-	class Framebuffer;
 	class SwapChain;
-	class Shader;
 	class RendererBatch;
 	class InstanceBuffer;
 

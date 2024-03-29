@@ -9,13 +9,11 @@
 #include "MaterialFactory.h"
 #include "ShaderFactory.h"
 #include "MeshFactory.h"
-#include "ImGuiManager.h"
+#include "GUIRenderPass.h"
 
 Application::Application(const ApplicationOptions& options)
 {
 	assert(options.window != nullptr && "Window must be valid");
-	
-	_lockSimulationSpeed = options.BenchmarkEnabled;
 
 	_timer = make_unique<Core::Timer>();
 
@@ -34,19 +32,17 @@ bool Application::Prepare()
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
 
-	_imgui = new Core::ImGuiManager(*_device, _renderPipeline->GetRenderPass(0));
+	_guiRenderPass = new GUIRenderPass(*_device, swapChain);
+	_guiRenderPass->Prepare();
 
 	return true;
 }
 
 void Application::Update()
 {
-	_imgui->Update();
+	_guiRenderPass->Update();
 	
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
-
-	_fps = 1.0f / deltaTime;
-	_frameTime = deltaTime * 1000.0f;
 
 	auto components = _scene->GetComponents<Core::Component>();
 	for (auto component : components)
@@ -60,7 +56,7 @@ void Application::Update()
 
 Application::~Application()
 {
-	delete(_imgui);
+	delete(_guiRenderPass);
 
 	Core::ShaderFactory::DeleteCache();
 	Core::MaterialFactory::DeleteCache();
@@ -80,6 +76,10 @@ void Application::Draw()
 
 	_renderPipeline->Draw(commandBuffer,
 		_renderContext->GetCurrentFrame(), 
+		_renderContext->GetImageIndex());
+
+	_guiRenderPass->Draw(commandBuffer, 
+		_renderContext->GetCurrentFrame(),
 		_renderContext->GetImageIndex());
 
 	commandBuffer.EndCommandBuffer();

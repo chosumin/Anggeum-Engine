@@ -4,7 +4,7 @@
 #include "Entity.h"
 
 Core::PerspectiveCamera::PerspectiveCamera(
-	Entity& entity, float width, float height)\
+	Entity& entity, float width, float height)
 	:Component(entity)
 {
 	Matrices.View = lookAt(

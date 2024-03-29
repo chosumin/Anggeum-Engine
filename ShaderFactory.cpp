@@ -2,6 +2,7 @@
 #include "ShaderFactory.h"
 #include "Shader.h"
 #include "SampleShader.h"
+#include "ShadowShader.h"
 #include "Utility.h"
 using namespace Core;
 
@@ -42,6 +43,8 @@ Shader* Core::ShaderFactory::CreateShaderInternal(Device& device, size_t hash)
 	{
 		case Utility::HashCode("Sample"):
 			return new SampleShader(device);
+		case Utility::HashCode("Shadow"):
+			return new ShadowShader(device);
 		default:
 			return new SampleShader(device);
 	}

@@ -45,16 +45,16 @@ namespace Core
 	protected:
 		Device& _device;
 		Framebuffer* _framebuffer;
-	private:
 		VkRenderPass _renderPass;
+	private:
 
-		vector<unique_ptr<RenderTarget>> _renderTargets;
+		vector<unique_ptr<RenderTarget>> _inputRenderTargets;
 		unique_ptr<RenderTarget> _depth;
 		unique_ptr<RenderTarget> _color;
 
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		array<VkClearValue, 3> _clearValues{};
+		vector<VkClearValue> _clearValues{};
 	};
 }
 

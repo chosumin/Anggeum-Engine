@@ -5,8 +5,18 @@
 
 namespace Core
 {
+	Scene::Scene()
+		:_name("Default")
+	{
+		_root = make_unique<Entity>(0, "root");
+	}
+
 	Scene::Scene(const string& name)
 		:_name(name)
+	{
+	}
+
+	Scene::~Scene()
 	{
 	}
 
@@ -91,11 +101,6 @@ namespace Core
 		}
 
 		return nullptr;
-	}
-
-	void Scene::SetRootEntity(Entity& entity)
-	{
-		_root = &entity;
 	}
 
 	Entity& Scene::GetRootEntity()

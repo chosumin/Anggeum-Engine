@@ -8,8 +8,9 @@ namespace Core
 	class Scene
 	{
 	public:
-		Scene() = default;
+		Scene();
 		Scene(const string& name);
+		virtual ~Scene();
 
 		void SetName(const string& name);
 		const string& GetName() const;
@@ -87,14 +88,13 @@ namespace Core
 		bool HasComponent(const type_index& type_info) const;
 
 		Entity* FindEntity(const string& name);
-		void SetRootEntity(Entity& entity);
 		Entity& GetRootEntity();
 
 		PerspectiveCamera& GetMainCamera() const;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;
-		Entity* _root{ nullptr };
+		unique_ptr<Entity> _root;
 		unordered_map<type_index, vector<unique_ptr<Component>>> _components;
 	};
 }

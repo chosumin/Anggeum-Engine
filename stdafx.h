@@ -45,6 +45,7 @@ using namespace glm;
 #include <assert.h>
 #include <queue>
 #include <mutex>
+#include <algorithm>
 using namespace std;
 
 #include "Device.h"

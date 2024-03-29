@@ -1,11 +1,29 @@
 #include "stdafx.h"
-#include "ImGuiManager.h"
+#include "GUIRenderPass.h"
+#include "SwapChain.h"
+#include "Framebuffer.h"
 #include "CommandBuffer.h"
-#include "RenderPass.h"
-using namespace Core;
 
-Core::ImGuiManager::ImGuiManager(Device& device, RenderPass& renderPass)
-	:_device(device)
+GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain)
+	:RenderPass(device)
+{
+	auto extent = swapChain.GetSwapChainExtent();
+	CreateColorRenderTarget(extent, swapChain.GetImageFormat());
+	CreateRenderPass();
+
+	_framebuffer = new Framebuffer(device, swapChain, *this);
+}
+
+GUIRenderPass::~GUIRenderPass()
+{
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	vkDestroyDescriptorPool(_device.GetDevice(), _pool, nullptr);
+}
+
+void GUIRenderPass::Prepare()
 {
 	VkDescriptorPoolSize pool_sizes[] =
 	{
@@ -29,7 +47,7 @@ Core::ImGuiManager::ImGuiManager(Device& device, RenderPass& renderPass)
 	pool_info.poolSizeCount = std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
 
-	vkCreateDescriptorPool(device.GetDevice(), &pool_info, nullptr, &_pool);
+	vkCreateDescriptorPool(_device.GetDevice(), &pool_info, nullptr, &_pool);
 
 	//this initializes the core structures of imgui
 	ImGui::CreateContext();
@@ -41,28 +59,32 @@ Core::ImGuiManager::ImGuiManager(Device& device, RenderPass& renderPass)
 
 	//this initializes imgui for Vulkan
 	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = device.GetInstance();
-	init_info.PhysicalDevice = device.GetPhysicalDevice();
-	init_info.Device = device.GetDevice();
-	init_info.Queue = device.GetGraphicsQueue();
+	init_info.Instance = _device.GetInstance();
+	init_info.PhysicalDevice = _device.GetPhysicalDevice();
+	init_info.Device = _device.GetDevice();
+	init_info.Queue = _device.GetGraphicsQueue();
 	init_info.DescriptorPool = _pool;
 	init_info.MinImageCount = 3;
 	init_info.ImageCount = 3;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_8_BIT;
-	init_info.RenderPass = renderPass.GetHandle();
+	init_info.RenderPass = GetHandle();
 	ImGui_ImplVulkan_Init(&init_info);
 }
 
-Core::ImGuiManager::~ImGuiManager()
+void GUIRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+	auto framebuffer = _framebuffer->GetHandle(imageIndex);
+	auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
+	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	vkDestroyDescriptorPool(_device.GetDevice(), _pool, nullptr);
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+		commandBuffer.GetHandle());
+
+	commandBuffer.EndRenderPass();
 }
 
-void Core::ImGuiManager::Update()
+void GUIRenderPass::Update()
 {
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -72,7 +94,7 @@ void Core::ImGuiManager::Update()
 	UpdateFrame();
 }
 
-void Core::ImGuiManager::UpdateFrame()
+void GUIRenderPass::UpdateFrame()
 {
 	static float f = 0.0f;
 	static int counter = 0;

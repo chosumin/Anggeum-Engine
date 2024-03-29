@@ -51,14 +51,12 @@ vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo()
 
 VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo()
 {
-	_vertexBindings = { Vertex::GetBindingDescription(
-		0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX) };
-	_vertexAttributes = Vertex::GetAttributeDescriptions();
-
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(_vertexAttributes.size());
+	vertexInputInfo.vertexBindingDescriptionCount =
+		static_cast<uint32_t>(_vertexBindings.size());
+	vertexInputInfo.vertexAttributeDescriptionCount =
+		static_cast<uint32_t>(_vertexAttributes.size());
 	vertexInputInfo.pVertexBindingDescriptions = _vertexBindings.data();
 	vertexInputInfo.pVertexAttributeDescriptions = _vertexAttributes.data();
 
