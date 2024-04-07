@@ -13,7 +13,7 @@ namespace Core
 	{
 	public:
 		ShadowRenderPass(Device& device,
-			Scene& scene, SwapChain& swapChain);
+			Scene& scene, SwapChain& swapChain, RenderTarget* depthRenderTarget);
 		virtual ~ShadowRenderPass() override;
 
 		virtual void Prepare() override;

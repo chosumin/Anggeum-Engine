@@ -19,12 +19,14 @@
 namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, 
-		Scene& scene, SwapChain& swapChain)
+		Scene& scene, SwapChain& swapChain, RenderTarget* colorRenderTarget, RenderTarget* depthRenderTarget)
 		:RenderPass(device), _scene(scene)
 	{
 		auto extent = swapChain.GetSwapChainExtent();
-		CreateColorRenderTarget(extent, swapChain.GetImageFormat());
-		CreateDepthRenderTarget(extent);
+		CreateColorAttachment(colorRenderTarget,
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		CreateDepthAttachment(depthRenderTarget,
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
 		CreateRenderPass();
 
 		_framebuffer = new Framebuffer(device, swapChain, *this);

@@ -14,7 +14,7 @@ namespace Core
 	{
 	public:
 		GeometryRenderPass(Device& device, 
-			Scene& scene, SwapChain& swapChain);
+			Scene& scene, SwapChain& swapChain, RenderTarget* colorRenderTarget, RenderTarget* depthRenderTarget);
 		virtual ~GeometryRenderPass() override;
 
 		virtual void Prepare() override;

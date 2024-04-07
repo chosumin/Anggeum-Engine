@@ -6,7 +6,7 @@
 #include "Shader.h"
 
 Core::Pipeline::Pipeline(Device& device, 
-	const RenderPass& renderPass, Shader& shader)
+	const RenderPass& renderPass, Shader& shader, VkSampleCountFlagBits sampleCount)
 	:_device(device)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
@@ -17,7 +17,7 @@ Core::Pipeline::Pipeline(Device& device,
 	auto viewportState = GetViewportStateCreateInfo();
 	auto rasterizationState = 
 		GetRasterizationStateCreateInfo();
-	auto multisampleState = GetMultisampleStateCreateInfo(renderPass.GetMSAASamples());
+	auto multisampleState = GetMultisampleStateCreateInfo(sampleCount);
 	auto depthStencilState = GetDepthStencilStateCreateInfo();
 	auto colorBlendAttachment = GetColorBlendAttachmentState();
 	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);

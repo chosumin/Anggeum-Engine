@@ -12,7 +12,7 @@ using namespace Core;
 Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass)
 	:SharedShader(shader)
 {
-	Pipeline = new Core::Pipeline(device, renderPass, SharedShader);
+	Pipeline = new Core::Pipeline(device, renderPass, SharedShader, VK_SAMPLE_COUNT_8_BIT);
 }
 
 Core::RendererBatch::~RendererBatch()

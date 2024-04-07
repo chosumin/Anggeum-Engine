@@ -8,7 +8,7 @@ namespace Core
 	class Pipeline
 	{
 	public:
-		Pipeline(Device& device, const RenderPass& renderPass, Shader& shader);
+		Pipeline(Device& device, const RenderPass& renderPass, Shader& shader, VkSampleCountFlagBits sampleCount);
 		~Pipeline();
 
 		VkPipeline GetGraphicsPipeline() { return _graphicsPipeline; }

@@ -16,7 +16,7 @@
 #include "Mesh.h"
 using namespace Core;
 
-Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain& swapChain)
+Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain& swapChain, RenderTarget* depthRenderTarget)
 	:RenderPass(device), _scene(scene)
 {
 	auto extent = swapChain.GetSwapChainExtent();
@@ -30,7 +30,7 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 
 	_material = MaterialFactory::CreateMaterial(device, MaterialType::SHADOW);
 
-	CreateDepthRenderTarget(extent);
+	CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	CreateRenderPass();
 
 	_framebuffer = new Framebuffer(device, swapChain, *this);

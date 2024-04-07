@@ -5,7 +5,8 @@ using namespace Core;
 class GUIRenderPass : public Core::RenderPass
 {
 public:
-	GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain);
+	GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain, 
+		RenderTarget* colorRenderTarget);
 	virtual ~GUIRenderPass() override;
 
 	virtual void Prepare() override;

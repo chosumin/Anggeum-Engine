@@ -4,11 +4,13 @@
 #include "Framebuffer.h"
 #include "CommandBuffer.h"
 
-GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain)
+GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
+	RenderTarget* colorRenderTarget)
 	:RenderPass(device)
 {
 	auto extent = swapChain.GetSwapChainExtent();
-	CreateColorRenderTarget(extent, swapChain.GetImageFormat());
+	CreateColorAttachment(colorRenderTarget,
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE);
 	CreateRenderPass();
 
 	_framebuffer = new Framebuffer(device, swapChain, *this);
@@ -44,7 +46,7 @@ void GUIRenderPass::Prepare()
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = std::size(pool_sizes);
+	pool_info.poolSizeCount = static_cast<uint32_t>(size(pool_sizes));
 	pool_info.pPoolSizes = pool_sizes;
 
 	vkCreateDescriptorPool(_device.GetDevice(), &pool_info, nullptr, &_pool);

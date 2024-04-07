@@ -1,16 +1,14 @@
 #pragma once
+#include "RenderTarget.h"
 
 namespace Core
 {
-	struct RenderTarget
+	struct Attachment
 	{
 	public:
-		VkFormat Format;
-		VkImage Image;
-		VkDeviceMemory ImageMemory;
-		VkImageView ImageView;
-		VkImageLayout Layout;
-		VkImageUsageFlags UsageFlags;
+		RenderTarget* RenderTarget;
+		VkAttachmentLoadOp LoadOp;
+		VkAttachmentStoreOp StoreOp;
 	};
 
 	class Device;
@@ -25,34 +23,27 @@ namespace Core
 		virtual ~RenderPass();
 
 		VkRenderPass GetHandle() const { return _renderPass; }
-		VkSampleCountFlagBits GetMSAASamples() const { return _msaaSamples; }
 
 		VkRenderPassBeginInfo CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent);
 		vector<VkImageView> GetAttachments(VkImageView swapChainImageView) const;
-		void Cleanup();
-		void Resize(SwapChain& swapChain);
 
 		virtual void Prepare() = 0;
 		virtual void Draw(CommandBuffer& commandBuffer, 
 			uint32_t currentFrame, uint32_t imageIndex) = 0;
 	protected:
-		void CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags);
-		void CreateDepthRenderTarget(VkExtent2D extent);
-		void CreateColorRenderTarget(VkExtent2D extent, VkFormat format);
+		void CreateAttachment(RenderTarget* renderTarget, 
+			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
+		void CreateDepthAttachment(RenderTarget* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
+		void CreateColorAttachment(RenderTarget* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
 		void CreateRenderPass();
-	private:
-		VkSampleCountFlagBits GetMaxUsableSampleCount();
 	protected:
 		Device& _device;
 		Framebuffer* _framebuffer;
 		VkRenderPass _renderPass;
 	private:
-
-		vector<unique_ptr<RenderTarget>> _inputRenderTargets;
-		unique_ptr<RenderTarget> _depth;
-		unique_ptr<RenderTarget> _color;
-
-		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+		vector<unique_ptr<Attachment>> _inputAttachments;
+		unique_ptr<Attachment> _depth;
+		unique_ptr<Attachment> _color;
 
 		vector<VkClearValue> _clearValues{};
 	};

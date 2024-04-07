@@ -11,20 +11,13 @@ namespace Core
 	RenderPass::RenderPass(Device& device)
         :_device{device}
 	{
-        _msaaSamples = GetMaxUsableSampleCount();
-
-        auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
-        Core::RenderContext::AddResizeCallback(a);
 	}
 
 	RenderPass::~RenderPass()
 	{
-        Cleanup();
-
-        auto a = std::bind(&RenderPass::Resize, this, std::placeholders::_1);
-        Core::RenderContext::RemoveResizeCallback(a);
-
         delete(_framebuffer);
+
+        vkDestroyRenderPass(_device.GetDevice(), _renderPass, nullptr);
 	}
 
     VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent)
@@ -51,7 +44,7 @@ namespace Core
             _clearValues.emplace_back(clearValue);
         }
 
-        for (auto& renderTarget : _inputRenderTargets)
+        for (auto& renderTarget : _inputAttachments)
         {
             VkClearValue clearValue{};
             _clearValues.emplace_back(clearValue);
@@ -69,145 +62,50 @@ namespace Core
 
         if (_color != nullptr)
         {
-            attachments.push_back(_color->ImageView);
+            attachments.push_back(_color->RenderTarget->ImageView);
             attachments.push_back(swapChainImageView);
         }
 
         if (_depth != nullptr)
         {
-            attachments.push_back(_depth->ImageView);
+            attachments.push_back(_depth->RenderTarget->ImageView);
         }
 
-        for (auto& renderTarget : _inputRenderTargets)
+        for (auto& renderTarget : _inputAttachments)
         {
-            attachments.push_back(renderTarget->ImageView);
+            attachments.push_back(renderTarget->RenderTarget->ImageView);
         }
 
         return attachments;
     }
 
-    void RenderPass::Cleanup()
-	{
-        auto device = _device.GetDevice();
-		for (size_t i = 0; i < _inputRenderTargets.size(); ++i)
-		{
-			vkDestroyImageView(device, _inputRenderTargets[i]->ImageView, nullptr);
-			vkDestroyImage(device, _inputRenderTargets[i]->Image, nullptr);
-			vkFreeMemory(device, _inputRenderTargets[i]->ImageMemory, nullptr);
-		}
-
-        if (_color != nullptr)
-        {
-            vkDestroyImageView(device, _color->ImageView, nullptr);
-            vkDestroyImage(device, _color->Image, nullptr);
-            vkFreeMemory(device, _color->ImageMemory, nullptr);
-        }
-
-        if (_depth != nullptr)
-        {
-            vkDestroyImageView(device, _depth->ImageView, nullptr);
-            vkDestroyImage(device, _depth->Image, nullptr);
-            vkFreeMemory(device, _depth->ImageMemory, nullptr);
-        }
-
-        vkDestroyRenderPass(device, _renderPass, nullptr);
-    }
-
-    void RenderPass::Resize(SwapChain& swapChain)
+    void RenderPass::CreateAttachment(RenderTarget* renderTarget,
+        VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
     {
-        Cleanup();
+        auto attachment = make_unique<Attachment>();
+        attachment->RenderTarget = renderTarget;
+        attachment->LoadOp = loadOp;
+        attachment->StoreOp = storeOp;
 
-        VkExtent2D extent = swapChain.GetSwapChainExtent();
-
-        if (_color != nullptr)
-        {
-            CreateColorRenderTarget(extent, _color->Format);
-        }
-
-        if (_depth != nullptr)
-        {
-            CreateDepthRenderTarget(extent);
-        }
-
-        for (auto& renderTarget : _inputRenderTargets)
-        {
-            CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout, renderTarget->UsageFlags);
-        }
-    }
-
-    void RenderPass::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
-    {
-        VkImage image;
-        VkImageView imageView;
-        VkDeviceMemory memory;
-
-        Utility::CreateImage(_device, extent.width, extent.height, 1,
-            _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
-            usageFlags,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
-
-        imageView = Utility::CreateImageView(_device, image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-
-        auto renderTarget = make_unique<RenderTarget>();
-        renderTarget->Format = format;
-        renderTarget->Layout = layout;
-        renderTarget->Image = image;
-        renderTarget->ImageMemory = memory;
-        renderTarget->ImageView = imageView;
-        renderTarget->UsageFlags = usageFlags;
-
-		_inputRenderTargets.emplace_back(move(renderTarget));
+		_inputAttachments.emplace_back(move(attachment));
 	}
 
-	void RenderPass::CreateDepthRenderTarget(VkExtent2D extent)
+	void RenderPass::CreateDepthAttachment(RenderTarget* renderTarget,
+        VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
 	{
-        VkImage image;
-        VkImageView imageView;
-        VkDeviceMemory memory;
-
-		auto depthFormat = _device.FindSupportedFormat(
-			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-		Utility::CreateImage(_device, extent.width, extent.height, 1,
-            _msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
-
-        imageView = Utility::CreateImageView(_device, 
-            image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-
-        _depth = make_unique<RenderTarget>();
-        _depth->Format = depthFormat;
-        _depth->Layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        _depth->Image = image;
-        _depth->ImageMemory = memory;
-        _depth->ImageView = imageView;
+        _depth = make_unique<Attachment>();
+        _depth->RenderTarget = renderTarget;
+        _depth->LoadOp = loadOp;
+        _depth->StoreOp = storeOp;
     }
 
-    void RenderPass::CreateColorRenderTarget(VkExtent2D extent, VkFormat format)
+    void RenderPass::CreateColorAttachment(RenderTarget* renderTarget,
+        VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
     {
-        VkImage image;
-        VkImageView imageView;
-        VkDeviceMemory memory;
-
-        //VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
-        //프레임버퍼에 사용되며, 싱글 렌더 패스 동안에만 존재함.
-        Utility::CreateImage(_device, extent.width, extent.height, 1,
-            _msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
-
-        imageView = Utility::CreateImageView(_device, 
-            image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-
-        _color = make_unique<RenderTarget>();
-        _color->Format = format;
-        _color->Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        _color->Image = image;
-        _color->ImageMemory = memory;
-        _color->ImageView = imageView;
+        _color = make_unique<Attachment>();
+        _color->RenderTarget = renderTarget;
+        _color->LoadOp = loadOp;
+        _color->StoreOp = storeOp;
     }
 
     void RenderPass::CreateRenderPass()
@@ -220,23 +118,23 @@ namespace Core
         if (_color != nullptr)
         {
             VkAttachmentDescription colorAttachment{};
-            colorAttachment.format = _color->Format;
-            colorAttachment.samples = _msaaSamples;
-            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachment.format = _color->RenderTarget->Format;
+            colorAttachment.samples = _color->RenderTarget->SampleCount;
+            colorAttachment.loadOp = _color->LoadOp;
+            colorAttachment.storeOp = _color->StoreOp;
             colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            colorAttachment.finalLayout = _color->Layout;
+            colorAttachment.finalLayout = _color->RenderTarget->Layout;
 
             attachments.push_back(colorAttachment);
 
             VkAttachmentReference colorAttachmentRef{};
             colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            colorAttachmentRef.layout = _color->Layout;
+            colorAttachmentRef.layout = _color->RenderTarget->Layout;
 
             VkAttachmentDescription colorAttachmentResolve{};
-            colorAttachmentResolve.format = _color->Format;
+            colorAttachmentResolve.format = _color->RenderTarget->Format;
             colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
             colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -259,43 +157,43 @@ namespace Core
         if (_depth != nullptr)
         {
             VkAttachmentDescription depthAttachment{};
-            depthAttachment.format = _depth->Format;
-            depthAttachment.samples = _msaaSamples;
-            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.format = _depth->RenderTarget->Format;
+            depthAttachment.samples = _depth->RenderTarget->SampleCount;
+            depthAttachment.loadOp = _depth->LoadOp;
+            depthAttachment.storeOp = _depth->StoreOp;
             depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            depthAttachment.finalLayout = _depth->Layout;
+            depthAttachment.finalLayout = _depth->RenderTarget->Layout;
 
             attachments.push_back(depthAttachment);
 
             VkAttachmentReference depthAttachmentRef{};
             depthAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            depthAttachmentRef.layout = _depth->Layout;
+            depthAttachmentRef.layout = _depth->RenderTarget->Layout;
 
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
 
-        vector<VkAttachmentDescription> inputDescs(_inputRenderTargets.size());
-        vector<VkAttachmentReference> inputRefs(_inputRenderTargets.size());
-		for (size_t i = 0; i < _inputRenderTargets.size(); ++i)
+        vector<VkAttachmentDescription> inputDescs(_inputAttachments.size());
+        vector<VkAttachmentReference> inputRefs(_inputAttachments.size());
+		for (size_t i = 0; i < _inputAttachments.size(); ++i)
 		{
 			VkAttachmentDescription inputAttachment{};
-			inputAttachment.format = _inputRenderTargets[i]->Format;
+			inputAttachment.format = _inputAttachments[i]->RenderTarget->Format;
 			inputAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-			inputAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			inputAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			inputAttachment.loadOp = _inputAttachments[i]->LoadOp;
+			inputAttachment.storeOp = _inputAttachments[i]->StoreOp;
 			inputAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			inputAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			inputAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			inputAttachment.finalLayout = _inputRenderTargets[i]->Layout;
+			inputAttachment.finalLayout = _inputAttachments[i]->RenderTarget->Layout;
 
             attachments.push_back(inputAttachment);
 
             inputDescs[i] = inputAttachment;
             inputRefs[i].attachment = static_cast<uint32_t>(attachments.size() - 1);
-            inputRefs[i].layout = _inputRenderTargets[i]->Layout;
+            inputRefs[i].layout = _inputAttachments[i]->RenderTarget->Layout;
 		}
 
         subpass.inputAttachmentCount = static_cast<uint32_t>(inputDescs.size());
@@ -328,25 +226,4 @@ namespace Core
 		if (vkCreateRenderPass(_device.GetDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
 			throw std::runtime_error("failed to create render pass!");
 	}
-
-    VkSampleCountFlagBits RenderPass::GetMaxUsableSampleCount()
-    {
-        VkPhysicalDeviceProperties physicalDeviceProperties;
-        vkGetPhysicalDeviceProperties(
-            _device.GetPhysicalDevice(),
-            &physicalDeviceProperties);
-
-        VkSampleCountFlags counts =
-            physicalDeviceProperties.limits.framebufferColorSampleCounts &
-            physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-
-        if (counts & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
-        if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
-        if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
-        if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
-        if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
-        if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
-
-        return VK_SAMPLE_COUNT_1_BIT;
-    }
 }

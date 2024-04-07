@@ -32,7 +32,7 @@ bool Application::Prepare()
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
 
-	_guiRenderPass = new GUIRenderPass(*_device, swapChain);
+	_guiRenderPass = new GUIRenderPass(*_device, swapChain, _renderPipeline->GetColorRenderTarget());
 	_guiRenderPass->Prepare();
 
 	return true;
