@@ -10,7 +10,8 @@ GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
 {
 	auto extent = swapChain.GetSwapChainExtent();
 	CreateColorAttachment(colorRenderTarget,
-		VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_STORE);
+		VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+	CreateColorResolveAttachment();
 	CreateRenderPass();
 
 	_framebuffer = new Framebuffer(device, swapChain, *this);

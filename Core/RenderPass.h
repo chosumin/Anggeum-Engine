@@ -35,6 +35,7 @@ namespace Core
 			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
 		void CreateDepthAttachment(RenderTarget* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
 		void CreateColorAttachment(RenderTarget* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
+		void CreateColorResolveAttachment();
 		void CreateRenderPass();
 	protected:
 		Device& _device;
@@ -44,6 +45,7 @@ namespace Core
 		vector<unique_ptr<Attachment>> _inputAttachments;
 		unique_ptr<Attachment> _depth;
 		unique_ptr<Attachment> _color;
+		unique_ptr<Attachment> _colorResolve;
 
 		vector<VkClearValue> _clearValues{};
 	};

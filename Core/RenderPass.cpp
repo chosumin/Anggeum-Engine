@@ -29,24 +29,29 @@ namespace Core
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = swapChainExtent;
 
+        VkClearValue clearValue{};
+
         if (_color != nullptr)
         {
-            VkClearValue clearValue{};
             clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
             _clearValues.push_back(clearValue);
+        }
+
+        if (_colorResolve != nullptr)
+        {
+            clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
             _clearValues.push_back(clearValue);
         }
 
         if (_depth != nullptr)
         {
-            VkClearValue clearValue{};
             clearValue.depthStencil = { 1.0f, 0 };
             _clearValues.emplace_back(clearValue);
         }
 
         for (auto& renderTarget : _inputAttachments)
         {
-            VkClearValue clearValue{};
+            clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
             _clearValues.emplace_back(clearValue);
         }
 
@@ -63,6 +68,10 @@ namespace Core
         if (_color != nullptr)
         {
             attachments.push_back(_color->RenderTarget->ImageView);
+        }
+
+        if (_colorResolve != nullptr)
+        {
             attachments.push_back(swapChainImageView);
         }
 
@@ -108,6 +117,13 @@ namespace Core
         _color->StoreOp = storeOp;
     }
 
+    void RenderPass::CreateColorResolveAttachment()
+    {
+        _colorResolve = make_unique<Attachment>();
+        _colorResolve->LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        _colorResolve->StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+    }
+
     void RenderPass::CreateRenderPass()
 	{
         vector<VkAttachmentDescription> attachments;
@@ -124,35 +140,49 @@ namespace Core
             colorAttachment.storeOp = _color->StoreOp;
             colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			if (_color->LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ||
+				_color->LoadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			{
+				colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			}
+			else
+			{
+				colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
+
             colorAttachment.finalLayout = _color->RenderTarget->Layout;
 
             attachments.push_back(colorAttachment);
 
-            VkAttachmentReference colorAttachmentRef{};
-            colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            colorAttachmentRef.layout = _color->RenderTarget->Layout;
+			VkAttachmentReference colorAttachmentRef{};
+			colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
+			colorAttachmentRef.layout = _color->RenderTarget->Layout;
 
-            VkAttachmentDescription colorAttachmentResolve{};
-            colorAttachmentResolve.format = _color->RenderTarget->Format;
-            colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-            colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			subpass.colorAttachmentCount = 1;
+			subpass.pColorAttachments = &colorAttachmentRef;
+		}
 
-            attachments.push_back(colorAttachmentResolve);
+		if (_colorResolve != nullptr)
+		{
+			VkAttachmentDescription colorAttachmentResolve{};
+			colorAttachmentResolve.format = _color->RenderTarget->Format;
+			colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+			colorAttachmentResolve.loadOp = _colorResolve->LoadOp;
+			colorAttachmentResolve.storeOp = _colorResolve->StoreOp;
+			colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-            VkAttachmentReference colorAttachmentResolveRef{};
-            colorAttachmentResolveRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments.push_back(colorAttachmentResolve);
 
-            subpass.colorAttachmentCount = 1;
-            subpass.pColorAttachments = &colorAttachmentRef;
-            subpass.pResolveAttachments = &colorAttachmentResolveRef;
-        }
+			VkAttachmentReference colorAttachmentResolveRef{};
+			colorAttachmentResolveRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
+			colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+			subpass.pResolveAttachments = &colorAttachmentResolveRef;
+		}
 
         if (_depth != nullptr)
         {
