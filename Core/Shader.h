@@ -18,6 +18,8 @@ namespace Core
 
 		virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
 		
+		virtual vector<string> GetVertexAttirbuteNames() const = 0;
+
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 
 		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }

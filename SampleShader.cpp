@@ -36,22 +36,38 @@ namespace Core
 	{
 		_vertexBindings = {
 			Vertex::GetBindingDescription(
-		0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX),
+		0, sizeof(Vertex::Pos), VK_VERTEX_INPUT_RATE_VERTEX),
 			Vertex::GetBindingDescription(
-		1, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
+		1, sizeof(Vertex::Color), VK_VERTEX_INPUT_RATE_VERTEX),
+			Vertex::GetBindingDescription(
+		2, sizeof(Vertex::TexCoord), VK_VERTEX_INPUT_RATE_VERTEX),
+			Vertex::GetBindingDescription(
+		3, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
 		};
 
-		_vertexAttributes = Vertex::GetAttributeDescriptions();
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 3, VK_FORMAT_R32G32B32A32_SFLOAT, 0));
+			0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0));
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 4, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 4));
+			1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0));
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 5, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8));
+			2, 2, VK_FORMAT_R32G32_SFLOAT, 0));
+
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			1, 6, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12));
+			3, 3, VK_FORMAT_R32G32B32A32_SFLOAT, 0));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			3, 4, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 4));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			3, 5, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8));
+		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
+			3, 6, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12));
 
 		return Shader::GetVertexInputStateCreateInfo();
+	}
+
+	vector<string> SampleShader::GetVertexAttirbuteNames() const
+	{
+		vector<string> names = { VertexAttributeName::Position, VertexAttributeName::Col, VertexAttributeName::UV };
+		return names;
 	}
 
 	bool SampleShader::UseInstancing()

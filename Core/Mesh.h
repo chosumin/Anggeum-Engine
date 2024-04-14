@@ -20,7 +20,7 @@ namespace Core
 			return static_cast<uint32_t>(_indices.size());
 		}
 
-		Buffer& GetVertexBuffer() { return *_vertexBuffer; }
+		vector<Buffer*> GetVertexBuffers(vector<string> names) const;
 		Buffer& GetIndexBuffer() { return *_indexBuffer; }
 
 		string GetModelPath() const { return _modelPath; }
@@ -33,11 +33,11 @@ namespace Core
 
 		Device& _device;
 
-		//clockwise.
-		vector<Vertex> _vertices;
+		unordered_map<string, vector<uint8_t>> _vertices;
 		vector<uint32_t> _indices;
 
-		Buffer* _vertexBuffer;
+		unordered_map<string, Buffer*> _vertexBuffers;
+
 		Buffer* _indexBuffer;
 	};
 }

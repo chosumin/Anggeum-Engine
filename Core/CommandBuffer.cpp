@@ -90,6 +90,20 @@ void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer, uint32_t binding)
     vkCmdBindVertexBuffers(_commandBuffer, binding, 1, vertexBuffers, offsets);
 }
 
+void Core::CommandBuffer::BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding)
+{
+    vector<VkBuffer> vertexBuffers(buffers.size());
+    transform(buffers.begin(), buffers.end(), vertexBuffers.begin(),
+        [](Buffer* buf)
+    {
+        return buf->GetBuffer();
+    });
+
+	vector<VkDeviceSize> offsets(buffers.size(), 0);
+
+    vkCmdBindVertexBuffers(_commandBuffer, binding, static_cast<uint32_t>(buffers.size()), vertexBuffers.data(), offsets.data());
+}
+
 void Core::CommandBuffer::BindIndexBuffer(Buffer& buffer, VkIndexType indexType)
 {
     vkCmdBindIndexBuffer(_commandBuffer, buffer.GetBuffer(), 0, indexType);

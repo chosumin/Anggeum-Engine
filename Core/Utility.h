@@ -21,6 +21,13 @@ namespace Core
 		{
 			return str[0] ? static_cast<uint32_t>(str[0]) + 0xEDB8832Full * HashCode(str + 1) : 8603;
 		}
+
+		template <typename T>
+		static inline std::vector<uint8_t> ToBytes(const T& value)
+		{
+			return std::vector<uint8_t>{reinterpret_cast<const uint8_t*>(&value),
+				reinterpret_cast<const uint8_t*>(&value) + sizeof(T)};
+		}
 	};
 }
 

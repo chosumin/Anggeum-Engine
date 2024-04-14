@@ -56,3 +56,9 @@ VkPipelineVertexInputStateCreateInfo ShadowShader::GetVertexInputStateCreateInfo
 
 	return Shader::GetVertexInputStateCreateInfo();
 }
+
+vector<string> ShadowShader::GetVertexAttirbuteNames() const
+{
+	vector<string> names = { VertexAttributeName::Position };
+	return names;
+}

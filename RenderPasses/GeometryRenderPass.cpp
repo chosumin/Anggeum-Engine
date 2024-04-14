@@ -84,13 +84,15 @@ namespace Core
 			commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
 				pipeline->GetGraphicsPipeline());
 
+			auto vertexAttibuteNames = batch.second->SharedShader.GetVertexAttirbuteNames();
+
+			commandBuffer.BindDescriptorSets(
+				VK_PIPELINE_BIND_POINT_GRAPHICS, batch.second->SharedShader, currentFrame);
+
 			auto& materials = batch.second->Materials;
 			for (auto&& material : materials)
 			{
 				material.second->SetBuffer(currentFrame, 0, &camera.Matrices);
-
-				commandBuffer.BindDescriptorSets(
-					VK_PIPELINE_BIND_POINT_GRAPHICS, material.second->GetShader(), currentFrame);
 
 				auto& meshBatches = 
 					batch.second->MeshBatches[material.first];
@@ -110,9 +112,11 @@ namespace Core
 					_instanceBuffer->Copy();
 
 					auto& mesh = meshBatch.second[0]->GetMesh();
-					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer(), 0);
+					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffers(vertexAttibuteNames), 0);
+
+					//fixme: hardcoded as 3.
 					commandBuffer.BindVertexBuffers(
-						_instanceBuffer->GetBuffer(), 1);
+						_instanceBuffer->GetBuffer(), 3);
 
 					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 

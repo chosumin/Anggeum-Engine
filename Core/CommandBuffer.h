@@ -26,6 +26,7 @@ namespace Core
 		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Shader& shader, uint32_t currentFrame);
 		void Flush(Material& material);
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
+		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
 		void EndRenderPass();

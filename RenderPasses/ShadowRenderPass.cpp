@@ -89,6 +89,8 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 			commandBuffer.BindDescriptorSets(
 				VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader(), currentFrame);
 
+			auto vertexAttibuteNames = _material->GetShader().GetVertexAttirbuteNames();
+
 			for (auto&& meshBatch : meshBatches)
 			{
 				RendererBatch::Sort(material.first);
@@ -104,7 +106,7 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 				_instanceBuffer->Copy();
 
 				auto& mesh = meshBatch.second[0]->GetMesh();
-				commandBuffer.BindVertexBuffers(mesh.GetVertexBuffer(), 0);
+				commandBuffer.BindVertexBuffers(mesh.GetVertexBuffers(vertexAttibuteNames), 0);
 				commandBuffer.BindVertexBuffers(
 					_instanceBuffer->GetBuffer(), 1);
 

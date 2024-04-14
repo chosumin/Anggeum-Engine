@@ -3,6 +3,7 @@
 #include "Vertex.h"
 #include "CommandBuffer.h"
 #include "Buffer.h"
+#include "Utility.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -19,7 +20,28 @@ Core::Mesh::Mesh(Device& device, string modelPath)
 Core::Mesh::~Mesh()
 {
 	delete(_indexBuffer);
-	delete(_vertexBuffer);
+
+	for (auto&& vertexBuffer : _vertexBuffers)
+	{
+		delete(vertexBuffer.second);
+	}
+	_vertexBuffers.clear();
+}
+
+vector<Core::Buffer*> Core::Mesh::GetVertexBuffers(vector<string> names) const
+{
+	vector<Core::Buffer*> buffers;
+
+	for (string name : names)
+	{
+		auto vertexBuffer = _vertexBuffers.find(name);
+		assert(vertexBuffer != _vertexBuffers.end(),
+			"Invalid vertex attribute name!");
+		
+		buffers.push_back(vertexBuffer->second);
+	}
+
+	return buffers;
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)
@@ -55,10 +77,30 @@ void Core::Mesh::LoadModel(const string& modelPath)
 
 			vertex.Color = { 1.0f, 1.0f, 1.0f };
 
+			//Create new vertex.
 			if (uniqueVertices.count(vertex) == 0)
 			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
-				_vertices.push_back(vertex);
+				auto vertices = _vertices.begin();
+				if (vertices != _vertices.end())
+					uniqueVertices[vertex] = static_cast<uint32_t>(vertices->second.size() / sizeof(vec3));
+				else
+					uniqueVertices[vertex] = 0;
+
+				//Separate vertex attributes.
+				{
+					auto bytes = Utility::ToBytes(vertex.Pos);
+					_vertices[VertexAttributeName::Position].insert(_vertices[VertexAttributeName::Position].end(), bytes.begin(), bytes.end());
+				}
+
+				{
+					auto bytes = Utility::ToBytes(vertex.TexCoord);
+					_vertices[VertexAttributeName::UV].insert(_vertices[VertexAttributeName::UV].end(), bytes.begin(), bytes.end());
+				}
+
+				{
+					auto bytes = Utility::ToBytes(vertex.Color);
+					_vertices[VertexAttributeName::Col].insert(_vertices[VertexAttributeName::Col].end(), bytes.begin(), bytes.end());
+				}
 			}
 
 			_indices.push_back(uniqueVertices[vertex]);
@@ -68,20 +110,27 @@ void Core::Mesh::LoadModel(const string& modelPath)
 
 void Core::Mesh::CreateVertexBuffer()
 {
-	VkDeviceSize bufferSize = sizeof(_vertices[0]) * _vertices.size();
+	for (auto& vertices : _vertices)
+	{
+		vector<uint8_t> verticesValue = vertices.second;
 
-	Core::Buffer stagingBuffer(_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		VkDeviceSize bufferSize = sizeof(verticesValue[0]) * verticesValue.size();
 
-	stagingBuffer.CopyBuffer(_vertices.data(), bufferSize);
+		Core::Buffer stagingBuffer(_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
-	_vertexBuffer = new Core::Buffer(_device, bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		stagingBuffer.CopyBuffer(verticesValue.data(), bufferSize);
 
-	//vertex memory is moved from CPU to GPU
-	_vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+		//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
+		auto vertexBuffer = new Core::Buffer(_device, bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		//vertex memory is moved from CPU to GPU
+		vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+
+		_vertexBuffers[vertices.first] = vertexBuffer;
+	}
 }
 
 void Core::Mesh::CreateIndexBuffer()

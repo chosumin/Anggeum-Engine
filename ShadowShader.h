@@ -11,5 +11,7 @@ public:
 	virtual bool UseInstancing() override;
 
 	virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo() override;
+
+	virtual vector<string> GetVertexAttirbuteNames() const override;
 };
 
