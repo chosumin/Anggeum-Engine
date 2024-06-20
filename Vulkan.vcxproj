@@ -147,6 +147,7 @@
     <ClCompile Include="Components\MeshRenderer.cpp" />
     <ClCompile Include="Components\PerspectiveCamera.cpp" />
     <ClCompile Include="Core\Buffer.cpp" />
+    <ClCompile Include="Core\BufferObjects\BufferObjects.cpp" />
     <ClCompile Include="Core\CommandBuffer.cpp" />
     <ClCompile Include="Core\CommandPool.cpp" />
     <ClCompile Include="Core\Component.cpp" />
@@ -227,6 +228,7 @@
     <ClInclude Include="Components\MeshRenderer.h" />
     <ClInclude Include="Components\PerspectiveCamera.h" />
     <ClInclude Include="Core\Buffer.h" />
+    <ClInclude Include="Core\BufferObjects\BufferObjects.h" />
     <ClInclude Include="Core\CommandBuffer.h" />
     <ClInclude Include="Core\CommandPool.h" />
     <ClInclude Include="Core\Component.h" />

@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "SampleMaterial.h"
 #include "ShaderFactory.h"
-#include "PerspectiveCamera.h"
 using namespace Core;
 
 SampleMaterial::SampleMaterial(Core::Device& device)

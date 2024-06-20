@@ -2,6 +2,7 @@
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
 #include "Texture.h"
+#include "BufferObjects/BufferObjects.h"
 
 namespace Core
 {

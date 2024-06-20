@@ -102,9 +102,6 @@
     <ClCompile Include="MaterialFactory.cpp" />
     <ClCompile Include="MeshFactory.cpp" />
     <ClCompile Include="GUIRenderPass.cpp" />
-    <ClCompile Include="Plane.cpp">
-      <Filter>Core\Polygons</Filter>
-    </ClCompile>
     <ClCompile Include="BaseMaterial.cpp" />
     <ClCompile Include="Core\Buffer.cpp">
       <Filter>Core\Vulkan</Filter>
@@ -144,6 +141,9 @@
     </ClCompile>
     <ClCompile Include="DescriptorPool.cpp">
       <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\BufferObjects\BufferObjects.cpp">
+      <Filter>Core\BufferObjects</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -248,9 +248,6 @@
     <ClInclude Include="MaterialFactory.h" />
     <ClInclude Include="MeshFactory.h" />
     <ClInclude Include="GUIRenderPass.h" />
-    <ClInclude Include="Plane.h">
-      <Filter>Core\Polygons</Filter>
-    </ClInclude>
     <ClInclude Include="BaseMaterial.h" />
     <ClInclude Include="Core\Buffer.h">
       <Filter>Core\Vulkan</Filter>
@@ -297,6 +294,9 @@
     <ClInclude Include="DescriptorPool.h">
       <Filter>Core\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="Core\BufferObjects\BufferObjects.h">
+      <Filter>Core\BufferObjects</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -337,6 +337,9 @@
     </Filter>
     <Filter Include="Core\Vulkan">
       <UniqueIdentifier>{e982dd07-29ca-4389-9f48-79b658dd442c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\BufferObjects">
+      <UniqueIdentifier>{665c6d6e-0aaa-4386-8ba5-8a74d463508a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

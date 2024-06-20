@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "ShadowMaterial.h"
 #include "ShaderFactory.h"
-#include "PerspectiveCamera.h"
 using namespace Core;
 
 ShadowMaterial::ShadowMaterial(Core::Device& device)
