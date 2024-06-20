@@ -5,6 +5,7 @@
 #include "PerspectiveCamera.h"
 #include "FreeCamera.h"
 #include "MeshRenderer.h"
+#include "MaterialFactory.h"
 using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, 
@@ -18,7 +19,7 @@ SampleScene::SampleScene(Core::Device& device,
 
 	AddEntity(move(cameraEntity));
 
-	for (int i = 0; i < 500; ++i)
+	//for (int i = 0; i < 500; ++i)
 	{
 		auto meshEntity = make_unique<Entity>(-1, "mesh");
 		auto& transform = meshEntity->GetTransform();
@@ -28,6 +29,13 @@ SampleScene::SampleScene(Core::Device& device,
 		AddComponent(move(meshRenderer), *meshEntity);
 		AddEntity(move(meshEntity));
 	}
+
+	//add ground
+	auto ground = make_unique<Entity>(-1, "ground");
+	auto meshRenderer = make_unique<MeshRenderer>(device, *ground, 0);
+	meshRenderer->SetMaterial(Core::MaterialType::BASE);
+	AddComponent(move(meshRenderer), *ground);
+	AddEntity(move(ground));
 }
 
 SampleScene::~SampleScene()

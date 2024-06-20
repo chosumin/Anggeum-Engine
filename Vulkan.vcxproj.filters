@@ -46,25 +46,10 @@
     <ClCompile Include="Components\PerspectiveCamera.cpp">
       <Filter>Components</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Buffer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\CommandBuffer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\CommandPool.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Component.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Device.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Entity.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Framebuffer.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\InputEvents.cpp">
@@ -79,12 +64,6 @@
     <ClCompile Include="Core\Mesh.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Pipeline.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\PushConstant.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\RenderContext.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -94,34 +73,19 @@
     <ClCompile Include="Core\RenderFrame.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\RenderPass.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderTarget.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Scene.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\Shader.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\SwapChain.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Texture.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\TextureBuffer.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\timer.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\Transform.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\UniformBuffer.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\Utility.cpp">
@@ -138,6 +102,49 @@
     <ClCompile Include="MaterialFactory.cpp" />
     <ClCompile Include="MeshFactory.cpp" />
     <ClCompile Include="GUIRenderPass.cpp" />
+    <ClCompile Include="Plane.cpp">
+      <Filter>Core\Polygons</Filter>
+    </ClCompile>
+    <ClCompile Include="BaseMaterial.cpp" />
+    <ClCompile Include="Core\Buffer.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\CommandBuffer.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\CommandPool.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Device.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Framebuffer.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Pipeline.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\PushConstant.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderPass.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\SwapChain.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\TextureBuffer.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\UniformBuffer.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderTarget.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="DescriptorPool.cpp">
+      <Filter>Core\Vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -182,37 +189,16 @@
     <ClInclude Include="Components\PerspectiveCamera.h">
       <Filter>Components</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Buffer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\CommandBuffer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\CommandPool.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Component.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Device.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Entity.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Framebuffer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\IDescriptor.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\InputEvents.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\InstanceData.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\IRenderPipeline.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Keycodes.h">
@@ -224,12 +210,6 @@
     <ClInclude Include="Core\Mesh.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Pipeline.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\PushConstant.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\RenderContext.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -239,34 +219,19 @@
     <ClInclude Include="Core\RenderFrame.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\RenderPass.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderTarget.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Scene.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Shader.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\SwapChain.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Texture.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\TextureBuffer.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\timer.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Transform.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\UniformBuffer.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Utility.h">
@@ -283,6 +248,55 @@
     <ClInclude Include="MaterialFactory.h" />
     <ClInclude Include="MeshFactory.h" />
     <ClInclude Include="GUIRenderPass.h" />
+    <ClInclude Include="Plane.h">
+      <Filter>Core\Polygons</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseMaterial.h" />
+    <ClInclude Include="Core\Buffer.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\CommandBuffer.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\CommandPool.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Device.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Framebuffer.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\IDescriptor.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\IRenderPipeline.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Pipeline.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\PushConstant.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderPass.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\SwapChain.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\UniformBuffer.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\TextureBuffer.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderTarget.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="DescriptorPool.h">
+      <Filter>Core\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -317,6 +331,12 @@
     </Filter>
     <Filter Include="Components">
       <UniqueIdentifier>{49ce4538-79c5-4c0c-9c49-abcbcdff5dd9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Polygons">
+      <UniqueIdentifier>{b30b5d06-f92b-4e4f-83ee-0eb124a33ca3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Vulkan">
+      <UniqueIdentifier>{e982dd07-29ca-4389-9f48-79b658dd442c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

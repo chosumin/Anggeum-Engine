@@ -4,6 +4,7 @@
 #include "PushConstant.h"
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
+#include "DescriptorPool.h"
 
 Core::Shader::Shader(Device& device, const string& vertFilePath, const string& fragFilePath)
 	:_device(device)
@@ -26,8 +27,7 @@ Core::Shader::~Shader()
 
 	vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);
 
-	vkDestroyDescriptorPool(vkDevice, _descriptorPool, nullptr);
-	vkDestroyDescriptorSetLayout(vkDevice, _descriptorSetLayout, nullptr);
+	delete(_descriptorPool);
 }
 
 vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo() const
@@ -65,13 +65,13 @@ VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo
 
 void Core::Shader::CreatePipelineLayout(vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants)
 {
-	CreateDescriptors(descriptors);
+	CreateDescriptorPool(descriptors);
 	CreatePushConstants(pushConstants);
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
+	pipelineLayoutInfo.pSetLayouts = &_descriptorPool->GetDescriptorSetLayout();
 
 	pipelineLayoutInfo.pushConstantRangeCount =
 		static_cast<uint32_t>(_pushConstantRanges.size());
@@ -126,75 +126,19 @@ VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage() const
 	return flags;
 }
 
-void Core::Shader::CreateDescriptors(vector<IDescriptor*> descriptors)
+VkDescriptorSetLayout& Core::Shader::GetDescriptorSetLayout()
 {
-	CreateDescriptorSetLayout(descriptors);
-	CreateDescriptorPool(descriptors);
-	CreateDescriptorSets(descriptors);
+	return _descriptorPool->GetDescriptorSetLayout();
 }
 
-void Core::Shader::CreateDescriptorSetLayout(vector<IDescriptor*> descriptors)
+VkDescriptorPool& Core::Shader::GetDescriptorPool()
 {
-	size_t size = descriptors.size();
-
-	vector<VkDescriptorSetLayoutBinding> bindings(size);
-	for (size_t i = 0; i < size; i++)
-	{
-		bindings[i] = (descriptors[i]->CreateDescriptorSetLayoutBinding());
-	}
-
-	VkDescriptorSetLayoutCreateInfo layoutInfo{};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-	layoutInfo.pBindings = bindings.data();
-
-	if (vkCreateDescriptorSetLayout(
-		_device.GetDevice(),
-		&layoutInfo, nullptr, &_descriptorSetLayout) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to create descriptor set layout!");
-	}
+	return _descriptorPool->AllocateDescriptorPool();
 }
 
 void Core::Shader::CreateDescriptorPool(vector<IDescriptor*> descriptors)
 {
-	size_t size = descriptors.size();
-
-	vector<VkDescriptorPoolSize> poolSizes(size);
-	for (size_t i = 0; i < size; i++)
-	{
-		poolSizes[i].type = descriptors[i]->GetDescriptorType();
-		poolSizes[i].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-	}
-
-	VkDescriptorPoolCreateInfo poolInfo{};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-	if (vkCreateDescriptorPool(_device.GetDevice(),
-		&poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to create descriptor pool!");
-	}
-}
-
-void Core::Shader::CreateDescriptorSets(vector<IDescriptor*> descriptors)
-{
-	vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _descriptorSetLayout);
-	VkDescriptorSetAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = _descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-	allocInfo.pSetLayouts = layouts.data();
-
-	_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	if (vkAllocateDescriptorSets(_device.GetDevice(),
-		&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to allocate descriptor sets!");
-	}
+	_descriptorPool = new DescriptorPool(_device, descriptors);
 }
 
 void Core::Shader::CreatePushConstants(vector<PushConstant>& pushConstants)

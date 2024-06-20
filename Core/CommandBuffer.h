@@ -4,7 +4,6 @@ namespace Core
 {
 	class Pipeline;
 	class SwapChain;
-	class Shader;
 	class Buffer;
 	class Material;
 	class CommandPool;
@@ -23,7 +22,7 @@ namespace Core
 		void BindPipeline(VkPipelineBindPoint pipelineBindPoint,
 			VkPipeline pipeline);
 		void SetViewportAndScissor(VkViewport viewport, VkRect2D scissor);
-		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Shader& shader, uint32_t currentFrame);
+		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame);
 		void Flush(Material& material);
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);

@@ -3,6 +3,7 @@
 #include "Material.h"
 #include "SampleMaterial.h"
 #include "ShadowMaterial.h"
+#include "BaseMaterial.h"
 using namespace Core;
 
 mutex _materialMutex;
@@ -38,13 +39,21 @@ void Core::MaterialFactory::DeleteCache()
 
 Material* Core::MaterialFactory::CreateMaterialInternal(Device& device, MaterialType material)
 {
+	Material* newMaterial = nullptr;
+
 	switch (material)
 	{
 		case Core::MaterialType::SAMPLE:
-			return new SampleMaterial(device);
+			newMaterial =  new SampleMaterial(device);
+			break;
 		case Core::MaterialType::SHADOW:
-			return new ShadowMaterial(device);
+			newMaterial = new ShadowMaterial(device);
+			break;
 		default:
-			return new SampleMaterial(device);
+			newMaterial = new BaseMaterial(device);
 	}
+
+	newMaterial->UpdateDescriptorSets();
+
+	return newMaterial;
 }

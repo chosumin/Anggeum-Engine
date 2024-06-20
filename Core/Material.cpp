@@ -2,12 +2,17 @@
 #include "Material.h"
 #include "Shader.h"
 #include "CommandPool.h"
+#include "ShaderFactory.h"
+#include "PerspectiveCamera.h"
 
 namespace Core
 {
-	Material::Material(Device& device)
+	Material::Material(Device& device, string shaderName)
 		:_device(device)
 	{
+		_shader = ShaderFactory::CreateShader(device, shaderName);
+
+		CreateDescriptorSets();
 	}
 
 	Core::Material::~Material()
@@ -54,6 +59,10 @@ namespace Core
 	void Core::Material::SetBuffer(uint32_t binding, Texture* texture)
 	{
 		_textureBuffers[binding]->SetDescriptorImageInfo(texture->GetDescriptorImageInfo());
+
+		if (_textures[binding] != nullptr)
+			delete(_textures[binding]);
+
 		_textures[binding] = texture;
 	}
 
@@ -63,9 +72,6 @@ namespace Core
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 		{
-			VkDescriptorSet* descriptorSet =
-				_shader->GetDescriptorSet(i);
-
 			vector<VkWriteDescriptorSet> descriptorWrites(size);
 			
 			for (uint32_t j = 0; j < size; j++)
@@ -84,7 +90,7 @@ namespace Core
 				}
 
 				descriptorWrites[j] = writeDescriptorSet;
-				descriptorWrites[j].dstSet = *descriptorSet;
+				descriptorWrites[j].dstSet = _descriptorSets[i];
 			}
 
 			vkUpdateDescriptorSets(
@@ -102,5 +108,22 @@ namespace Core
 	void Material::ClearPushConstantsCache()
 	{
 		_pushConstants.clear();
+	}
+
+	void Material::CreateDescriptorSets()
+	{
+		vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _shader->GetDescriptorSetLayout());
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = _shader->GetDescriptorPool();
+		allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+		allocInfo.pSetLayouts = layouts.data();
+
+		_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+		if (vkAllocateDescriptorSets(_device.GetDevice(),
+			&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
+		{
+			throw runtime_error("failed to allocate descriptor sets!");
+		}
 	}
 }

@@ -87,7 +87,7 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 				batch.second->MeshBatches[material.first];
 
 			commandBuffer.BindDescriptorSets(
-				VK_PIPELINE_BIND_POINT_GRAPHICS, _material->GetShader(), currentFrame);
+				VK_PIPELINE_BIND_POINT_GRAPHICS, *_material, currentFrame);
 
 			auto vertexAttibuteNames = _material->GetShader().GetVertexAttirbuteNames();
 

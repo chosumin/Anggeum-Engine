@@ -15,7 +15,9 @@ Core::UniformBuffer::~UniformBuffer()
 
 void Core::UniformBuffer::SetBuffer(uint32_t currentImage, void* data)
 {
-	memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
+	if (_uniformBuffersMapped.size() > 0 &&
+		_uniformBuffersMapped[currentImage] != nullptr)
+		memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
 }
 
 VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)

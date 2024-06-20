@@ -142,6 +142,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="BaseMaterial.cpp" />
     <ClCompile Include="Components\FreeCamera.cpp" />
     <ClCompile Include="Components\MeshRenderer.cpp" />
     <ClCompile Include="Components\PerspectiveCamera.cpp" />
@@ -175,6 +176,7 @@
     <ClCompile Include="Core\Vertex.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
+    <ClCompile Include="DescriptorPool.cpp" />
     <ClCompile Include="ForwardRenderPipeline.cpp" />
     <ClCompile Include="GUIRenderPass.cpp" />
     <ClCompile Include="imgui\imgui.cpp">
@@ -220,6 +222,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="BaseMaterial.h" />
     <ClInclude Include="Components\FreeCamera.h" />
     <ClInclude Include="Components\MeshRenderer.h" />
     <ClInclude Include="Components\PerspectiveCamera.h" />
@@ -256,6 +259,7 @@
     <ClInclude Include="Core\Vertex.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
+    <ClInclude Include="DescriptorPool.h" />
     <ClInclude Include="ForwardRenderPipeline.h" />
     <ClInclude Include="GUIRenderPass.h" />
     <ClInclude Include="imgui\imconfig.h" />

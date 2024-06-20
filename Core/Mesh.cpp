@@ -8,10 +8,38 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+void AddVertex(unordered_map<string, vector<uint8_t>>& vertices, Vertex vertex)
+{
+	//Separate vertex attributes.
+	{
+		auto bytes = Core::Utility::ToBytes(vertex.Pos);
+		vertices[VertexAttributeName::Position].insert(vertices[VertexAttributeName::Position].end(), bytes.begin(), bytes.end());
+	}
+
+	{
+		auto bytes = Core::Utility::ToBytes(vertex.TexCoord);
+		vertices[VertexAttributeName::UV].insert(vertices[VertexAttributeName::UV].end(), bytes.begin(), bytes.end());
+	}
+
+	{
+		auto bytes = Core::Utility::ToBytes(vertex.Color);
+		vertices[VertexAttributeName::Col].insert(vertices[VertexAttributeName::Col].end(), bytes.begin(), bytes.end());
+	}
+}
+
 Core::Mesh::Mesh(Device& device, string modelPath)
 	:_device(device), _modelPath(modelPath)
 {
 	LoadModel(modelPath);
+
+	CreateVertexBuffer();
+	CreateIndexBuffer();
+}
+
+Core::Mesh::Mesh(Device& device, int polygonType)
+	:_device(device)
+{
+	LoadPlane();
 
 	CreateVertexBuffer();
 	CreateIndexBuffer();
@@ -86,26 +114,40 @@ void Core::Mesh::LoadModel(const string& modelPath)
 				else
 					uniqueVertices[vertex] = 0;
 
-				//Separate vertex attributes.
-				{
-					auto bytes = Utility::ToBytes(vertex.Pos);
-					_vertices[VertexAttributeName::Position].insert(_vertices[VertexAttributeName::Position].end(), bytes.begin(), bytes.end());
-				}
-
-				{
-					auto bytes = Utility::ToBytes(vertex.TexCoord);
-					_vertices[VertexAttributeName::UV].insert(_vertices[VertexAttributeName::UV].end(), bytes.begin(), bytes.end());
-				}
-
-				{
-					auto bytes = Utility::ToBytes(vertex.Color);
-					_vertices[VertexAttributeName::Col].insert(_vertices[VertexAttributeName::Col].end(), bytes.begin(), bytes.end());
-				}
+				AddVertex(_vertices, vertex);
 			}
 
 			_indices.push_back(uniqueVertices[vertex]);
 		}
 	}
+}
+
+void Core::Mesh::LoadPlane()
+{
+	Vertex vertices[4];
+
+	vertices[0].Pos = { -2,2,0 };
+	vertices[0].TexCoord = { 0, 1 };
+	vertices[0].Color = { 1.0f, 1.0f, 1.0f };
+
+	vertices[1].Pos = { -2,-2,0 };
+	vertices[1].TexCoord = { 0, 0 };
+	vertices[1].Color = { 1.0f, 1.0f, 1.0f };
+
+	vertices[2].Pos = { 2,2,0 };
+	vertices[2].TexCoord = { 1, 1 };
+	vertices[2].Color = { 1.0f, 1.0f, 1.0f };
+
+	vertices[3].Pos = { 2,-2,0 };
+	vertices[3].TexCoord = { 1, 0 };
+	vertices[3].Color = { 1.0f, 1.0f, 1.0f };
+
+	for (auto&& vertex : vertices)
+	{
+		AddVertex(_vertices, vertex);
+	}
+
+	_indices = { 0,1,2,2,1,3 };
 }
 
 void Core::Mesh::CreateVertexBuffer()

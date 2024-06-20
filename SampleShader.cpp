@@ -17,9 +17,6 @@ namespace Core
 		auto textureBuffer = new TextureBufferLayoutBinding(1);
 
 		CreatePipelineLayout({ cameraBuffer, textureBuffer }, {});
-
-		delete(cameraBuffer);
-		delete(textureBuffer);
 	}
 
 	type_index SampleShader::GetType()

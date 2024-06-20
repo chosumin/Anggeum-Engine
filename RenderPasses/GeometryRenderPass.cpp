@@ -86,13 +86,13 @@ namespace Core
 
 			auto vertexAttibuteNames = batch.second->SharedShader.GetVertexAttirbuteNames();
 
-			commandBuffer.BindDescriptorSets(
-				VK_PIPELINE_BIND_POINT_GRAPHICS, batch.second->SharedShader, currentFrame);
-
 			auto& materials = batch.second->Materials;
 			for (auto&& material : materials)
 			{
 				material.second->SetBuffer(currentFrame, 0, &camera.Matrices);
+
+				commandBuffer.BindDescriptorSets(
+					VK_PIPELINE_BIND_POINT_GRAPHICS, *material.second, currentFrame);
 
 				auto& meshBatches = 
 					batch.second->MeshBatches[material.first];

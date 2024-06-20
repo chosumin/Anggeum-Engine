@@ -14,23 +14,29 @@ Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity, string modelPat
 	SetMaterial(MaterialType::SAMPLE);
 }
 
+Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity, int polygonType)
+	:Component(entity), _device(device), _mesh(nullptr), _material(nullptr)
+{
+	SetMesh(polygonType);
+	SetMaterial(MaterialType::SAMPLE);
+}
+
 Core::MeshRenderer::~MeshRenderer()
 {
 }
 
+void Core::MeshRenderer::SetMesh(int polygonType)
+{
+	_mesh = MeshFactory::CreateMesh(_device, polygonType);
+}
+
 void Core::MeshRenderer::SetMesh(string modelPath)
 {
-	if (_mesh != nullptr)
-		delete(_mesh);
-
 	_mesh = MeshFactory::CreateMesh(_device, modelPath);
 }
 
 void Core::MeshRenderer::SetMaterial(MaterialType type)
 {
-	if (_material != nullptr)
-		delete(_material);
-
 	_material = MaterialFactory::CreateMaterial(_device, type);
 }
 

@@ -1,12 +1,14 @@
 #include "stdafx.h"
-#include "SampleMaterial.h"
+#include "BaseMaterial.h"
 #include "ShaderFactory.h"
 #include "PerspectiveCamera.h"
 using namespace Core;
 
-SampleMaterial::SampleMaterial(Core::Device& device)
-	:Material(device, "Sample")
+BaseMaterial::BaseMaterial(Core::Device& device)
+    :Material(device, "Sample")
 {
+	//todo : add buffer automatically based on the shader properties.
+	
 	//hack : binding duplication declaration.
 	auto cameraBuffer = new UniformBuffer(device, sizeof(VPBufferObject), 0);
 	_uniformBuffers.insert({ 0, cameraBuffer });
@@ -16,11 +18,11 @@ SampleMaterial::SampleMaterial(Core::Device& device)
 	_textureBuffers.insert({ 1, textureBuffer });
 
 	auto texture = new Texture(device,
-		"Textures/viking_room.png", Core::TextureFormat::Rgb_alpha, 1);
+		"Textures/white.png", Core::TextureFormat::Rgb_alpha, 1);
 	SetBuffer(1, texture);
 }
 
-type_index SampleMaterial::GetType() const
+type_index BaseMaterial::GetType() const
 {
-    return typeid(SampleMaterial);
+    return typeid(BaseMaterial);
 }

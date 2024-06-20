@@ -12,11 +12,13 @@ namespace Core
 	{
 	public:
 		MeshRenderer(Device& device, Entity& entity, string modelPath);
+		MeshRenderer(Device& device, Entity& entity, int polygonType);
 		~MeshRenderer();
 
 		Mesh& GetMesh() { return *_mesh; }
 		Material& GetMaterial() { return* _material; }
 
+		void SetMesh(int polygonType);
 		void SetMesh(string modelPath);
 		void SetMaterial(MaterialType type);
 

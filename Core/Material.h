@@ -11,10 +11,11 @@ namespace Core
 	class UniformBuffer;
 	class TextureBuffer;
 	class CommandPool;
+	class IDescriptor;
 	class Material
 	{
 	public:
-		Material(Device& device);
+		Material(Device& device, string shaderName);
 		Material(const Material& other) = default;
 		virtual ~Material();
 
@@ -40,6 +41,10 @@ namespace Core
 		}
 		vector<uint8_t>* GetPushConstantsData();
 		void ClearPushConstantsCache();
+
+		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
+	private:
+		void CreateDescriptorSets();
 	protected:
 		Device& _device;
 		Shader* _shader;
@@ -47,6 +52,7 @@ namespace Core
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
+		vector<VkDescriptorSet> _descriptorSets;
 	};
 }
 

@@ -13,6 +13,7 @@ namespace Core
 	{
 	public:
 		Mesh(Device& device, string modelPath);
+		Mesh(Device& device, int polygonType);
 		~Mesh();
 
 		uint32_t GetIndexCount() const 
@@ -26,6 +27,7 @@ namespace Core
 		string GetModelPath() const { return _modelPath; }
 	private:
 		void LoadModel(const string& modelPath);
+		void LoadPlane();
 		void CreateVertexBuffer();
 		void CreateIndexBuffer();
 	private:

@@ -4,6 +4,7 @@
 namespace Core
 {
 	class IDescriptor;
+	class DescriptorPool;
 	class Shader
 	{
 	public:
@@ -22,20 +23,16 @@ namespace Core
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 
-		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
-
 		VkShaderStageFlags GetPushConstantsShaderStage() const;
 		vector<VkPushConstantRange>& GetPushConstantRanges() { return _pushConstantRanges; }
-		VkDescriptorSetLayout& GetDescriptorSetLayout() { return _descriptorSetLayout; }
+		VkDescriptorSetLayout& GetDescriptorSetLayout();
+		VkDescriptorPool& GetDescriptorPool();
 		VkPipelineLayout GetPipelineLayout() { return _pipelineLayout; }
 	protected:
 		void CreatePipelineLayout(
 			vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants);
 	private:
-		void CreateDescriptors(vector<IDescriptor*> descriptors);
-		void CreateDescriptorSetLayout(vector<IDescriptor*> descriptors);
 		void CreateDescriptorPool(vector<IDescriptor*> descriptors);
-		void CreateDescriptorSets(vector<IDescriptor*> descriptors);
 		void CreatePushConstants(vector<PushConstant>& pushConstants);
 
 		vector<char> ReadFile(const string& filePath);
@@ -51,9 +48,8 @@ namespace Core
 		VkShaderModule _vertShaderModule;
 		VkShaderModule _fragShaderModule;
 
-		vector<VkDescriptorSet> _descriptorSets;
-		VkDescriptorPool _descriptorPool;
-		VkDescriptorSetLayout _descriptorSetLayout;
+		DescriptorPool* _descriptorPool;
+
 		VkPipelineLayout _pipelineLayout;
 	};
 }

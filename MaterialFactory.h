@@ -4,6 +4,7 @@ namespace Core
 {
 	enum class MaterialType
 	{
+		BASE,
 		SAMPLE,
 		SHADOW,
 	};
