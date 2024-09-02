@@ -22,17 +22,19 @@ namespace Core
 		vector<unique_ptr<Buffer>> _buffers;
 		VkDescriptorBufferInfo _bufferInfo;
 		uint32_t _binding;
+		VkDescriptorType _descriptorType;
 	};
 
 	class UniformBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		UniformBufferLayoutBinding(uint32_t binding);
+		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
 	private:
 		uint32_t _binding;
+		VkShaderStageFlagBits _stage;
 	};
 }
 

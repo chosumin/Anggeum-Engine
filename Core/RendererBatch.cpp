@@ -9,10 +9,10 @@
 #include "CommandBuffer.h"
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass)
+Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, VkSampleCountFlagBits sampleCount)
 	:SharedShader(shader)
 {
-	Pipeline = new Core::Pipeline(device, renderPass, SharedShader, VK_SAMPLE_COUNT_8_BIT);
+	Pipeline = new Core::Pipeline(device, renderPass, SharedShader, sampleCount);
 }
 
 Core::RendererBatch::~RendererBatch()

@@ -7,9 +7,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-Core::Texture::Texture(Device& device, string fileName, 
-	TextureFormat format, uint32_t binding)
-	:_binding(binding), _device(device)
+Core::Texture::Texture(Device& device, string fileName,
+	TextureFormat format)
+	:_device(device)
 {
 	int texWidth, texHeight, texChannels;
 
@@ -54,8 +54,6 @@ Core::Texture::Texture(Device& device, string fileName,
 
 	CreateTextureImageView();
 	CreateTextureSampler();
-
-	SetDescriptorImageInfo();
 }
 
 Core::Texture::~Texture()
@@ -66,6 +64,17 @@ Core::Texture::~Texture()
 	vkDestroyImageView(device, _textureImageView, nullptr);
 	vkDestroyImage(device, _textureImage, nullptr);
 	vkFreeMemory(device, _textureImageMemory, nullptr);
+}
+
+VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()
+{
+	VkDescriptorImageInfo imageInfo{};
+
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = _textureImageView;
+	imageInfo.sampler = _textureSampler;
+
+	return imageInfo;
 }
 
 void Core::Texture::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
@@ -229,13 +238,6 @@ void Core::Texture::GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t
 		1, &barrier);
 
 	_device.EndSingleTimeCommands(commandBuffer);
-}
-
-void Core::Texture::SetDescriptorImageInfo()
-{
-	_imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	_imageInfo.imageView = _textureImageView;
-	_imageInfo.sampler = _textureSampler;
 }
 
 void Core::Texture::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)

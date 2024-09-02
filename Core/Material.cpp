@@ -4,11 +4,12 @@
 #include "CommandPool.h"
 #include "ShaderFactory.h"
 #include "PerspectiveCamera.h"
+#include "RenderTarget.h"
 
 namespace Core
 {
 	Material::Material(Device& device, string shaderName)
-		:_device(device)
+		:_device(device), _isDirty(true)
 	{
 		_shader = ShaderFactory::CreateShader(device, shaderName);
 
@@ -45,12 +46,6 @@ namespace Core
 	{
 	}
 
-	void Material::SetTexture(uint32_t binding, Texture& texture)
-	{
-		//todo : set buffer
-		//todo : UpdateDescriptorSets() before begin render pass.
-	}
-
 	void Core::Material::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
 	{
 		_uniformBuffers[binding]->SetBuffer(currentImage, data);
@@ -58,12 +53,17 @@ namespace Core
 
 	void Core::Material::SetBuffer(uint32_t binding, Texture* texture)
 	{
-		_textureBuffers[binding]->SetDescriptorImageInfo(texture->GetDescriptorImageInfo());
+		_textureBuffers[binding]->CopyDescriptorImageInfo(texture->GetDescriptorImageInfo());
 
 		if (_textures[binding] != nullptr)
 			delete(_textures[binding]);
 
 		_textures[binding] = texture;
+	}
+
+	void Material::SetBuffer(uint32_t binding, RenderTarget* renderTarget)
+	{
+		_textureBuffers[binding]->CopyDescriptorImageInfo(renderTarget->GetDescriptorImageInfo());
 	}
 
 	void Core::Material::UpdateDescriptorSets()
@@ -74,23 +74,26 @@ namespace Core
 		{
 			vector<VkWriteDescriptorSet> descriptorWrites(size);
 			
-			for (uint32_t j = 0; j < size; j++)
+			uint32_t index = 0;
+
+			for (auto iter = _uniformBuffers.begin(); iter != _uniformBuffers.end(); ++iter)
 			{
-				VkWriteDescriptorSet writeDescriptorSet{};
+				VkWriteDescriptorSet writeDescriptorSet =
+					iter->second->CreateWriteDescriptorSet(i);
 
-				if (_uniformBuffers.find(j) != _uniformBuffers.end())
-				{
-					writeDescriptorSet =
-						_uniformBuffers[j]->CreateWriteDescriptorSet(i);
-				}
-				else if (_textureBuffers.find(j) != _textureBuffers.end())
-				{
-					writeDescriptorSet =
-						_textureBuffers[j]->CreateWriteDescriptorSet(i);
-				}
+				descriptorWrites[index] = writeDescriptorSet;
+				descriptorWrites[index].dstSet = _descriptorSets[i];
+				++index;
+			}
 
-				descriptorWrites[j] = writeDescriptorSet;
-				descriptorWrites[j].dstSet = _descriptorSets[i];
+			for (auto iter = _textureBuffers.begin(); iter != _textureBuffers.end(); ++iter)
+			{
+				VkWriteDescriptorSet writeDescriptorSet =
+					iter->second->CreateWriteDescriptorSet(i);
+
+				descriptorWrites[index] = writeDescriptorSet;
+				descriptorWrites[index].dstSet = _descriptorSets[i];
+				++index;
 			}
 
 			vkUpdateDescriptorSets(
@@ -98,6 +101,8 @@ namespace Core
 				static_cast<uint32_t>(descriptorWrites.size()),
 				descriptorWrites.data(), 0, nullptr);
 		}
+
+		_isDirty = false;
 	}
 
 	vector<uint8_t>* Material::GetPushConstantsData()

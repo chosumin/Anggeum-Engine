@@ -57,6 +57,9 @@ void Core::CommandBuffer::SetViewportAndScissor(VkViewport viewport, VkRect2D sc
 void Core::CommandBuffer::BindDescriptorSets(
     VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame)
 {
+	if (material.IsDirty())
+		material.UpdateDescriptorSets();
+
     auto descriptorLayout = material.GetShader().GetPipelineLayout();
     auto descriptorSet = material.GetDescriptorSet(currentFrame);
 

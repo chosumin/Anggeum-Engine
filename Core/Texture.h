@@ -14,19 +14,15 @@ namespace Core
 	class Texture
 	{
 	public:
-		Texture(Device& device, string fileName, TextureFormat format, uint32_t binding);
+		Texture(Device& device, string fileName, TextureFormat format);
 		~Texture();
 
-		VkDescriptorImageInfo& GetDescriptorImageInfo() 
-		{
-			return _imageInfo;
-		}
+		VkDescriptorImageInfo GetDescriptorImageInfo();
 	private:
 		void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 		void CreateTextureImageView();
 		void CreateTextureSampler();
 		void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-		void SetDescriptorImageInfo();
 
 		void TransitionImageLayout(VkImage image, VkFormat format,
 			VkImageLayout oldLayout, VkImageLayout newLayout, 
@@ -37,9 +33,7 @@ namespace Core
 		VkDeviceMemory _textureImageMemory;
 		VkImageView _textureImageView;
 		VkSampler _textureSampler;
-		VkDescriptorImageInfo _imageInfo;
 		uint32_t _mipLevels;
-		uint32_t _binding;
 	};
 }
 

@@ -6,9 +6,11 @@ Core::TextureBuffer::TextureBuffer(uint32_t binding)
 {
 }
 
-void Core::TextureBuffer::SetDescriptorImageInfo(VkDescriptorImageInfo& info)
+void Core::TextureBuffer::CopyDescriptorImageInfo(VkDescriptorImageInfo info)
 {
-	_imageInfo = info;
+	_imageInfo.imageLayout = info.imageLayout;
+	_imageInfo.imageView = info.imageView;
+	_imageInfo.sampler = info.sampler;
 }
 
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(size_t index)

@@ -38,8 +38,10 @@ namespace Core
 
 		unique_ptr<RenderTarget> CreateRenderTarget(VkExtent2D extent, VkFormat format,
 			VkImageLayout layout, VkImageUsageFlags usageFlags);
-		unique_ptr<RenderTarget> CreateDepthRenderTarget(VkExtent2D extent);
-		unique_ptr<RenderTarget> CreateColorRenderTarget(VkExtent2D extent, VkFormat format);
+		unique_ptr<RenderTarget> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
+		unique_ptr<RenderTarget> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
+
+		void CreateSampler();
 	private:
 		Device& _device;
 
@@ -48,6 +50,8 @@ namespace Core
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
 		vector<unique_ptr<RenderTarget>> _renderTargets;
+		
+		VkSampler _sampler;
 	};
 }
 

@@ -17,8 +17,13 @@ BaseMaterial::BaseMaterial(Core::Device& device)
 	_textureBuffers.insert({ 1, textureBuffer });
 
 	auto texture = new Texture(device,
-		"Textures/white.png", Core::TextureFormat::Rgb_alpha, 1);
+		"Textures/white.png", Core::TextureFormat::Rgb_alpha);
 	SetBuffer(1, texture);
+
+	_textureBuffers.insert({ 2, new TextureBuffer(2) });
+
+	auto shadowBuffer = new UniformBuffer(device, sizeof(ShadowUniform), 3);
+	_uniformBuffers.insert({ 3, shadowBuffer });
 }
 
 type_index BaseMaterial::GetType() const

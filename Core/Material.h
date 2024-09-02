@@ -13,6 +13,8 @@ namespace Core
 	class TextureBuffer;
 	class CommandPool;
 	class IDescriptor;
+	struct RenderTarget;
+
 	class Material
 	{
 	public:
@@ -25,9 +27,9 @@ namespace Core
 		Shader& GetShader() const;
 		void SetShader(Shader& shader);
 
-		void SetTexture(uint32_t binding, Texture& texture);
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
 		void SetBuffer(uint32_t binding, Texture* texture);
+		void SetBuffer(uint32_t binding, RenderTarget* renderTarget);
 
 		void UpdateDescriptorSets();
 
@@ -44,6 +46,8 @@ namespace Core
 		void ClearPushConstantsCache();
 
 		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
+
+		bool IsDirty() { return _isDirty; }
 	private:
 		void CreateDescriptorSets();
 	protected:
@@ -54,6 +58,8 @@ namespace Core
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
 		vector<VkDescriptorSet> _descriptorSets;
+	private:
+		bool _isDirty;
 	};
 }
 

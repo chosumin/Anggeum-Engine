@@ -13,7 +13,7 @@ namespace Core
 	public:
 		static void Sort(type_index type);
 
-		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass);
+		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, VkSampleCountFlagBits sampleCount);
 		~RendererBatch();
 
 		void Add(MeshRenderer& meshRenderer);

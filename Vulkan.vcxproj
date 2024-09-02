@@ -288,6 +288,7 @@
   <ItemGroup>
     <None Include="cpp.hint" />
     <None Include="imgui\misc\debuggers\imgui.natstepfilter" />
+    <None Include="Shaders\common.glsl" />
     <None Include="Shaders\fs.frag" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />

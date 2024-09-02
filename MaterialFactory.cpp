@@ -53,7 +53,5 @@ Material* Core::MaterialFactory::CreateMaterialInternal(Device& device, Material
 			newMaterial = new BaseMaterial(device);
 	}
 
-	newMaterial->UpdateDescriptorSets();
-
 	return newMaterial;
 }

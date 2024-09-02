@@ -60,8 +60,8 @@ void Core::UniformBuffer::CreateUniformBuffer()
 	}
 }
 
-Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding)
-	:_binding(binding)
+Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage)
+	:_binding(binding), _stage(stage)
 {
 }
 
@@ -71,7 +71,7 @@ VkDescriptorSetLayoutBinding Core::UniformBufferLayoutBinding::CreateDescriptorS
 	uboLayoutBinding.binding = _binding;
 	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	uboLayoutBinding.stageFlags = _stage;
 	uboLayoutBinding.pImmutableSamplers = nullptr;
 
 	return uboLayoutBinding;

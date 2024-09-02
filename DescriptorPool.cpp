@@ -53,6 +53,7 @@ void Core::DescriptorPool::CreatePoolCreateInfo(vector<IDescriptor*> descriptors
 	_poolCreateInfo.poolSizeCount = static_cast<uint32_t>(_poolSize.size());
 	_poolCreateInfo.pPoolSizes = _poolSize.data();
 	_poolCreateInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	_poolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 }
 
 void Core::DescriptorPool::CreateDescriptorSetLayout(vector<IDescriptor*> descriptors)
@@ -69,6 +70,15 @@ void Core::DescriptorPool::CreateDescriptorSetLayout(vector<IDescriptor*> descri
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	layoutInfo.pBindings = bindings.data();
+	//layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+
+	vector<VkDescriptorBindingFlags> bindingFlags(size, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
+
+	VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlagsCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT };
+	bindingFlagsCreateInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+	bindingFlagsCreateInfo.pBindingFlags = bindingFlags.data();
+
+	//layoutInfo.pNext = &bindingFlagsCreateInfo;
 
 	if (vkCreateDescriptorSetLayout(
 		_device.GetDevice(),

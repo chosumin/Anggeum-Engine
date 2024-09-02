@@ -19,7 +19,7 @@
 using namespace Core;
 
 Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain& swapChain, RenderTarget* depthRenderTarget)
-	:RenderPass(device), _scene(scene)
+	:RenderPass(device), _scene(scene), _shadowMap(depthRenderTarget)
 {
 	_directionalLight.View = lookAt(
 		vec3(-2.0f, 2.0f, 2.0f),
@@ -32,6 +32,8 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 		extent.width / (float)extent.height,
 		0.1f, 10.0f);
 	_directionalLight.Perspective[1][1] *= -1;
+
+	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 
 	_material = MaterialFactory::CreateMaterial(device, MaterialType::SHADOW);
 
@@ -63,7 +65,7 @@ void Core::ShadowRenderPass::Prepare()
 		auto batch = _batches[key];
 		if (batch == nullptr)
 		{
-			batch = new RendererBatch(_device, _material->GetShader(), *this);
+			batch = new RendererBatch(_device, _material->GetShader(), *this, _shadowMap->SampleCount);
 			_batches[key] = batch;
 		}
 
@@ -74,6 +76,11 @@ void Core::ShadowRenderPass::Prepare()
 void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	UpdateGUI();
+
+	_shadowMap->TransitionImageLayout(commandBuffer,
+		0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 	auto framebuffer = _framebuffer->GetHandle(imageIndex);
 	auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
@@ -157,5 +164,7 @@ void Core::ShadowRenderPass::UpdateGUI()
 		_directionalLight.View = translate(glm::mat4(1.0), translation) *
 			glm::mat4_cast(newRotation) *
 			glm::scale(glm::mat4(1.0), scale);
+
+		_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 	}
 }

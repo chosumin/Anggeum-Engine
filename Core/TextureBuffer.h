@@ -8,7 +8,7 @@ namespace Core
 	public:
 		TextureBuffer(uint32_t binding);
 
-		void SetDescriptorImageInfo(VkDescriptorImageInfo& info);
+		void CopyDescriptorImageInfo(VkDescriptorImageInfo info);
 		
 		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);
 	private:
@@ -23,6 +23,8 @@ namespace Core
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
+
+		uint32_t GetBinding() { return _binding; }
 	private:
 		uint32_t _binding;
 	};

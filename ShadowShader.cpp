@@ -14,7 +14,7 @@ ShadowShader::ShadowShader(Core::Device& device)
 		"shaders/shadow.vert.spv",
 		"shaders/shadow.frag.spv")
 {
-	auto cameraBuffer = new Core::UniformBufferLayoutBinding(0);
+	auto cameraBuffer = new Core::UniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT);
 
 	CreatePipelineLayout({ cameraBuffer }, {});
 }

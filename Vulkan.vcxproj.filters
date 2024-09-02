@@ -315,6 +315,9 @@
     <None Include="Shaders\vs.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\common.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

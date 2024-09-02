@@ -12,11 +12,12 @@ namespace Core
 			"shaders/simple_vs.vert.spv",
 			"shaders/simple_fs.frag.spv")
 	{
-		auto cameraBuffer = new UniformBufferLayoutBinding(0);
-
+		auto cameraBuffer = new UniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT);
 		auto textureBuffer = new TextureBufferLayoutBinding(1);
+		auto shadowBuffer = new TextureBufferLayoutBinding(2);
+		auto lightBuffer = new UniformBufferLayoutBinding(3, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		CreatePipelineLayout({ cameraBuffer, textureBuffer }, {});
+		CreatePipelineLayout({ cameraBuffer, textureBuffer, shadowBuffer, lightBuffer }, {});
 	}
 
 	type_index SampleShader::GetType()
