@@ -145,6 +145,9 @@
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp">
       <Filter>Core\BufferObjects</Filter>
     </ClCompile>
+    <ClCompile Include="Core\PipelineState.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -296,6 +299,9 @@
     </ClInclude>
     <ClInclude Include="Core\BufferObjects\BufferObjects.h">
       <Filter>Core\BufferObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\PipelineState.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

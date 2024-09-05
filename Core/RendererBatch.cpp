@@ -2,17 +2,17 @@
 #include "RendererBatch.h"
 #include "Shader.h"
 #include "Material.h"
-#include "Pipeline.h"
 #include "Mesh.h"
-#include "RenderPass.h"
 #include "MeshRenderer.h"
-#include "CommandBuffer.h"
+#include "PipelineState.h"
+#include "Pipeline.h"
+#include "RenderPass.h"
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, VkSampleCountFlagBits sampleCount)
+Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, PipelineState& pipelineState)
 	:SharedShader(shader)
 {
-	Pipeline = new Core::Pipeline(device, renderPass, SharedShader, sampleCount);
+	Pipeline = new Core::Pipeline(device, renderPass, shader, pipelineState);
 }
 
 Core::RendererBatch::~RendererBatch()

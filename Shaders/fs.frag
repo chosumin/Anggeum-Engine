@@ -18,7 +18,7 @@ float CalculateShadow()
 
 	float lightDepth = texture(shadowmap, projectedCoord.xy).r;
 
-	return lightDepth.r > projectedCoord.z  - 0.00005f ? 1.0f : 0.0f;
+	return lightDepth.r > projectedCoord.z ? 1.0f : 0.0f;
 }
 
 void main()

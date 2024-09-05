@@ -11,6 +11,7 @@ namespace Core
 	RenderPass::RenderPass(Device& device)
         :_device{device}
 	{
+        _pipelineState = new PipelineState();
 	}
 
 	RenderPass::~RenderPass()

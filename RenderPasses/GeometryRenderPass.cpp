@@ -32,6 +32,9 @@ namespace Core
 		_framebuffer = new Framebuffer(device, swapChain, *this);
 
 		_instanceBuffer = new InstanceBuffer(device);
+
+		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
+		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
 	}
 
 	GeometryRenderPass::~GeometryRenderPass()
@@ -59,7 +62,7 @@ namespace Core
 				auto batch = _batches[key];
 				if (batch == nullptr)
 				{
-					batch = new RendererBatch(_device, shader, *this, VK_SAMPLE_COUNT_8_BIT);
+					batch = new RendererBatch(_device, shader, *this, *_pipelineState);
 					_batches[key] = batch;
 				}
 
@@ -83,9 +86,7 @@ namespace Core
 
 		for (auto&& batch : _batches)
 		{
-			auto& pipeline = batch.second->Pipeline;
-			commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
-				pipeline->GetGraphicsPipeline());
+			commandBuffer.BindPipeline(batch.second->Pipeline);
 
 			auto vertexAttibuteNames = batch.second->SharedShader.GetVertexAttirbuteNames();
 

@@ -7,13 +7,14 @@ namespace Core
 	class MeshRenderer;
 	class Shader;
 	class RenderPass;
-	class CommandBuffer;
+	class PipelineState;
+
 	class RendererBatch
 	{
 	public:
 		static void Sort(type_index type);
 
-		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, VkSampleCountFlagBits sampleCount);
+		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, PipelineState& pipelineState);
 		~RendererBatch();
 
 		void Add(MeshRenderer& meshRenderer);

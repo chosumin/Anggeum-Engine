@@ -42,6 +42,10 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 
 	_framebuffer = new Framebuffer(device, swapChain, *this);
 	_instanceBuffer = new InstanceBuffer(device);
+
+	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
+	rasterization.depthBiasEnable = VK_TRUE;
+	rasterization.depthBiasSlopeFactor = 1.5f;
 }
 
 Core::ShadowRenderPass::~ShadowRenderPass()
@@ -65,7 +69,7 @@ void Core::ShadowRenderPass::Prepare()
 		auto batch = _batches[key];
 		if (batch == nullptr)
 		{
-			batch = new RendererBatch(_device, _material->GetShader(), *this, _shadowMap->SampleCount);
+			batch = new RendererBatch(_device, _material->GetShader(), *this, *_pipelineState);
 			_batches[key] = batch;
 		}
 
@@ -90,9 +94,7 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 
 	for (auto&& batch : _batches)
 	{
-		auto& pipeline = batch.second->Pipeline;
-		commandBuffer.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipeline->GetGraphicsPipeline());
+		commandBuffer.BindPipeline(batch.second->Pipeline);
 
 		auto& materials = batch.second->Materials;
 		for (auto&& material : materials)

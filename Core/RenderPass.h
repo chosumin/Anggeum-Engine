@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderTarget.h"
+#include "PipelineState.h"
 
 namespace Core
 {
@@ -16,6 +17,7 @@ namespace Core
 	class CommandBuffer;
 	class Framebuffer;
 	class CommandPool;
+	class PipelineState;
 	class RenderPass
 	{
 	public:
@@ -41,6 +43,8 @@ namespace Core
 		Device& _device;
 		Framebuffer* _framebuffer;
 		VkRenderPass _renderPass;
+
+		PipelineState* _pipelineState;
 	private:
 		vector<unique_ptr<Attachment>> _inputAttachments;
 		unique_ptr<Attachment> _depth;

@@ -159,6 +159,7 @@
     <ClCompile Include="Core\Material.cpp" />
     <ClCompile Include="Core\Mesh.cpp" />
     <ClCompile Include="Core\Pipeline.cpp" />
+    <ClCompile Include="Core\PipelineState.cpp" />
     <ClCompile Include="Core\PushConstant.cpp" />
     <ClCompile Include="Core\RenderContext.cpp" />
     <ClCompile Include="Core\RendererBatch.cpp" />
@@ -243,6 +244,7 @@
     <ClInclude Include="Core\Material.h" />
     <ClInclude Include="Core\Mesh.h" />
     <ClInclude Include="Core\Pipeline.h" />
+    <ClInclude Include="Core\PipelineState.h" />
     <ClInclude Include="Core\PushConstant.h" />
     <ClInclude Include="Core\RenderContext.h" />
     <ClInclude Include="Core\RendererBatch.h" />

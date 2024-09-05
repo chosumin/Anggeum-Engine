@@ -2,11 +2,11 @@
 #include "Pipeline.h"
 #include "RenderPass.h"
 #include "Vertex.h"
-#include "IDescriptor.h"
 #include "Shader.h"
+#include "PipelineState.h"
 
 Core::Pipeline::Pipeline(Device& device, 
-	const RenderPass& renderPass, Shader& shader, VkSampleCountFlagBits sampleCount)
+	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
 	:_device(device)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
@@ -15,9 +15,7 @@ Core::Pipeline::Pipeline(Device& device,
 	auto inputAssemblyState =
 		GetInputAssemblyStateCreateInfo();
 	auto viewportState = GetViewportStateCreateInfo();
-	auto rasterizationState = 
-		GetRasterizationStateCreateInfo();
-	auto multisampleState = GetMultisampleStateCreateInfo(sampleCount);
+
 	auto depthStencilState = GetDepthStencilStateCreateInfo();
 	auto colorBlendAttachment = GetColorBlendAttachmentState();
 	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);
@@ -31,8 +29,8 @@ Core::Pipeline::Pipeline(Device& device,
 	pipelineInfo.pVertexInputState = &vertexInputState;
 	pipelineInfo.pInputAssemblyState = &inputAssemblyState;
 	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &rasterizationState;
-	pipelineInfo.pMultisampleState = &multisampleState;
+	pipelineInfo.pRasterizationState = &pipelineState.GetRasterizationStateCreateInfo();
+	pipelineInfo.pMultisampleState = &pipelineState.GetMultisampleStateCreateInfo();
 	pipelineInfo.pDepthStencilState = &depthStencilState;
 	pipelineInfo.pColorBlendState = &colorBlendState;
 	pipelineInfo.pDynamicState = &dynamicState;
@@ -70,38 +68,6 @@ VkPipelineViewportStateCreateInfo Core::Pipeline::GetViewportStateCreateInfo()
 	viewportState.scissorCount = 1;
 
 	return viewportState;
-}
-
-VkPipelineRasterizationStateCreateInfo Core::Pipeline::GetRasterizationStateCreateInfo()
-{
-	VkPipelineRasterizationStateCreateInfo rasterizer{};
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE; //if it is true, fragments that are beyond the near and far planes are clamped. useful case is like shadow map.
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-	rasterizer.depthBiasClamp = 0.0f; // Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
-
-	return rasterizer;
-}
-
-VkPipelineMultisampleStateCreateInfo Core::Pipeline::GetMultisampleStateCreateInfo(VkSampleCountFlagBits sampleCount)
-{
-	VkPipelineMultisampleStateCreateInfo multisampling{};
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.sampleShadingEnable = VK_TRUE;
-	multisampling.rasterizationSamples = sampleCount;
-	multisampling.minSampleShading = 0.2f;
-	multisampling.pSampleMask = nullptr; // Optional
-	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-	multisampling.alphaToOneEnable = VK_FALSE; // Optional
-
-	return multisampling;
 }
 
 VkPipelineDepthStencilStateCreateInfo Core::Pipeline::GetDepthStencilStateCreateInfo()

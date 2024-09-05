@@ -19,8 +19,7 @@ namespace Core
 		void ResetCommandBuffer();
 		void BeginCommandBuffer(bool isSingleTime = false);
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
-		void BindPipeline(VkPipelineBindPoint pipelineBindPoint,
-			VkPipeline pipeline);
+		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkViewport viewport, VkRect2D scissor);
 		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame);
 		void Flush(Material& material);

@@ -43,9 +43,9 @@ void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)
     vkCmdBeginRenderPass(_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void Core::CommandBuffer::BindPipeline(VkPipelineBindPoint pipelineBindPoint, VkPipeline pipeline)
+void Core::CommandBuffer::BindPipeline(const Pipeline* pipeline)
 {
-    vkCmdBindPipeline(_commandBuffer, pipelineBindPoint, pipeline);
+    vkCmdBindPipeline(_commandBuffer, pipeline->GetPipelineBindPoint(), pipeline->GetGraphicsPipeline());
 }
 
 void Core::CommandBuffer::SetViewportAndScissor(VkViewport viewport, VkRect2D scissor)

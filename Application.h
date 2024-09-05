@@ -5,7 +5,6 @@
 namespace Core
 {
 	class Window;
-	class Pipeline;
 	class SwapChain;
 	class CommandBuffer;
 	class Timer;

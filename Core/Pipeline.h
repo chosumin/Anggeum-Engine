@@ -2,21 +2,20 @@
 
 namespace Core
 {
-	class IDescriptor;
 	class RenderPass;
 	class Shader;
+	class PipelineState;
 	class Pipeline
 	{
 	public:
-		Pipeline(Device& device, const RenderPass& renderPass, Shader& shader, VkSampleCountFlagBits sampleCount);
+		Pipeline(Device& device, RenderPass& renderPass, Shader& shader, PipelineState& pipelineState);
 		~Pipeline();
 
-		VkPipeline GetGraphicsPipeline() { return _graphicsPipeline; }
+		VkPipeline GetGraphicsPipeline() const { return _graphicsPipeline; }
+		VkPipelineBindPoint GetPipelineBindPoint() const { return _pipelineBindPoint; }
 	private:
 		VkPipelineInputAssemblyStateCreateInfo GetInputAssemblyStateCreateInfo();
 		VkPipelineViewportStateCreateInfo GetViewportStateCreateInfo();
-		VkPipelineRasterizationStateCreateInfo GetRasterizationStateCreateInfo();
-		VkPipelineMultisampleStateCreateInfo GetMultisampleStateCreateInfo(VkSampleCountFlagBits sampleCount);
 		VkPipelineDepthStencilStateCreateInfo GetDepthStencilStateCreateInfo();
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
@@ -25,11 +24,12 @@ namespace Core
 		Device& _device;
 
 		VkPipeline _graphicsPipeline;
+		VkPipelineBindPoint _pipelineBindPoint;
 
 		vector<VkDynamicState> _dynamicStates =
 		{
 			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR
+			VK_DYNAMIC_STATE_SCISSOR,
 		};
 	};
 }
