@@ -2,17 +2,12 @@
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
 #include "Texture.h"
-#include "BufferObjects/BufferObjects.h"
 
 namespace Core
 {
 	class Device;
 	class Shader;
-	class Texture;
-	class UniformBuffer;
-	class TextureBuffer;
 	class CommandPool;
-	class IDescriptor;
 	struct RenderTarget;
 
 	class Material
@@ -31,6 +26,11 @@ namespace Core
 		void SetBuffer(uint32_t binding, Texture* texture);
 		void SetBuffer(uint32_t binding, RenderTarget* renderTarget);
 
+		const VkDescriptorSet& GetDescriptorSet(size_t index) const
+		{
+			return _descriptorSets[index];
+		}
+
 		void UpdateDescriptorSets();
 
 		template <typename T>
@@ -45,11 +45,10 @@ namespace Core
 		vector<uint8_t>* GetPushConstantsData();
 		void ClearPushConstantsCache();
 
-		VkDescriptorSet* GetDescriptorSet(size_t index) { return &_descriptorSets[index]; }
-
 		bool IsDirty() { return _isDirty; }
 	private:
 		void CreateDescriptorSets();
+		void CreateBuffers();
 	protected:
 		Device& _device;
 		Shader* _shader;
@@ -57,9 +56,10 @@ namespace Core
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
-		vector<VkDescriptorSet> _descriptorSets;
 	private:
 		bool _isDirty;
+
+		vector<VkDescriptorSet> _descriptorSets;
 	};
 }
 

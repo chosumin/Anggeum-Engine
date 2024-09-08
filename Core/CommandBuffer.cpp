@@ -66,7 +66,7 @@ void Core::CommandBuffer::BindDescriptorSets(
     vkCmdBindDescriptorSets(
         _commandBuffer, pipelineBindPoint,
         descriptorLayout, 0, 1,
-        descriptorSet, 0, nullptr);
+        &descriptorSet, 0, nullptr);
 }
 
 void Core::CommandBuffer::Flush(Material& material)

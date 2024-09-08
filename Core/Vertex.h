@@ -42,6 +42,11 @@ struct Vertex
     }
 };
 
+struct ShadowVertex
+{
+    vec3 Pos;
+};
+
 namespace std {
     template<> struct hash<Vertex> {
         size_t operator()(Vertex const& vertex) const {

@@ -2,11 +2,12 @@
 #include "UniformBuffer.h"
 #include "Buffer.h"
 
-Core::UniformBuffer::UniformBuffer(Device& device, 
-	VkDeviceSize bufferSize, uint32_t binding)
-	:_bufferSize(bufferSize), _binding(binding), _device(device)
+Core::UniformBuffer::UniformBuffer(Device& device, VkDeviceSize bufferSize)
+	:_device(device)
 {
-	CreateUniformBuffer();
+	CreateUniformBuffer(bufferSize);
+
+	_bufferInfo.range = bufferSize;
 }
 
 Core::UniformBuffer::~UniformBuffer()
@@ -17,18 +18,17 @@ void Core::UniformBuffer::SetBuffer(uint32_t currentImage, void* data)
 {
 	if (_uniformBuffersMapped.size() > 0 &&
 		_uniformBuffersMapped[currentImage] != nullptr)
-		memcpy(_uniformBuffersMapped[currentImage], data, _bufferSize);
+		memcpy(_uniformBuffersMapped[currentImage], data, _bufferInfo.range);
 }
 
-VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)
+VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)
 {
 	_bufferInfo.buffer = _buffers[index]->GetBuffer();
 	_bufferInfo.offset = 0;
-	_bufferInfo.range = _bufferSize;
 
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstBinding = _binding;
+	descriptorWrite.dstBinding = binding;
 	descriptorWrite.dstArrayElement = 0;
 	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorWrite.descriptorCount = 1;
@@ -37,10 +37,8 @@ VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index)
 	return descriptorWrite;
 }
 
-void Core::UniformBuffer::CreateUniformBuffer()
+void Core::UniformBuffer::CreateUniformBuffer(VkDeviceSize bufferSize)
 {
-	VkDeviceSize bufferSize = _bufferSize;
-
 	_buffers.resize(MAX_FRAMES_IN_FLIGHT);
 	_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -60,18 +58,18 @@ void Core::UniformBuffer::CreateUniformBuffer()
 	}
 }
 
-Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage)
-	:_binding(binding), _stage(stage)
+Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize bufferSize)
+	:Binding(binding), Stage(stage), BufferSize(bufferSize)
 {
 }
 
 VkDescriptorSetLayoutBinding Core::UniformBufferLayoutBinding::CreateDescriptorSetLayoutBinding()
 {
 	VkDescriptorSetLayoutBinding uboLayoutBinding{};
-	uboLayoutBinding.binding = _binding;
+	uboLayoutBinding.binding = Binding;
 	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = _stage;
+	uboLayoutBinding.stageFlags = Stage;
 	uboLayoutBinding.pImmutableSamplers = nullptr;
 
 	return uboLayoutBinding;

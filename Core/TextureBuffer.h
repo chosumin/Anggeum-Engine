@@ -6,27 +6,25 @@ namespace Core
 	class TextureBuffer
 	{
 	public:
-		TextureBuffer(uint32_t binding);
+		TextureBuffer();
 
 		void CopyDescriptorImageInfo(VkDescriptorImageInfo info);
 		
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);
+		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
 	private:
-		uint32_t _binding;
 		VkDescriptorImageInfo _imageInfo;
 	};
 
-	class TextureBufferLayoutBinding : public IDescriptor
+	struct TextureBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		TextureBufferLayoutBinding(uint32_t binding);
+		TextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
 
-		uint32_t GetBinding() { return _binding; }
-	private:
-		uint32_t _binding;
+		uint32_t Binding;
+		VkShaderStageFlagBits Stage;
 	};
 }
 

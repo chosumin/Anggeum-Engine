@@ -3,20 +3,16 @@
 #include "UniformBuffer.h"
 #include "InstanceData.h"
 #include "Vertex.h"
-
-struct ShadowVertex
-{
-	vec3 Pos;
-};
+#include "BufferObjects/BufferObjects.h"
 
 ShadowShader::ShadowShader(Core::Device& device)
 	:Shader(device,
 		"shaders/shadow.vert.spv",
 		"shaders/shadow.frag.spv")
 {
-	auto cameraBuffer = new Core::UniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT);
+	AddUniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT, sizeof(VPBufferObject));
 
-	CreatePipelineLayout({ cameraBuffer }, {});
+	CreatePipelineLayout({});
 }
 
 type_index ShadowShader::GetType()

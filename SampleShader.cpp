@@ -4,6 +4,7 @@
 #include "UniformBuffer.h"
 #include "Vertex.h"
 #include "InstanceData.h"
+#include "BufferObjects/BufferObjects.h"
 
 namespace Core
 {
@@ -12,12 +13,12 @@ namespace Core
 			"shaders/simple_vs.vert.spv",
 			"shaders/simple_fs.frag.spv")
 	{
-		auto cameraBuffer = new UniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT);
-		auto textureBuffer = new TextureBufferLayoutBinding(1);
-		auto shadowBuffer = new TextureBufferLayoutBinding(2);
-		auto lightBuffer = new UniformBufferLayoutBinding(3, VK_SHADER_STAGE_FRAGMENT_BIT);
+		AddUniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT, sizeof(VPBufferObject));
+		AddTextureBufferLayoutBinding(1, VK_SHADER_STAGE_FRAGMENT_BIT);
+		AddTextureBufferLayoutBinding(2, VK_SHADER_STAGE_FRAGMENT_BIT);
+		AddUniformBufferLayoutBinding(3, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(ShadowUniform));
 
-		CreatePipelineLayout({ cameraBuffer, textureBuffer, shadowBuffer, lightBuffer }, {});
+		CreatePipelineLayout({});
 	}
 
 	type_index SampleShader::GetType()

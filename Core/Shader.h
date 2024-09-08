@@ -1,5 +1,7 @@
 #pragma once
 #include "PushConstant.h"
+#include "UniformBuffer.h"
+#include "TextureBuffer.h"
 
 namespace Core
 {
@@ -28,11 +30,23 @@ namespace Core
 		VkDescriptorSetLayout& GetDescriptorSetLayout();
 		VkDescriptorPool& GetDescriptorPool();
 		VkPipelineLayout GetPipelineLayout() { return _pipelineLayout; }
+
+		const vector<UniformBufferLayoutBinding>& GetUniformBufferLayoutBindings() const
+		{
+			return _uniformBufferLayoutBindings;
+		}
+
+		const vector<TextureBufferLayoutBinding>& GetTextureBufferLayoutBindings() const
+		{
+			return _textureBufferLayoutBindings;
+		}
 	protected:
-		void CreatePipelineLayout(
-			vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants);
+		void CreatePipelineLayout(vector<PushConstant> pushConstants);
+
+		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size);
+		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
 	private:
-		void CreateDescriptorPool(vector<IDescriptor*> descriptors);
+		void CreateDescriptorPool();
 		void CreatePushConstants(vector<PushConstant>& pushConstants);
 
 		vector<char> ReadFile(const string& filePath);
@@ -51,5 +65,8 @@ namespace Core
 		DescriptorPool* _descriptorPool;
 
 		VkPipelineLayout _pipelineLayout;
+
+		vector<UniformBufferLayoutBinding> _uniformBufferLayoutBindings;
+		vector<TextureBufferLayoutBinding> _textureBufferLayoutBindings;
 	};
 }

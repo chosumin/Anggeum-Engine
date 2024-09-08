@@ -1,9 +1,6 @@
 #include "stdafx.h"
 #include "Shader.h"
 #include "Vertex.h"
-#include "PushConstant.h"
-#include "UniformBuffer.h"
-#include "TextureBuffer.h"
 #include "DescriptorPool.h"
 
 Core::Shader::Shader(Device& device, const string& vertFilePath, const string& fragFilePath)
@@ -63,9 +60,9 @@ VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo
 	return vertexInputInfo;
 }
 
-void Core::Shader::CreatePipelineLayout(vector<IDescriptor*> descriptors, vector<PushConstant> pushConstants)
+void Core::Shader::CreatePipelineLayout(vector<PushConstant> pushConstants)
 {
-	CreateDescriptorPool(descriptors);
+	CreateDescriptorPool();
 	CreatePushConstants(pushConstants);
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -79,6 +76,16 @@ void Core::Shader::CreatePipelineLayout(vector<IDescriptor*> descriptors, vector
 
 	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("failed to create pipeline layout!");
+}
+
+void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size)
+{
+	_uniformBufferLayoutBindings.emplace_back(binding, stage, size);
+}
+
+void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage)
+{
+	_textureBufferLayoutBindings.emplace_back(binding, stage);
 }
 
 vector<char> Core::Shader::ReadFile(const string& filePath)
@@ -136,8 +143,20 @@ VkDescriptorPool& Core::Shader::GetDescriptorPool()
 	return _descriptorPool->AllocateDescriptorPool();
 }
 
-void Core::Shader::CreateDescriptorPool(vector<IDescriptor*> descriptors)
+void Core::Shader::CreateDescriptorPool()
 {
+	vector<IDescriptor*> descriptors;
+	
+	for (auto& binding : _uniformBufferLayoutBindings)
+	{
+		descriptors.push_back(&binding);
+	}
+
+	for (auto& binding : _textureBufferLayoutBindings)
+	{
+		descriptors.push_back(&binding);
+	}
+
 	_descriptorPool = new DescriptorPool(_device, descriptors);
 }
 

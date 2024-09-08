@@ -3,7 +3,6 @@
 #include "Shader.h"
 #include "CommandPool.h"
 #include "ShaderFactory.h"
-#include "PerspectiveCamera.h"
 #include "RenderTarget.h"
 
 namespace Core
@@ -14,6 +13,7 @@ namespace Core
 		_shader = ShaderFactory::CreateShader(device, shaderName);
 
 		CreateDescriptorSets();
+		CreateBuffers();
 	}
 
 	Core::Material::~Material()
@@ -76,23 +76,25 @@ namespace Core
 			
 			uint32_t index = 0;
 
+			auto descriptorSet = _descriptorSets[i];
+
 			for (auto iter = _uniformBuffers.begin(); iter != _uniformBuffers.end(); ++iter)
 			{
 				VkWriteDescriptorSet writeDescriptorSet =
-					iter->second->CreateWriteDescriptorSet(i);
+					iter->second->CreateWriteDescriptorSet(i, iter->first);
 
 				descriptorWrites[index] = writeDescriptorSet;
-				descriptorWrites[index].dstSet = _descriptorSets[i];
+				descriptorWrites[index].dstSet = descriptorSet;
 				++index;
 			}
 
 			for (auto iter = _textureBuffers.begin(); iter != _textureBuffers.end(); ++iter)
 			{
 				VkWriteDescriptorSet writeDescriptorSet =
-					iter->second->CreateWriteDescriptorSet(i);
+					iter->second->CreateWriteDescriptorSet(i, iter->first);
 
 				descriptorWrites[index] = writeDescriptorSet;
-				descriptorWrites[index].dstSet = _descriptorSets[i];
+				descriptorWrites[index].dstSet = descriptorSet;
 				++index;
 			}
 
@@ -129,6 +131,25 @@ namespace Core
 			&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
 		{
 			throw runtime_error("failed to allocate descriptor sets!");
+		}
+	}
+
+	void Material::CreateBuffers()
+	{
+		auto& uniformBindings = _shader->GetUniformBufferLayoutBindings();
+
+		for (auto& binding : uniformBindings)
+		{
+			auto buffer = new Core::UniformBuffer(_device, binding.BufferSize);
+			_uniformBuffers[binding.Binding] = buffer;
+		}
+
+		auto& textureBindings = _shader->GetTextureBufferLayoutBindings();
+		
+		for (auto& binding : textureBindings)
+		{
+			auto buffer = new Core::TextureBuffer();
+			_textureBuffers[binding.Binding] = buffer;
 		}
 	}
 }

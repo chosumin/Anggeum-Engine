@@ -7,34 +7,32 @@ namespace Core
 	class UniformBuffer
 	{
 	public:
-		UniformBuffer(Device& device, VkDeviceSize bufferSize, uint32_t binding);
+		UniformBuffer(Device& device, VkDeviceSize bufferSize);
 		~UniformBuffer();
 
 		void SetBuffer(uint32_t currentImage, void* data);
 
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index);
+		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
 	private:
-		void CreateUniformBuffer();
+		void CreateUniformBuffer(VkDeviceSize bufferSize);
 	private:
 		Device& _device;
-		VkDeviceSize _bufferSize;
 		vector<void*> _uniformBuffersMapped;
 		vector<unique_ptr<Buffer>> _buffers;
 		VkDescriptorBufferInfo _bufferInfo;
-		uint32_t _binding;
-		VkDescriptorType _descriptorType;
 	};
 
-	class UniformBufferLayoutBinding : public IDescriptor
+	struct UniformBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
+		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize bufferSize);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
-	private:
-		uint32_t _binding;
-		VkShaderStageFlagBits _stage;
+	
+		uint32_t Binding;
+		VkShaderStageFlagBits Stage;
+		VkDeviceSize BufferSize;
 	};
 }
 
