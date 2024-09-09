@@ -35,7 +35,7 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 
 	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 
-	_material = MaterialFactory::CreateMaterial(device, MaterialType::SHADOW);
+	_material = MaterialFactory::CreateMaterial(device, "Assets/Materials/Shadow.json");
 
 	CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	CreateRenderPass();
@@ -109,7 +109,7 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 
 			for (auto&& meshBatch : meshBatches)
 			{
-				RendererBatch::Sort(material.first);
+				RendererBatch::Sort();
 
 				commandBuffer.Flush(*material.second);
 

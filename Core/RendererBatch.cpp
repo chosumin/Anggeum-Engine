@@ -22,18 +22,18 @@ Core::RendererBatch::~RendererBatch()
 
 void Core::RendererBatch::Add(MeshRenderer& meshRenderer)
 {
-	auto matType = meshRenderer.GetMaterial().GetType();
+	auto hash = meshRenderer.GetMaterial().GetHash();
 
-	auto matPtr = Materials.find(matType);
+	auto matPtr = Materials.find(hash);
 	if (matPtr == Materials.end())
 	{
-		Materials.insert(make_pair(matType, &meshRenderer.GetMaterial()));
+		Materials.insert(make_pair(hash, &meshRenderer.GetMaterial()));
 	}
 
-	auto& batch = MeshBatches[matType][meshRenderer.GetMesh().GetModelPath()];
+	auto& batch = MeshBatches[hash][meshRenderer.GetMesh().GetModelPath()];
 	batch.push_back(&meshRenderer);
 }
 
-void Core::RendererBatch::Sort(type_index type)
+void Core::RendererBatch::Sort()
 {
 }

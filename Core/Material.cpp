@@ -7,8 +7,8 @@
 
 namespace Core
 {
-	Material::Material(Device& device, string shaderName)
-		:_device(device), _isDirty(true)
+	Material::Material(Device& device, string shaderName, uint32_t hash)
+		:_device(device), _isDirty(true), _hash(hash)
 	{
 		_shader = ShaderFactory::CreateShader(device, shaderName);
 

@@ -12,7 +12,7 @@ namespace Core
 	class RendererBatch
 	{
 	public:
-		static void Sort(type_index type);
+		static void Sort();
 
 		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, PipelineState& pipelineState);
 		~RendererBatch();
@@ -21,8 +21,8 @@ namespace Core
 
 		Pipeline* Pipeline;
 		Shader& SharedShader;
-		unordered_map<type_index, Material*> Materials;
-		unordered_map<type_index, unordered_map<string, vector<MeshRenderer*>>> MeshBatches;
+		unordered_map<uint32_t, Material*> Materials;
+		unordered_map<uint32_t, unordered_map<string, vector<MeshRenderer*>>> MeshBatches;
 	};
 }
 

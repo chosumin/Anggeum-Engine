@@ -1,0 +1,10 @@
+{
+  "shader": "Sample",
+  "uniforms": [],
+  "textures": [
+	{
+		"binding": 1,
+		"path": "Assets/Textures/white.png"
+	}
+  ]
+}

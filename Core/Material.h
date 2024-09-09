@@ -9,15 +9,14 @@ namespace Core
 	class Shader;
 	class CommandPool;
 	struct RenderTarget;
-
 	class Material
 	{
 	public:
-		Material(Device& device, string shaderName);
+		Material(Device& device, string shaderName, uint32_t hash);
 		Material(const Material& other) = default;
 		virtual ~Material();
 
-		virtual type_index GetType() const = 0;
+		const uint32_t GetHash() const { return _hash; }
 
 		Shader& GetShader() const;
 		void SetShader(Shader& shader);
@@ -58,6 +57,8 @@ namespace Core
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
 	private:
 		bool _isDirty;
+
+		uint32_t _hash;
 
 		vector<VkDescriptorSet> _descriptorSets;
 	};

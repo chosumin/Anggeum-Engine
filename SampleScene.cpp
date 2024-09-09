@@ -25,15 +25,21 @@ SampleScene::SampleScene(Core::Device& device,
 		auto& transform = meshEntity->GetTransform();
 		vec3 position = vec3(0, 0, 0);
 		transform.SetTranslation(position);
-		auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity, "Models/viking_room.obj");
+		
+		auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity);
+		meshRenderer->SetMesh("Assets/Models/viking_room.obj");
+		meshRenderer->SetMaterial("Assets/Materials/Sample.json");
+
 		AddComponent(move(meshRenderer), *meshEntity);
 		AddEntity(move(meshEntity));
 	}
 
 	//add ground
 	auto ground = make_unique<Entity>(-1, "ground");
-	auto meshRenderer = make_unique<MeshRenderer>(device, *ground, 0);
-	meshRenderer->SetMaterial(Core::MaterialType::BASE);
+	auto meshRenderer = make_unique<MeshRenderer>(device, *ground);
+	meshRenderer->SetMesh(0);
+	meshRenderer->SetMaterial("Assets/Materials/Base.json");
+
 	AddComponent(move(meshRenderer), *ground);
 	AddEntity(move(ground));
 }

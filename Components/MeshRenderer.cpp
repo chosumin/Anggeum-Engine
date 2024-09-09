@@ -7,18 +7,9 @@
 #include "Entity.h"
 using namespace Core;
 
-Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity, string modelPath)
-	:Component(entity), _device(device), _mesh(nullptr), _material(nullptr)
+Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity)
+	:Component(entity), _device(device)
 {
-	SetMesh(modelPath);
-	SetMaterial(MaterialType::SAMPLE);
-}
-
-Core::MeshRenderer::MeshRenderer(Device& device, Entity& entity, int polygonType)
-	:Component(entity), _device(device), _mesh(nullptr), _material(nullptr)
-{
-	SetMesh(polygonType);
-	SetMaterial(MaterialType::SAMPLE);
 }
 
 Core::MeshRenderer::~MeshRenderer()
@@ -30,14 +21,14 @@ void Core::MeshRenderer::SetMesh(int polygonType)
 	_mesh = MeshFactory::CreateMesh(_device, polygonType);
 }
 
-void Core::MeshRenderer::SetMesh(string modelPath)
+void Core::MeshRenderer::SetMesh(string path)
 {
-	_mesh = MeshFactory::CreateMesh(_device, modelPath);
+	_mesh = MeshFactory::CreateMesh(_device, path);
 }
 
-void Core::MeshRenderer::SetMaterial(MaterialType type)
+void Core::MeshRenderer::SetMaterial(string path)
 {
-	_material = MaterialFactory::CreateMaterial(_device, type);
+	_material = MaterialFactory::CreateMaterial(_device, path);
 }
 
 void Core::MeshRenderer::UpdateFrame(float deltaTime)

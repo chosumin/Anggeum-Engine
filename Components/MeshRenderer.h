@@ -11,16 +11,15 @@ namespace Core
 	class MeshRenderer : public Component
 	{
 	public:
-		MeshRenderer(Device& device, Entity& entity, string modelPath);
-		MeshRenderer(Device& device, Entity& entity, int polygonType);
+		MeshRenderer(Device& device, Entity& entity);
 		~MeshRenderer();
 
 		Mesh& GetMesh() { return *_mesh; }
 		Material& GetMaterial() { return* _material; }
 
 		void SetMesh(int polygonType);
-		void SetMesh(string modelPath);
-		void SetMaterial(MaterialType type);
+		void SetMesh(string path);
+		void SetMaterial(string path);
 
 		virtual void UpdateFrame(float deltaTime) override;
 		virtual std::type_index GetType() override;

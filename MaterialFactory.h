@@ -2,23 +2,16 @@
 
 namespace Core
 {
-	enum class MaterialType
-	{
-		BASE,
-		SAMPLE,
-		SHADOW,
-	};
-
 	class Material;
 	class MaterialFactory
 	{
 	public:
-		static Material* CreateMaterial(Device& device, MaterialType material);
+		static Material* CreateMaterial(Device& device, string materialPath);
 		static void DeleteCache();
 	private:
-		static Material* CreateMaterialInternal(Device& device, MaterialType material);
+		static Material* Parse(Device& device, string materialPath);
 	private:
-		static unordered_map<MaterialType, Material*> _materialCache;
+		static unordered_map<uint32_t, Material*> _materialCache;
 	};
 }
 

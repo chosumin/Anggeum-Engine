@@ -142,7 +142,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
-    <ClCompile Include="BaseMaterial.cpp" />
     <ClCompile Include="Components\FreeCamera.cpp" />
     <ClCompile Include="Components\MeshRenderer.cpp" />
     <ClCompile Include="Components\PerspectiveCamera.cpp" />
@@ -214,18 +213,15 @@
     <ClCompile Include="MeshFactory.cpp" />
     <ClCompile Include="RenderPasses\GeometryRenderPass.cpp" />
     <ClCompile Include="RenderPasses\ShadowRenderPass.cpp" />
-    <ClCompile Include="SampleMaterial.cpp" />
     <ClCompile Include="SampleScene.cpp" />
     <ClCompile Include="SampleShader.cpp" />
     <ClCompile Include="SceneFactory.cpp" />
     <ClCompile Include="ShaderFactory.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ShadowMaterial.cpp" />
     <ClCompile Include="ShadowShader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
-    <ClInclude Include="BaseMaterial.h" />
     <ClInclude Include="Components\FreeCamera.h" />
     <ClInclude Include="Components\MeshRenderer.h" />
     <ClInclude Include="Components\PerspectiveCamera.h" />
@@ -279,13 +275,11 @@
     <ClInclude Include="RenderPasses\GeometryRenderPass.h" />
     <ClInclude Include="RenderPasses\ShadowRenderPass.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="SampleMaterial.h" />
     <ClInclude Include="SampleScene.h" />
     <ClInclude Include="SampleShader.h" />
     <ClInclude Include="SceneFactory.h" />
     <ClInclude Include="ShaderFactory.h" />
     <ClInclude Include="main.h" />
-    <ClInclude Include="ShadowMaterial.h" />
     <ClInclude Include="ShadowShader.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

@@ -8,7 +8,6 @@
     <ClCompile Include="SceneFactory.cpp" />
     <ClCompile Include="SampleShader.cpp" />
     <ClCompile Include="ForwardRenderPipeline.cpp" />
-    <ClCompile Include="SampleMaterial.cpp" />
     <ClCompile Include="ShaderFactory.cpp" />
     <ClCompile Include="imgui\imgui.cpp">
       <Filter>IMGUI</Filter>
@@ -98,11 +97,9 @@
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="ShadowShader.cpp" />
-    <ClCompile Include="ShadowMaterial.cpp" />
     <ClCompile Include="MaterialFactory.cpp" />
     <ClCompile Include="MeshFactory.cpp" />
     <ClCompile Include="GUIRenderPass.cpp" />
-    <ClCompile Include="BaseMaterial.cpp" />
     <ClCompile Include="Core\Buffer.cpp">
       <Filter>Core\Vulkan</Filter>
     </ClCompile>
@@ -162,7 +159,6 @@
     <ClInclude Include="SampleShader.h" />
     <ClInclude Include="ForwardRenderPipeline.h" />
     <ClInclude Include="IRenderPipeline.h" />
-    <ClInclude Include="SampleMaterial.h" />
     <ClInclude Include="ShaderFactory.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="imgui\imconfig.h">
@@ -250,11 +246,9 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="ShadowShader.h" />
-    <ClInclude Include="ShadowMaterial.h" />
     <ClInclude Include="MaterialFactory.h" />
     <ClInclude Include="MeshFactory.h" />
     <ClInclude Include="GUIRenderPass.h" />
-    <ClInclude Include="BaseMaterial.h" />
     <ClInclude Include="Core\Buffer.h">
       <Filter>Core\Vulkan</Filter>
     </ClInclude>

@@ -108,7 +108,7 @@ namespace Core
 
 				for (auto&& meshBatch : meshBatches)
 				{
-					RendererBatch::Sort(material.first);
+					RendererBatch::Sort();
 
 					commandBuffer.Flush(*material.second);
 
