@@ -4,38 +4,6 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="SampleScene.cpp" />
-    <ClCompile Include="SceneFactory.cpp" />
-    <ClCompile Include="SampleShader.cpp" />
-    <ClCompile Include="ForwardRenderPipeline.cpp" />
-    <ClCompile Include="ShaderFactory.cpp" />
-    <ClCompile Include="imgui\imgui.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_demo.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_draw.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_tables.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\imgui_widgets.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderPasses\GeometryRenderPass.cpp">
-      <Filter>RenderPasses</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderPasses\ShadowRenderPass.cpp">
-      <Filter>RenderPasses</Filter>
-    </ClCompile>
     <ClCompile Include="Components\FreeCamera.cpp">
       <Filter>Components</Filter>
     </ClCompile>
@@ -96,10 +64,6 @@
     <ClCompile Include="Core\Window.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="ShadowShader.cpp" />
-    <ClCompile Include="MaterialFactory.cpp" />
-    <ClCompile Include="MeshFactory.cpp" />
-    <ClCompile Include="GUIRenderPass.cpp" />
     <ClCompile Include="Core\Buffer.cpp">
       <Filter>Core\Vulkan</Filter>
     </ClCompile>
@@ -136,16 +100,53 @@
     <ClCompile Include="Core\RenderTarget.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="DescriptorPool.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp">
       <Filter>Core\BufferObjects</Filter>
     </ClCompile>
     <ClCompile Include="Core\PipelineState.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="JsonParser.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_tables.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Sample\Sample\SampleScene.cpp">
+      <Filter>Sample</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\ForwardRenderPipeline.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\JsonParser.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp">
+      <Filter>Core\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp">
+      <Filter>Core\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp">
+      <Filter>Core\RenderPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\MaterialFactory.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\MeshFactory.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\ShaderFactory.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Shaders\SampleShader.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Shaders\ShadowShader.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\DescriptorPool.cpp">
       <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
@@ -154,34 +155,8 @@
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="SampleScene.h" />
-    <ClInclude Include="SceneFactory.h" />
-    <ClInclude Include="SampleShader.h" />
-    <ClInclude Include="ForwardRenderPipeline.h" />
     <ClInclude Include="IRenderPipeline.h" />
-    <ClInclude Include="ShaderFactory.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="imgui\imconfig.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\imgui.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\imgui_impl_glfw.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\imgui_impl_vulkan.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\imgui_internal.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderPasses\GeometryRenderPass.h">
-      <Filter>RenderPasses</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderPasses\ShadowRenderPass.h">
-      <Filter>RenderPasses</Filter>
-    </ClInclude>
     <ClInclude Include="Components\FreeCamera.h">
       <Filter>Components</Filter>
     </ClInclude>
@@ -245,10 +220,6 @@
     <ClInclude Include="Core\Window.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="ShadowShader.h" />
-    <ClInclude Include="MaterialFactory.h" />
-    <ClInclude Include="MeshFactory.h" />
-    <ClInclude Include="GUIRenderPass.h" />
     <ClInclude Include="Core\Buffer.h">
       <Filter>Core\Vulkan</Filter>
     </ClInclude>
@@ -291,24 +262,56 @@
     <ClInclude Include="Core\RenderTarget.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="DescriptorPool.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="Core\BufferObjects\BufferObjects.h">
       <Filter>Core\BufferObjects</Filter>
     </ClInclude>
     <ClInclude Include="Core\PipelineState.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="JsonParser.h">
+    <ClInclude Include="ThirdParties\imgui\imconfig.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
+    <ClInclude Include="Sample\Sample\SampleScene.h">
+      <Filter>Sample</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ForwardRenderPipeline.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\JsonParser.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h">
+      <Filter>Core\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderPasses\GUIRenderPass.h">
+      <Filter>Core\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h">
+      <Filter>Core\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\MaterialFactory.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\MeshFactory.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ShaderFactory.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\SampleShader.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders\ShadowShader.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\DescriptorPool.h">
       <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
-    <None Include="imgui\misc\debuggers\imgui.natstepfilter">
-      <Filter>IMGUI</Filter>
-    </None>
     <None Include="Shaders\fs.frag">
       <Filter>Shaders</Filter>
     </None>
@@ -324,6 +327,7 @@
     <None Include="Shaders\common.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">
@@ -334,9 +338,6 @@
     </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{58e3dbde-ec2a-4fa5-98a9-00c0dcd46de9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="RenderPasses">
-      <UniqueIdentifier>{e649309a-0e9b-4cd3-a513-cdca3c02d1f7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Components">
       <UniqueIdentifier>{49ce4538-79c5-4c0c-9c49-abcbcdff5dd9}</UniqueIdentifier>
@@ -350,13 +351,17 @@
     <Filter Include="Core\BufferObjects">
       <UniqueIdentifier>{665c6d6e-0aaa-4386-8ba5-8a74d463508a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sample">
+      <UniqueIdentifier>{9c04a490-60dd-4427-954d-ae8fbe2cf9a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\RenderPasses">
+      <UniqueIdentifier>{e649309a-0e9b-4cd3-a513-cdca3c02d1f7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="imgui\misc\debuggers\imgui.natvis">
-      <Filter>IMGUI</Filter>
-    </Natvis>
+    <Natvis Include="ThirdParties\imgui\misc\debuggers\imgui.natvis" />
   </ItemGroup>
 </Project>

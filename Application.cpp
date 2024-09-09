@@ -3,13 +3,13 @@
 #include "SwapChain.h"
 #include "CommandBuffer.h"
 #include "timer.h"
-#include "SampleScene.h"
+#include "Sample/Sample/SampleScene.h"
 #include "ForwardRenderPipeline.h"
 #include "RenderContext.h"
 #include "MaterialFactory.h"
 #include "ShaderFactory.h"
 #include "MeshFactory.h"
-#include "GUIRenderPass.h"
+#include "Core/RenderPasses/GUIRenderPass.h"
 
 Application::Application(const ApplicationOptions& options)
 {

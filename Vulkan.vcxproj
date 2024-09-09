@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories);imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Include;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\tinyobjloader;%(AdditionalIncludeDirectories);ThirdParties\imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -112,7 +112,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Lib;$(ProjectDir)glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Lib;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -125,7 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Include;$(ProjectDir)glfw-3.3.8.bin.WIN64\include;$(ProjectDir)glm;$(ProjectDir)stb;$(ProjectDir)tinyobjloader;%(AdditionalIncludeDirectories);imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Include;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\tinyobjloader;%(AdditionalIncludeDirectories);ThirdParties\imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -135,8 +135,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Lib;$(ProjectDir)glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Lib;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;ThirdParties\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -150,13 +150,18 @@
     <ClCompile Include="Core\CommandBuffer.cpp" />
     <ClCompile Include="Core\CommandPool.cpp" />
     <ClCompile Include="Core\Component.cpp" />
+    <ClCompile Include="Core\DescriptorPool.cpp" />
     <ClCompile Include="Core\Device.cpp" />
     <ClCompile Include="Core\Entity.cpp" />
+    <ClCompile Include="Core\ForwardRenderPipeline.cpp" />
     <ClCompile Include="Core\Framebuffer.cpp" />
     <ClCompile Include="Core\InputEvents.cpp" />
     <ClCompile Include="Core\InstanceData.cpp" />
+    <ClCompile Include="Core\JsonParser.cpp" />
     <ClCompile Include="Core\Material.cpp" />
+    <ClCompile Include="Core\MaterialFactory.cpp" />
     <ClCompile Include="Core\Mesh.cpp" />
+    <ClCompile Include="Core\MeshFactory.cpp" />
     <ClCompile Include="Core\Pipeline.cpp" />
     <ClCompile Include="Core\PipelineState.cpp" />
     <ClCompile Include="Core\PushConstant.cpp" />
@@ -164,9 +169,13 @@
     <ClCompile Include="Core\RendererBatch.cpp" />
     <ClCompile Include="Core\RenderFrame.cpp" />
     <ClCompile Include="Core\RenderPass.cpp" />
+    <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp" />
+    <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp" />
+    <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp" />
     <ClCompile Include="Core\RenderTarget.cpp" />
     <ClCompile Include="Core\Scene.cpp" />
     <ClCompile Include="Core\Shader.cpp" />
+    <ClCompile Include="Core\ShaderFactory.cpp" />
     <ClCompile Include="Core\SwapChain.cpp" />
     <ClCompile Include="Core\Texture.cpp" />
     <ClCompile Include="Core\TextureBuffer.cpp" />
@@ -177,48 +186,38 @@
     <ClCompile Include="Core\Vertex.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
-    <ClCompile Include="DescriptorPool.cpp" />
-    <ClCompile Include="ForwardRenderPipeline.cpp" />
-    <ClCompile Include="GUIRenderPass.cpp" />
-    <ClCompile Include="imgui\imgui.cpp">
+    <ClCompile Include="Sample\Sample\SampleScene.cpp" />
+    <ClCompile Include="Shaders\SampleShader.cpp" />
+    <ClCompile Include="Shaders\ShadowShader.cpp" />
+    <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_demo.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_draw.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_impl_glfw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_impl_vulkan.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_impl_vulkan.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_tables.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_tables.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_widgets.cpp">
+    <ClCompile Include="ThirdParties\imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="JsonParser.cpp" />
-    <ClCompile Include="MaterialFactory.cpp" />
-    <ClCompile Include="MeshFactory.cpp" />
-    <ClCompile Include="RenderPasses\GeometryRenderPass.cpp" />
-    <ClCompile Include="RenderPasses\ShadowRenderPass.cpp" />
-    <ClCompile Include="SampleScene.cpp" />
-    <ClCompile Include="SampleShader.cpp" />
-    <ClCompile Include="SceneFactory.cpp" />
-    <ClCompile Include="ShaderFactory.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ShadowShader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -230,16 +229,21 @@
     <ClInclude Include="Core\CommandBuffer.h" />
     <ClInclude Include="Core\CommandPool.h" />
     <ClInclude Include="Core\Component.h" />
+    <ClInclude Include="Core\DescriptorPool.h" />
     <ClInclude Include="Core\Device.h" />
     <ClInclude Include="Core\Entity.h" />
+    <ClInclude Include="Core\ForwardRenderPipeline.h" />
     <ClInclude Include="Core\Framebuffer.h" />
     <ClInclude Include="Core\IDescriptor.h" />
     <ClInclude Include="Core\InputEvents.h" />
     <ClInclude Include="Core\InstanceData.h" />
     <ClInclude Include="Core\IRenderPipeline.h" />
+    <ClInclude Include="Core\JsonParser.h" />
     <ClInclude Include="Core\Keycodes.h" />
     <ClInclude Include="Core\Material.h" />
+    <ClInclude Include="Core\MaterialFactory.h" />
     <ClInclude Include="Core\Mesh.h" />
+    <ClInclude Include="Core\MeshFactory.h" />
     <ClInclude Include="Core\Pipeline.h" />
     <ClInclude Include="Core\PipelineState.h" />
     <ClInclude Include="Core\PushConstant.h" />
@@ -247,9 +251,13 @@
     <ClInclude Include="Core\RendererBatch.h" />
     <ClInclude Include="Core\RenderFrame.h" />
     <ClInclude Include="Core\RenderPass.h" />
+    <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h" />
+    <ClInclude Include="Core\RenderPasses\GUIRenderPass.h" />
+    <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h" />
     <ClInclude Include="Core\RenderTarget.h" />
     <ClInclude Include="Core\Scene.h" />
     <ClInclude Include="Core\Shader.h" />
+    <ClInclude Include="Core\ShaderFactory.h" />
     <ClInclude Include="Core\SwapChain.h" />
     <ClInclude Include="Core\Texture.h" />
     <ClInclude Include="Core\TextureBuffer.h" />
@@ -260,32 +268,22 @@
     <ClInclude Include="Core\Vertex.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
-    <ClInclude Include="DescriptorPool.h" />
-    <ClInclude Include="ForwardRenderPipeline.h" />
-    <ClInclude Include="GUIRenderPass.h" />
-    <ClInclude Include="imgui\imconfig.h" />
-    <ClInclude Include="imgui\imgui.h" />
-    <ClInclude Include="imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="imgui\imgui_impl_vulkan.h" />
-    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="Sample\Sample\SampleScene.h" />
+    <ClInclude Include="Shaders\SampleShader.h" />
+    <ClInclude Include="Shaders\ShadowShader.h" />
+    <ClInclude Include="ThirdParties\imgui\imconfig.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
     <ClInclude Include="IRenderPipeline.h" />
-    <ClInclude Include="JsonParser.h" />
-    <ClInclude Include="MaterialFactory.h" />
-    <ClInclude Include="MeshFactory.h" />
-    <ClInclude Include="RenderPasses\GeometryRenderPass.h" />
-    <ClInclude Include="RenderPasses\ShadowRenderPass.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="SampleScene.h" />
-    <ClInclude Include="SampleShader.h" />
-    <ClInclude Include="SceneFactory.h" />
-    <ClInclude Include="ShaderFactory.h" />
     <ClInclude Include="main.h" />
-    <ClInclude Include="ShadowShader.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
-    <None Include="imgui\misc\debuggers\imgui.natstepfilter" />
+    <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
     <None Include="Shaders\common.glsl" />
     <None Include="Shaders\fs.frag" />
     <None Include="Shaders\shadow.frag" />
@@ -296,7 +294,7 @@
     <ResourceCompile Include="Vulkan.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="imgui\misc\debuggers\imgui.natvis" />
+    <Natvis Include="ThirdParties\imgui\misc\debuggers\imgui.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

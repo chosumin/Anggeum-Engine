@@ -1,11 +1,11 @@
-[submodule "stb"]
-	path = stb
+[submodule "ThirdParties/stb"]
+	path = ThirdParties/stb
 	url = https://github.com/nothings/stb.git
-[submodule "tinyobjloader"]
-	path = tinyobjloader
+[submodule "ThirdParties/tinyobjloader"]
+	path = ThirdParties/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader.git
-[submodule "imgui"]
-	path = imgui
+[submodule "ThirdParties/imgui"]
+	path = ThirdParties/imgui
 	url = https://github.com/ocornut/imgui.git
 [submodule "ThirdParties/rapidjson"]
 	path = ThirdParties/rapidjson
