@@ -20,6 +20,12 @@
 #include <glm/gtx/quaternion.hpp>
 using namespace glm;
 
+#include "ThirdParties/rapidjson/include/rapidjson/document.h"
+#include "ThirdParties/rapidjson/include/rapidjson/writer.h"
+#include "ThirdParties/rapidjson/include/rapidjson/stringbuffer.h"
+#include "ThirdParties/rapidjson/include/rapidjson/filereadstream.h"
+using namespace rapidjson;
+
 #include "imgui.h"
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui_impl_glfw.h"

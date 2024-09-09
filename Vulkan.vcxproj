@@ -209,6 +209,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="JsonParser.cpp" />
     <ClCompile Include="MaterialFactory.cpp" />
     <ClCompile Include="MeshFactory.cpp" />
     <ClCompile Include="RenderPasses\GeometryRenderPass.cpp" />
@@ -272,6 +273,7 @@
     <ClInclude Include="imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="IRenderPipeline.h" />
+    <ClInclude Include="JsonParser.h" />
     <ClInclude Include="MaterialFactory.h" />
     <ClInclude Include="MeshFactory.h" />
     <ClInclude Include="RenderPasses\GeometryRenderPass.h" />

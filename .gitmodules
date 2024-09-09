@@ -7,3 +7,6 @@
 [submodule "imgui"]
 	path = imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "ThirdParties/rapidjson"]
+	path = ThirdParties/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
