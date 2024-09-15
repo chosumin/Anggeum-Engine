@@ -126,19 +126,19 @@ void Core::Mesh::LoadPlane()
 {
 	Vertex vertices[4];
 
-	vertices[0].Pos = { -2,2,0 };
+	vertices[0].Pos = { -2,0,-2 };
 	vertices[0].TexCoord = { 0, 1 };
 	vertices[0].Color = { 1.0f, 1.0f, 1.0f };
 
-	vertices[1].Pos = { -2,-2,0 };
+	vertices[1].Pos = { -2,0,2 };
 	vertices[1].TexCoord = { 0, 0 };
 	vertices[1].Color = { 1.0f, 1.0f, 1.0f };
 
-	vertices[2].Pos = { 2,2,0 };
+	vertices[2].Pos = { 2,0,-2};
 	vertices[2].TexCoord = { 1, 1 };
 	vertices[2].Color = { 1.0f, 1.0f, 1.0f };
 
-	vertices[3].Pos = { 2,-2,0 };
+	vertices[3].Pos = { 2,0,2 };
 	vertices[3].TexCoord = { 1, 0 };
 	vertices[3].Color = { 1.0f, 1.0f, 1.0f };
 

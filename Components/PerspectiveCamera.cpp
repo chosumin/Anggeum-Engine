@@ -10,7 +10,7 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	Matrices.View = lookAt(
 		vec3(2.0f, 2.0f, 2.0f),
 		vec3(0.0f, 0.0f, 0.0f),
-		vec3(0.0f, 0.0f, 1.0f));
+		vec3(0.0f, 1.0f, 0.0f));
 
 	Matrices.Perspective = perspective(
 		radians(60.0f),

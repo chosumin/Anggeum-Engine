@@ -5,12 +5,12 @@
 #include "Entity.h"
 using namespace Core;
 
-const float Core::FreeCamera::TOUCH_DOWN_MOVE_FORWARD_WAIT_TIME = 2.0f;
-const float Core::FreeCamera::ROTATION_MOVE_WEIGHT = 1.0f;
-const float Core::FreeCamera::KEY_ROTATION_MOVE_WEIGHT = 0.5f;
-const float Core::FreeCamera::TRANSLATION_MOVE_WEIGHT = 3.0f;
-const float Core::FreeCamera::TRANSLATION_MOVE_STEP = 5.0f;
-const uint32_t Core::FreeCamera::TRANSLATION_MOVE_SPEED = 3;
+const float TOUCH_DOWN_MOVE_FORWARD_WAIT_TIME = 2.0f;
+const float ROTATION_MOVE_WEIGHT = 1.0f;
+const float KEY_ROTATION_MOVE_WEIGHT = 0.5f;
+const float TRANSLATION_MOVE_WEIGHT = 3.0f;
+const float TRANSLATION_MOVE_STEP = 5.0f;
+const uint32_t TRANSLATION_MOVE_SPEED = 3;
 
 Core::FreeCamera::FreeCamera(Entity& entity)
 	:Component(entity)
@@ -22,41 +22,12 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 	glm::vec3 deltaTranslation(0.0f, 0.0f, 0.0f);
 	glm::vec3 deltaRotation(0.0f, 0.0f, 0.0f);
 
-	float mulTranslation = _speedMultiplier;
+	float mulTranslation = 1.0f;
 
 	auto& keyPressed = Core::Input::KeyPressed;
-	if (keyPressed[KeyCode::W])
-	{
-		deltaTranslation.z -= TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::S])
-	{
-		deltaTranslation.z += TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::A])
-	{
-		deltaTranslation.x -= TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::D])
-	{
-		deltaTranslation.x += TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::Q])
-	{
-		deltaTranslation.y -= TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::E])
-	{
-		deltaTranslation.y += TRANSLATION_MOVE_STEP;
-	}
-	if (keyPressed[KeyCode::LeftControl])
-	{
-		mulTranslation *= (1.0f * TRANSLATION_MOVE_SPEED);
-	}
-	if (keyPressed[KeyCode::LeftShift])
-	{
-		mulTranslation *= (1.0f / TRANSLATION_MOVE_SPEED);
-	}
+
+	//todo : translate
+	Translate(deltaTranslation, mulTranslation);
 
 	if (keyPressed[KeyCode::I])
 	{
@@ -86,11 +57,11 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 		deltaRotation.x -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.y;
 		deltaRotation.y -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.x;
 	}
-	else if (mouseButtonPressed[MouseButton::Left])
+	/*else if (mouseButtonPressed[MouseButton::Left])
 	{
 		deltaTranslation.x += TRANSLATION_MOVE_WEIGHT * mouseMoveDelta.x;
 		deltaTranslation.y += TRANSLATION_MOVE_WEIGHT * -mouseMoveDelta.y;
-	}
+	}*/
 
 	deltaTranslation *= mulTranslation * deltaTime;
 	deltaRotation *= deltaTime;
@@ -101,7 +72,7 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 		auto& transform = _entity.GetComponent<Transform>();
 		
 		glm::quat qx = glm::angleAxis(deltaRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, -1.0f, 0.0f));
 
 		glm::quat orientation = glm::normalize(qy * transform.GetRotation() * qx);
 
@@ -112,18 +83,51 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 
 void Core::FreeCamera::Resize(uint32_t width, uint32_t height)
 {
-	/*auto& camera_node = get_node();
-
-	if (camera_node.has_component<Camera>())
-	{
-		if (auto camera = dynamic_cast<PerspectiveCamera*>(&camera_node.get_component<Camera>()))
-		{
-			camera->set_aspect_ratio(static_cast<float>(width) / height);
-		}
-	}*/
 }
 
 type_index Core::FreeCamera::GetType()
 {
 	return typeid(FreeCamera);
+}
+
+
+void Core::FreeCamera::Translate(vec3& delta, float& multiplier)
+{
+	auto& keyPressed = Core::Input::KeyPressed;
+
+	if (keyPressed[KeyCode::W])
+	{
+		delta.z -= TRANSLATION_MOVE_STEP;
+	}
+	if (keyPressed[KeyCode::S])
+	{
+		delta.z += TRANSLATION_MOVE_STEP;
+	}
+	if (keyPressed[KeyCode::A])
+	{
+		delta.x -= TRANSLATION_MOVE_STEP;
+	}
+	if (keyPressed[KeyCode::D])
+	{
+		delta.x += TRANSLATION_MOVE_STEP;
+	}
+	if (keyPressed[KeyCode::Q])
+	{
+		delta.y -= TRANSLATION_MOVE_STEP;
+	}
+	if (keyPressed[KeyCode::E])
+	{
+		delta.y += TRANSLATION_MOVE_STEP;
+	}
+
+	multiplier = 1.0f;
+
+	if (keyPressed[KeyCode::LeftControl])
+	{
+		multiplier *= (1.0f * TRANSLATION_MOVE_SPEED);
+	}
+	if (keyPressed[KeyCode::LeftShift])
+	{
+		multiplier *= (1.0f / TRANSLATION_MOVE_SPEED);
+	}
 }
