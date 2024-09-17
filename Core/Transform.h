@@ -14,6 +14,9 @@ namespace Core
 		virtual type_index GetType() override;
 		virtual void Resize(uint32_t width, uint32_t height) override;
 
+		void Rotate(const glm::vec3& deltaAngle);
+		void Translate(const glm::vec4& delta);
+
 		void SetTranslation(const glm::vec3& translation);
 		void SetRotation(const glm::quat& rotation);
 		void SetScale(const glm::vec3& scale);

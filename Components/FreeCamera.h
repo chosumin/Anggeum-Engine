@@ -13,7 +13,8 @@ namespace Core
 		virtual void Resize(uint32_t width, uint32_t height) override;
 		virtual type_index GetType() override;
 	private:
-		void Translate(vec3& delta, float& multiplier);
+		void Translate(vec4& delta, float& multiplier);
+		void Rotate(vec3& delta);
 	};
 }
 

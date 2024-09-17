@@ -149,6 +149,9 @@
     <ClCompile Include="Core\DescriptorPool.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Utils\Math.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -309,6 +312,9 @@
     <ClInclude Include="Core\DescriptorPool.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="Core\Utils\Math.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -356,6 +362,9 @@
     </Filter>
     <Filter Include="Core\RenderPasses">
       <UniqueIdentifier>{e649309a-0e9b-4cd3-a513-cdca3c02d1f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Utils">
+      <UniqueIdentifier>{70c848c7-0b73-402a-98ce-b669fb9cf25e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

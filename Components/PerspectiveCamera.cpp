@@ -8,18 +8,18 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	:Component(entity)
 {
 	Matrices.View = lookAt(
-		vec3(2.0f, 2.0f, 2.0f),
+		vec3(0.0f, 0.0f, 2.0f),
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(0.0f, 1.0f, 0.0f));
+
+	auto& transform = entity.GetComponent<Transform>();
+	transform.SetMatrix(Matrices.View);
 
 	Matrices.Perspective = perspective(
 		radians(60.0f),
 		width / height,
 		0.1f, 10.0f);
 	Matrices.Perspective[1][1] *= -1;
-
-	auto& transform = entity.GetComponent<Transform>();
-	transform.SetMatrix(Matrices.View);
 }
 
 type_index Core::PerspectiveCamera::GetType()

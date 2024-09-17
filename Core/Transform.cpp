@@ -76,6 +76,21 @@ void Core::Transform::Resize(uint32_t width, uint32_t height)
 {
 }
 
+void Core::Transform::Rotate(const glm::vec3& deltaAngle)
+{
+	glm::quat qx = glm::angleAxis(deltaAngle.x, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::quat qy = glm::angleAxis(deltaAngle.y, glm::vec3(0.0f, -1.0f, 0.0f));
+
+	_rotation = glm::normalize(qy * _rotation * qx);
+}
+
+void Core::Transform::Translate(const glm::vec4& delta)
+{
+	_translation.x += delta.x;
+	_translation.y += delta.y;
+	_translation.z += delta.z;
+}
+
 void Core::Transform::UpdateFrame(float deltaTime)
 {
 }

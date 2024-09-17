@@ -19,65 +19,29 @@ Core::FreeCamera::FreeCamera(Entity& entity)
 
 void Core::FreeCamera::UpdateFrame(float deltaTime)
 {
-	glm::vec3 deltaTranslation(0.0f, 0.0f, 0.0f);
+	glm::vec4 deltaTranslation(0.0f, 0.0f, 0.0f, 1.0f);
 	glm::vec3 deltaRotation(0.0f, 0.0f, 0.0f);
 
 	float mulTranslation = 1.0f;
 
-	auto& keyPressed = Core::Input::KeyPressed;
-
-	//todo : translate
 	Translate(deltaTranslation, mulTranslation);
-
-	if (keyPressed[KeyCode::I])
-	{
-		deltaRotation.x += KEY_ROTATION_MOVE_WEIGHT;
-	}
-	if (keyPressed[KeyCode::K])
-	{
-		deltaRotation.x -= KEY_ROTATION_MOVE_WEIGHT;
-	}
-	if (keyPressed[KeyCode::J])
-	{
-		deltaRotation.y += KEY_ROTATION_MOVE_WEIGHT;
-	}
-	if (keyPressed[KeyCode::L])
-	{
-		deltaRotation.y -= KEY_ROTATION_MOVE_WEIGHT;
-	}
-
-	auto& mouseButtonPressed = Core::Input::MouseButtonPressed;
-	auto& mouseMoveDelta = Core::Input::MouseMoveDelta;
-	if (mouseButtonPressed[MouseButton::Left] && mouseButtonPressed[MouseButton::Right])
-	{
-		deltaRotation.z += TRANSLATION_MOVE_WEIGHT * mouseMoveDelta.x;
-	}
-	else if (mouseButtonPressed[MouseButton::Right])
-	{
-		deltaRotation.x -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.y;
-		deltaRotation.y -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.x;
-	}
-	/*else if (mouseButtonPressed[MouseButton::Left])
-	{
-		deltaTranslation.x += TRANSLATION_MOVE_WEIGHT * mouseMoveDelta.x;
-		deltaTranslation.y += TRANSLATION_MOVE_WEIGHT * -mouseMoveDelta.y;
-	}*/
+	Rotate(deltaRotation);
 
 	deltaTranslation *= mulTranslation * deltaTime;
+	deltaTranslation.w = 1.0f;
+
 	deltaRotation *= deltaTime;
 
 	// Only re-calculate the transform if it's changed
-	if (deltaRotation != glm::vec3(0.0f, 0.0f, 0.0f) || deltaTranslation != glm::vec3(0.0f, 0.0f, 0.0f))
+	if (deltaRotation != glm::vec3(0.0f, 0.0f, 0.0f) || deltaTranslation != glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
 	{
 		auto& transform = _entity.GetComponent<Transform>();
-		
-		glm::quat qx = glm::angleAxis(deltaRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-		glm::quat qy = glm::angleAxis(deltaRotation.y, glm::vec3(0.0f, -1.0f, 0.0f));
 
-		glm::quat orientation = glm::normalize(qy * transform.GetRotation() * qx);
+		transform.Rotate(deltaRotation);
 
-		transform.SetTranslation(transform.GetTranslation() + deltaTranslation * glm::conjugate(orientation));
-		transform.SetRotation(orientation);
+		auto rotMat = toMat4(transform.GetRotation());
+		auto translation = rotMat * deltaTranslation;
+		transform.Translate(deltaTranslation);
 	}
 }
 
@@ -91,25 +55,25 @@ type_index Core::FreeCamera::GetType()
 }
 
 
-void Core::FreeCamera::Translate(vec3& delta, float& multiplier)
+void Core::FreeCamera::Translate(vec4& delta, float& multiplier)
 {
 	auto& keyPressed = Core::Input::KeyPressed;
 
 	if (keyPressed[KeyCode::W])
 	{
-		delta.z -= TRANSLATION_MOVE_STEP;
+		delta.z += TRANSLATION_MOVE_STEP;
 	}
 	if (keyPressed[KeyCode::S])
 	{
-		delta.z += TRANSLATION_MOVE_STEP;
+		delta.z -= TRANSLATION_MOVE_STEP;
 	}
 	if (keyPressed[KeyCode::A])
 	{
-		delta.x -= TRANSLATION_MOVE_STEP;
+		delta.x += TRANSLATION_MOVE_STEP;
 	}
 	if (keyPressed[KeyCode::D])
 	{
-		delta.x += TRANSLATION_MOVE_STEP;
+		delta.x -= TRANSLATION_MOVE_STEP;
 	}
 	if (keyPressed[KeyCode::Q])
 	{
@@ -130,4 +94,17 @@ void Core::FreeCamera::Translate(vec3& delta, float& multiplier)
 	{
 		multiplier *= (1.0f / TRANSLATION_MOVE_SPEED);
 	}
+}
+
+void Core::FreeCamera::Rotate(vec3& delta)
+{
+	auto& mouseButtonPressed = Core::Input::MouseButtonPressed;
+
+	if (mouseButtonPressed[MouseButton::Right] == false)
+		return;
+
+	auto& mouseMoveDelta = Core::Input::MouseMoveDelta;
+
+	delta.x -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.y;
+	delta.y -= ROTATION_MOVE_WEIGHT * mouseMoveDelta.x;
 }

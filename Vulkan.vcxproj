@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -183,6 +183,7 @@
     <ClCompile Include="Core\Transform.cpp" />
     <ClCompile Include="Core\UniformBuffer.cpp" />
     <ClCompile Include="Core\Utility.cpp" />
+    <ClCompile Include="Core\Utils\Math.cpp" />
     <ClCompile Include="Core\Vertex.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
@@ -265,6 +266,7 @@
     <ClInclude Include="Core\Transform.h" />
     <ClInclude Include="Core\UniformBuffer.h" />
     <ClInclude Include="Core\Utility.h" />
+    <ClInclude Include="Core\Utils\Math.h" />
     <ClInclude Include="Core\Vertex.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
