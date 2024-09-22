@@ -1,5 +1,5 @@
 #pragma once
-#include "Shader.h"
+#include "VulkanWrapper/Shader.h"
 
 namespace Core
 {

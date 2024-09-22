@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "ShaderFactory.h"
-#include "Shader.h"
+#include "VulkanWrapper/Shader.h"
 #include "Shaders/SampleShader.h"
 #include "Shaders/ShadowShader.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 using namespace Core;
 
 mutex _shaderMutex;

@@ -1,5 +1,4 @@
 #pragma once
-#include "PushConstant.h"
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
 
@@ -18,10 +17,12 @@ namespace Core
 		virtual std::type_index GetType() = 0;
 		virtual string GetPass() = 0;
 		virtual bool UseInstancing() = 0;
-
-		virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
-		
 		virtual vector<string> GetVertexAttirbuteNames() const = 0;
+		virtual void Prepare() = 0;
+		
+		void CreatePipelineLayout();
+
+		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 
@@ -41,13 +42,10 @@ namespace Core
 			return _textureBufferLayoutBindings;
 		}
 	protected:
-		void CreatePipelineLayout(vector<PushConstant> pushConstants);
-
 		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size);
 		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
 	private:
 		void CreateDescriptorPool();
-		void CreatePushConstants(vector<PushConstant>& pushConstants);
 
 		vector<char> ReadFile(const string& filePath);
 		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code) const;

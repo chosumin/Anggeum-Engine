@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "RenderContext.h"
-#include "SwapChain.h"
-#include "CommandBuffer.h"
-#include "CommandPool.h"
+#include "VulkanWrapper/SwapChain.h"
+#include "VulkanWrapper/CommandBuffer.h"
+#include "VulkanWrapper/CommandPool.h"
 
 namespace Core
 {

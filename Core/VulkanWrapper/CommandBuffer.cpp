@@ -69,7 +69,7 @@ void Core::CommandBuffer::BindDescriptorSets(
         &descriptorSet, 0, nullptr);
 }
 
-void Core::CommandBuffer::Flush(Material& material)
+void Core::CommandBuffer::PushConstants(Material& material)
 {
     auto& shader = material.GetShader();
 
@@ -77,8 +77,6 @@ void Core::CommandBuffer::Flush(Material& material)
 
     if (pushConstants->empty())
         return;
-
-    auto shaderStageFlags = shader.GetPushConstantsShaderStage();
 
     vkCmdPushConstants(_commandBuffer, shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
 

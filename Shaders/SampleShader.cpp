@@ -1,9 +1,8 @@
 #include "stdafx.h"
 #include "SampleShader.h"
-#include "TextureBuffer.h"
-#include "UniformBuffer.h"
-#include "Vertex.h"
-#include "InstanceData.h"
+#include "VulkanWrapper/TextureBuffer.h"
+#include "VulkanWrapper/UniformBuffer.h"
+#include "VulkanWrapper/Vertex.h"
 #include "BufferObjects/BufferObjects.h"
 
 namespace Core

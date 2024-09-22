@@ -1,7 +1,7 @@
 #pragma once
-#include "UniformBuffer.h"
-#include "TextureBuffer.h"
-#include "Texture.h"
+#include "VulkanWrapper/UniformBuffer.h"
+#include "VulkanWrapper/TextureBuffer.h"
+#include "VulkanWrapper/Texture.h"
 
 namespace Core
 {

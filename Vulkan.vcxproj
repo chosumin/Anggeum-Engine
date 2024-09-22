@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -142,49 +142,47 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
-    <ClCompile Include="Components\FreeCamera.cpp" />
-    <ClCompile Include="Components\MeshRenderer.cpp" />
-    <ClCompile Include="Components\PerspectiveCamera.cpp" />
-    <ClCompile Include="Core\Buffer.cpp" />
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp" />
-    <ClCompile Include="Core\CommandBuffer.cpp" />
-    <ClCompile Include="Core\CommandPool.cpp" />
     <ClCompile Include="Core\Component.cpp" />
-    <ClCompile Include="Core\DescriptorPool.cpp" />
-    <ClCompile Include="Core\Device.cpp" />
+    <ClCompile Include="Core\Components\FreeCamera.cpp" />
+    <ClCompile Include="Core\Components\MeshRenderer.cpp" />
+    <ClCompile Include="Core\Components\PerspectiveCamera.cpp" />
+    <ClCompile Include="Core\Components\Transform.cpp" />
     <ClCompile Include="Core\Entity.cpp" />
     <ClCompile Include="Core\ForwardRenderPipeline.cpp" />
-    <ClCompile Include="Core\Framebuffer.cpp" />
     <ClCompile Include="Core\InputEvents.cpp" />
-    <ClCompile Include="Core\InstanceData.cpp" />
     <ClCompile Include="Core\JsonParser.cpp" />
     <ClCompile Include="Core\Material.cpp" />
     <ClCompile Include="Core\MaterialFactory.cpp" />
     <ClCompile Include="Core\Mesh.cpp" />
     <ClCompile Include="Core\MeshFactory.cpp" />
-    <ClCompile Include="Core\Pipeline.cpp" />
-    <ClCompile Include="Core\PipelineState.cpp" />
-    <ClCompile Include="Core\PushConstant.cpp" />
     <ClCompile Include="Core\RenderContext.cpp" />
     <ClCompile Include="Core\RendererBatch.cpp" />
     <ClCompile Include="Core\RenderFrame.cpp" />
-    <ClCompile Include="Core\RenderPass.cpp" />
     <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp" />
     <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp" />
     <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp" />
-    <ClCompile Include="Core\RenderTarget.cpp" />
     <ClCompile Include="Core\Scene.cpp" />
-    <ClCompile Include="Core\Shader.cpp" />
     <ClCompile Include="Core\ShaderFactory.cpp" />
-    <ClCompile Include="Core\SwapChain.cpp" />
-    <ClCompile Include="Core\Texture.cpp" />
-    <ClCompile Include="Core\TextureBuffer.cpp" />
     <ClCompile Include="Core\timer.cpp" />
-    <ClCompile Include="Core\Transform.cpp" />
-    <ClCompile Include="Core\UniformBuffer.cpp" />
-    <ClCompile Include="Core\Utility.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
-    <ClCompile Include="Core\Vertex.cpp" />
+    <ClCompile Include="Core\Utils\Utility.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Buffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\CommandBuffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\CommandPool.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\DescriptorPool.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Device.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Framebuffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Pipeline.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\PipelineState.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\RenderTarget.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Shader.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\SwapChain.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Texture.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\TextureBuffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\UniformBuffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Vertex.cpp" />
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Sample\Sample\SampleScene.cpp" />
@@ -222,22 +220,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
-    <ClInclude Include="Components\FreeCamera.h" />
-    <ClInclude Include="Components\MeshRenderer.h" />
-    <ClInclude Include="Components\PerspectiveCamera.h" />
-    <ClInclude Include="Core\Buffer.h" />
     <ClInclude Include="Core\BufferObjects\BufferObjects.h" />
-    <ClInclude Include="Core\CommandBuffer.h" />
-    <ClInclude Include="Core\CommandPool.h" />
     <ClInclude Include="Core\Component.h" />
-    <ClInclude Include="Core\DescriptorPool.h" />
-    <ClInclude Include="Core\Device.h" />
+    <ClInclude Include="Core\Components\FreeCamera.h" />
+    <ClInclude Include="Core\Components\MeshRenderer.h" />
+    <ClInclude Include="Core\Components\PerspectiveCamera.h" />
+    <ClInclude Include="Core\Components\Transform.h" />
     <ClInclude Include="Core\Entity.h" />
     <ClInclude Include="Core\ForwardRenderPipeline.h" />
-    <ClInclude Include="Core\Framebuffer.h" />
-    <ClInclude Include="Core\IDescriptor.h" />
     <ClInclude Include="Core\InputEvents.h" />
-    <ClInclude Include="Core\InstanceData.h" />
     <ClInclude Include="Core\IRenderPipeline.h" />
     <ClInclude Include="Core\JsonParser.h" />
     <ClInclude Include="Core\Keycodes.h" />
@@ -245,29 +236,34 @@
     <ClInclude Include="Core\MaterialFactory.h" />
     <ClInclude Include="Core\Mesh.h" />
     <ClInclude Include="Core\MeshFactory.h" />
-    <ClInclude Include="Core\Pipeline.h" />
-    <ClInclude Include="Core\PipelineState.h" />
-    <ClInclude Include="Core\PushConstant.h" />
     <ClInclude Include="Core\RenderContext.h" />
     <ClInclude Include="Core\RendererBatch.h" />
     <ClInclude Include="Core\RenderFrame.h" />
-    <ClInclude Include="Core\RenderPass.h" />
     <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h" />
     <ClInclude Include="Core\RenderPasses\GUIRenderPass.h" />
     <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h" />
-    <ClInclude Include="Core\RenderTarget.h" />
     <ClInclude Include="Core\Scene.h" />
-    <ClInclude Include="Core\Shader.h" />
     <ClInclude Include="Core\ShaderFactory.h" />
-    <ClInclude Include="Core\SwapChain.h" />
-    <ClInclude Include="Core\Texture.h" />
-    <ClInclude Include="Core\TextureBuffer.h" />
     <ClInclude Include="Core\timer.h" />
-    <ClInclude Include="Core\Transform.h" />
-    <ClInclude Include="Core\UniformBuffer.h" />
-    <ClInclude Include="Core\Utility.h" />
     <ClInclude Include="Core\Utils\Math.h" />
-    <ClInclude Include="Core\Vertex.h" />
+    <ClInclude Include="Core\Utils\Utility.h" />
+    <ClInclude Include="Core\VulkanWrapper\Buffer.h" />
+    <ClInclude Include="Core\VulkanWrapper\CommandBuffer.h" />
+    <ClInclude Include="Core\VulkanWrapper\CommandPool.h" />
+    <ClInclude Include="Core\VulkanWrapper\DescriptorPool.h" />
+    <ClInclude Include="Core\VulkanWrapper\Device.h" />
+    <ClInclude Include="Core\VulkanWrapper\Framebuffer.h" />
+    <ClInclude Include="Core\VulkanWrapper\IDescriptor.h" />
+    <ClInclude Include="Core\VulkanWrapper\Pipeline.h" />
+    <ClInclude Include="Core\VulkanWrapper\PipelineState.h" />
+    <ClInclude Include="Core\VulkanWrapper\RenderPass.h" />
+    <ClInclude Include="Core\VulkanWrapper\RenderTarget.h" />
+    <ClInclude Include="Core\VulkanWrapper\Shader.h" />
+    <ClInclude Include="Core\VulkanWrapper\SwapChain.h" />
+    <ClInclude Include="Core\VulkanWrapper\Texture.h" />
+    <ClInclude Include="Core\VulkanWrapper\TextureBuffer.h" />
+    <ClInclude Include="Core\VulkanWrapper\UniformBuffer.h" />
+    <ClInclude Include="Core\VulkanWrapper\Vertex.h" />
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Sample\Sample\SampleScene.h" />

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "RenderPass.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 #include "SwapChain.h"
 #include "CommandBuffer.h"
 #include "RenderContext.h"

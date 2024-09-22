@@ -1,8 +1,7 @@
 #include "stdafx.h"
 #include "ShadowShader.h"
-#include "UniformBuffer.h"
-#include "InstanceData.h"
-#include "Vertex.h"
+#include "VulkanWrapper/UniformBuffer.h"
+#include "VulkanWrapper/Vertex.h"
 #include "BufferObjects/BufferObjects.h"
 
 ShadowShader::ShadowShader(Core::Device& device)

@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "Mesh.h"
-#include "Vertex.h"
-#include "CommandBuffer.h"
-#include "Buffer.h"
-#include "Utility.h"
+#include "VulkanWrapper/Vertex.h"
+#include "VulkanWrapper/CommandBuffer.h"
+#include "VulkanWrapper/Buffer.h"
+#include "Utils/Utility.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>

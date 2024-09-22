@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "Material.h"
-#include "Shader.h"
-#include "CommandPool.h"
+#include "VulkanWrapper/Shader.h"
+#include "VulkanWrapper/CommandPool.h"
+#include "VulkanWrapper/RenderTarget.h"
 #include "ShaderFactory.h"
-#include "RenderTarget.h"
 
 namespace Core
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include "RenderPass.h"
+#include "VulkanWrapper/RenderPass.h"
 using namespace Core;
 
 class GUIRenderPass : public Core::RenderPass

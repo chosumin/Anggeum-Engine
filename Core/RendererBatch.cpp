@@ -1,12 +1,12 @@
 #include "stdafx.h"
 #include "RendererBatch.h"
-#include "Shader.h"
+#include "VulkanWrapper/Shader.h"
 #include "Material.h"
 #include "Mesh.h"
-#include "MeshRenderer.h"
-#include "PipelineState.h"
-#include "Pipeline.h"
-#include "RenderPass.h"
+#include "Components/MeshRenderer.h"
+#include "VulkanWrapper/PipelineState.h"
+#include "VulkanWrapper/Pipeline.h"
+#include "VulkanWrapper/RenderPass.h"
 using namespace Core;
 
 Core::RendererBatch::RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, PipelineState& pipelineState)

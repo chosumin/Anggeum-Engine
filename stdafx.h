@@ -54,7 +54,7 @@ using namespace rapidjson;
 #include <algorithm>
 using namespace std;
 
-#include "Device.h"
+#include "VulkanWrapper/Device.h"
 #include "Window.h"
 #include "InputEvents.h"
 

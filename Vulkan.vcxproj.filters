@@ -4,15 +4,6 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Components\FreeCamera.cpp">
-      <Filter>Components</Filter>
-    </ClCompile>
-    <ClCompile Include="Components\MeshRenderer.cpp">
-      <Filter>Components</Filter>
-    </ClCompile>
-    <ClCompile Include="Components\PerspectiveCamera.cpp">
-      <Filter>Components</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Component.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -20,9 +11,6 @@
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\InputEvents.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\InstanceData.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\Material.cpp">
@@ -43,68 +31,14 @@
     <ClCompile Include="Core\Scene.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Shader.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Texture.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\timer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Transform.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Utility.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Vertex.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\Window.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Buffer.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\CommandBuffer.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\CommandPool.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Device.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Framebuffer.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Pipeline.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\PushConstant.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderPass.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\SwapChain.cpp">
-      <Filter>Core\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\TextureBuffer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\UniformBuffer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderTarget.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp">
       <Filter>Core\BufferObjects</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\PipelineState.cpp">
-      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="ThirdParties\imgui\imgui.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp" />
@@ -146,11 +80,71 @@
     <ClCompile Include="Shaders\ShadowShader.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
-    <ClCompile Include="Core\DescriptorPool.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Utils\Math.cpp">
       <Filter>Core\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Utils\Utility.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Buffer.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\CommandBuffer.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\CommandPool.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\DescriptorPool.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Device.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Framebuffer.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Pipeline.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\PipelineState.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\RenderTarget.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Shader.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\SwapChain.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Texture.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\TextureBuffer.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\UniformBuffer.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Vertex.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Components\FreeCamera.cpp">
+      <Filter>Core\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Components\MeshRenderer.cpp">
+      <Filter>Core\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Components\PerspectiveCamera.cpp">
+      <Filter>Core\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Components\Transform.cpp">
+      <Filter>Core\Components</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -160,15 +154,6 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="IRenderPipeline.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Components\FreeCamera.h">
-      <Filter>Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Components\MeshRenderer.h">
-      <Filter>Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Components\PerspectiveCamera.h">
-      <Filter>Components</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Component.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -176,9 +161,6 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\InputEvents.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\InstanceData.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Keycodes.h">
@@ -202,74 +184,14 @@
     <ClInclude Include="Core\Scene.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Shader.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Texture.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\timer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Transform.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Utility.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Vertex.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Window.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Buffer.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\CommandBuffer.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\CommandPool.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Device.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Framebuffer.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\IDescriptor.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\IRenderPipeline.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Pipeline.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\PushConstant.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderPass.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\SwapChain.h">
-      <Filter>Core\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\UniformBuffer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\TextureBuffer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderTarget.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\BufferObjects\BufferObjects.h">
       <Filter>Core\BufferObjects</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\PipelineState.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
@@ -309,11 +231,77 @@
     <ClInclude Include="Shaders\ShadowShader.h">
       <Filter>Shaders</Filter>
     </ClInclude>
-    <ClInclude Include="Core\DescriptorPool.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Utils\Math.h">
       <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\Utility.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Buffer.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\CommandBuffer.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\CommandPool.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\DescriptorPool.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Device.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Framebuffer.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\IDescriptor.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Pipeline.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\PipelineState.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\RenderPass.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\RenderTarget.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Shader.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\SwapChain.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Texture.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\TextureBuffer.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\UniformBuffer.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Vertex.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\IRenderPipeline.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\FreeCamera.h">
+      <Filter>Core\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\MeshRenderer.h">
+      <Filter>Core\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\PerspectiveCamera.h">
+      <Filter>Core\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\Transform.h">
+      <Filter>Core\Components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -345,14 +333,8 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{58e3dbde-ec2a-4fa5-98a9-00c0dcd46de9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Components">
-      <UniqueIdentifier>{49ce4538-79c5-4c0c-9c49-abcbcdff5dd9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Polygons">
       <UniqueIdentifier>{b30b5d06-f92b-4e4f-83ee-0eb124a33ca3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Vulkan">
-      <UniqueIdentifier>{e982dd07-29ca-4389-9f48-79b658dd442c}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\BufferObjects">
       <UniqueIdentifier>{665c6d6e-0aaa-4386-8ba5-8a74d463508a}</UniqueIdentifier>
@@ -365,6 +347,12 @@
     </Filter>
     <Filter Include="Core\Utils">
       <UniqueIdentifier>{70c848c7-0b73-402a-98ce-b669fb9cf25e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\VulkanWrapper">
+      <UniqueIdentifier>{e982dd07-29ca-4389-9f48-79b658dd442c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Components">
+      <UniqueIdentifier>{49ce4538-79c5-4c0c-9c49-abcbcdff5dd9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

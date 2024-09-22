@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "Texture.h"
 #include "Buffer.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 #include "CommandBuffer.h"
 
 #define STB_IMAGE_IMPLEMENTATION

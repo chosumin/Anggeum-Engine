@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "SwapChain.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 
 Core::SwapChain::SwapChain(Device& device)
     :_device(device)

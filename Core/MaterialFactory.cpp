@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "MaterialFactory.h"
 #include "Material.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 #include "JsonParser.h"
-#include "Texture.h"
+#include "VulkanWrapper/Texture.h"
 using namespace Core;
 
 mutex _materialMutex;

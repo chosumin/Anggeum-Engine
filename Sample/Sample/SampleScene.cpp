@@ -2,9 +2,9 @@
 #include "SampleScene.h"
 #include "Entity.h"
 #include "Component.h"
-#include "PerspectiveCamera.h"
-#include "FreeCamera.h"
-#include "MeshRenderer.h"
+#include "Components/PerspectiveCamera.h"
+#include "Components/FreeCamera.h"
+#include "Components/MeshRenderer.h"
 #include "MaterialFactory.h"
 #include "Utils/Math.h"
 using namespace Core;
@@ -27,11 +27,11 @@ SampleScene::SampleScene(Core::Device& device,
 	vec3 position = vec3(0, 0, 0);
 	transform.SetTranslation(position);
 
-	auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity);
-	meshRenderer->SetMesh("Assets/Models/viking_room.obj");
-	meshRenderer->SetMaterial("Assets/Materials/Sample.json");
+	auto room = make_unique<MeshRenderer>(device, *meshEntity);
+	room->SetMesh("Assets/Models/viking_room.obj");
+	room->SetMaterial("Assets/Materials/Sample.json");
 
-	AddComponent(move(meshRenderer), *meshEntity);
+	AddComponent(move(room), *meshEntity);
 	AddEntity(move(meshEntity));
 
 	//add ground

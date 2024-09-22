@@ -60,10 +60,9 @@ VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo
 	return vertexInputInfo;
 }
 
-void Core::Shader::CreatePipelineLayout(vector<PushConstant> pushConstants)
+void Core::Shader::CreatePipelineLayout()
 {
 	CreateDescriptorPool();
-	CreatePushConstants(pushConstants);
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -158,21 +157,4 @@ void Core::Shader::CreateDescriptorPool()
 	}
 
 	_descriptorPool = new DescriptorPool(_device, descriptors);
-}
-
-void Core::Shader::CreatePushConstants(vector<PushConstant>& pushConstants)
-{
-	uint32_t offset = 0;
-
-	for (auto& pushConstant : pushConstants)
-	{
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.offset = offset;
-		pushConstantRange.stageFlags = pushConstant.StageFlags;
-		pushConstantRange.size += pushConstant.Size;
-
-		offset += pushConstant.Size;
-
-		_pushConstantRanges.emplace_back(pushConstantRange);
-	}
 }

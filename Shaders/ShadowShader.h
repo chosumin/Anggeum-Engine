@@ -1,5 +1,5 @@
 #pragma once
-#include "Shader.h"
+#include "VulkanWrapper/Shader.h"
 
 class ShadowShader : public Core::Shader
 {

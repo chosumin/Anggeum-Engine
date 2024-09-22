@@ -1,11 +1,11 @@
 #include "stdafx.h"
 #include "ForwardRenderPipeline.h"
-#include "RenderPass.h"
+#include "VulkanWrapper/RenderPass.h"
+#include "VulkanWrapper/SwapChain.h"
 #include "Core/RenderPasses/GeometryRenderPass.h"
 #include "Core/RenderPasses/ShadowRenderPass.h"
 #include "Scene.h"
-#include "SwapChain.h"
-#include "Utility.h"
+#include "Utils/Utility.h"
 #include "RenderContext.h"
 using namespace Core;
 

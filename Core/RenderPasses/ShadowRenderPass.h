@@ -1,5 +1,5 @@
 #pragma once
-#include "RenderPass.h"
+#include "VulkanWrapper/RenderPass.h"
 #include "BufferObjects/BufferObjects.h"
 
 namespace Core

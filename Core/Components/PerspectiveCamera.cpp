@@ -8,7 +8,7 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	:Component(entity)
 {
 	Matrices.View = lookAt(
-		vec3(0.0f, 0.0f, 2.0f),
+		vec3(2.0f, 2.0f, 2.0f),
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(0.0f, 1.0f, 0.0f));
 

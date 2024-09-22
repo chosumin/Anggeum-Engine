@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "GUIRenderPass.h"
-#include "SwapChain.h"
-#include "Framebuffer.h"
-#include "CommandBuffer.h"
+#include "VulkanWrapper/SwapChain.h"
+#include "VulkanWrapper/Framebuffer.h"
+#include "VulkanWrapper/CommandBuffer.h"
 
 GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
 	RenderTarget* colorRenderTarget)

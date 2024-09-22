@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "Scene.h"
 #include "Component.h"
-#include "PerspectiveCamera.h"
+#include "Components/PerspectiveCamera.h"
 
 namespace Core
 {
