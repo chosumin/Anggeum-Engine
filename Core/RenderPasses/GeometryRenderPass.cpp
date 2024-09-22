@@ -13,7 +13,6 @@
 #include "Shader.h"
 #include "RendererBatch.h"
 #include "Buffer.h"
-#include "InstanceData.h"
 #include "Component.h"
 
 namespace Core
@@ -31,8 +30,6 @@ namespace Core
 
 		_framebuffer = new Framebuffer(device, swapChain, *this);
 
-		_instanceBuffer = new InstanceBuffer(device);
-
 		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
 	}
@@ -45,8 +42,6 @@ namespace Core
 		}
 
 		_batches.clear();
-
-		delete(_instanceBuffer);
 	}
 
 	void GeometryRenderPass::Prepare()
@@ -110,22 +105,22 @@ namespace Core
 				{
 					RendererBatch::Sort();
 
-					commandBuffer.Flush(*material.second);
-
 					auto& meshRenderers = meshBatch.second;
 					for (size_t i = 0; i < meshRenderers.size(); ++i)
 					{
 						auto& entity = meshRenderers[i]->GetEntity();
-						_instanceBuffer->SetBuffer(i, entity.GetTransform());
+						material.second->SetPushConstants<mat4>(entity.GetTransform().GetMatrix());
+						//_instanceBuffer->SetBuffer(i, entity.GetTransform());
 					}
-					_instanceBuffer->Copy();
+					//_instanceBuffer->Copy();
+
+					commandBuffer.PushConstants(*material.second);
 
 					auto& mesh = meshBatch.second[0]->GetMesh();
 					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffers(vertexAttibuteNames), 0);
 
 					//fixme: hardcoded as 3.
-					commandBuffer.BindVertexBuffers(
-						_instanceBuffer->GetBuffer(), 3);
+					//commandBuffer.BindVertexBuffers(_instanceBuffer->GetBuffer(), 3);
 
 					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 

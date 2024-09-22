@@ -6,6 +6,7 @@
 #include "FreeCamera.h"
 #include "MeshRenderer.h"
 #include "MaterialFactory.h"
+#include "Utils/Math.h"
 using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, 
@@ -19,20 +20,19 @@ SampleScene::SampleScene(Core::Device& device,
 
 	AddEntity(move(cameraEntity));
 
-	//for (int i = 0; i < 500; ++i)
-	{
-		auto meshEntity = make_unique<Entity>(-1, "mesh");
-		auto& transform = meshEntity->GetTransform();
-		vec3 position = vec3(0, 0, 0);
-		transform.SetTranslation(position);
-		
-		auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity);
-		meshRenderer->SetMesh("Assets/Models/viking_room.obj");
-		meshRenderer->SetMaterial("Assets/Materials/Sample.json");
+	auto meshEntity = make_unique<Entity>(-1, "mesh");
+	auto& transform = meshEntity->GetTransform();
 
-		AddComponent(move(meshRenderer), *meshEntity);
-		AddEntity(move(meshEntity));
-	}
+	transform.Rotate(vec3(Math::ToRadian(-90.0f), Math::ToRadian(90.0f), 0));
+	vec3 position = vec3(0, 0, 0);
+	transform.SetTranslation(position);
+
+	auto meshRenderer = make_unique<MeshRenderer>(device, *meshEntity);
+	meshRenderer->SetMesh("Assets/Models/viking_room.obj");
+	meshRenderer->SetMaterial("Assets/Materials/Sample.json");
+
+	AddComponent(move(meshRenderer), *meshEntity);
+	AddEntity(move(meshEntity));
 
 	//add ground
 	auto ground = make_unique<Entity>(-1, "ground");

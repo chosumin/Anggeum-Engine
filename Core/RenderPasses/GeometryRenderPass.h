@@ -9,7 +9,6 @@ namespace Core
 	class Scene;
 	class SwapChain;
 	class RendererBatch;
-	class InstanceBuffer;
 
 	class GeometryRenderPass : public RenderPass
 	{
@@ -29,7 +28,6 @@ namespace Core
 		Scene& _scene;
 
 		unordered_map<type_index, RendererBatch*> _batches;
-		InstanceBuffer* _instanceBuffer;
 
 		RenderTarget* _shadowRenderTarget;
 

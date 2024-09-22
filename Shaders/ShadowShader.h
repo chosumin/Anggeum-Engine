@@ -10,8 +10,8 @@ public:
 	virtual string GetPass() override;
 	virtual bool UseInstancing() override;
 
-	virtual VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo() override;
-
 	virtual vector<string> GetVertexAttirbuteNames() const override;
+
+	virtual void Prepare() override;
 };
 

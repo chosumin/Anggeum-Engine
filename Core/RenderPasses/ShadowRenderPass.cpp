@@ -2,7 +2,6 @@
 #include "ShadowRenderPass.h"
 #include "Scene.h"
 #include "SwapChain.h"
-#include "InstanceData.h"
 #include "PerspectiveCamera.h"
 #include "Entity.h"
 #include "MeshRenderer.h"
@@ -41,7 +40,6 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 	CreateRenderPass();
 
 	_framebuffer = new Framebuffer(device, swapChain, *this);
-	_instanceBuffer = new InstanceBuffer(device);
 
 	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
 	rasterization.depthBiasEnable = VK_TRUE;
@@ -56,8 +54,6 @@ Core::ShadowRenderPass::~ShadowRenderPass()
 	}
 
 	_batches.clear();
-
-	delete(_instanceBuffer);
 }
 
 void Core::ShadowRenderPass::Prepare()
@@ -111,20 +107,20 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 			{
 				RendererBatch::Sort();
 
-				commandBuffer.Flush(*material.second);
-
 				auto& meshRenderers = meshBatch.second;
 				for (size_t i = 0; i < meshRenderers.size(); ++i)
 				{
 					auto& entity = meshRenderers[i]->GetEntity();
-					_instanceBuffer->SetBuffer(i, entity.GetTransform());
+					material.second->SetPushConstants<mat4>(entity.GetTransform().GetMatrix());
+					//_instanceBuffer->SetBuffer(i, entity.GetTransform());
 				}
-				_instanceBuffer->Copy();
+				//_instanceBuffer->Copy();
+
+				commandBuffer.PushConstants(*material.second);
 
 				auto& mesh = meshBatch.second[0]->GetMesh();
 				commandBuffer.BindVertexBuffers(mesh.GetVertexBuffers(vertexAttibuteNames), 0);
-				commandBuffer.BindVertexBuffers(
-					_instanceBuffer->GetBuffer(), 1);
+				//commandBuffer.BindVertexBuffers(_instanceBuffer->GetBuffer(), 1);
 
 				commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
 

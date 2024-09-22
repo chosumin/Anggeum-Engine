@@ -20,6 +20,9 @@ Shader* Core::ShaderFactory::CreateShader(Device& device, string name)
 	if (cached == nullptr)
 	{
 		cached = CreateShaderInternal(device, hash);
+		cached->Prepare();
+		cached->CreatePipelineLayout();
+
 		_cache[hash] = cached;
 	}
 

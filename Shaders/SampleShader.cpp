@@ -17,8 +17,6 @@ namespace Core
 		AddTextureBufferLayoutBinding(1, VK_SHADER_STAGE_FRAGMENT_BIT);
 		AddTextureBufferLayoutBinding(2, VK_SHADER_STAGE_FRAGMENT_BIT);
 		AddUniformBufferLayoutBinding(3, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(ShadowUniform));
-
-		CreatePipelineLayout({});
 	}
 
 	type_index SampleShader::GetType()
@@ -31,7 +29,13 @@ namespace Core
 		return "Geometry";
 	}
 
-	VkPipelineVertexInputStateCreateInfo SampleShader::GetVertexInputStateCreateInfo()
+	vector<string> SampleShader::GetVertexAttirbuteNames() const
+	{
+		vector<string> names = { VertexAttributeName::Position, VertexAttributeName::Col, VertexAttributeName::UV };
+		return names;
+	}
+
+	void SampleShader::Prepare()
 	{
 		_vertexBindings = {
 			Vertex::GetBindingDescription(
@@ -40,8 +44,6 @@ namespace Core
 		1, sizeof(Vertex::Color), VK_VERTEX_INPUT_RATE_VERTEX),
 			Vertex::GetBindingDescription(
 		2, sizeof(Vertex::TexCoord), VK_VERTEX_INPUT_RATE_VERTEX),
-			Vertex::GetBindingDescription(
-		3, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE)
 		};
 
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
@@ -51,22 +53,10 @@ namespace Core
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
 			2, 2, VK_FORMAT_R32G32_SFLOAT, 0));
 
-		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			3, 3, VK_FORMAT_R32G32B32A32_SFLOAT, 0));
-		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			3, 4, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 4));
-		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			3, 5, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 8));
-		_vertexAttributes.push_back(Vertex::GetAttributeDescription(
-			3, 6, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 12));
-
-		return Shader::GetVertexInputStateCreateInfo();
-	}
-
-	vector<string> SampleShader::GetVertexAttirbuteNames() const
-	{
-		vector<string> names = { VertexAttributeName::Position, VertexAttributeName::Col, VertexAttributeName::UV };
-		return names;
+		VkPushConstantRange pushConstant{};
+		pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		pushConstant.size = sizeof(mat4);
+		_pushConstantRanges.push_back(pushConstant);
 	}
 
 	bool SampleShader::UseInstancing()
