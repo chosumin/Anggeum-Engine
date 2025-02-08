@@ -149,6 +149,9 @@
     <ClCompile Include="Core\Utils\GLTFLoader.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Image.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -308,6 +311,12 @@
     </ClInclude>
     <ClInclude Include="Core\Utils\GLTFLoader.h">
       <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\Log.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Image.h">
+      <Filter>Core\VulkanWrapper</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

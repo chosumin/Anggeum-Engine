@@ -174,6 +174,7 @@
     <ClCompile Include="Core\VulkanWrapper\DescriptorPool.cpp" />
     <ClCompile Include="Core\VulkanWrapper\Device.cpp" />
     <ClCompile Include="Core\VulkanWrapper\Framebuffer.cpp" />
+    <ClCompile Include="Core\VulkanWrapper\Image.cpp" />
     <ClCompile Include="Core\VulkanWrapper\Pipeline.cpp" />
     <ClCompile Include="Core\VulkanWrapper\PipelineState.cpp" />
     <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp" />
@@ -247,6 +248,7 @@
     <ClInclude Include="Core\ShaderFactory.h" />
     <ClInclude Include="Core\timer.h" />
     <ClInclude Include="Core\Utils\GLTFLoader.h" />
+    <ClInclude Include="Core\Utils\Log.h" />
     <ClInclude Include="Core\Utils\Math.h" />
     <ClInclude Include="Core\Utils\Utility.h" />
     <ClInclude Include="Core\VulkanWrapper\Buffer.h" />
@@ -256,6 +258,7 @@
     <ClInclude Include="Core\VulkanWrapper\Device.h" />
     <ClInclude Include="Core\VulkanWrapper\Framebuffer.h" />
     <ClInclude Include="Core\VulkanWrapper\IDescriptor.h" />
+    <ClInclude Include="Core\VulkanWrapper\Image.h" />
     <ClInclude Include="Core\VulkanWrapper\Pipeline.h" />
     <ClInclude Include="Core\VulkanWrapper\PipelineState.h" />
     <ClInclude Include="Core\VulkanWrapper\RenderPass.h" />
