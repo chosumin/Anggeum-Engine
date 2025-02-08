@@ -165,6 +165,7 @@
     <ClCompile Include="Core\Scene.cpp" />
     <ClCompile Include="Core\ShaderFactory.cpp" />
     <ClCompile Include="Core\timer.cpp" />
+    <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
     <ClCompile Include="Core\VulkanWrapper\Buffer.cpp" />
@@ -245,6 +246,7 @@
     <ClInclude Include="Core\Scene.h" />
     <ClInclude Include="Core\ShaderFactory.h" />
     <ClInclude Include="Core\timer.h" />
+    <ClInclude Include="Core\Utils\GLTFLoader.h" />
     <ClInclude Include="Core\Utils\Math.h" />
     <ClInclude Include="Core\Utils\Utility.h" />
     <ClInclude Include="Core\VulkanWrapper\Buffer.h" />

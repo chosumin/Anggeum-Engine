@@ -10,3 +10,6 @@
 [submodule "ThirdParties/rapidjson"]
 	path = ThirdParties/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
+[submodule "ThirdParties/tinygltf"]
+	path = ThirdParties/tinygltf
+	url = https://github.com/syoyo/tinygltf.git

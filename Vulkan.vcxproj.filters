@@ -146,6 +146,9 @@
     <ClCompile Include="Core\Components\Transform.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Utils\GLTFLoader.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -302,6 +305,9 @@
     </ClInclude>
     <ClInclude Include="Core\Components\Transform.h">
       <Filter>Core\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\GLTFLoader.h">
+      <Filter>Core\Utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
