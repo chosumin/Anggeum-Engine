@@ -3,6 +3,8 @@
 #include "Log.h"
 
 #include "Core/VulkanWrapper/Image.h"
+#include "Core/VulkanWrapper/Sampler.h"
+#include "Core/VulkanWrapper/Texture.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -118,11 +120,12 @@ void Core::GLTFLoader::LoadScene(Device& device, const tinygltf::Model& model, c
 
 	LoadLights(model);
 
-	auto samplers = LoadSamplers(model);
+	auto samplers = LoadSamplers(device, model);
 
 	auto images = LoadImages(device, model, modelPath);
 
 	//todo : load textures?
+	auto textures = LoadTextures(device, model, samplers, images);
 
 	//todo : load materials
 
@@ -151,16 +154,15 @@ void Core::GLTFLoader::LoadLights(const tinygltf::Model& model)
 {
 }
 
-vector<VkSamplerCreateInfo> Core::GLTFLoader::LoadSamplers(const tinygltf::Model& model)
+vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers(Device& device, const tinygltf::Model& model)
 {
 	size_t size = model.samplers.size();
 
-	vector<VkSamplerCreateInfo> samplers(size);
+	vector<Core::Sampler*> samplers(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
 		auto sampler = model.samplers[i];
-
 		VkSamplerCreateInfo samplerInfo{};
 		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
@@ -172,24 +174,41 @@ vector<VkSamplerCreateInfo> Core::GLTFLoader::LoadSamplers(const tinygltf::Model
 		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 		samplerInfo.mipmapMode = FindMipmapMode(sampler.minFilter);
+		
+		VkPhysicalDeviceProperties properties{};
+		vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
 
-		samplers[i] = samplerInfo;
+		samplerInfo.anisotropyEnable = VK_TRUE;
+		//lower value results in better performance, but lower quality results.
+		samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+
+		samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		samplerInfo.unnormalizedCoordinates = VK_FALSE;
+		samplerInfo.compareEnable = VK_FALSE; //usually used for percentage-closer filtering on shadow maps.
+		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+		samplerInfo.mipLodBias = 0.0f;
+		samplerInfo.minLod = 0.0f;
+
+		//HACK : hardcoded.
+		samplerInfo.maxLod = numeric_limits<float>::max();
+
+		samplers[i] = new Sampler(device, samplerInfo);
 	}
 
 	return samplers;
 }
 
-vector<unique_ptr<Core::Image>> Core::GLTFLoader::LoadImages(Device& device, const tinygltf::Model& model, const string& modelPath)
+vector<Core::Image*> Core::GLTFLoader::LoadImages(Device& device, const tinygltf::Model& model, const string& modelPath)
 {
 	auto size = model.images.size();
 
-	vector<unique_ptr<Core::Image>> images(size);
+	vector<Core::Image*> images(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
 		auto image = model.images[i];
 
-		unique_ptr<Core::Image> vkImage;
+		Core::Image* vkImage;
 
 		//Embedded data is corrupt so use uri instead.
 		
@@ -202,11 +221,34 @@ vector<unique_ptr<Core::Image>> Core::GLTFLoader::LoadImages(Device& device, con
 		{
 			// From URI
 			auto imagePath = modelPath + "/" + image.uri;
-			vkImage = make_unique<Core::Image>(device, imagePath);
+			vkImage = new Core::Image(device, imagePath);
 		}
 
 		images[i] = move(vkImage);
 	}
 
 	return images;
+}
+
+vector<Core::Texture*> Core::GLTFLoader::LoadTextures(Device& device, 
+	const tinygltf::Model& model,
+	vector<Core::Sampler*>& samplers, vector<Core::Image*>& images)
+{
+	size_t size = model.textures.size();
+
+	vector<Core::Texture*> textures(size);
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		int imageIndex = model.textures[i].source;
+		int samplerIndex = model.textures[i].sampler;
+
+		//TODO : default sampler
+		auto texture = new Texture(device, model.textures[i].name,
+			images[imageIndex], samplers[samplerIndex]);
+
+		textures[i] = texture;
+	}
+
+	return textures;
 }

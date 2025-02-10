@@ -4,6 +4,8 @@
 #include "Utils/Utility.h"
 #include "JsonParser.h"
 #include "VulkanWrapper/Texture.h"
+#include "VulkanWrapper/Image.h"
+#include "VulkanWrapper/Sampler.h"
 using namespace Core;
 
 mutex _materialMutex;
@@ -73,8 +75,10 @@ Material* Core::MaterialFactory::Parse(Device& device, string materialPath)
 			uint32_t binding = textureJson["binding"].GetUint();
 			string texturePath = textureJson["path"].GetString();
 
-			auto texture = new Texture(device,
-				texturePath, Core::TextureFormat::Rgb_alpha);
+			auto image = new Image(device, texturePath);
+			auto sampler = Sampler::CreateDefault(device);
+			auto texture = new Texture(device, texturePath,
+				image, sampler);
 
 			material->SetBuffer(binding, texture);
 		}

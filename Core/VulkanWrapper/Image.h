@@ -19,23 +19,26 @@ namespace Core
 
 		~Image();
 
+		VkFormat GetFormat() { return _format; }
 		VkImage& GetImage() { return _image; }
 		VkImageView& GetImageView() { return _imageView; }
 		const VkExtent3D& GetExtent() { return _extent; }
 	private:
 		void CreateImage(void* pixels, VkExtent3D extent);
 		void CreateImage(VkExtent3D extent, uint32_t mipLevels, 
-			VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, 
+			VkSampleCountFlagBits numSamples, VkImageTiling tiling, 
 			VkImageUsageFlags usage, VkImageLayout initialLayout);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
-		void CreateImageView(VkFormat format, uint32_t mipLevels);
+		void CreateImageView(uint32_t mipLevels);
 
 		void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-		void TransitionImageLayout(VkImage image, VkFormat format,
+		void TransitionImageLayout(VkImage image,
 			VkImageLayout oldLayout, VkImageLayout newLayout,
 			uint32_t mipLevels);
+		void GenerateMipmaps(uint32_t mipLevels);
 	private:
 		Device& _device;
+		VkFormat _format;
 		VkImage _image;
 		VkImageView _imageView;
 		VkDeviceMemory _imageMemory;

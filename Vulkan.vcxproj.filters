@@ -152,6 +152,9 @@
     <ClCompile Include="Core\VulkanWrapper\Image.cpp">
       <Filter>Core\VulkanWrapper</Filter>
     </ClCompile>
+    <ClCompile Include="Core\VulkanWrapper\Sampler.cpp">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -316,6 +319,9 @@
       <Filter>Core\Utils</Filter>
     </ClInclude>
     <ClInclude Include="Core\VulkanWrapper\Image.h">
+      <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\VulkanWrapper\Sampler.h">
       <Filter>Core\VulkanWrapper</Filter>
     </ClInclude>
   </ItemGroup>
