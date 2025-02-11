@@ -10,6 +10,7 @@ namespace Core
 		Texture(Device& device, string name, Image* image, Sampler* sampler);
 		~Texture();
 
+		Image* GetImage() { return _image; }
 		VkDescriptorImageInfo GetDescriptorImageInfo();
 	private:
 		string _name;

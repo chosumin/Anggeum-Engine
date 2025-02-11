@@ -5,6 +5,9 @@
 #include "Core/VulkanWrapper/Image.h"
 #include "Core/VulkanWrapper/Sampler.h"
 #include "Core/VulkanWrapper/Texture.h"
+#include "Core/Material.h"
+#include "Core/Utils/Utility.h"
+#include "Core/Mesh.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -70,6 +73,19 @@ inline VkSamplerAddressMode FindWrapMode(int wrap)
 	}
 };
 
+inline bool NeedSRGB(const std::string& name)
+{
+	// The gltf spec states that the base and emissive textures MUST be encoded with the sRGB
+	// transfer function. All other texture types are linear.
+	if (name == "baseColorTexture" || name == "emissiveTexture")
+		return true;
+
+	// metallicRoughnessTexture, normalTexture & occlusionTexture must be linear
+	assert(name == "metallicRoughnessTexture" || name == "normalTexture" || name == "occlusionTexture");
+	
+	return false;
+}
+
 void Core::GLTFLoader::LoadScene(Device& device, const string& path)
 {
 	string err;
@@ -124,12 +140,11 @@ void Core::GLTFLoader::LoadScene(Device& device, const tinygltf::Model& model, c
 
 	auto images = LoadImages(device, model, modelPath);
 
-	//todo : load textures?
 	auto textures = LoadTextures(device, model, samplers, images);
 
-	//todo : load materials
-
-	//todo : load meshes
+	auto materials = LoadMaterials(device, model, textures);
+	
+	auto meshes = LoadMeshes(device, model, materials);
 
 	//todo : load cameras
 
@@ -251,4 +266,74 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(Device& device,
 	}
 
 	return textures;
+}
+
+vector<Core::Material*> Core::GLTFLoader::LoadMaterials(Device& device, 
+	const tinygltf::Model& model, vector<Core::Texture*>& textures)
+{
+	size_t size = model.materials.size();
+	
+	vector<Material*> materials(size);
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		auto& gltfMaterial = model.materials[i];
+
+		uint32_t hash = Utility::HashCode(gltfMaterial.name.c_str());
+
+		//FIXME : hardcoded shader and should use lightweight pattern.
+		auto material = new Material(device, "Sample", hash);
+
+		for (auto& value : gltfMaterial.values)
+		{
+			if (value.first.find("Texture") != string::npos)
+			{
+				//Texture
+				string texName = value.first;
+				
+				int index = value.second.TextureIndex();
+				auto texture = textures[index];
+
+				if (NeedSRGB(value.first))
+					texture->GetImage()->SetSRGBFormat();
+
+				material->SetBuffer(1, texture);
+			}
+		}
+
+		for (auto& value : gltfMaterial.additionalValues)
+		{
+			if (value.first.find("Texture") != std::string::npos)
+			{
+				string texName = value.first;
+
+				auto texture = textures[value.second.TextureIndex()];
+
+				if (NeedSRGB(value.first))
+					texture->GetImage()->SetSRGBFormat();
+
+				//material->SetBuffer(1, texture);
+			}
+		}
+		
+		//TODO : map properties.
+
+		materials[i] = material;
+	}
+
+	return materials;
+}
+
+vector<Core::Mesh*> Core::GLTFLoader::LoadMeshes(Device& device, const tinygltf::Model& model, vector<Core::Material*>& materials)
+{
+	size_t size = model.meshes.size();
+
+	vector<Core::Mesh*> meshes(size);
+
+	for (auto& gltfMesh : model.meshes)
+	{
+
+	}
+
+	return meshes;
 }

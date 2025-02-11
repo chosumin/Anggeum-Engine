@@ -23,6 +23,7 @@ namespace Core
 		VkImage& GetImage() { return _image; }
 		VkImageView& GetImageView() { return _imageView; }
 		const VkExtent3D& GetExtent() { return _extent; }
+		void SetSRGBFormat();
 	private:
 		void CreateImage(void* pixels, VkExtent3D extent);
 		void CreateImage(VkExtent3D extent, uint32_t mipLevels, 

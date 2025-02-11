@@ -10,6 +10,8 @@ namespace Core
 	class Image;
 	class Sampler;
 	class Texture;
+	class Material;
+	class Mesh;
 	class GLTFLoader
 	{
 	public:
@@ -25,5 +27,9 @@ namespace Core
 			const tinygltf::Model& model,
 			vector<Core::Sampler*>& samplers,
 			vector<Core::Image*>& images);
+		static vector<Core::Material*> LoadMaterials(Device& device, const tinygltf::Model& model,
+			vector<Core::Texture*>& textures);
+		static vector<Core::Mesh*> LoadMeshes(Device& device, const tinygltf::Model& model,
+			vector<Core::Material*>& materials);
 	};
 }

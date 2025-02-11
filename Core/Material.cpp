@@ -55,8 +55,8 @@ namespace Core
 	{
 		_textureBuffers[binding]->CopyDescriptorImageInfo(texture->GetDescriptorImageInfo());
 
-		if (_textures[binding] != nullptr)
-			delete(_textures[binding]);
+		/*if (_textures[binding] != nullptr)
+			delete(_textures[binding]);*/
 
 		_textures[binding] = texture;
 	}
