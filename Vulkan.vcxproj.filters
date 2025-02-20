@@ -16,9 +16,6 @@
     <ClCompile Include="Core\Material.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Mesh.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\RenderContext.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -66,9 +63,6 @@
       <Filter>Core\RenderPasses</Filter>
     </ClCompile>
     <ClCompile Include="Core\MaterialFactory.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\MeshFactory.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="Core\ShaderFactory.cpp">
@@ -137,9 +131,6 @@
     <ClCompile Include="Core\Components\FreeCamera.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Components\MeshRenderer.cpp">
-      <Filter>Core\Components</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Components\PerspectiveCamera.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
@@ -154,6 +145,12 @@
     </ClCompile>
     <ClCompile Include="Core\VulkanWrapper\Sampler.cpp">
       <Filter>Core\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\SubMesh.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Components\Mesh.cpp">
+      <Filter>Core\Components</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -176,9 +173,6 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Material.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Mesh.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\RenderContext.h">
@@ -226,9 +220,6 @@
       <Filter>Core\RenderPasses</Filter>
     </ClInclude>
     <ClInclude Include="Core\MaterialFactory.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\MeshFactory.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\ShaderFactory.h">
@@ -303,9 +294,6 @@
     <ClInclude Include="Core\Components\FreeCamera.h">
       <Filter>Core\Components</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Components\MeshRenderer.h">
-      <Filter>Core\Components</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Components\PerspectiveCamera.h">
       <Filter>Core\Components</Filter>
     </ClInclude>
@@ -323,6 +311,12 @@
     </ClInclude>
     <ClInclude Include="Core\VulkanWrapper\Sampler.h">
       <Filter>Core\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\SubMesh.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\Mesh.h">
+      <Filter>Core\Components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "GeometryRenderPass.h"
 #include "Scene.h"
-#include "Components/MeshRenderer.h"
 #include "Components/PerspectiveCamera.h"
 #include "VulkanWrapper/CommandBuffer.h"
 #include "VulkanWrapper/Framebuffer.h"
@@ -9,9 +8,8 @@
 #include "VulkanWrapper/CommandPool.h"
 #include "VulkanWrapper/Pipeline.h"
 #include "VulkanWrapper/Shader.h"
-#include "VulkanWrapper/Buffer.h"
 #include "Material.h"
-#include "Mesh.h"
+#include "Core/Components/Mesh.h"
 #include "RendererBatch.h"
 #include "Component.h"
 
@@ -46,22 +44,26 @@ namespace Core
 
 	void GeometryRenderPass::Prepare()
 	{
-		auto meshRenderers = _scene.GetComponents<Core::MeshRenderer>();
-		for (auto&& meshRenderer : meshRenderers)
+		auto meshes = _scene.GetComponents<Core::Mesh>();
+		for (auto&& mesh : meshes)
 		{
-			auto& shader = meshRenderer->GetMaterial().GetShader();
-
-			if (shader.GetPass() == "Geometry")
+			auto materials = mesh->GetMaterials();
+			for (size_t i = 0; i < materials.size(); ++i)
 			{
-				auto key = shader.GetType();
-				auto batch = _batches[key];
-				if (batch == nullptr)
-				{
-					batch = new RendererBatch(_device, shader, *this, *_pipelineState);
-					_batches[key] = batch;
-				}
+				auto& shader = materials[i]->GetShader();
 
-				batch->Add(*meshRenderer);
+				if (shader.GetPass() == "Geometry")
+				{
+					auto key = shader.GetType();
+					auto batch = _batches[key];
+					if (batch == nullptr)
+					{
+						batch = new RendererBatch(_device, shader, *this, *_pipelineState);
+						_batches[key] = batch;
+					}
+
+					batch->Add(*mesh);
+				}
 			}
 		}
 	}
@@ -79,54 +81,18 @@ namespace Core
 		auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
+		PerspectiveCamera& camera = _scene.GetMainCamera();
+
 		for (auto&& batch : _batches)
 		{
-			commandBuffer.BindPipeline(batch.second->Pipeline);
-
-			auto vertexAttibuteNames = batch.second->SharedShader.GetVertexAttirbuteNames();
-
-			auto& materials = batch.second->Materials;
-			for (auto&& material : materials)
+			for (auto&& material : batch.second->Materials)
 			{
-				PerspectiveCamera& camera = _scene.GetMainCamera();
-
 				material.second->SetBuffer(currentFrame, 0, &camera.Matrices);
-
 				material.second->SetBuffer(2, _shadowRenderTarget);
 				material.second->SetBuffer(currentFrame, 3, &_shadowBuffer->Projection);
-
-				commandBuffer.BindDescriptorSets(
-					VK_PIPELINE_BIND_POINT_GRAPHICS, *material.second, currentFrame);
-
-				auto& meshBatches = 
-					batch.second->MeshBatches[material.first];
-
-				for (auto&& meshBatch : meshBatches)
-				{
-					RendererBatch::Sort();
-
-					auto& meshRenderers = meshBatch.second;
-					for (size_t i = 0; i < meshRenderers.size(); ++i)
-					{
-						auto& entity = meshRenderers[i]->GetEntity();
-						material.second->SetPushConstants<mat4>(entity.GetTransform().GetMatrix());
-						//_instanceBuffer->SetBuffer(i, entity.GetTransform());
-					}
-					//_instanceBuffer->Copy();
-
-					commandBuffer.PushConstants(*material.second);
-
-					auto& mesh = meshBatch.second[0]->GetMesh();
-					commandBuffer.BindVertexBuffers(mesh.GetVertexBuffers(vertexAttibuteNames), 0);
-
-					//fixme: hardcoded as 3.
-					//commandBuffer.BindVertexBuffers(_instanceBuffer->GetBuffer(), 3);
-
-					commandBuffer.BindIndexBuffer(mesh.GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
-
-					commandBuffer.DrawIndexed(mesh.GetIndexCount(), static_cast<uint32_t>(meshRenderers.size()));
-				}
 			}
+
+			batch.second->Draw(commandBuffer, currentFrame);
 		}
 
 		commandBuffer.EndRenderPass();

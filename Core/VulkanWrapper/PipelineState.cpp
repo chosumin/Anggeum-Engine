@@ -16,7 +16,7 @@ namespace Core
 		_rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 		_rasterizationStateCreateInfo.lineWidth = 1.0f;
 		_rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-		_rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		_rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
 		_rasterizationStateCreateInfo.depthClampEnable = VK_FALSE;
 		_rasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;

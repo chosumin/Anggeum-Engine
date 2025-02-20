@@ -4,7 +4,7 @@
 #include "Component.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
-#include "Components/MeshRenderer.h"
+#include "Components/Mesh.h"
 #include "MaterialFactory.h"
 #include "Utils/Math.h"
 using namespace Core;
@@ -27,18 +27,18 @@ SampleScene::SampleScene(Core::Device& device,
 	vec3 position = vec3(0, 0, 0);
 	transform.SetTranslation(position);
 
-	auto room = make_unique<MeshRenderer>(device, *meshEntity);
-	room->SetMesh("Assets/Models/viking_room.obj");
-	room->SetMaterial("Assets/Materials/Sample.json");
+	auto room = make_unique<Mesh>(*meshEntity, device);
+	room->AddSubMesh("Assets/Models/viking_room.obj");
+	room->AddMaterial("Assets/Materials/Sample.json");
 
 	AddComponent(move(room), *meshEntity);
 	AddEntity(move(meshEntity));
 
 	//add ground
 	auto ground = make_unique<Entity>(-1, "ground");
-	auto meshRenderer = make_unique<MeshRenderer>(device, *ground);
-	meshRenderer->SetMesh(0);
-	meshRenderer->SetMaterial("Assets/Materials/Base.json");
+	auto meshRenderer = make_unique<Mesh>(*ground, device);
+	meshRenderer->AddSubMesh(0);
+	meshRenderer->AddMaterial("Assets/Materials/Base.json");
 
 	AddComponent(move(meshRenderer), *ground);
 	AddEntity(move(ground));

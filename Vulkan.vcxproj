@@ -145,7 +145,7 @@
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp" />
     <ClCompile Include="Core\Component.cpp" />
     <ClCompile Include="Core\Components\FreeCamera.cpp" />
-    <ClCompile Include="Core\Components\MeshRenderer.cpp" />
+    <ClCompile Include="Core\Components\Mesh.cpp" />
     <ClCompile Include="Core\Components\PerspectiveCamera.cpp" />
     <ClCompile Include="Core\Components\Transform.cpp" />
     <ClCompile Include="Core\Entity.cpp" />
@@ -154,8 +154,6 @@
     <ClCompile Include="Core\JsonParser.cpp" />
     <ClCompile Include="Core\Material.cpp" />
     <ClCompile Include="Core\MaterialFactory.cpp" />
-    <ClCompile Include="Core\Mesh.cpp" />
-    <ClCompile Include="Core\MeshFactory.cpp" />
     <ClCompile Include="Core\RenderContext.cpp" />
     <ClCompile Include="Core\RendererBatch.cpp" />
     <ClCompile Include="Core\RenderFrame.cpp" />
@@ -164,6 +162,7 @@
     <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp" />
     <ClCompile Include="Core\Scene.cpp" />
     <ClCompile Include="Core\ShaderFactory.cpp" />
+    <ClCompile Include="Core\SubMesh.cpp" />
     <ClCompile Include="Core\timer.cpp" />
     <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
@@ -226,7 +225,7 @@
     <ClInclude Include="Core\BufferObjects\BufferObjects.h" />
     <ClInclude Include="Core\Component.h" />
     <ClInclude Include="Core\Components\FreeCamera.h" />
-    <ClInclude Include="Core\Components\MeshRenderer.h" />
+    <ClInclude Include="Core\Components\Mesh.h" />
     <ClInclude Include="Core\Components\PerspectiveCamera.h" />
     <ClInclude Include="Core\Components\Transform.h" />
     <ClInclude Include="Core\Entity.h" />
@@ -237,8 +236,6 @@
     <ClInclude Include="Core\Keycodes.h" />
     <ClInclude Include="Core\Material.h" />
     <ClInclude Include="Core\MaterialFactory.h" />
-    <ClInclude Include="Core\Mesh.h" />
-    <ClInclude Include="Core\MeshFactory.h" />
     <ClInclude Include="Core\RenderContext.h" />
     <ClInclude Include="Core\RendererBatch.h" />
     <ClInclude Include="Core\RenderFrame.h" />
@@ -247,6 +244,7 @@
     <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h" />
     <ClInclude Include="Core\Scene.h" />
     <ClInclude Include="Core\ShaderFactory.h" />
+    <ClInclude Include="Core\SubMesh.h" />
     <ClInclude Include="Core\timer.h" />
     <ClInclude Include="Core\Utils\GLTFLoader.h" />
     <ClInclude Include="Core\Utils\Log.h" />

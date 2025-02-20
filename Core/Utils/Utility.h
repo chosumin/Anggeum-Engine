@@ -28,6 +28,19 @@ namespace Core
 			return std::vector<uint8_t>{reinterpret_cast<const uint8_t*>(&value),
 				reinterpret_cast<const uint8_t*>(&value) + sizeof(T)};
 		}
+
+		template <class T>
+		static inline uint32_t ToU32(T value)
+		{
+			static_assert(is_arithmetic<T>::value, "T must be numeric");
+
+			if (static_cast<uintmax_t>(value) > static_cast<uintmax_t>(numeric_limits<uint32_t>::max()))
+			{
+				throw runtime_error("to_u32() failed, value is too big to be converted to uint32_t");
+			}
+
+			return static_cast<uint32_t>(value);
+		}
 	};
 }
 

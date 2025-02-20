@@ -30,7 +30,7 @@ namespace Core
 		VPBufferObject _directionalLight;
 		ShadowUniform _shadowBuffer;
 
-		unordered_map<type_index, RendererBatch*> _batches;
+		RendererBatch* _batch;
 		Material* _material;
 
 		RenderTarget* _shadowMap;

@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "Mesh.h"
 #include "VulkanWrapper/Vertex.h"
-#include "VulkanWrapper/CommandBuffer.h"
-#include "VulkanWrapper/Buffer.h"
 #include "Utils/Utility.h"
+#include "SubMesh.h"
+#include "Material.h"
+#include "MaterialFactory.h"
+#include "Entity.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -27,53 +29,62 @@ void AddVertex(unordered_map<string, vector<uint8_t>>& vertices, Vertex vertex)
 	}
 }
 
-Core::Mesh::Mesh(Device& device, string modelPath)
-	:_device(device), _modelPath(modelPath)
+Core::Mesh::Mesh(Entity& entity, Device& device, string modelPath)
+	:Component(entity), _device(device), _modelPath(modelPath)
 {
 	LoadModel(modelPath);
-
-	CreateVertexBuffer();
-	CreateIndexBuffer();
 }
 
-Core::Mesh::Mesh(Device& device, int polygonType)
-	:_device(device)
+Core::Mesh::Mesh(Entity& entity, Device& device, int polygonType)
+	:Component(entity), _device(device)
 {
 	LoadPlane();
+}
 
-	CreateVertexBuffer();
-	CreateIndexBuffer();
+Core::Mesh::Mesh(Entity& entity, Device& device)
+	:Component(entity), _device(device)
+{
 }
 
 Core::Mesh::~Mesh()
 {
-	delete(_indexBuffer);
-
-	for (auto&& vertexBuffer : _vertexBuffers)
+	for (auto&& subMesh : _subMeshes)
 	{
-		delete(vertexBuffer.second);
+		delete(subMesh);
 	}
-	_vertexBuffers.clear();
+	_subMeshes.clear();
 }
 
-vector<Core::Buffer*> Core::Mesh::GetVertexBuffers(vector<string> names) const
+void Core::Mesh::AddSubMesh(int polygonType)
 {
-	vector<Core::Buffer*> buffers;
+	LoadPlane();
+}
 
-	for (string name : names)
-	{
-		auto vertexBuffer = _vertexBuffers.find(name);
-		assert(vertexBuffer != _vertexBuffers.end(),
-			"Invalid vertex attribute name!");
-		
-		buffers.push_back(vertexBuffer->second);
-	}
+void Core::Mesh::AddSubMesh(string path)
+{
+	LoadModel(path);
+}
 
-	return buffers;
+void Core::Mesh::AddSubMesh(SubMesh* subMesh)
+{
+	_subMeshes.push_back(subMesh);
+}
+
+void Core::Mesh::AddMaterial(Material* material)
+{
+	_materials.push_back(material);
+}
+
+void Core::Mesh::AddMaterial(string path)
+{
+	auto material = MaterialFactory::CreateMaterial(_device, path);
+	_materials.push_back(material);
 }
 
 void Core::Mesh::LoadModel(const string& modelPath)
 {
+	SubMesh* subMesh = new SubMesh(_device, modelPath);
+
 	tinyobj::attrib_t attrib;
 	vector<tinyobj::shape_t> shapes;
 	vector<tinyobj::material_t> materials;
@@ -84,8 +95,13 @@ void Core::Mesh::LoadModel(const string& modelPath)
 
 	unordered_map<Vertex, uint32_t> uniqueVertices;
 
+	unordered_map<string, vector<uint8_t>> objVertices;
+	vector<uint8_t> indices;
+
 	for (const auto& shape : shapes)
 	{
+		subMesh->SetIndexCount(Utility::ToU32(shape.mesh.indices.size()));
+
 		for (const auto& index : shape.mesh.indices)
 		{
 			Vertex vertex{};
@@ -108,22 +124,34 @@ void Core::Mesh::LoadModel(const string& modelPath)
 			//Create new vertex.
 			if (uniqueVertices.count(vertex) == 0)
 			{
-				auto vertices = _vertices.begin();
-				if (vertices != _vertices.end())
+				auto vertices = objVertices.begin();
+				if (vertices != objVertices.end())
 					uniqueVertices[vertex] = static_cast<uint32_t>(vertices->second.size() / sizeof(vec3));
 				else
 					uniqueVertices[vertex] = 0;
 
-				AddVertex(_vertices, vertex);
+				AddVertex(objVertices, vertex);
 			}
-
-			_indices.push_back(uniqueVertices[vertex]);
+;
+			auto indexBytes = Core::Utility::ToBytes(uniqueVertices[vertex]);
+			indices.insert(indices.begin(), indexBytes.begin(), indexBytes.end());
 		}
 	}
+
+	for (auto& vertices : objVertices)
+	{
+		subMesh->CreateVertexBuffer(vertices.first, vertices.second);
+	}
+
+	subMesh->CreateIndexBuffer(indices);
+
+	_subMeshes.push_back(subMesh);
 }
 
 void Core::Mesh::LoadPlane()
 {
+	SubMesh* subMesh = new SubMesh(_device, "Plane");
+
 	Vertex vertices[4];
 
 	vertices[0].Pos = { -2,0,-2 };
@@ -142,52 +170,42 @@ void Core::Mesh::LoadPlane()
 	vertices[3].TexCoord = { 1, 0 };
 	vertices[3].Color = { 1.0f, 1.0f, 1.0f };
 
+	unordered_map<string, vector<uint8_t>> objVertices;
+	vector<uint32_t> intIndices = { 0,1,2,2,1,3 };
+
+	subMesh->SetIndexCount(6);
+
 	for (auto&& vertex : vertices)
 	{
-		AddVertex(_vertices, vertex);
+		AddVertex(objVertices, vertex);
 	}
 
-	_indices = { 0,1,2,2,1,3 };
-}
-
-void Core::Mesh::CreateVertexBuffer()
-{
-	for (auto& vertices : _vertices)
+	vector<uint8_t> byteIndices;
+	for (auto&& index : intIndices)
 	{
-		vector<uint8_t> verticesValue = vertices.second;
-
-		VkDeviceSize bufferSize = sizeof(verticesValue[0]) * verticesValue.size();
-
-		Core::Buffer stagingBuffer(_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		stagingBuffer.CopyBuffer(verticesValue.data(), bufferSize);
-
-		//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
-		auto vertexBuffer = new Core::Buffer(_device, bufferSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		//vertex memory is moved from CPU to GPU
-		vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
-
-		_vertexBuffers[vertices.first] = vertexBuffer;
+		auto indexBytes = Core::Utility::ToBytes(index);
+		byteIndices.insert(byteIndices.begin(), indexBytes.begin(), indexBytes.end());
 	}
+
+	for (auto& vertices : objVertices)
+	{
+		subMesh->CreateVertexBuffer(vertices.first, vertices.second);
+	}
+
+	subMesh->CreateIndexBuffer(byteIndices);
+
+	_subMeshes.push_back(subMesh);
 }
 
-void Core::Mesh::CreateIndexBuffer()
+void Core::Mesh::UpdateFrame(float deltaTime)
 {
-	VkDeviceSize bufferSize = sizeof(_indices[0]) * _indices.size();
+}
 
-	Core::Buffer stagingBuffer(_device, bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+std::type_index Core::Mesh::GetType()
+{
+	return typeid(Mesh);
+}
 
-	stagingBuffer.CopyBuffer(_indices.data(), bufferSize);
-
-	_indexBuffer = new Core::Buffer(_device, bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+void Core::Mesh::Resize(uint32_t width, uint32_t height)
+{
 }
