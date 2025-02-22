@@ -100,7 +100,7 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 
 			commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
 
-			commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), VK_INDEX_TYPE_UINT32);
+			commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
 
 			commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
 		}

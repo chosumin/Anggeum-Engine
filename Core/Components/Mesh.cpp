@@ -143,7 +143,7 @@ void Core::Mesh::LoadModel(const string& modelPath)
 		subMesh->CreateVertexBuffer(vertices.first, vertices.second);
 	}
 
-	subMesh->CreateIndexBuffer(indices);
+	subMesh->CreateIndexBuffer(indices, VK_INDEX_TYPE_UINT16);
 
 	_subMeshes.push_back(subMesh);
 }
@@ -192,7 +192,7 @@ void Core::Mesh::LoadPlane()
 		subMesh->CreateVertexBuffer(vertices.first, vertices.second);
 	}
 
-	subMesh->CreateIndexBuffer(byteIndices);
+	subMesh->CreateIndexBuffer(byteIndices, VK_INDEX_TYPE_UINT16);
 
 	_subMeshes.push_back(subMesh);
 }

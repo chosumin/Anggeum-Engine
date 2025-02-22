@@ -2,6 +2,7 @@
 #include "GLTFLoader.h"
 #include "Log.h"
 
+#include "Scene.h"
 #include "Core/VulkanWrapper/Image.h"
 #include "Core/VulkanWrapper/Sampler.h"
 #include "Core/VulkanWrapper/Texture.h"
@@ -10,6 +11,7 @@
 #include "Core/Components/Mesh.h"
 #include "Core/SubMesh.h"
 #include "Core/Entity.h"
+#include "Core/VulkanWrapper/Vertex.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -240,16 +242,35 @@ inline vector<uint8_t> ConvertDataStride(const std::vector<uint8_t>& srcData, ui
 	return result;
 }
 
-void Core::GLTFLoader::LoadScene(Device& device, const string& path)
+inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessorId)
+{
+	assert(accessorId < model->accessors.size());
+	auto& accessor = model->accessors[accessorId];
+	assert(accessor.bufferView < model->bufferViews.size());
+	auto& bufferView = model->bufferViews[accessor.bufferView];
+
+	return accessor.ByteStride(bufferView);
+};
+
+Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
+	: _device(device), _scene(scene)
+{
+	_model = new tinygltf::Model();
+}
+
+Core::GLTFLoader::~GLTFLoader()
+{
+	delete(_model);
+}
+
+void Core::GLTFLoader::LoadScene(const string& path)
 {
 	string err;
 	string warn;
 
 	tinygltf::TinyGLTF loader;
 
-	tinygltf::Model model;
-
-	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+	bool ret = loader.LoadASCIIFromFile(_model, &err, &warn, path);
 
 	if (ret == false)
 	{
@@ -269,7 +290,7 @@ void Core::GLTFLoader::LoadScene(Device& device, const string& path)
 	size_t pos = path.find_last_of('/');
 	string modelPath = path.substr(0, pos);
 
-	LoadScene(device, model, modelPath);
+	LoadAssets(modelPath);
 }
 
 void Core::GLTFLoader::LoadModel(const string& path)
@@ -284,21 +305,21 @@ void Core::GLTFLoader::LoadModel(const string& path)
 	int a = 10;
 }
 
-void Core::GLTFLoader::LoadScene(Device& device, const tinygltf::Model& model, const string& modelPath)
+void Core::GLTFLoader::LoadAssets(const string& modelPath)
 {
-	CheckExtensions(model);
+	CheckExtensions();
 
-	LoadLights(model);
+	LoadLights();
 
-	auto samplers = LoadSamplers(device, model);
+	auto samplers = LoadSamplers();
 
-	auto images = LoadImages(device, model, modelPath);
+	auto images = LoadImages(modelPath);
 
-	auto textures = LoadTextures(device, model, samplers, images);
+	auto textures = LoadTextures(samplers, images);
 
-	auto materials = LoadMaterials(device, model, textures);
+	auto materials = LoadMaterials(textures);
 	
-	auto meshes = LoadMeshes(device, model, materials);
+	LoadMeshes(materials);
 
 	//todo : load cameras
 
@@ -307,31 +328,29 @@ void Core::GLTFLoader::LoadScene(Device& device, const tinygltf::Model& model, c
 	//todo : load animations
 
 	//todo : load scenes
-
-	int a = 10;
 }
 
-void Core::GLTFLoader::CheckExtensions(const tinygltf::Model& model)
+void Core::GLTFLoader::CheckExtensions()
 {
-	for (auto& extention : model.extensionsUsed)
+	for (auto& extention : _model->extensionsUsed)
 	{
 
 	}
 }
 
-void Core::GLTFLoader::LoadLights(const tinygltf::Model& model)
+void Core::GLTFLoader::LoadLights()
 {
 }
 
-vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers(Device& device, const tinygltf::Model& model)
+vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers()
 {
-	size_t size = model.samplers.size();
+	size_t size = _model->samplers.size();
 
 	vector<Core::Sampler*> samplers(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		auto sampler = model.samplers[i];
+		auto sampler = _model->samplers[i];
 		VkSamplerCreateInfo samplerInfo{};
 		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
@@ -345,7 +364,7 @@ vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers(Device& device, const tiny
 		samplerInfo.mipmapMode = FindMipmapMode(sampler.minFilter);
 		
 		VkPhysicalDeviceProperties properties{};
-		vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
+		vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
 
 		samplerInfo.anisotropyEnable = VK_TRUE;
 		//lower value results in better performance, but lower quality results.
@@ -361,21 +380,21 @@ vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers(Device& device, const tiny
 		//HACK : hardcoded.
 		samplerInfo.maxLod = numeric_limits<float>::max();
 
-		samplers[i] = new Sampler(device, samplerInfo);
+		samplers[i] = new Sampler(_device, samplerInfo);
 	}
 
 	return samplers;
 }
 
-vector<Core::Image*> Core::GLTFLoader::LoadImages(Device& device, const tinygltf::Model& model, const string& modelPath)
+vector<Core::Image*> Core::GLTFLoader::LoadImages(const string& modelPath)
 {
-	auto size = model.images.size();
+	auto size = _model->images.size();
 
 	vector<Core::Image*> images(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		auto image = model.images[i];
+		auto image = _model->images[i];
 
 		Core::Image* vkImage;
 
@@ -390,7 +409,7 @@ vector<Core::Image*> Core::GLTFLoader::LoadImages(Device& device, const tinygltf
 		{
 			// From URI
 			auto imagePath = modelPath + "/" + image.uri;
-			vkImage = new Core::Image(device, imagePath);
+			vkImage = new Core::Image(_device, imagePath);
 		}
 
 		images[i] = move(vkImage);
@@ -399,21 +418,20 @@ vector<Core::Image*> Core::GLTFLoader::LoadImages(Device& device, const tinygltf
 	return images;
 }
 
-vector<Core::Texture*> Core::GLTFLoader::LoadTextures(Device& device, 
-	const tinygltf::Model& model,
+vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 	vector<Core::Sampler*>& samplers, vector<Core::Image*>& images)
 {
-	size_t size = model.textures.size();
+	size_t size = _model->textures.size();
 
 	vector<Core::Texture*> textures(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		int imageIndex = model.textures[i].source;
-		int samplerIndex = model.textures[i].sampler;
+		int imageIndex = _model->textures[i].source;
+		int samplerIndex = _model->textures[i].sampler;
 
 		//TODO : default sampler
-		auto texture = new Texture(device, model.textures[i].name,
+		auto texture = new Texture(_device, _model->textures[i].name,
 			images[imageIndex], samplers[samplerIndex]);
 
 		textures[i] = texture;
@@ -422,21 +440,20 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(Device& device,
 	return textures;
 }
 
-vector<Core::Material*> Core::GLTFLoader::LoadMaterials(Device& device, 
-	const tinygltf::Model& model, vector<Core::Texture*>& textures)
+vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& textures)
 {
-	size_t size = model.materials.size();
+	size_t size = _model->materials.size();
 	
 	vector<Material*> materials(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		auto& gltfMaterial = model.materials[i];
+		auto& gltfMaterial = _model->materials[i];
 
 		uint32_t hash = Utility::HashCode(gltfMaterial.name.c_str());
 
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = new Material(device, "Sample", hash);
+		auto material = new Material(_device, "Sample", hash);
 
 		for (auto& value : gltfMaterial.values)
 		{
@@ -478,56 +495,94 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(Device& device,
 	return materials;
 }
 
-vector<Core::Mesh*> Core::GLTFLoader::LoadMeshes(Device& device, const tinygltf::Model& model, vector<Core::Material*>& materials)
+void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 {
-	size_t size = model.meshes.size();
+	size_t size = _model->meshes.size();
 
-	vector<Core::Mesh*> meshes(size);
+	vector<unique_ptr<Core::Mesh>> meshes(size);
 
-	for (auto& gltfMesh : model.meshes)
+	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
 
-		auto meshEntity = make_unique<Entity>(-1, "mesh");
-		Mesh* mesh = new Mesh(*meshEntity, device);
+		auto meshEntity = make_unique<Entity>(-1, meshName);
+		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(*meshEntity, _device);
 
 		size_t primSize = gltfMesh.primitives.size();
 		for (int i = 0; i < primSize; ++i)
 		{
 			string subMeshName = meshName + to_string(i);
-			auto subMesh = new SubMesh(device, subMeshName);
+			auto subMesh = new SubMesh(_device, subMeshName);
 
 			auto primitive = gltfMesh.primitives[i];
+
+			size_t count = 0;
 			for (auto& attribute : primitive.attributes)
 			{
 				string name = attribute.first;
 
-				auto vertexData = GetAttributeData(&model, attribute.second);
+				auto vertexData = GetAttributeData(_model, attribute.second);
+
+				auto& accessor = _model->accessors[attribute.second];
+				
+				count = accessor.count;
+
+
+				VkFormat format = GetAttributeFormat(_model, attribute.second);
+				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
 
 				subMesh->CreateVertexBuffer(name, vertexData);
 			}
 
-			if (primitive.indices >= 0)
+			//ADD VERTEX COLOR
+			if (subMesh->HasVertexAttribute(VertexAttributeName::Col) == false)
 			{
-				subMesh->SetIndexCount(Utility::ToU32(model.accessors[primitive.indices].count));
-				
-				auto indexData = GetAttributeData(&model, primitive.indices);
-				
-				VkFormat format = GetAttributeFormat(&model, primitive.indices);
+				vector<uint8_t> colorData;
 
-				if (format == VK_FORMAT_R8_UINT)
+				float color[3] = {1.0f, 1.0f, 1.0f};
+				auto bytes = Core::Utility::ToBytes(color);
+				for (size_t i = 0; i < count; ++i)
 				{
-					// Converts uint8 data into uint16 data, still represented by a uint8 vector
-					indexData = ConvertDataStride(indexData, 1, 2);
+					colorData.insert(colorData.end(), bytes.begin(), bytes.end());
 				}
 
-				subMesh->CreateIndexBuffer(indexData);
+				subMesh->CreateVertexBuffer(VertexAttributeName::Col, colorData);
+			}
+			
+
+			if (primitive.indices >= 0)
+			{
+				subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
+				
+				auto indexData = GetAttributeData(_model, primitive.indices);
+				
+				VkFormat format = GetAttributeFormat(_model, primitive.indices);
+
+				VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+
+				switch (format)
+				{
+				case VK_FORMAT_R8_UINT:
+					// Converts uint8 data into uint16 data, still represented by a uint8 vector
+					indexData = ConvertDataStride(indexData, 1, 2);
+					indexType = VK_INDEX_TYPE_UINT16;
+					break;
+				case VK_FORMAT_R16_UINT:
+					indexType = VK_INDEX_TYPE_UINT16;
+					break;
+				case VK_FORMAT_R32_UINT:
+					indexType = VK_INDEX_TYPE_UINT32;
+					break;
+				}
+
+				subMesh->CreateIndexBuffer(indexData, indexType);
 			}
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
+
+			_scene.AddComponent(move(mesh), *meshEntity);
+			_scene.AddEntity(move(meshEntity));
 		}
 	}
-
-	return meshes;
 }

@@ -17,14 +17,20 @@ namespace Core
 
 		string GetName() const { return _name; }
 
+		VkIndexType GetIndexType() const { return _indexType; }
+
+		bool HasVertexAttribute(string attributeName) const;
+
 		void CreateVertexBuffer(string name, vector<uint8_t>& vertexData);
-		void CreateIndexBuffer(vector<uint8_t>& vertexData);
+		void CreateIndexBuffer(vector<uint8_t>& vertexData, VkIndexType indexType);
 	private:
 		Device& _device;
 
 		string _name;
 
 		uint32_t _indexCount;
+
+		VkIndexType _indexType;
 
 		//Key: Attribute name, Value: Attribute value
 		unordered_map<string, Buffer*> _vertexBuffers;

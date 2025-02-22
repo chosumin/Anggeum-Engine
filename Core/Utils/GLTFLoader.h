@@ -7,6 +7,7 @@ namespace tinygltf
 
 namespace Core
 {
+	class Scene;
 	class Image;
 	class Sampler;
 	class Texture;
@@ -15,21 +16,25 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		static void LoadScene(Device& device, const string& path);
-		static void LoadModel(const string& path);
+		GLTFLoader(Device& device, Scene& scene);
+		~GLTFLoader();
+
+		void LoadScene(const string& path);
+		void LoadModel(const string& path);
 	private:
-		static void LoadScene(Device& device, const tinygltf::Model & model, const string& modelPath);
-		static void CheckExtensions(const tinygltf::Model& model);
-		static void LoadLights(const tinygltf::Model& model);
-		static vector<Core::Sampler*> LoadSamplers(Device& device, const tinygltf::Model& model);
-		static vector<Core::Image*> LoadImages(Device& device, const tinygltf::Model& model, const string& modelPath);
-		static vector<Core::Texture*> LoadTextures(Device& device,
-			const tinygltf::Model& model,
+		void LoadAssets(const string& modelPath);
+		void CheckExtensions();
+		void LoadLights();
+		vector<Core::Sampler*> LoadSamplers();
+		vector<Core::Image*> LoadImages(const string& modelPath);
+		vector<Core::Texture*> LoadTextures(
 			vector<Core::Sampler*>& samplers,
 			vector<Core::Image*>& images);
-		static vector<Core::Material*> LoadMaterials(Device& device, const tinygltf::Model& model,
-			vector<Core::Texture*>& textures);
-		static vector<Core::Mesh*> LoadMeshes(Device& device, const tinygltf::Model& model,
-			vector<Core::Material*>& materials);
+		vector<Core::Material*> LoadMaterials(vector<Core::Texture*>& textures);
+		void LoadMeshes(vector<Core::Material*>& materials);
+	private:
+		Device& _device;
+		Scene& _scene;
+		tinygltf::Model* _model;
 	};
 }

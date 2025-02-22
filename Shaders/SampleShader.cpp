@@ -38,11 +38,11 @@ namespace Core
 	{
 		_vertexBindings = {
 			Vertex::GetBindingDescription(
-		0, sizeof(Vertex::Pos), VK_VERTEX_INPUT_RATE_VERTEX),
+		0, 12, VK_VERTEX_INPUT_RATE_VERTEX),
 			Vertex::GetBindingDescription(
-		1, sizeof(Vertex::Color), VK_VERTEX_INPUT_RATE_VERTEX),
+		1, 12, VK_VERTEX_INPUT_RATE_VERTEX),
 			Vertex::GetBindingDescription(
-		2, sizeof(Vertex::TexCoord), VK_VERTEX_INPUT_RATE_VERTEX),
+		2, 8, VK_VERTEX_INPUT_RATE_VERTEX),
 		};
 
 		_vertexAttributes.push_back(Vertex::GetAttributeDescription(

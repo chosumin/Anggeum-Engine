@@ -3,6 +3,7 @@
 struct VertexAttributeName
 {
     static string Position;
+    static string Normal;
     static string Col;
     static string UV;
 };

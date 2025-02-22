@@ -18,6 +18,12 @@ Core::SubMesh::~SubMesh()
 	_vertexBuffers.clear();
 }
 
+bool Core::SubMesh::HasVertexAttribute(string attributeName) const
+{
+	auto vertexBuffer = _vertexBuffers.find(attributeName);
+	return vertexBuffer != _vertexBuffers.end();
+}
+
 void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 {
 	VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
@@ -38,7 +44,7 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 	_vertexBuffers[name] = vertexBuffer;
 }
 
-void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData)
+void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType indexType)
 {
 	VkDeviceSize bufferSize = sizeof(indexData[0]) * indexData.size();
 
@@ -53,6 +59,8 @@ void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData)
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+
+	_indexType = indexType;
 }
 
 vector<Core::Buffer*> Core::SubMesh::GetVertexBuffers(vector<string> names) const
