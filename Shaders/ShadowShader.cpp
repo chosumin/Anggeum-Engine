@@ -37,7 +37,7 @@ void ShadowShader::Prepare()
 {
 	_vertexBindings = {
 			Vertex::GetBindingDescription(
-		0, sizeof(ShadowVertex), VK_VERTEX_INPUT_RATE_VERTEX),
+		0, 12, VK_VERTEX_INPUT_RATE_VERTEX),
 	};
 
 	_vertexAttributes.push_back(Vertex::GetAttributeDescription(
