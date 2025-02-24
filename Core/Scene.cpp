@@ -108,9 +108,13 @@ namespace Core
 		return *_root;
 	}
 
-	PerspectiveCamera& Scene::GetMainCamera() const
+	PerspectiveCamera* Scene::GetMainCamera() const
 	{
 		auto cameras = GetComponents<PerspectiveCamera>();
-		return *cameras[0];
+
+		if (cameras.empty())
+			return nullptr;
+
+		return cameras[0];
 	}
 }

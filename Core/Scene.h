@@ -90,7 +90,7 @@ namespace Core
 		Entity* FindEntity(const string& name);
 		Entity& GetRootEntity();
 
-		PerspectiveCamera& GetMainCamera() const;
+		PerspectiveCamera* GetMainCamera() const;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;

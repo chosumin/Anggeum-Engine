@@ -12,6 +12,8 @@
 #include "Core/SubMesh.h"
 #include "Core/Entity.h"
 #include "Core/VulkanWrapper/Vertex.h"
+#include "Core/Components/PerspectiveCamera.h"
+#include "Core/Components/FreeCamera.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -321,9 +323,9 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 	
 	LoadMeshes(materials);
 
-	//todo : load cameras
+	LoadCameras();
 
-	//todo : load nodes
+	LoadNodes();
 
 	//todo : load animations
 
@@ -457,7 +459,7 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 
 		for (auto& value : gltfMaterial.values)
 		{
-			if (value.first.find("Texture") != string::npos)
+			if (value.first.find("baseColorTexture") != string::npos)
 			{
 				//Texture
 				string texName = value.first;
@@ -470,6 +472,8 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 
 				material->SetBuffer(1, texture);
 			}
+
+			//TODO : parse PBR textures
 		}
 
 		for (auto& value : gltfMaterial.additionalValues)
@@ -585,4 +589,116 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 			_scene.AddEntity(move(meshEntity));
 		}
 	}
+}
+
+void Core::GLTFLoader::LoadCameras()
+{
+	for (auto& gltfCamera : _model->cameras)
+	{
+		assert(gltfCamera.type == "perspective");
+
+		string name = gltfCamera.name;
+
+		auto cameraEntity = make_unique<Entity>(-1, name);
+		
+		auto camera = make_unique<PerspectiveCamera>(*cameraEntity);
+		
+		camera->SetAspectRatio(gltfCamera.perspective.aspectRatio);
+		camera->SetFieldOfView(gltfCamera.perspective.yfov);
+		camera->SetNearPlane(gltfCamera.perspective.znear);
+		camera->SetFarPlane(gltfCamera.perspective.zfar);
+
+		_scene.AddComponent(move(camera), *cameraEntity);
+		
+		auto freeCamera = make_unique<FreeCamera>(*cameraEntity);
+		_scene.AddComponent(move(freeCamera), *cameraEntity);
+
+		_scene.AddEntity(move(cameraEntity));
+	}
+}
+
+void Core::GLTFLoader::LoadNodes()
+{
+	/*vector<Core::Entity*> nodes;
+
+	for (size_t i = 0; i < _model->nodes.size(); ++i)
+	{
+		auto gltfNode = _model->nodes[i];
+		{
+			auto node = std::make_unique<sg::Node>(index, gltf_node.name);
+
+			auto& transform = node->get_component<sg::Transform>();
+
+			if (!gltf_node.translation.empty())
+			{
+				glm::vec3 translation;
+
+				std::transform(gltf_node.translation.begin(), gltf_node.translation.end(), glm::value_ptr(translation), TypeCast<double, float>{});
+
+				transform.set_translation(translation);
+			}
+
+			if (!gltf_node.rotation.empty())
+			{
+				glm::quat rotation;
+
+				std::transform(gltf_node.rotation.begin(), gltf_node.rotation.end(), glm::value_ptr(rotation), TypeCast<double, float>{});
+
+				transform.set_rotation(rotation);
+			}
+
+			if (!gltf_node.scale.empty())
+			{
+				glm::vec3 scale;
+
+				std::transform(gltf_node.scale.begin(), gltf_node.scale.end(), glm::value_ptr(scale), TypeCast<double, float>{});
+
+				transform.set_scale(scale);
+			}
+
+			if (!gltf_node.matrix.empty())
+			{
+				glm::mat4 matrix;
+
+				std::transform(gltf_node.matrix.begin(), gltf_node.matrix.end(), glm::value_ptr(matrix), TypeCast<double, float>{});
+
+				transform.set_matrix(matrix);
+			}
+		}
+
+		if (gltfNode.mesh >= 0)
+		{
+			assert(gltfNode.mesh < meshes.size());
+			auto mesh = meshes[gltfNode.mesh];
+
+			node->set_component(*mesh);
+
+			mesh->add_node(*node);
+		}
+
+		if (gltfNode.camera >= 0)
+		{
+			auto cameras = scene.get_components<sg::Camera>();
+			assert(gltfNode.camera < cameras.size());
+			auto camera = cameras[gltfNode.camera];
+
+			node->set_component(*camera);
+
+			camera->set_node(*node);
+		}
+
+		if (auto extension = get_extension(gltfNode.extensions, KHR_LIGHTS_PUNCTUAL_EXTENSION))
+		{
+			auto lights = scene.get_components<sg::Light>();
+			int  light_index = extension->Get("light").Get<int>();
+			assert(light_index < lights.size());
+			auto light = lights[light_index];
+
+			node->set_component(*light);
+
+			light->set_node(*node);
+		}
+
+		nodes.push_back(std::move(node));
+	}*/
 }

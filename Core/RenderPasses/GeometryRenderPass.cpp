@@ -81,13 +81,13 @@ namespace Core
 		auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-		PerspectiveCamera& camera = _scene.GetMainCamera();
+		PerspectiveCamera* camera = _scene.GetMainCamera();
 
 		for (auto&& batch : _batches)
 		{
 			for (auto&& material : batch.second->Materials)
 			{
-				material.second->SetBuffer(currentFrame, 0, &camera.Matrices);
+				material.second->SetBuffer(currentFrame, 0, &camera->Matrices);
 				material.second->SetBuffer(2, _shadowRenderTarget);
 				material.second->SetBuffer(currentFrame, 3, &_shadowBuffer->Projection);
 			}

@@ -8,6 +8,8 @@ namespace Core
 	{
 	public:
 		PerspectiveCamera(Entity& entity, float width, float height);
+		PerspectiveCamera(Entity& entity);
+
 		virtual ~PerspectiveCamera() = default;
 
 		virtual type_index GetType() override;
@@ -26,6 +28,8 @@ namespace Core
 		mat4 GetView();
 		const mat4 GetPreRotation();
 		void SetPreRotation(const glm::mat4& pre_rotation);
+	private:
+		void SetPerspective();
 	public:
 		VPBufferObject Matrices;
 	private:

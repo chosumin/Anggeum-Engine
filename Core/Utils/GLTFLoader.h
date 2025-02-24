@@ -32,6 +32,8 @@ namespace Core
 			vector<Core::Image*>& images);
 		vector<Core::Material*> LoadMaterials(vector<Core::Texture*>& textures);
 		void LoadMeshes(vector<Core::Material*>& materials);
+		void LoadCameras();
+		void LoadNodes();
 	private:
 		Device& _device;
 		Scene& _scene;

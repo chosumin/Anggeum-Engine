@@ -8,18 +8,31 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	:Component(entity)
 {
 	Matrices.View = lookAt(
-		vec3(2.0f, 2.0f, 2.0f),
+		vec3(0.5f, 0.5f, 0.5f),
 		vec3(0.0f, 0.0f, 0.0f),
 		vec3(0.0f, 1.0f, 0.0f));
 
 	auto& transform = entity.GetComponent<Transform>();
 	transform.SetMatrix(Matrices.View);
 
-	Matrices.Perspective = perspective(
-		radians(60.0f),
-		width / height,
-		0.1f, 10.0f);
-	Matrices.Perspective[1][1] *= -1;
+	_fov = radians(60.0f);
+	_aspectRatio = width / height;
+	_nearPlane = 0.1f;
+	_farPlane = 10.0f;
+
+	SetPerspective();
+}
+
+Core::PerspectiveCamera::PerspectiveCamera(Entity& entity)
+	:Component(entity)
+{
+	Matrices.View = lookAt(
+		vec3(0.5f, 0.5f, 0.5f),
+		vec3(0.0f, 0.0f, 0.0f),
+		vec3(0.0f, 1.0f, 0.0f));
+
+	auto& transform = entity.GetComponent<Transform>();
+	transform.SetMatrix(Matrices.View);
 }
 
 type_index Core::PerspectiveCamera::GetType()
@@ -30,11 +43,13 @@ type_index Core::PerspectiveCamera::GetType()
 void Core::PerspectiveCamera::SetAspectRatio(float aspectRatio)
 {
 	_aspectRatio = aspectRatio;
+	SetPerspective();
 }
 
 void Core::PerspectiveCamera::SetFieldOfView(float fov)
 {
 	_fov = fov;
+	SetPerspective();
 }
 
 float Core::PerspectiveCamera::GetFarPlane() const
@@ -45,6 +60,7 @@ float Core::PerspectiveCamera::GetFarPlane() const
 void Core::PerspectiveCamera::SetFarPlane(float zfar)
 {
 	_farPlane = zfar;
+	SetPerspective();
 }
 
 float Core::PerspectiveCamera::GetNearPlane() const
@@ -55,6 +71,7 @@ float Core::PerspectiveCamera::GetNearPlane() const
 void Core::PerspectiveCamera::SetNearPlane(float znear)
 {
 	_nearPlane = znear;
+	SetPerspective();
 }
 
 float Core::PerspectiveCamera::GetAspectRatio()
@@ -85,6 +102,17 @@ const mat4 Core::PerspectiveCamera::GetPreRotation()
 void Core::PerspectiveCamera::SetPreRotation(const glm::mat4& pre_rotation)
 {
 	_preRotation = pre_rotation;
+}
+
+void Core::PerspectiveCamera::SetPerspective()
+{
+	Matrices.Perspective = perspective(
+		_fov,
+		_aspectRatio,
+		_nearPlane, _farPlane);
+
+	//Flip Y in clipspace.
+	Matrices.Perspective[1][1] *= -1;
 }
 
 void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
