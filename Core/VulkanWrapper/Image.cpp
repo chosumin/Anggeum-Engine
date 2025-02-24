@@ -140,6 +140,8 @@ void Core::Image::SetSRGBFormat()
 
 void Core::Image::CreateImage(void* pixels, VkExtent3D extent)
 {
+    _extent = extent;
+
     int mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
 
     CreateImage(extent, mipLevels, 
