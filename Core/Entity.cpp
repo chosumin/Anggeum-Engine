@@ -3,9 +3,10 @@
 #include "Component.h"
 
 Core::Entity::Entity(const size_t id, const string& name)
-	:_id(id), _name(name), _transform{ *this }
+	:_id(id), _name(name), _transform()
 {
 	SetComponent(_transform);
+	_transform.SetEntity(this);
 }
 
 Core::Entity::~Entity()

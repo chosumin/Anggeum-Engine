@@ -8,9 +8,9 @@ namespace Core
 	class Mesh : public Component
 	{
 	public:
-		Mesh(Entity& entity, Device& device, string modelPath);
-		Mesh(Entity& entity, Device& device, int polygonType);
-		Mesh(Entity& entity, Device& device);
+		Mesh(Device& device, string modelPath);
+		Mesh(Device& device, int polygonType);
+		Mesh(Device& device);
 		~Mesh();
 
 		const vector<Material*>& GetMaterials() const { return _materials; }

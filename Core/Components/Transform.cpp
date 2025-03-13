@@ -2,8 +2,7 @@
 #include "Transform.h"
 #include <glm/gtx/matrix_decompose.hpp>
 
-Core::Transform::Transform(Entity& entity)
-	:Component(entity)
+Core::Transform::Transform()
 {
 }
 

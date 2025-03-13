@@ -6,8 +6,7 @@ namespace Core
 	class Transform : public Component
 	{
 	public:
-		Transform(Entity& entity);
-
+		Transform();
 		virtual ~Transform() = default;
 
 		virtual void UpdateFrame(float deltaTime) override;

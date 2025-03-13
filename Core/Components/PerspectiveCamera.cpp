@@ -3,18 +3,8 @@
 #include "Transform.h"
 #include "Entity.h"
 
-Core::PerspectiveCamera::PerspectiveCamera(
-	Entity& entity, float width, float height)
-	:Component(entity)
+Core::PerspectiveCamera::PerspectiveCamera(float width, float height)
 {
-	Matrices.View = lookAt(
-		vec3(0.5f, 0.5f, 0.5f),
-		vec3(0.0f, 0.0f, 0.0f),
-		vec3(0.0f, 1.0f, 0.0f));
-
-	auto& transform = entity.GetComponent<Transform>();
-	transform.SetMatrix(Matrices.View);
-
 	_fov = radians(60.0f);
 	_aspectRatio = width / height;
 	_nearPlane = 0.1f;
@@ -23,16 +13,8 @@ Core::PerspectiveCamera::PerspectiveCamera(
 	SetPerspective();
 }
 
-Core::PerspectiveCamera::PerspectiveCamera(Entity& entity)
-	:Component(entity)
+Core::PerspectiveCamera::PerspectiveCamera()
 {
-	Matrices.View = lookAt(
-		vec3(0.5f, 0.5f, 0.5f),
-		vec3(0.0f, 0.0f, 0.0f),
-		vec3(0.0f, 1.0f, 0.0f));
-
-	auto& transform = entity.GetComponent<Transform>();
-	transform.SetMatrix(Matrices.View);
 }
 
 type_index Core::PerspectiveCamera::GetType()
@@ -117,7 +99,7 @@ void Core::PerspectiveCamera::SetPerspective()
 
 void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
 {
-	auto& transform = _entity.GetComponent<Transform>();
+	auto& transform = _entity->GetComponent<Transform>();
 	Matrices.View = transform.GetMatrix();
 }
 

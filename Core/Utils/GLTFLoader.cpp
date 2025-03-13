@@ -509,8 +509,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 	{
 		auto meshName = gltfMesh.name;
 
-		auto meshEntity = make_unique<Entity>(-1, meshName);
-		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(*meshEntity, _device);
+		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
 
 		size_t primSize = gltfMesh.primitives.size();
 		for (int i = 0; i < primSize; ++i)
@@ -585,8 +584,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
 
-			_scene.AddComponent(move(mesh), *meshEntity);
-			_scene.AddEntity(move(meshEntity));
+			_scene.AddComponent(move(mesh));
 		}
 	}
 }
@@ -599,95 +597,86 @@ void Core::GLTFLoader::LoadCameras()
 
 		string name = gltfCamera.name;
 
-		auto cameraEntity = make_unique<Entity>(-1, name);
+		auto camera = make_unique<PerspectiveCamera>();
 		
-		auto camera = make_unique<PerspectiveCamera>(*cameraEntity);
-		
-		camera->SetAspectRatio(gltfCamera.perspective.aspectRatio);
-		camera->SetFieldOfView(gltfCamera.perspective.yfov);
-		camera->SetNearPlane(gltfCamera.perspective.znear);
-		camera->SetFarPlane(gltfCamera.perspective.zfar);
+		camera->SetAspectRatio(static_cast<float>(gltfCamera.perspective.aspectRatio));
+		camera->SetFieldOfView(static_cast<float>(gltfCamera.perspective.yfov));
+		camera->SetNearPlane(static_cast<float>(gltfCamera.perspective.znear));
+		camera->SetFarPlane(static_cast<float>(gltfCamera.perspective.zfar));
 
-		_scene.AddComponent(move(camera), *cameraEntity);
-		
-		auto freeCamera = make_unique<FreeCamera>(*cameraEntity);
-		_scene.AddComponent(move(freeCamera), *cameraEntity);
-
-		_scene.AddEntity(move(cameraEntity));
+		_scene.AddComponent(move(camera));
 	}
 }
 
 void Core::GLTFLoader::LoadNodes()
 {
-	/*vector<Core::Entity*> nodes;
+	auto meshes = _scene.GetComponents<Mesh>();
+	auto cameras = _scene.GetComponents<PerspectiveCamera>();
 
 	for (size_t i = 0; i < _model->nodes.size(); ++i)
 	{
 		auto gltfNode = _model->nodes[i];
+
+		auto entity = make_unique<Entity>(i, gltfNode.name);
+
+		auto& transform = entity->GetTransform();
+
+		if (!gltfNode.translation.empty())
 		{
-			auto node = std::make_unique<sg::Node>(index, gltf_node.name);
+			vec3 translation;
 
-			auto& transform = node->get_component<sg::Transform>();
+			std::transform(gltfNode.translation.begin(), gltfNode.translation.end(),
+				&translation.x, TypeCast<double, float>{});
 
-			if (!gltf_node.translation.empty())
-			{
-				glm::vec3 translation;
+			transform.SetTranslation(translation);
+		}
 
-				std::transform(gltf_node.translation.begin(), gltf_node.translation.end(), glm::value_ptr(translation), TypeCast<double, float>{});
+		if (!gltfNode.rotation.empty())
+		{
+			glm::quat rotation;
 
-				transform.set_translation(translation);
-			}
+			std::transform(gltfNode.rotation.begin(), gltfNode.rotation.end(),
+				&rotation.x, TypeCast<double, float>{});
 
-			if (!gltf_node.rotation.empty())
-			{
-				glm::quat rotation;
+			transform.SetRotation(rotation);
+		}
 
-				std::transform(gltf_node.rotation.begin(), gltf_node.rotation.end(), glm::value_ptr(rotation), TypeCast<double, float>{});
+		if (!gltfNode.scale.empty())
+		{
+			glm::vec3 scale;
 
-				transform.set_rotation(rotation);
-			}
+			std::transform(gltfNode.scale.begin(), gltfNode.scale.end(),
+				&scale.x, TypeCast<double, float>{});
 
-			if (!gltf_node.scale.empty())
-			{
-				glm::vec3 scale;
+			transform.SetScale(scale);
+		}
 
-				std::transform(gltf_node.scale.begin(), gltf_node.scale.end(), glm::value_ptr(scale), TypeCast<double, float>{});
+		if (!gltfNode.matrix.empty())
+		{
+			glm::mat4 matrix;
 
-				transform.set_scale(scale);
-			}
+			std::transform(gltfNode.matrix.begin(), gltfNode.matrix.end(), &matrix[0].x, TypeCast<double, float>{});
 
-			if (!gltf_node.matrix.empty())
-			{
-				glm::mat4 matrix;
-
-				std::transform(gltf_node.matrix.begin(), gltf_node.matrix.end(), glm::value_ptr(matrix), TypeCast<double, float>{});
-
-				transform.set_matrix(matrix);
-			}
+			transform.SetMatrix(matrix);
 		}
 
 		if (gltfNode.mesh >= 0)
 		{
-			assert(gltfNode.mesh < meshes.size());
 			auto mesh = meshes[gltfNode.mesh];
 
-			node->set_component(*mesh);
-
-			mesh->add_node(*node);
+			entity->SetComponent(*mesh);
+			mesh->SetEntity(entity.get());
 		}
 
 		if (gltfNode.camera >= 0)
 		{
-			auto cameras = scene.get_components<sg::Camera>();
-			assert(gltfNode.camera < cameras.size());
 			auto camera = cameras[gltfNode.camera];
 
-			node->set_component(*camera);
-
-			camera->set_node(*node);
+			entity->SetComponent(*camera);
+			camera->SetEntity(entity.get());
 		}
 
-		if (auto extension = get_extension(gltfNode.extensions, KHR_LIGHTS_PUNCTUAL_EXTENSION))
+		/*if (auto extension = get_extension(gltfNode.extensions, KHR_LIGHTS_PUNCTUAL_EXTENSION))
 		{
 			auto lights = scene.get_components<sg::Light>();
 			int  light_index = extension->Get("light").Get<int>();
@@ -697,8 +686,8 @@ void Core::GLTFLoader::LoadNodes()
 			node->set_component(*light);
 
 			light->set_node(*node);
-		}
+		}*/
 
-		nodes.push_back(std::move(node));
-	}*/
+		_scene.AddEntity(std::move(entity));
+	}
 }

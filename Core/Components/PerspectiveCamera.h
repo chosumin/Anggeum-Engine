@@ -7,8 +7,8 @@ namespace Core
 	class PerspectiveCamera : public Component
 	{
 	public:
-		PerspectiveCamera(Entity& entity, float width, float height);
-		PerspectiveCamera(Entity& entity);
+		PerspectiveCamera(float width, float height);
+		PerspectiveCamera();
 
 		virtual ~PerspectiveCamera() = default;
 

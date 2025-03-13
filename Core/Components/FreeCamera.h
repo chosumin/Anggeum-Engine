@@ -6,7 +6,7 @@ namespace Core
 	class FreeCamera : public Component
 	{
 	public:
-		FreeCamera(Entity& entity);
+		FreeCamera();
 		virtual ~FreeCamera() = default;
 
 		virtual void UpdateFrame(float deltaTime) override;

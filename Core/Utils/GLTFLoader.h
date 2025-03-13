@@ -13,6 +13,22 @@ namespace Core
 	class Texture;
 	class Material;
 	class Mesh;
+
+	/**
+	 * @brief Helper Function to change array type T to array type Y
+	 * Create a struct that can be used with std::transform so that we do not need to recreate lambda functions
+	 * @param T
+	 * @param Y
+	 */
+	template <class T, class Y>
+	struct TypeCast
+	{
+		Y operator()(T value) const noexcept
+		{
+			return static_cast<Y>(value);
+		}
+	};
+
 	class GLTFLoader
 	{
 	public:

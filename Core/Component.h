@@ -7,7 +7,6 @@ namespace Core
 	{
 	public:
 		Component() = default;
-		Component(Entity& entity);
 		Component(Component&& other) = default;
 		virtual ~Component() = default;
 
@@ -15,9 +14,10 @@ namespace Core
 		virtual std::type_index GetType() = 0;
 		virtual void Resize(uint32_t width, uint32_t height) = 0;
 
-		Entity& GetEntity() { return _entity; }
+		Entity& GetEntity() { return *_entity; }
+		void SetEntity(Entity* entity) { _entity = entity; }
 	protected:
-		Entity& _entity;
+		Entity* _entity;
 	};
 }
 

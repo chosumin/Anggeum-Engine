@@ -12,8 +12,7 @@ const float TRANSLATION_MOVE_WEIGHT = 3.0f;
 const float TRANSLATION_MOVE_STEP = 5.0f;
 const uint32_t TRANSLATION_MOVE_SPEED = 3;
 
-Core::FreeCamera::FreeCamera(Entity& entity)
-	:Component(entity)
+Core::FreeCamera::FreeCamera()
 {
 }
 
@@ -35,7 +34,7 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 	// Only re-calculate the transform if it's changed
 	if (deltaRotation != glm::vec3(0.0f, 0.0f, 0.0f) || deltaTranslation != glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
 	{
-		auto& transform = _entity.GetComponent<Transform>();
+		auto& transform = _entity->GetComponent<Transform>();
 
 		transform.Rotate(deltaRotation);
 

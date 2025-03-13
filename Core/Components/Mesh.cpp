@@ -29,20 +29,20 @@ void AddVertex(unordered_map<string, vector<uint8_t>>& vertices, Vertex vertex)
 	}
 }
 
-Core::Mesh::Mesh(Entity& entity, Device& device, string modelPath)
-	:Component(entity), _device(device), _modelPath(modelPath)
+Core::Mesh::Mesh(Device& device, string modelPath)
+	:_device(device), _modelPath(modelPath)
 {
 	LoadModel(modelPath);
 }
 
-Core::Mesh::Mesh(Entity& entity, Device& device, int polygonType)
-	:Component(entity), _device(device)
+Core::Mesh::Mesh(Device& device, int polygonType)
+	:_device(device)
 {
 	LoadPlane();
 }
 
-Core::Mesh::Mesh(Entity& entity, Device& device)
-	:Component(entity), _device(device)
+Core::Mesh::Mesh(Device& device)
+	:_device(device)
 {
 }
 
