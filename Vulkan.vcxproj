@@ -145,6 +145,7 @@
     <ClCompile Include="Core\BufferObjects\BufferObjects.cpp" />
     <ClCompile Include="Core\Component.cpp" />
     <ClCompile Include="Core\Components\FreeCamera.cpp" />
+    <ClCompile Include="Core\Components\Light.cpp" />
     <ClCompile Include="Core\Components\Mesh.cpp" />
     <ClCompile Include="Core\Components\PerspectiveCamera.cpp" />
     <ClCompile Include="Core\Components\Transform.cpp" />
@@ -225,6 +226,7 @@
     <ClInclude Include="Core\BufferObjects\BufferObjects.h" />
     <ClInclude Include="Core\Component.h" />
     <ClInclude Include="Core\Components\FreeCamera.h" />
+    <ClInclude Include="Core\Components\Light.h" />
     <ClInclude Include="Core\Components\Mesh.h" />
     <ClInclude Include="Core\Components\PerspectiveCamera.h" />
     <ClInclude Include="Core\Components\Transform.h" />

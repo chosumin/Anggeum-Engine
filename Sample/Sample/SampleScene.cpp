@@ -4,8 +4,7 @@
 #include "Component.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
-#include "Components/Mesh.h"
-#include "Utils/Math.h"
+#include "Components/Light.h"
 #include "Core/Utils/GLTFLoader.h"
 using namespace Core;
 
@@ -34,6 +33,19 @@ SampleScene::SampleScene(Core::Device& device,
 	auto freeCamera = make_unique<FreeCamera>();
 	freeCamera->SetEntity(&cameraEntity);
 	AddComponent(move(freeCamera), mainCamera->GetEntity());
+
+	auto mainLight = GetMainLight();
+
+	if (mainLight == nullptr)
+	{
+		auto lightEntity = make_unique<Entity>(-1, "main light");
+		auto light = make_unique<Light>("main light");
+
+		mainLight = light.get();
+		mainLight->SetEntity(lightEntity.get());
+		AddComponent(move(light), *lightEntity);
+		AddEntity(move(lightEntity));
+	}
 }
 
 SampleScene::~SampleScene()

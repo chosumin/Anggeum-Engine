@@ -1,5 +1,7 @@
 #pragma once
 
+#define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
+
 namespace tinygltf
 {
 	class Model;

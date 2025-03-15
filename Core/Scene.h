@@ -4,6 +4,7 @@
 namespace Core
 {
 	class PerspectiveCamera;
+	class Light;
 	class Component;
 	class Scene
 	{
@@ -91,6 +92,7 @@ namespace Core
 		Entity& GetRootEntity();
 
 		PerspectiveCamera* GetMainCamera() const;
+		Light* GetMainLight() const;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;

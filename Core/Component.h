@@ -17,7 +17,7 @@ namespace Core
 		Entity& GetEntity() { return *_entity; }
 		void SetEntity(Entity* entity) { _entity = entity; }
 	protected:
-		Entity* _entity;
+		Entity* _entity = nullptr;
 	};
 }
 

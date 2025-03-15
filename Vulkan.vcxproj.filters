@@ -152,6 +152,9 @@
     <ClCompile Include="Core\Components\Mesh.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Components\Light.cpp">
+      <Filter>Core\Components</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -316,6 +319,9 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Components\Mesh.h">
+      <Filter>Core\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Components\Light.h">
       <Filter>Core\Components</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Component.h"
 #include "Components/PerspectiveCamera.h"
+#include "Components/Light.h"
 
 namespace Core
 {
@@ -116,5 +117,15 @@ namespace Core
 			return nullptr;
 
 		return cameras[0];
+	}
+
+	Light* Scene::GetMainLight() const
+	{
+		auto lights = GetComponents<Light>();
+
+		if (lights.empty())
+			return nullptr;
+
+		return lights[0];
 	}
 }

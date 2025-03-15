@@ -3,17 +3,18 @@
 #include "Log.h"
 
 #include "Scene.h"
-#include "Core/VulkanWrapper/Image.h"
-#include "Core/VulkanWrapper/Sampler.h"
-#include "Core/VulkanWrapper/Texture.h"
-#include "Core/Material.h"
-#include "Core/Utils/Utility.h"
-#include "Core/Components/Mesh.h"
-#include "Core/SubMesh.h"
-#include "Core/Entity.h"
-#include "Core/VulkanWrapper/Vertex.h"
-#include "Core/Components/PerspectiveCamera.h"
-#include "Core/Components/FreeCamera.h"
+#include "VulkanWrapper/Image.h"
+#include "VulkanWrapper/Sampler.h"
+#include "VulkanWrapper/Texture.h"
+#include "Material.h"
+#include "Utils/Utility.h"
+#include "Components/Mesh.h"
+#include "SubMesh.h"
+#include "Entity.h"
+#include "VulkanWrapper/Vertex.h"
+#include "Components/PerspectiveCamera.h"
+#include "Components/FreeCamera.h"
+#include "Components/Light.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -342,6 +343,105 @@ void Core::GLTFLoader::CheckExtensions()
 
 void Core::GLTFLoader::LoadLights()
 {
+	if (_model->extensions.find(KHR_LIGHTS_PUNCTUAL_EXTENSION) == _model->extensions.end() ||
+		!_model->extensions.at(KHR_LIGHTS_PUNCTUAL_EXTENSION).Has("lights"))
+	{
+		return;
+	}
+
+	auto& khrLights = 
+		_model->extensions.at(KHR_LIGHTS_PUNCTUAL_EXTENSION).Get("lights");
+
+	for (size_t i = 0; i < khrLights.ArrayLen(); ++i)
+	{
+		auto& khrLight = khrLights.Get(static_cast<int>(i));
+
+		// Spec states a light has to have a type to be valid
+		if (!khrLight.Has("type"))
+		{
+			LOG("KHR_lights_punctual extension: light {} doesn't have a type!", i);
+			throw runtime_error("Couldn't load glTF file, KHR_lights_punctual extension is invalid");
+		}
+
+		auto light = 
+			make_unique<Core::Light>(khrLight.Get("name").Get<string>());
+
+		LightType type;
+		LightProperties properties;
+
+		// Get type
+		auto& gltfLightType = khrLight.Get("type").Get<string>();
+		
+		if (gltfLightType == "point")
+		{
+			type = LightType::Point;
+		}
+		else if (gltfLightType == "spot")
+		{
+			type = LightType::Spot;
+		}
+		else if (gltfLightType == "directional")
+		{
+			type = LightType::Directional;
+		}
+		else
+		{
+			LOG("KHR_lights_punctual extension: light type '{}' is invalid", gltfLightType);
+			throw std::runtime_error("Couldn't load glTF file, KHR_lights_punctual extension is invalid");
+		}
+
+		// Get properties
+		if (khrLight.Has("color"))
+		{
+			properties.Color = glm::vec3(
+				static_cast<float>(khrLight.Get("color").Get(0).Get<double>()),
+				static_cast<float>(khrLight.Get("color").Get(1).Get<double>()),
+				static_cast<float>(khrLight.Get("color").Get(2).Get<double>()));
+		}
+
+		if (khrLight.Has("intensity"))
+		{
+			properties.Intensity = 
+				static_cast<float>(khrLight.Get("intensity").Get<double>());
+		}
+
+		if (type != LightType::Directional)
+		{
+			properties.Range = static_cast<float>(khrLight.Get("range").Get<double>());
+			if (type != LightType::Point)
+			{
+				if (!khrLight.Has("spot"))
+				{
+					LOG("KHR_lights_punctual extension: spot light doesn't have a 'spot' property set", gltfLightType);
+					throw std::runtime_error("Couldn't load glTF file, KHR_lights_punctual extension is invalid");
+				}
+
+				properties.InnerConeAngle = static_cast<float>(khrLight.Get("spot").Get("innerConeAngle").Get<double>());
+
+				if (khrLight.Get("spot").Has("outerConeAngle"))
+				{
+					properties.OuterConeAngle = static_cast<float>(khrLight.Get("spot").Get("outerConeAngle").Get<double>());
+				}
+				else
+				{
+					// Spec states default value is PI/4
+					properties.OuterConeAngle = glm::pi<float>() / 4.0f;
+				}
+			}
+		}
+		else if (type == LightType::Directional || type == LightType::Spot)
+		{
+			// The spec states that the light will inherit the transform of the node.
+			// The light's direction is defined as the 3-vector (0.0, 0.0, -1.0) and
+			// the rotation of the node orients the light accordingly.
+			properties.Direction = glm::vec3(0.0f, 0.0f, -1.0f);
+		}
+
+		light->SetLightType(type);
+		light->SetProperties(properties);
+
+		_scene.AddComponent(move(light));
+	}
 }
 
 vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers()
@@ -612,6 +712,7 @@ void Core::GLTFLoader::LoadNodes()
 {
 	auto meshes = _scene.GetComponents<Mesh>();
 	auto cameras = _scene.GetComponents<PerspectiveCamera>();
+	auto lights = _scene.GetComponents<Light>();
 
 	for (size_t i = 0; i < _model->nodes.size(); ++i)
 	{
@@ -676,17 +777,13 @@ void Core::GLTFLoader::LoadNodes()
 			camera->SetEntity(entity.get());
 		}
 
-		/*if (auto extension = get_extension(gltfNode.extensions, KHR_LIGHTS_PUNCTUAL_EXTENSION))
+		if (gltfNode.light >= 0)
 		{
-			auto lights = scene.get_components<sg::Light>();
-			int  light_index = extension->Get("light").Get<int>();
-			assert(light_index < lights.size());
-			auto light = lights[light_index];
+			auto light = lights[gltfNode.light];
 
-			node->set_component(*light);
-
-			light->set_node(*node);
-		}*/
+			entity->SetComponent(*light);
+			light->SetEntity(entity.get());
+		}
 
 		_scene.AddEntity(std::move(entity));
 	}
