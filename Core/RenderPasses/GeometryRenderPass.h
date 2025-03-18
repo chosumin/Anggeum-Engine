@@ -32,6 +32,8 @@ namespace Core
 		RenderTarget* _shadowRenderTarget;
 
 		ShadowUniform* _shadowBuffer;
+
+		LightBuffer _lightBuffer;
 	};
 }
 

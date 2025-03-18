@@ -142,7 +142,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
-    <ClCompile Include="Core\BufferObjects\BufferObjects.cpp" />
     <ClCompile Include="Core\Component.cpp" />
     <ClCompile Include="Core\Components\FreeCamera.cpp" />
     <ClCompile Include="Core\Components\Light.cpp" />
@@ -189,7 +188,7 @@
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Sample\Sample\SampleScene.cpp" />
-    <ClCompile Include="Shaders\SampleShader.cpp" />
+    <ClCompile Include="Shaders\PBRShader.cpp" />
     <ClCompile Include="Shaders\ShadowShader.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -274,7 +273,8 @@
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Sample\Sample\SampleScene.h" />
-    <ClInclude Include="Shaders\SampleShader.h" />
+    <ClInclude Include="Shaders\lighting.h" />
+    <ClInclude Include="Shaders\PBRShader.h" />
     <ClInclude Include="Shaders\ShadowShader.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
@@ -290,10 +290,10 @@
     <None Include="cpp.hint" />
     <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
     <None Include="Shaders\common.glsl" />
-    <None Include="Shaders\fs.frag" />
+    <None Include="Shaders\pbr.frag" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
-    <None Include="Shaders\vs.vert" />
+    <None Include="Shaders\pbr.vert" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan.rc" />

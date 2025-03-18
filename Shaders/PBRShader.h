@@ -3,10 +3,10 @@
 
 namespace Core
 {
-	class SampleShader : public Shader
+	class PBRShader : public Shader
 	{
 	public:
-		SampleShader(Device& device);
+		PBRShader(Device& device);
 
 		virtual type_index GetType() override;
 		virtual string GetPass() override;

@@ -264,6 +264,7 @@ Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
 Core::GLTFLoader::~GLTFLoader()
 {
 	delete(_model);
+	delete(_defaultTexture);
 }
 
 void Core::GLTFLoader::LoadScene(const string& path)
@@ -319,6 +320,8 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 	auto images = LoadImages(modelPath);
 
 	auto textures = LoadTextures(samplers, images);
+
+	LoadDefaultTexture();
 
 	auto materials = LoadMaterials(textures);
 	
@@ -453,39 +456,47 @@ vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers()
 	for (size_t i = 0; i < size; ++i)
 	{
 		auto sampler = _model->samplers[i];
-		VkSamplerCreateInfo samplerInfo{};
-		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
-		samplerInfo.minFilter = FindMinFilter(sampler.minFilter);
-		samplerInfo.magFilter = FindMagFilter(sampler.magFilter);
-
-		samplerInfo.addressModeU = FindWrapMode(sampler.wrapS);
-		samplerInfo.addressModeV = FindWrapMode(sampler.wrapT);
-		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-		samplerInfo.mipmapMode = FindMipmapMode(sampler.minFilter);
-		
-		VkPhysicalDeviceProperties properties{};
-		vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
-
-		samplerInfo.anisotropyEnable = VK_TRUE;
-		//lower value results in better performance, but lower quality results.
-		samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-
-		samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		samplerInfo.unnormalizedCoordinates = VK_FALSE;
-		samplerInfo.compareEnable = VK_FALSE; //usually used for percentage-closer filtering on shadow maps.
-		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-		samplerInfo.mipLodBias = 0.0f;
-		samplerInfo.minLod = 0.0f;
-
-		//HACK : hardcoded.
-		samplerInfo.maxLod = numeric_limits<float>::max();
-
-		samplers[i] = new Sampler(_device, samplerInfo);
+		samplers[i] = LoadSampler(sampler);
 	}
 
 	return samplers;
+}
+
+Core::Sampler* Core::GLTFLoader::LoadSampler(tinygltf::Sampler& gltfSampler)
+{
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+	samplerInfo.minFilter = FindMinFilter(gltfSampler.minFilter);
+	samplerInfo.magFilter = FindMagFilter(gltfSampler.magFilter);
+
+	samplerInfo.addressModeU = FindWrapMode(gltfSampler.wrapS);
+	samplerInfo.addressModeV = FindWrapMode(gltfSampler.wrapT);
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	samplerInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
+
+	samplerInfo.anisotropyEnable = VK_TRUE;
+	//lower value results in better performance, but lower quality results.
+	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE; //usually used for percentage-closer filtering on shadow maps.
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+
+	//HACK : hardcoded.
+	samplerInfo.maxLod = numeric_limits<float>::max();
+
+	auto sampler = new Core::Sampler(_device, samplerInfo);
+
+	return sampler;
 }
 
 vector<Core::Image*> Core::GLTFLoader::LoadImages(const string& modelPath)
@@ -532,7 +543,6 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 		int imageIndex = _model->textures[i].source;
 		int samplerIndex = _model->textures[i].sampler;
 
-		//TODO : default sampler
 		auto texture = new Texture(_device, _model->textures[i].name,
 			images[imageIndex], samplers[samplerIndex]);
 
@@ -540,6 +550,23 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 	}
 
 	return textures;
+}
+
+void Core::GLTFLoader::LoadDefaultTexture()
+{
+	tinygltf::Sampler gltfSampler;
+
+	gltfSampler.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+	gltfSampler.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+
+	gltfSampler.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
+	gltfSampler.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
+
+	auto defaultSampler = LoadSampler(gltfSampler);
+
+	auto defaultImage = new Core::Image(_device, "Assets/Textures/white.png");
+
+	_defaultTexture = new Texture(_device, "default", defaultImage, defaultSampler);
 }
 
 vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& textures)
@@ -555,43 +582,84 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 		uint32_t hash = Utility::HashCode(gltfMaterial.name.c_str());
 
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = new Material(_device, "Sample", hash);
+		auto material = new Material(_device, "PBR", hash, *_defaultTexture);
+
+		PBRBuffer* pbrBuffer = new PBRBuffer();
+		material->AddBuffer(6, pbrBuffer);
 
 		for (auto& value : gltfMaterial.values)
 		{
-			if (value.first.find("baseColorTexture") != string::npos)
+			if (value.first.find("baseColorFactor") != string::npos)
 			{
-				//Texture
-				string texName = value.first;
-				
-				int index = value.second.TextureIndex();
-				auto texture = textures[index];
+				const auto& colorFactor = value.second.ColorFactor();
+				pbrBuffer->Albedo = glm::vec4(colorFactor[0], colorFactor[1], colorFactor[2], colorFactor[3]);
+			}
+			else if (value.first.find("roughnessFactor") != string::npos)
+			{
+				pbrBuffer->Roughness = static_cast<float>(value.second.Factor());
+			}
+			else if (value.first.find("metallicFactor") != string::npos)
+			{
+				pbrBuffer->Metallic = static_cast<float>(value.second.Factor());
+			}
+			else if (value.first.find("baseColorTexture") != string::npos)
+			{
+				auto texture = textures[value.second.TextureIndex()];
 
 				if (NeedSRGB(value.first))
 					texture->GetImage()->SetSRGBFormat();
 
 				material->SetBuffer(1, texture);
 			}
-
-			//TODO : parse PBR textures
-		}
-
-		for (auto& value : gltfMaterial.additionalValues)
-		{
-			if (value.first.find("Texture") != std::string::npos)
+			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
-				string texName = value.first;
-
 				auto texture = textures[value.second.TextureIndex()];
 
 				if (NeedSRGB(value.first))
 					texture->GetImage()->SetSRGBFormat();
 
-				//material->SetBuffer(1, texture);
+				material->SetBuffer(3, texture);
 			}
 		}
-		
-		//TODO : map properties.
+
+		for (auto& additionalValue : gltfMaterial.additionalValues)
+		{
+			if (additionalValue.first.find("normalTexture") != string::npos)
+			{
+				auto texture = textures[additionalValue.second.TextureIndex()];
+
+				if (NeedSRGB(additionalValue.first))
+					texture->GetImage()->SetSRGBFormat();
+
+				material->SetBuffer(2, texture);
+			}
+			else if (additionalValue.first.find("emissiveTexture") != string::npos)
+			{
+			}
+			else if (additionalValue.first.find("occlusionTexture") != string::npos)
+			{
+			}
+			else if (additionalValue.first.find("alphaMode") != string::npos)
+			{
+				/*tinygltf::Parameter param = additionalValue.first["alphaMode"];
+				if (param.string_value == "BLEND") {
+					material.alphaMode = AlphaMode::Blend;
+				}
+				if (param.string_value == "MASK") {
+					material.alphaCutoff = 0.5f;
+					material.alphaMode = AlphaMode::Mask;
+				}*/
+			}
+			else if (additionalValue.first.find("alphaCutoff") != string::npos)
+			{
+				/*material.alphaCutoff =
+					static_cast<float>(additionalValue.first["alphaCutoff"].Factor());*/
+			}
+			else if (additionalValue.first.find("emissiveFactor") != string::npos)
+			{
+				/*material.emissiveFactor = glm::vec4(glm::make_vec3(gltfMaterial.additionalValues["emissiveFactor"].ColorFactor().data()), 1.0);*/
+			}
+		}
 
 		materials[i] = material;
 	}

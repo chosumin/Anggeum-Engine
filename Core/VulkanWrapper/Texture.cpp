@@ -11,11 +11,12 @@ Core::Texture::Texture(Device& device, string name, Image* image, Sampler* sampl
 
 Core::Texture::~Texture()
 {
-	if (_image != nullptr)
+	//TODO : Implement a resouce cache system.
+	/*if (_image != nullptr)
 		delete(_image);
 
 	if (_sampler != nullptr)
-		delete(_sampler);
+		delete(_sampler);*/
 }
 
 VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()

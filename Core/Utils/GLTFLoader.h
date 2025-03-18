@@ -5,6 +5,7 @@
 namespace tinygltf
 {
 	class Model;
+	class Sampler;
 }
 
 namespace Core
@@ -44,10 +45,12 @@ namespace Core
 		void CheckExtensions();
 		void LoadLights();
 		vector<Core::Sampler*> LoadSamplers();
+		Core::Sampler* LoadSampler(tinygltf::Sampler& sampler);
 		vector<Core::Image*> LoadImages(const string& modelPath);
 		vector<Core::Texture*> LoadTextures(
 			vector<Core::Sampler*>& samplers,
 			vector<Core::Image*>& images);
+		void LoadDefaultTexture();
 		vector<Core::Material*> LoadMaterials(vector<Core::Texture*>& textures);
 		void LoadMeshes(vector<Core::Material*>& materials);
 		void LoadCameras();
@@ -56,5 +59,6 @@ namespace Core
 		Device& _device;
 		Scene& _scene;
 		tinygltf::Model* _model;
+		Core::Texture* _defaultTexture;
 	};
 }

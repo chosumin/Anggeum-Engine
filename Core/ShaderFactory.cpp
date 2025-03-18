@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "ShaderFactory.h"
 #include "VulkanWrapper/Shader.h"
-#include "Shaders/SampleShader.h"
+#include "Shaders/PBRShader.h"
 #include "Shaders/ShadowShader.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -44,11 +44,11 @@ Shader* Core::ShaderFactory::CreateShaderInternal(Device& device, size_t hash)
 {
 	switch (hash)
 	{
-		case Utility::HashCode("Sample"):
-			return new SampleShader(device);
+		case Utility::HashCode("PBR"):
+			return new PBRShader(device);
 		case Utility::HashCode("Shadow"):
 			return new ShadowShader(device);
 		default:
-			return new SampleShader(device);
+			return new PBRShader(device);
 	}
 }

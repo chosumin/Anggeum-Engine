@@ -39,7 +39,7 @@ SampleScene::SampleScene(Core::Device& device,
 	if (mainLight == nullptr)
 	{
 		auto lightEntity = make_unique<Entity>(-1, "main light");
-		auto light = make_unique<Light>("main light");
+		auto light = make_unique<Core::Light>("main light");
 
 		mainLight = light.get();
 		mainLight->SetEntity(lightEntity.get());

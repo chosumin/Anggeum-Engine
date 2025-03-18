@@ -3,10 +3,23 @@
 #include "VulkanWrapper/Shader.h"
 #include "VulkanWrapper/CommandPool.h"
 #include "VulkanWrapper/RenderTarget.h"
+#include "VulkanWrapper/Texture.h"
 #include "ShaderFactory.h"
 
 namespace Core
 {
+	Material::Material(Device& device, string shaderName, uint32_t hash, Texture& defaultTexture)
+		:_device(device), _isDirty(true), _hash(hash)
+	{
+		_shader = ShaderFactory::CreateShader(device, shaderName);
+
+		CreateDescriptorSets();
+		CreateBuffers();
+
+		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
+		SetDefault(defaultTexture);
+	}
+
 	Material::Material(Device& device, string shaderName, uint32_t hash)
 		:_device(device), _isDirty(true), _hash(hash)
 	{
@@ -18,12 +31,6 @@ namespace Core
 
 	Core::Material::~Material()
 	{
-		for (auto& texture : _textures)
-		{
-			delete(texture.second);
-		}
-		_textures.clear();
-
 		for (auto& uniformBuffer : _uniformBuffers)
 		{
 			delete(uniformBuffer.second);
@@ -35,6 +42,12 @@ namespace Core
 			delete(textureBuffer.second);
 		}
 		_textureBuffers.clear();
+
+		for (auto& buffer : _buffers)
+		{
+			delete(buffer.second);
+		}
+		_buffers.clear();
 	}
 
 	Shader& Core::Material::GetShader() const
@@ -48,21 +61,25 @@ namespace Core
 
 	void Core::Material::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
 	{
+		if (_uniformBuffers.find(binding) == _uniformBuffers.end())
+			return;
+
 		_uniformBuffers[binding]->SetBuffer(currentImage, data);
 	}
 
 	void Core::Material::SetBuffer(uint32_t binding, Texture* texture)
 	{
+		if (_textureBuffers.find(binding) == _textureBuffers.end())
+			return;
+
 		_textureBuffers[binding]->CopyDescriptorImageInfo(texture->GetDescriptorImageInfo());
-
-		/*if (_textures[binding] != nullptr)
-			delete(_textures[binding]);*/
-
-		_textures[binding] = texture;
 	}
 
 	void Material::SetBuffer(uint32_t binding, RenderTarget* renderTarget)
 	{
+		if (_textureBuffers.find(binding) == _textureBuffers.end())
+			return;
+
 		_textureBuffers[binding]->CopyDescriptorImageInfo(renderTarget->GetDescriptorImageInfo());
 	}
 
@@ -150,6 +167,17 @@ namespace Core
 		{
 			auto buffer = new Core::TextureBuffer();
 			_textureBuffers[binding.Binding] = buffer;
+		}
+	}
+
+	void Material::SetDefault(Texture& defaultTexture)
+	{
+		auto descriptor = defaultTexture.GetDescriptorImageInfo();
+
+		for (auto&& textureBuffer : _textureBuffers)
+		{
+			textureBuffer.second->CopyDescriptorImageInfo(descriptor);
+
 		}
 	}
 }

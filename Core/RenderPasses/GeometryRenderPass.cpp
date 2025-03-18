@@ -88,8 +88,10 @@ namespace Core
 			for (auto&& material : batch.second->Materials)
 			{
 				material.second->SetBuffer(currentFrame, 0, &camera->Matrices);
-				material.second->SetBuffer(2, _shadowRenderTarget);
-				material.second->SetBuffer(currentFrame, 3, &_shadowBuffer->Projection);
+				material.second->SetBuffer(4, _shadowRenderTarget);
+				material.second->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
+				material.second->SetBuffer(currentFrame, 7, &_lightBuffer);
+				material.second->SetBuffer(currentFrame);
 			}
 
 			batch.second->Draw(commandBuffer, currentFrame);

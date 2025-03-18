@@ -1,17 +1,28 @@
 #pragma once
 #include "VulkanWrapper/UniformBuffer.h"
 #include "VulkanWrapper/TextureBuffer.h"
-#include "VulkanWrapper/Texture.h"
 
 namespace Core
 {
 	class Device;
 	class Shader;
-	class CommandPool;
+	class Texture;
 	struct RenderTarget;
+
+	enum class AlphaMode
+	{
+		/// Alpha value is ignored
+		Opaque,
+		/// Either full opaque or fully transparent
+		Mask,
+		/// Output is combined with the background
+		Blend
+	};
+
 	class Material
 	{
 	public:
+		Material(Device& device, string shaderName, uint32_t hash, Texture& defaultTexture);
 		Material(Device& device, string shaderName, uint32_t hash);
 		Material(const Material& other) = default;
 		virtual ~Material();
@@ -21,9 +32,27 @@ namespace Core
 		Shader& GetShader() const;
 		void SetShader(Shader& shader);
 
+		void* GetBuffer(uint32_t binding)
+		{
+			return _buffers[binding];
+		}
+
+		void AddBuffer(uint32_t binding, void* data)
+		{
+			_buffers[binding] = data;
+		}
+
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
 		void SetBuffer(uint32_t binding, Texture* texture);
 		void SetBuffer(uint32_t binding, RenderTarget* renderTarget);
+
+		void SetBuffer(uint32_t currentImage)
+		{
+			for (auto&& buffer : _buffers)
+			{
+				SetBuffer(currentImage, buffer.first, buffer.second);
+			}
+		}
 
 		const VkDescriptorSet& GetDescriptorSet(size_t index) const
 		{
@@ -48,10 +77,10 @@ namespace Core
 	private:
 		void CreateDescriptorSets();
 		void CreateBuffers();
+		void SetDefault(Texture& defaultTexture);
 	protected:
 		Device& _device;
 		Shader* _shader;
-		unordered_map<uint32_t, Texture*> _textures;
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
@@ -61,6 +90,12 @@ namespace Core
 		uint32_t _hash;
 
 		vector<VkDescriptorSet> _descriptorSets;
+
+		bool _isDoubledSided;
+		AlphaMode _alphaMode = AlphaMode::Opaque;
+		bool _isAlphaCutoff;
+
+		unordered_map<uint32_t, void*> _buffers;
 	};
 }
 

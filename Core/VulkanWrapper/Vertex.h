@@ -12,6 +12,7 @@ struct Vertex
 {
     vec3 Pos;
     vec3 Color;
+    vec3 Normal;
     vec2 TexCoord;
 
     static VkVertexInputBindingDescription GetBindingDescription(
@@ -39,7 +40,10 @@ struct Vertex
 
     bool operator==(const Vertex& other) const
     {
-        return Pos == other.Pos && Color == other.Color && TexCoord == other.TexCoord;
+        return Pos == other.Pos && 
+            Normal == other.Normal &&
+            Color == other.Color && 
+            TexCoord == other.TexCoord;
     }
 };
 
@@ -53,7 +57,8 @@ namespace std {
         size_t operator()(Vertex const& vertex) const {
             return 
                 ((hash<glm::vec3>()(vertex.Pos) ^ 
-                (hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^ 
+                (hash<glm::vec3>()(vertex.Color) << 1)) >> 1) ^
+                (hash<glm::vec3>()(vertex.Normal) << 1) ^
                 (hash<glm::vec2>()(vertex.TexCoord) << 1);
         }
     };

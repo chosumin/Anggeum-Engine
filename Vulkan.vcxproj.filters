@@ -34,9 +34,6 @@
     <ClCompile Include="Core\Window.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\BufferObjects\BufferObjects.cpp">
-      <Filter>Core\BufferObjects</Filter>
-    </ClCompile>
     <ClCompile Include="ThirdParties\imgui\imgui.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp" />
@@ -68,7 +65,7 @@
     <ClCompile Include="Core\ShaderFactory.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Shaders\SampleShader.cpp">
+    <ClCompile Include="Shaders\PBRShader.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
     <ClCompile Include="Shaders\ShadowShader.cpp">
@@ -228,7 +225,7 @@
     <ClInclude Include="Core\ShaderFactory.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\SampleShader.h">
+    <ClInclude Include="Shaders\PBRShader.h">
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="Shaders\ShadowShader.h">
@@ -324,10 +321,13 @@
     <ClInclude Include="Core\Components\Light.h">
       <Filter>Core\Components</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\lighting.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
-    <None Include="Shaders\fs.frag">
+    <None Include="Shaders\pbr.frag">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\shadow.frag">
@@ -336,7 +336,7 @@
     <None Include="Shaders\shadow.vert">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\vs.vert">
+    <None Include="Shaders\pbr.vert">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\common.glsl">

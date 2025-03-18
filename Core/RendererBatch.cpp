@@ -75,14 +75,14 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 	//1. Material batch
 	for (auto&& material : Materials)
 	{
-		auto& subMeshBatches = SubMeshBatches[material.first];
-
 		commandBuffer.BindDescriptorSets(
 			VK_PIPELINE_BIND_POINT_GRAPHICS, *material.second, currentFrame);
 
 		auto vertexAttibuteNames = material.second->GetShader().GetVertexAttirbuteNames();
 
 		//2. SubMesh batch
+		auto& subMeshBatches = SubMeshBatches[material.first];
+
 		for (auto&& subMeshBatch : subMeshBatches)
 		{
 			RendererBatch::Sort();

@@ -66,7 +66,7 @@ Core::Image::~Image()
 
 void Core::Image::SetSRGBFormat()
 {
-    VkFormat srgb;
+    VkFormat srgb = _format;
     switch (_format)
     {
     case VK_FORMAT_R8_UNORM:
@@ -136,6 +136,8 @@ void Core::Image::SetSRGBFormat()
     case VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG:
         srgb = VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG; break;
     }
+
+    _format = srgb;
 }
 
 void Core::Image::CreateImage(void* pixels, VkExtent3D extent)
