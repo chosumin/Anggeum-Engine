@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "Transform.h"
-#include <glm/gtx/matrix_decompose.hpp>
 
 Core::Transform::Transform()
 {
@@ -69,6 +68,7 @@ glm::mat4 Core::Transform::GetMatrix() const
 void Core::Transform::InvalidateWorldMatrix()
 {
 	_updateWorldMatrix = true;
+	_worldMatrix = GetMatrix();
 }
 
 void Core::Transform::Resize(uint32_t width, uint32_t height)

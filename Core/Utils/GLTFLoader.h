@@ -5,7 +5,7 @@
 namespace tinygltf
 {
 	class Model;
-	class Sampler;
+	struct Sampler;
 }
 
 namespace Core

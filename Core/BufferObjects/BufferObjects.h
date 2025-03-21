@@ -29,5 +29,5 @@ struct alignas(16) LightInfo
 
 struct LightBuffer
 {
-	LightInfo DirectionalLight;
+	LightInfo Light;
 };

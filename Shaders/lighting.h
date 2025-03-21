@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+#define DIRECTIONAL_LIGHT 0
+#define POINT_LIGHT 1
+#define SPOT_LIGHT 2
+
 struct Light
 {
 	vec4 position;         // position.w represents type of light
@@ -23,30 +27,56 @@ struct Light
 	vec2 info;             // (only used for spot lights) info.x represents light inner cone angle, info.y represents light outer cone angle
 };
 
-vec3 apply_directional_light(Light light, vec3 normal)
+vec3 ApplyDirectionalLight(Light light, vec3 normal)
 {
-	vec3 world_to_light = -light.direction.xyz;
-	world_to_light = normalize(world_to_light);
-	float ndotl = clamp(dot(normal, world_to_light), 0.0, 1.0);
+	vec3 worldToLight = -light.direction.xyz;
+	worldToLight = normalize(worldToLight);
+	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
 	return ndotl * light.color.w * light.color.rgb;
 }
 
-vec3 apply_point_light(Light light, vec3 pos, vec3 normal)
+vec3 ApplyPointLight(Light light, vec3 pos, vec3 normal)
 {
-	vec3  world_to_light = light.position.xyz - pos;
-	float dist = length(world_to_light) * 0.005;
+	vec3  worldToLight = light.position.xyz - pos;
+	float dist = length(worldToLight) * 0.005;
 	float atten = 1.0 / (dist * dist);
-	world_to_light = normalize(world_to_light);
-	float ndotl = clamp(dot(normal, world_to_light), 0.0, 1.0);
+	worldToLight = normalize(worldToLight);
+	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
 	return ndotl * light.color.w * atten * light.color.rgb;
 }
 
-vec3 apply_spot_light(Light light, vec3 pos, vec3 normal)
+vec3 ApplySpotLight(Light light, vec3 pos, vec3 normal)
 {
-	vec3  light_to_pixel = normalize(pos - light.position.xyz);
-	float theta = dot(light_to_pixel, normalize(light.direction.xyz));
-	float inner_cone_angle = light.info.x;
-	float outer_cone_angle = light.info.y;
-	float intensity = (theta - outer_cone_angle) / (inner_cone_angle - outer_cone_angle);
+	vec3  lightToPixel = normalize(pos - light.position.xyz);
+	float theta = dot(lightToPixel, normalize(light.direction.xyz));
+	float innerConeAngle = light.info.x;
+	float outerConeAngle = light.info.y;
+	float intensity = (theta - outerConeAngle) / (innerConeAngle - outerConeAngle);
 	return smoothstep(0.0, 1.0, intensity) * light.color.w * light.color.rgb;
+}
+
+vec3 GetLightDirection(Light light, vec3 worldPos)
+{
+	if (light.position.w == DIRECTIONAL_LIGHT)
+	{
+		return -light.direction.xyz;
+	}
+	else
+	{
+		return light.position.xyz - worldPos;
+	}
+}
+
+vec3 ApplyLight(Light light, vec3 pos, vec3 normal)
+{
+	if (light.position.w == DIRECTIONAL_LIGHT)
+	{
+		return ApplyDirectionalLight(light, pos);
+	}
+	else if (light.position.w == POINT_LIGHT)
+	{
+		return ApplyPointLight(light, pos, normal);
+	}
+	else
+		return ApplySpotLight(light, pos, normal);
 }

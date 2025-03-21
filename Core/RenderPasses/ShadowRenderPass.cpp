@@ -2,22 +2,23 @@
 #include "ShadowRenderPass.h"
 #include "Scene.h"
 #include "RendererBatch.h"
-#include "Shaders/ShadowShader.h"
-#include "Components/PerspectiveCamera.h"
+#include "Entity.h"
+#include "Components/Mesh.h"
+#include "Components/Light.h"
 #include "VulkanWrapper/Framebuffer.h"
 #include "VulkanWrapper/SwapChain.h"
 #include "VulkanWrapper/CommandBuffer.h"
 #include "VulkanWrapper/Pipeline.h"
 #include "MaterialFactory.h"
 #include "Material.h"
-#include "Core/Components/Mesh.h"
-#include <glm/gtx/matrix_decompose.hpp>
-#include <glm/gtx/euler_angles.hpp>
 using namespace Core;
 
 Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain& swapChain, RenderTarget* depthRenderTarget)
 	:RenderPass(device), _scene(scene), _shadowMap(depthRenderTarget)
 {
+	/*auto light = _scene.GetMainLight();
+	auto viewMat = light->GetEntity().GetTransform().GetMatrix();
+	_directionalLight*/
 	_directionalLight.View = lookAt(
 		vec3(-2.0f, 2.0f, 2.0f),
 		vec3(0.0f, 0.0f, 0.0f),
@@ -30,6 +31,7 @@ Core::ShadowRenderPass::ShadowRenderPass(Device& device, Scene& scene, SwapChain
 		0.1f, 10.0f);
 	_directionalLight.Perspective[1][1] *= -1;
 
+	//TODO : remove _shadowBuffer
 	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 
 	_material = MaterialFactory::CreateMaterial(device, "Assets/Materials/Shadow.json");
@@ -82,35 +84,4 @@ void Core::ShadowRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t current
 
 void Core::ShadowRenderPass::UpdateGUI()
 {
-	static float radian = 3.14159f / 180.f;
-
-	vec3 skew;
-	vec4 perspective;
-	vec3 scale;
-	quat rotation;
-	vec3 translation;
-	decompose(_directionalLight.View, scale, rotation, translation, skew, perspective);
-
-	//quat to degree.
-	glm::vec3 euler = glm::eulerAngles(rotation) / radian;
-
-	ImGui::Begin("Directional Light");
-
-	bool x = ImGui::SliderFloat("x", &euler.x, -360.0f, 360.0f);
-	bool y = ImGui::SliderFloat("y", &euler.y, -360.0f, 360.0f);
-	bool z = ImGui::SliderFloat("z", &euler.z, -360.0f, 360.0f);
-
-	ImGui::End();
-
-	if (x || y || z)
-	{
-		vec3 degreeToRadian = euler * radian;
-		quat newRotation = glm::quat(degreeToRadian);
-
-		_directionalLight.View = translate(glm::mat4(1.0), translation) *
-			glm::mat4_cast(newRotation) *
-			glm::scale(glm::mat4(1.0), scale);
-
-		_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
-	}
 }

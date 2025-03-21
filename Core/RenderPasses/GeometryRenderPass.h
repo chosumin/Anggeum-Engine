@@ -20,10 +20,14 @@ namespace Core
 		virtual void Prepare() override;
 		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 
-		void SetShadowBuffer(ShadowUniform& shadowBuffer)
+		//TODO : remove and replace it to the light component
+		void SetBuffer(ShadowUniform& shadowBuffer)
 		{
 			_shadowBuffer = &shadowBuffer;
 		}
+	private:
+		void UpdateGUI();
+		void UpdateLightBuffer();
 	private:
 		Scene& _scene;
 

@@ -18,6 +18,8 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/euler_angles.hpp>
 using namespace glm;
 
 #include "ThirdParties/rapidjson/include/rapidjson/document.h"

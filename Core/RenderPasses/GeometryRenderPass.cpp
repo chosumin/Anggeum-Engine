@@ -2,6 +2,7 @@
 #include "GeometryRenderPass.h"
 #include "Scene.h"
 #include "Components/PerspectiveCamera.h"
+#include "Components/Light.h"
 #include "VulkanWrapper/CommandBuffer.h"
 #include "VulkanWrapper/Framebuffer.h"
 #include "VulkanWrapper/SwapChain.h"
@@ -68,10 +69,12 @@ namespace Core
 		}
 	}
 
-	void GeometryRenderPass::Draw(
-		CommandBuffer& commandBuffer, 
+	void GeometryRenderPass::Draw(CommandBuffer& commandBuffer,
 		uint32_t currentFrame, uint32_t imageIndex)
 	{
+		UpdateGUI();
+		UpdateLightBuffer();
+
 		_shadowRenderTarget->TransitionImageLayout(commandBuffer,
 			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
 			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -98,5 +101,52 @@ namespace Core
 		}
 
 		commandBuffer.EndRenderPass();
+	}
+
+	void GeometryRenderPass::UpdateGUI()
+	{
+		auto mainLight = _scene.GetMainLight();
+
+		auto& properties = mainLight->GetProperties();
+		auto& transform = mainLight->GetEntity().GetTransform();
+
+		auto& rotation = transform.GetRotation();
+		glm::vec3 euler = glm::eulerAngles(rotation);
+		euler = glm::degrees(euler);
+
+		ImGui::Begin("Directional Light");
+
+		bool x = ImGui::SliderFloat("x", &euler.x, -90.0f, 90.0f);
+		bool y = ImGui::SliderFloat("y", &euler.y, -90.0f, 90.0f);
+		bool z = ImGui::SliderFloat("z", &euler.z, -90.0f, 90.0f);
+
+		ImGui::End();
+
+		if (x || y || z)
+		{
+			quat newRotation = glm::quat(glm::radians(euler));
+
+			transform.SetRotation(newRotation);
+		}
+	}
+
+	void GeometryRenderPass::UpdateLightBuffer()
+	{
+		auto mainLight = _scene.GetMainLight();
+
+		auto& properties = mainLight->GetProperties();
+		auto& transform = mainLight->GetEntity().GetTransform();
+
+		LightInfo lightInfo{};
+		lightInfo.Position = vec4(transform.GetTranslation(), 
+			static_cast<float>(mainLight->GetLightType()));
+		lightInfo.Color = vec4(properties.Color, properties.Intensity);
+
+		auto direction = glm::eulerAngles(transform.GetRotation());
+		lightInfo.Direction = 
+			vec4(direction, properties.Range);
+		lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
+
+		_lightBuffer.Light = lightInfo;
 	}
 }

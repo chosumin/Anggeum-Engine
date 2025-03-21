@@ -32,7 +32,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 
 	auto geometryRenderPass = new GeometryRenderPass(
 		device, scene, swapChain, _renderTargets[0].get(), _renderTargets[1].get(), _renderTargets[2].get());
-	geometryRenderPass->SetShadowBuffer(shadowRenderPass->GetShadowBuffer());
+	geometryRenderPass->SetBuffer(shadowRenderPass->GetShadowBuffer());
 
 	AddRenderPass(geometryRenderPass);
 }
