@@ -20,8 +20,11 @@ layout(location = 3) out vec2 uv;
 void main() 
 {
     worldPos = instance.world * vec4(position, 1.0);
-    gl_Position = camera.proj * camera.view * worldPos;
-    worldNormal = mat3(instance.world) * normal;
+
+    worldNormal = normalize(mat3(transpose(inverse(instance.world))) * normal);
+
     fragColor = color;
     uv = texCoord;
+    
+    gl_Position = camera.proj * camera.view * worldPos;
 }

@@ -101,6 +101,7 @@ void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
 {
 	auto& transform = _entity->GetComponent<Transform>();
 	Matrices.View = transform.GetMatrix();
+	Matrices.Position = vec3(glm::inverse(Matrices.View)[3]);
 }
 
 void Core::PerspectiveCamera::Resize(uint32_t width, uint32_t height)

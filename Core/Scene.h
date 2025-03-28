@@ -93,6 +93,8 @@ namespace Core
 
 		PerspectiveCamera* GetMainCamera() const;
 		Light* GetMainLight() const;
+
+		virtual void Update() = 0;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;

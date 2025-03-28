@@ -1,9 +1,10 @@
 #pragma once
 
-struct VPBufferObject
+struct alignas(16) VPBufferObject
 {
-	alignas(16) mat4 View;
-	alignas(16) mat4 Perspective;
+	mat4 View;
+	mat4 Perspective;
+	vec3 Position;
 };
 
 struct ShadowUniform
@@ -17,6 +18,11 @@ struct alignas(16) PBRBuffer
 	float Metallic;
 	float Roughness;
 	float AO;
+	int AlbedoTextureSet;
+	int MetallicTextureSet;
+	int RoughnessTextureSet;
+	int OcclusionTextureSet;
+	int DebugMode;
 };
 
 struct alignas(16) LightInfo

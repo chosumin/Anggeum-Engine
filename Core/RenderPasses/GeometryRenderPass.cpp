@@ -116,18 +116,12 @@ namespace Core
 
 		ImGui::Begin("Directional Light");
 
-		bool x = ImGui::SliderFloat("x", &euler.x, -90.0f, 90.0f);
-		bool y = ImGui::SliderFloat("y", &euler.y, -90.0f, 90.0f);
-		bool z = ImGui::SliderFloat("z", &euler.z, -90.0f, 90.0f);
+		ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
+		ImGui::SliderFloat3("Direction", &euler[0], -90.0f, 90.0f);
 
 		ImGui::End();
 
-		if (x || y || z)
-		{
-			quat newRotation = glm::quat(glm::radians(euler));
-
-			transform.SetRotation(newRotation);
-		}
+		transform.SetRotation(euler);
 	}
 
 	void GeometryRenderPass::UpdateLightBuffer()
@@ -142,7 +136,7 @@ namespace Core
 			static_cast<float>(mainLight->GetLightType()));
 		lightInfo.Color = vec4(properties.Color, properties.Intensity);
 
-		auto direction = glm::eulerAngles(transform.GetRotation());
+		auto direction = transform.GetRotation() * properties.Direction;
 		lightInfo.Direction = 
 			vec4(direction, properties.Range);
 		lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);

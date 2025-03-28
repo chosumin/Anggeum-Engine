@@ -37,7 +37,7 @@ namespace Core
 		const LightType& GetLightType();
 		void SetLightType(const LightType& type);
 
-		const LightProperties& GetProperties();
+		LightProperties& GetProperties();
 		void SetProperties(const LightProperties& properties);
 	private:
 		string _name;

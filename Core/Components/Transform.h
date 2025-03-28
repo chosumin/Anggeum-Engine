@@ -18,6 +18,7 @@ namespace Core
 
 		void SetTranslation(const glm::vec3& translation);
 		void SetRotation(const glm::quat& rotation);
+		void SetRotation(const glm::vec3& eulerAngles);
 		void SetScale(const glm::vec3& scale);
 		const vec3& GetTranslation() const;
 		const quat& GetRotation() const;

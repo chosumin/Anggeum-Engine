@@ -21,7 +21,7 @@ void Core::Light::SetLightType(const LightType& type)
 	_lightType = type;
 }
 
-const Core::LightProperties& Core::Light::GetProperties()
+Core::LightProperties& Core::Light::GetProperties()
 {
 	return _properties;
 }

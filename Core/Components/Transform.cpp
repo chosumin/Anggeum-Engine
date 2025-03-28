@@ -22,6 +22,12 @@ void Core::Transform::SetRotation(const glm::quat& rotation)
 	InvalidateWorldMatrix();
 }
 
+void Core::Transform::SetRotation(const glm::vec3& eulerAngles)
+{
+	_rotation = glm::quat(glm::radians(eulerAngles));
+	InvalidateWorldMatrix();
+}
+
 void Core::Transform::SetScale(const glm::vec3& scale)
 {
 	_scale = scale;

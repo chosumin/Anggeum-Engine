@@ -34,7 +34,7 @@ namespace Core
 
         if (_color != nullptr)
         {
-            clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+            clearValue.color = { {0.25f, 0.25f, 0.25f, 1.0f} };
             _clearValues.push_back(clearValue);
         }
 

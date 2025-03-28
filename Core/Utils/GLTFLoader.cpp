@@ -587,6 +587,12 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
 		material->AddBuffer(6, pbrBuffer);
 
+		pbrBuffer->Albedo = glm::vec4(1);
+
+		auto pbrMetallicRoughness = gltfMaterial.pbrMetallicRoughness;
+		pbrBuffer->Metallic = static_cast<float>(pbrMetallicRoughness.metallicFactor);
+		pbrBuffer->Roughness = static_cast<float>(pbrMetallicRoughness.roughnessFactor);
+
 		for (auto& value : gltfMaterial.values)
 		{
 			if (value.first.find("baseColorFactor") != string::npos)
@@ -610,6 +616,8 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 					texture->GetImage()->SetSRGBFormat();
 
 				material->SetBuffer(1, texture);
+				
+				pbrBuffer->AlbedoTextureSet = 1;
 			}
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
@@ -619,6 +627,10 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 					texture->GetImage()->SetSRGBFormat();
 
 				material->SetBuffer(3, texture);
+				
+				pbrBuffer->RoughnessTextureSet = 1;
+				pbrBuffer->MetallicTextureSet = 1;
+				pbrBuffer->OcclusionTextureSet = 1;
 			}
 		}
 
