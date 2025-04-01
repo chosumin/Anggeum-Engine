@@ -3,6 +3,7 @@
 #include "VulkanWrapper/Shader.h"
 #include "Shaders/PBRShader.h"
 #include "Shaders/ShadowShader.h"
+#include "Shaders/SkyboxShader.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -48,6 +49,8 @@ Shader* Core::ShaderFactory::CreateShaderInternal(Device& device, size_t hash)
 			return new PBRShader(device);
 		case Utility::HashCode("Shadow"):
 			return new ShadowShader(device);
+		case Utility::HashCode("Skybox"):
+			return new SkyboxShader(device);
 		default:
 			return new PBRShader(device);
 	}

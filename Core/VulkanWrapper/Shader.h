@@ -1,6 +1,8 @@
 #pragma once
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
+#include "VulkanWrapper/Vertex.h"
+#include "BufferObjects/BufferObjects.h"
 
 namespace Core
 {

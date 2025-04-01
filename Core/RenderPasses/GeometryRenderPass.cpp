@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/Light.h"
+#include "Components/Mesh.h"
 #include "VulkanWrapper/CommandBuffer.h"
 #include "VulkanWrapper/Framebuffer.h"
 #include "VulkanWrapper/SwapChain.h"
@@ -10,8 +11,8 @@
 #include "VulkanWrapper/Pipeline.h"
 #include "VulkanWrapper/Shader.h"
 #include "Material.h"
-#include "Core/Components/Mesh.h"
 #include "RendererBatch.h"
+#include "SubMesh.h"
 #include "Component.h"
 
 namespace Core
@@ -41,6 +42,8 @@ namespace Core
 		}
 
 		_batches.clear();
+
+		delete(_skyboxPipeline);
 	}
 
 	void GeometryRenderPass::Prepare()
@@ -100,7 +103,59 @@ namespace Core
 			batch.second->Draw(commandBuffer, currentFrame);
 		}
 
+		DrawSkybox(commandBuffer, currentFrame);
+
 		commandBuffer.EndRenderPass();
+	}
+
+	void GeometryRenderPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)
+	{
+		PerspectiveCamera* camera = _scene.GetMainCamera();
+
+		auto meshes = _scene.GetComponents<Core::Mesh>();
+
+		auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh) 
+		{
+			auto material = mesh->GetMaterials()[0];
+			auto& shader = material->GetShader();
+			return shader.GetPass() == "Skybox";
+		});
+
+		if (it != meshes.end())
+		{
+			auto skybox = *it;
+			auto material = skybox->GetMaterials()[0];
+			auto subMesh = skybox->GetSubMeshes()[0];
+			auto& shader = material->GetShader();
+
+			if (_skyboxPipeline == nullptr)
+			{
+				auto pipelineState = *_pipelineState;
+				auto& depthInfo = pipelineState.GetDepthStencilStateCreateInfo();
+				depthInfo.depthWriteEnable = VK_FALSE;
+				//depthInfo.depthCompareOp = VK_COMPARE_OP_GREATER;
+
+				auto& rasterizationInfo = pipelineState.GetRasterizationStateCreateInfo();
+				rasterizationInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+
+				_skyboxPipeline = new Pipeline(_device, *this, shader, pipelineState);
+			}
+
+			material->SetBuffer(currentFrame, 0, &camera->Matrices);
+
+			commandBuffer.BindPipeline(_skyboxPipeline);
+
+			commandBuffer.BindDescriptorSets(
+				VK_PIPELINE_BIND_POINT_GRAPHICS, *material, currentFrame);
+
+			auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
+
+			commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+
+			commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+
+			commandBuffer.DrawIndexed(subMesh->GetIndexCount(), 1);
+		}
 	}
 
 	void GeometryRenderPass::UpdateGUI()

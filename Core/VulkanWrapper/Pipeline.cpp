@@ -16,7 +16,7 @@ Core::Pipeline::Pipeline(Device& device,
 		GetInputAssemblyStateCreateInfo();
 	auto viewportState = GetViewportStateCreateInfo();
 
-	auto depthStencilState = GetDepthStencilStateCreateInfo();
+	auto depthStencilState = pipelineState.GetDepthStencilStateCreateInfo();
 	auto colorBlendAttachment = GetColorBlendAttachmentState();
 	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);
 	auto dynamicState = GetDynamicStateCreateInfo();
@@ -68,19 +68,6 @@ VkPipelineViewportStateCreateInfo Core::Pipeline::GetViewportStateCreateInfo()
 	viewportState.scissorCount = 1;
 
 	return viewportState;
-}
-
-VkPipelineDepthStencilStateCreateInfo Core::Pipeline::GetDepthStencilStateCreateInfo()
-{
-	VkPipelineDepthStencilStateCreateInfo depthStencil{};
-	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_TRUE;
-	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	depthStencil.depthBoundsTestEnable = VK_FALSE;
-	depthStencil.stencilTestEnable = VK_FALSE;
-
-	return depthStencil;
 }
 
 VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo(

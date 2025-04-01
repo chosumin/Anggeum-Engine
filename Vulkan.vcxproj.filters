@@ -152,6 +152,10 @@
     <ClCompile Include="Core\Components\Light.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Shaders\SkyboxShader.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Utils\FileSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -324,6 +328,10 @@
     <ClInclude Include="Shaders\lighting.h">
       <Filter>Shaders</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\SkyboxShader.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\FileSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -343,6 +351,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
+    <None Include="Shaders\skybox.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\skybox.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

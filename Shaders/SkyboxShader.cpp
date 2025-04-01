@@ -1,36 +1,37 @@
 #include "stdafx.h"
-#include "ShadowShader.h"
+#include "SkyboxShader.h"
 
-ShadowShader::ShadowShader(Core::Device& device)
+SkyboxShader::SkyboxShader(Core::Device& device)
 	:Shader(device,
-		"shaders/shadow.vert.spv",
-		"shaders/shadow.frag.spv")
+		"shaders/skybox.vert.spv",
+		"shaders/skybox.frag.spv")
 {
 	AddUniformBufferLayoutBinding(0, VK_SHADER_STAGE_VERTEX_BIT, sizeof(VPBufferObject));
+	AddTextureBufferLayoutBinding(1, VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-type_index ShadowShader::GetType()
+type_index SkyboxShader::GetType()
 {
-	return typeid(ShadowShader);
+	return typeid(SkyboxShader);
 }
 
-string ShadowShader::GetPass()
+string SkyboxShader::GetPass()
 {
-	return string();
+	return "Skybox";
 }
 
-bool ShadowShader::UseInstancing()
+bool SkyboxShader::UseInstancing()
 {
-	return true;
+	return false;
 }
 
-vector<string> ShadowShader::GetVertexAttirbuteNames() const
+vector<string> SkyboxShader::GetVertexAttirbuteNames() const
 {
 	vector<string> names = { VertexAttributeName::Position };
 	return names;
 }
 
-void ShadowShader::Prepare()
+void SkyboxShader::Prepare()
 {
 	_vertexBindings = {
 			Vertex::GetBindingDescription(

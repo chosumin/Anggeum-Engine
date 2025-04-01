@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Include;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\tinyobjloader;%(AdditionalIncludeDirectories);ThirdParties\imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;RenderPasses;$(ProjectDir);Core;Components;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)VulkanSDK\1.3.275.0\Include</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -112,8 +112,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.275.0\Lib;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.250.0\Lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -125,7 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Include;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\tinyobjloader;%(AdditionalIncludeDirectories);ThirdParties\imgui;Components;Core;$(ProjectDir);RenderPasses</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;RenderPasses;$(ProjectDir);Core;Components;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)VulkanSDK\1.3.275.0\Include</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -135,8 +135,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)VulkanSDK\1.3.250.0\Lib;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;ThirdParties\glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.250.0\Lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -164,6 +164,7 @@
     <ClCompile Include="Core\ShaderFactory.cpp" />
     <ClCompile Include="Core\SubMesh.cpp" />
     <ClCompile Include="Core\timer.cpp" />
+    <ClCompile Include="Core\Utils\FileSystem.cpp" />
     <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
@@ -190,6 +191,7 @@
     <ClCompile Include="Sample\Sample\SampleScene.cpp" />
     <ClCompile Include="Shaders\PBRShader.cpp" />
     <ClCompile Include="Shaders\ShadowShader.cpp" />
+    <ClCompile Include="Shaders\SkyboxShader.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -247,6 +249,7 @@
     <ClInclude Include="Core\ShaderFactory.h" />
     <ClInclude Include="Core\SubMesh.h" />
     <ClInclude Include="Core\timer.h" />
+    <ClInclude Include="Core\Utils\FileSystem.h" />
     <ClInclude Include="Core\Utils\GLTFLoader.h" />
     <ClInclude Include="Core\Utils\Log.h" />
     <ClInclude Include="Core\Utils\Math.h" />
@@ -276,6 +279,7 @@
     <ClInclude Include="Shaders\lighting.h" />
     <ClInclude Include="Shaders\PBRShader.h" />
     <ClInclude Include="Shaders\ShadowShader.h" />
+    <ClInclude Include="Shaders\SkyboxShader.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
@@ -288,6 +292,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="Shaders\skybox.frag" />
+    <None Include="Shaders\skybox.vert" />
     <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
     <None Include="Shaders\common.glsl" />
     <None Include="Shaders\pbr.frag" />

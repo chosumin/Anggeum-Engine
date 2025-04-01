@@ -13,3 +13,6 @@
 [submodule "ThirdParties/tinygltf"]
 	path = ThirdParties/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
+[submodule "ThirdParties/ktx"]
+	path = ThirdParties/ktx
+	url = https://github.com/KhronosGroup/KTX-Software.git

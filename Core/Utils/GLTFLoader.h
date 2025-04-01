@@ -16,6 +16,8 @@ namespace Core
 	class Texture;
 	class Material;
 	class Mesh;
+	class PerspectiveCamera;
+	class Light;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -39,8 +41,9 @@ namespace Core
 		~GLTFLoader();
 
 		void LoadScene(const string& path);
-		void LoadModel(const string& path);
+		void LoadSkybox(const string& path);
 	private:
+		bool LoadFromFile(tinygltf::Model* model, const string& path);
 		void LoadAssets(const string& modelPath);
 		void CheckExtensions();
 		void LoadLights();
@@ -55,10 +58,17 @@ namespace Core
 		void LoadMeshes(vector<Core::Material*>& materials);
 		void LoadCameras();
 		void LoadNodes();
+		void ClearCaches();
 	private:
 		Device& _device;
 		Scene& _scene;
 		tinygltf::Model* _model;
+
 		Core::Texture* _defaultTexture;
+		Core::Sampler* _defaultSampler;
+
+		vector<Core::Mesh*> _meshes;
+		vector<Core::PerspectiveCamera*> _cameras;
+		vector<Core::Light*> _lights;
 	};
 }

@@ -16,11 +16,18 @@ namespace Core
 		{ 
 			return _multisampleStateCreateInfo;
 		}
+
+		VkPipelineDepthStencilStateCreateInfo& GetDepthStencilStateCreateInfo()
+		{
+			return _depthStencilStateCreateInfo;
+		}
 	private:
 		void InitRasterizationStateCreateInfo();
 		void InitMultisampleStateCreateInfo();
+		void InitDepthStencilStateCreateInfo();
 	private:
 		VkPipelineRasterizationStateCreateInfo _rasterizationStateCreateInfo{};
 		VkPipelineMultisampleStateCreateInfo _multisampleStateCreateInfo{};
+		VkPipelineDepthStencilStateCreateInfo _depthStencilStateCreateInfo{};
 	};
 }

@@ -49,7 +49,8 @@ void Application::Update()
 		component->UpdateFrame(deltaTime);
 	}
 
-	//todo : update scene
+	_scene->Update();
+
 	//todo : update stats
 }
 

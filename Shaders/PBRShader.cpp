@@ -1,9 +1,5 @@
 #include "stdafx.h"
 #include "PBRShader.h"
-#include "VulkanWrapper/TextureBuffer.h"
-#include "VulkanWrapper/UniformBuffer.h"
-#include "VulkanWrapper/Vertex.h"
-#include "BufferObjects/BufferObjects.h"
 
 namespace Core
 {

@@ -1,17 +1,16 @@
 #include "stdafx.h"
 #include "GLTFLoader.h"
 #include "Log.h"
-
 #include "Scene.h"
 #include "VulkanWrapper/Image.h"
 #include "VulkanWrapper/Sampler.h"
 #include "VulkanWrapper/Texture.h"
+#include "VulkanWrapper/Vertex.h"
 #include "Material.h"
 #include "Utils/Utility.h"
 #include "Components/Mesh.h"
 #include "SubMesh.h"
 #include "Entity.h"
-#include "VulkanWrapper/Vertex.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
 #include "Components/Light.h"
@@ -265,9 +264,48 @@ Core::GLTFLoader::~GLTFLoader()
 {
 	delete(_model);
 	delete(_defaultTexture);
+	delete(_defaultSampler);
 }
 
 void Core::GLTFLoader::LoadScene(const string& path)
+{
+	if (LoadFromFile(_model, path) == false)
+		return;
+
+	size_t pos = path.find_last_of('/');
+	string modelPath = path.substr(0, pos);
+
+	LoadAssets(modelPath);
+}
+
+void Core::GLTFLoader::LoadSkybox(const string& texturePath)
+{
+	if (LoadFromFile(_model, "./Assets/Models/cube.gltf") == false)
+		return;
+
+	ClearCaches();
+	LoadDefaultTexture();
+
+	//Create a cubemap
+	auto image = new Core::Image(_device, texturePath, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+
+	size_t pos = texturePath.find_last_of('/');
+	string textureName = texturePath.substr(pos + 1, texturePath.length() - 1);
+
+	auto texture = new Texture(_device, textureName,
+		image, _defaultSampler);
+
+	uint32_t hash = Utility::HashCode("skybox");
+	auto material = new Material(_device, "Skybox", hash, *_defaultTexture);
+	material->SetBuffer(1, texture);
+
+	vector<Material*> materials = { material };
+	LoadMeshes(materials);
+
+	LoadNodes();
+}
+
+bool Core::GLTFLoader::LoadFromFile(tinygltf::Model* model, const string& path)
 {
 	string err;
 	string warn;
@@ -291,26 +329,13 @@ void Core::GLTFLoader::LoadScene(const string& path)
 		LOG("Warning loading gltf file {}.", path);
 	}
 
-	size_t pos = path.find_last_of('/');
-	string modelPath = path.substr(0, pos);
-
-	LoadAssets(modelPath);
-}
-
-void Core::GLTFLoader::LoadModel(const string& path)
-{
-	tinygltf::Model model;
-	tinygltf::TinyGLTF loader;
-	string err;
-	string warn;
-
-	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
-
-	int a = 10;
+	return ret;
 }
 
 void Core::GLTFLoader::LoadAssets(const string& modelPath)
 {
+	ClearCaches();
+
 	CheckExtensions();
 
 	LoadLights();
@@ -443,6 +468,7 @@ void Core::GLTFLoader::LoadLights()
 		light->SetLightType(type);
 		light->SetProperties(properties);
 
+		_lights.push_back(light.get());
 		_scene.AddComponent(move(light));
 	}
 }
@@ -554,19 +580,25 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 
 void Core::GLTFLoader::LoadDefaultTexture()
 {
-	tinygltf::Sampler gltfSampler;
+	if (_defaultSampler == nullptr)
+	{
+		tinygltf::Sampler gltfSampler;
 
-	gltfSampler.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-	gltfSampler.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+		gltfSampler.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+		gltfSampler.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
 
-	gltfSampler.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
-	gltfSampler.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
+		gltfSampler.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
+		gltfSampler.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
 
-	auto defaultSampler = LoadSampler(gltfSampler);
+		_defaultSampler = LoadSampler(gltfSampler);
+	}
 
-	auto defaultImage = new Core::Image(_device, "Assets/Textures/white.png");
+	if (_defaultTexture == nullptr)
+	{
+		auto defaultImage = new Core::Image(_device, "Assets/Textures/white.png");
 
-	_defaultTexture = new Texture(_device, "default", defaultImage, defaultSampler);
+		_defaultTexture = new Texture(_device, "default", defaultImage, _defaultSampler);
+	}
 }
 
 vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& textures)
@@ -764,6 +796,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
 
+			_meshes.push_back(mesh.get());
 			_scene.AddComponent(move(mesh));
 		}
 	}
@@ -784,15 +817,16 @@ void Core::GLTFLoader::LoadCameras()
 		camera->SetNearPlane(static_cast<float>(gltfCamera.perspective.znear));
 		camera->SetFarPlane(static_cast<float>(gltfCamera.perspective.zfar));
 
+		_cameras.push_back(camera.get());
 		_scene.AddComponent(move(camera));
 	}
 }
 
 void Core::GLTFLoader::LoadNodes()
 {
-	auto meshes = _scene.GetComponents<Mesh>();
-	auto cameras = _scene.GetComponents<PerspectiveCamera>();
-	auto lights = _scene.GetComponents<Light>();
+	auto meshes = _meshes;
+	auto cameras = _cameras;
+	auto lights = _lights;
 
 	for (size_t i = 0; i < _model->nodes.size(); ++i)
 	{
@@ -867,4 +901,11 @@ void Core::GLTFLoader::LoadNodes()
 
 		_scene.AddEntity(std::move(entity));
 	}
+}
+
+void Core::GLTFLoader::ClearCaches()
+{
+	_meshes.clear();
+	_cameras.clear();
+	_lights.clear();
 }

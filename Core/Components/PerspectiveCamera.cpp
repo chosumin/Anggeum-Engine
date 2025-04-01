@@ -8,7 +8,7 @@ Core::PerspectiveCamera::PerspectiveCamera(float width, float height)
 	_fov = radians(60.0f);
 	_aspectRatio = width / height;
 	_nearPlane = 0.1f;
-	_farPlane = 10.0f;
+	_farPlane = 1000.0f;
 
 	SetPerspective();
 }

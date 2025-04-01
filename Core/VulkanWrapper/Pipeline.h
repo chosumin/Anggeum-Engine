@@ -16,7 +16,6 @@ namespace Core
 	private:
 		VkPipelineInputAssemblyStateCreateInfo GetInputAssemblyStateCreateInfo();
 		VkPipelineViewportStateCreateInfo GetViewportStateCreateInfo();
-		VkPipelineDepthStencilStateCreateInfo GetDepthStencilStateCreateInfo();
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
 		VkPipelineColorBlendAttachmentState GetColorBlendAttachmentState();

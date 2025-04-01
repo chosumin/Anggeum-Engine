@@ -103,6 +103,7 @@ vec3 Normal()
 	mat3 TBN = mat3(T, B, N);
 
 	vec3 n = texture(normalmap, uv).rgb;
+
 	return normalize(TBN * (2.0 * n - 1.0));
 }
 

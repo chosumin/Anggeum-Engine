@@ -14,8 +14,7 @@ namespace Core
 	class Image
 	{
 	public:
-		Image(Device& device, vector<uint8_t>&& data);
-		Image(Device& device, string filePath);
+		Image(Device& device, string filePath, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D, VkImageCreateFlags flags = 0);
 
 		~Image();
 
@@ -25,12 +24,16 @@ namespace Core
 		const VkExtent3D& GetExtent() { return _extent; }
 		void SetSRGBFormat();
 	private:
-		void CreateImage(void* pixels, VkExtent3D extent);
+		void LoadRawImage(const string& filePath);
+		void LoadStbImage(const string& filePath);
+		void LoadKtxImage(const string& path);
+		void CreateImage(VkExtent3D extent, 
+			VkImageViewType imageViewType, VkImageCreateFlags flags);
 		void CreateImage(VkExtent3D extent, uint32_t mipLevels, 
 			VkSampleCountFlagBits numSamples, VkImageTiling tiling, 
-			VkImageUsageFlags usage, VkImageLayout initialLayout);
+			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
-		void CreateImageView(uint32_t mipLevels);
+		void CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType);
 
 		void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 		void TransitionImageLayout(VkImage image,
@@ -44,5 +47,8 @@ namespace Core
 		VkImageView _imageView;
 		VkDeviceMemory _imageMemory;
 		VkExtent3D _extent;
+		uint32_t _layer;
+
+		vector<uint8_t> _data;
 	};
 }

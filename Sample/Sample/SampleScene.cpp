@@ -12,14 +12,15 @@
 #include "Core/BufferObjects/BufferObjects.h"
 using namespace Core;
 
-SampleScene::SampleScene(Core::Device& device, 
-	float width, float height)
+SampleScene::SampleScene(Core::Device& device, float width, float height)
 {
-	GLTFLoader gltfLoader(device, *this);
+	_gltfLoader = make_unique<GLTFLoader>(device, *this);
 	
 	string path = "./Assets/Models/bull_head_4k.gltf/bull_head_4k.gltf";
+	_gltfLoader->LoadScene(path);
 
-	gltfLoader.LoadScene(path);
+	string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";
+	_gltfLoader->LoadSkybox(skyTexture);
 
 	auto mainCamera = GetMainCamera();
 

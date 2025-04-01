@@ -9,7 +9,7 @@ namespace Core
 	class Scene;
 	class SwapChain;
 	class RendererBatch;
-
+	class Pipeline;
 	class GeometryRenderPass : public RenderPass
 	{
 	public:
@@ -26,6 +26,7 @@ namespace Core
 			_shadowBuffer = &shadowBuffer;
 		}
 	private:
+		void DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame);
 		void UpdateGUI();
 		void UpdateLightBuffer();
 	private:
@@ -38,6 +39,8 @@ namespace Core
 		ShadowUniform* _shadowBuffer;
 
 		LightBuffer _lightBuffer;
+
+		Pipeline* _skyboxPipeline;
 	};
 }
 
