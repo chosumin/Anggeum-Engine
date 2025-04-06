@@ -28,6 +28,9 @@ namespace Core
 
 		void CreateImageViews();
 		void CleanupSwapChain();
+
+		VkImageView CreateImageView(Device& device,
+			VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 	private:
 		Device& _device;
 

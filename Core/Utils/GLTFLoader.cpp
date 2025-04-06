@@ -287,12 +287,12 @@ void Core::GLTFLoader::LoadSkybox(const string& texturePath)
 	LoadDefaultTexture();
 
 	//Create a cubemap
-	auto image = new Core::Image(_device, texturePath, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	auto image = new Core::Image(_device, texturePath, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
 	size_t pos = texturePath.find_last_of('/');
 	string textureName = texturePath.substr(pos + 1, texturePath.length() - 1);
 
-	auto texture = new Texture(_device, textureName,
+	auto texture = new Texture(textureName,
 		image, _defaultSampler);
 
 	uint32_t hash = Utility::HashCode("skybox");
@@ -569,7 +569,7 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 		int imageIndex = _model->textures[i].source;
 		int samplerIndex = _model->textures[i].sampler;
 
-		auto texture = new Texture(_device, _model->textures[i].name,
+		auto texture = new Texture(_model->textures[i].name,
 			images[imageIndex], samplers[samplerIndex]);
 
 		textures[i] = texture;
@@ -597,7 +597,7 @@ void Core::GLTFLoader::LoadDefaultTexture()
 	{
 		auto defaultImage = new Core::Image(_device, "Assets/Textures/white.png");
 
-		_defaultTexture = new Texture(_device, "default", defaultImage, _defaultSampler);
+		_defaultTexture = new Texture("default", defaultImage, _defaultSampler);
 	}
 }
 

@@ -77,12 +77,6 @@ namespace Core
 		auto& commandBuffer = _commandPool->RequestCommandBuffer(_currentFrame);
 		commandBuffer.BeginCommandBuffer();
 
-		VkViewport viewport;
-		VkRect2D scissor;
-		_swapChain->GetViewportAndScissor(viewport, scissor);
-
-		commandBuffer.SetViewportAndScissor(viewport, scissor);
-
 		return commandBuffer;
 	}
 

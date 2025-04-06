@@ -104,9 +104,6 @@
     <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp">
       <Filter>Core\VulkanWrapper</Filter>
     </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\RenderTarget.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
     <ClCompile Include="Core\VulkanWrapper\Shader.cpp">
       <Filter>Core\VulkanWrapper</Filter>
     </ClCompile>
@@ -269,9 +266,6 @@
       <Filter>Core\VulkanWrapper</Filter>
     </ClInclude>
     <ClInclude Include="Core\VulkanWrapper\RenderPass.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\RenderTarget.h">
       <Filter>Core\VulkanWrapper</Filter>
     </ClInclude>
     <ClInclude Include="Core\VulkanWrapper\Shader.h">

@@ -2,6 +2,11 @@
 
 namespace Core
 {
+	/*
+	 * RenderContext acts as a frame manager
+	 * It swaps between RenderFrame objects and forwards a request for vulkan resources to the active frame.
+	 * More than one frame can be in-flight in the GPU, thus the need for per-frame resources.
+	 */
 	class CommandBuffer;
 	class SwapChain;
 	class CommandPool;

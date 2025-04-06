@@ -1,11 +1,10 @@
 #include "stdafx.h"
 #include "GUIRenderPass.h"
 #include "VulkanWrapper/SwapChain.h"
-#include "VulkanWrapper/Framebuffer.h"
 #include "VulkanWrapper/CommandBuffer.h"
 
 GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
-	RenderTarget* colorRenderTarget)
+	Texture* colorRenderTarget)
 	:RenderPass(device)
 {
 	auto extent = swapChain.GetSwapChainExtent();
@@ -13,8 +12,7 @@ GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
 		VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
 	CreateColorResolveAttachment();
 	CreateRenderPass();
-
-	_framebuffer = new Framebuffer(device, swapChain, *this);
+	CreateFrameBuffer(swapChain);
 }
 
 GUIRenderPass::~GUIRenderPass()
@@ -76,8 +74,9 @@ void GUIRenderPass::Prepare()
 
 void GUIRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
-	auto framebuffer = _framebuffer->GetHandle(imageIndex);
-	auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
+	commandBuffer.SetViewportAndScissor(GetBufferExtent2D());
+
+	auto renderPassBeginInfo = CreateRenderPassBeginInfo(imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
 	ImGui::Render();

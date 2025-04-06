@@ -10,14 +10,64 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-Core::Image::Image(Device& device, string filePath, 
+Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sampleCount,
     VkImageViewType imageViewType, VkImageCreateFlags flags)
-    :_device(device)
+    :_device(device), _sampleCount(sampleCount)
 {
     _format = VK_FORMAT_R8G8B8A8_SRGB;
+    _usageFlags = 
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+        VK_IMAGE_USAGE_SAMPLED_BIT;
 
     LoadRawImage(filePath);
-    CreateImage(_extent, imageViewType, flags);
+
+    _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
+
+    CreateImage(
+        VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
+        _usageFlags,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        flags);
+
+    BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkDeviceSize imageSize = _data.size();
+
+    Buffer stagingBuffer(_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    stagingBuffer.CopyBuffer(_data.data(), imageSize);
+
+    auto& commandBuffer = _device.BeginSingleTimeCommands();
+    commandBuffer.TransitionImageLayout(*this, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    _device.EndSingleTimeCommands(commandBuffer);
+
+    CopyBufferToImage(stagingBuffer.GetBuffer(),
+        _image, _extent.width, _extent.height);
+
+    //hack : need to be pregenerated and stored in the texture file to improve loading speed.
+    if (_mipLevels > 1)
+        GenerateMipmaps(_mipLevels);
+
+    CreateImageView(_mipLevels, imageViewType, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
+    VkImageLayout layout, VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
+	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
+    _layout(layout), _layer(imageInfo.arrayLayers)
+{
+	CreateImage(
+		VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
+		_usageFlags,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		0);
+
+	BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	CreateImageView(_mipLevels, imageViewType, aspectFlags);
 }
 
 Core::Image::~Image()
@@ -105,6 +155,20 @@ void Core::Image::SetSRGBFormat()
     _format = srgb;
 }
 
+VkImageAspectFlags Core::Image::GetAspectFlags() const
+{
+    if (_format == VK_FORMAT_D16_UNORM ||
+        _format == VK_FORMAT_D32_SFLOAT)
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    if (_format == VK_FORMAT_D16_UNORM_S8_UINT ||
+        _format == VK_FORMAT_D24_UNORM_S8_UINT ||
+        _format == VK_FORMAT_D32_SFLOAT_S8_UINT)
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+    return VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
 void Core::Image::LoadRawImage(const string& filePath)
 {
     string extension = FileSystem::GetExtension(filePath);
@@ -189,54 +253,18 @@ void Core::Image::LoadKtxImage(const string& path)
     ktxTexture_Destroy(texture);
 }
 
-void Core::Image::CreateImage(VkExtent3D extent, 
-    VkImageViewType imageViewType, VkImageCreateFlags flags)
-{
-    int mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
-
-    CreateImage(extent, mipLevels, 
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        flags);
-
-    BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    //VkDeviceSize imageSize = extent.width * extent.height * 4;
-    VkDeviceSize imageSize = _data.size();
-
-    Buffer stagingBuffer(_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    stagingBuffer.CopyBuffer(_data.data(), imageSize);
-
-    TransitionImageLayout(_image,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
-
-    CopyBufferToImage(stagingBuffer.GetBuffer(),
-        _image, extent.width, extent.height);
-
-    //hack : need to be pregenerated and stored in the texture file to improve loading speed.
-    GenerateMipmaps(mipLevels);
-
-    CreateImageView(mipLevels, imageViewType);
-}
-
-void Core::Image::CreateImage(VkExtent3D extent, uint32_t mipLevels,
-    VkSampleCountFlagBits numSamples, VkImageTiling tiling,
+void Core::Image::CreateImage(VkImageTiling tiling,
     VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent = extent;
-    imageInfo.mipLevels = mipLevels;
+    imageInfo.extent = _extent;
+    imageInfo.mipLevels = _mipLevels;
     imageInfo.arrayLayers = _layer;
     imageInfo.format = _format;
     imageInfo.tiling = tiling;
-    imageInfo.samples = numSamples;
+    imageInfo.samples = _sampleCount;
 
     //VK_IMAGE_LAYOUT_PREINITIALIZED, the first transition will preserve the texels.
     imageInfo.initialLayout = initialLayout;
@@ -273,14 +301,15 @@ void Core::Image::BindImageMemory(VkMemoryPropertyFlags properties)
     vkBindImageMemory(device, _image, _imageMemory, 0);
 }
 
-void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType)
+void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType,
+    VkImageAspectFlags aspectFlags)
 {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = _image;
     viewInfo.viewType = imageViewType;
     viewInfo.format = _format;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -317,63 +346,6 @@ void Core::Image::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t wid
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1,
         &region
-    );
-
-    _device.EndSingleTimeCommands(commandBuffer);
-}
-
-void Core::Image::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
-{
-    auto& commandBuffer = _device.BeginSingleTimeCommands();
-
-    //모든 밉맵 이미지에 같은 레이아웃을 적용.
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = _layer;
-
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
-    //tranfer writes that don't need to wait on anything.
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-        newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-    {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-        newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    }
-    else
-    {
-        throw invalid_argument("unsupported layout transition!");
-    }
-
-    vkCmdPipelineBarrier(
-        commandBuffer.GetHandle(),
-        sourceStage, destinationStage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
     );
 
     _device.EndSingleTimeCommands(commandBuffer);

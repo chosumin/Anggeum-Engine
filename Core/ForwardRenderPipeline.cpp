@@ -46,7 +46,7 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 		delete(renderPass);
 	}
 
-	vkDestroySampler(_device.GetDevice(), _sampler, nullptr);
+	delete(_sampler);
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
@@ -58,6 +58,8 @@ void ForwardRenderPipeline::Prepare()
 	{
 		renderPass->Prepare();
 	}
+	
+	//todo : offscreen renderpass
 }
 
 void ForwardRenderPipeline::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -75,12 +77,9 @@ RenderPass& Core::ForwardRenderPipeline::GetRenderPass(uint32_t index)
 
 void Core::ForwardRenderPipeline::Cleanup()
 {
-	auto device = _device.GetDevice();
-	for (size_t i = 0; i < _renderTargets.size(); ++i)
+	for (auto&& renderTarget : _renderTargets)
 	{
-		vkDestroyImageView(device, _renderTargets[i]->ImageView, nullptr);
-		vkDestroyImage(device, _renderTargets[i]->Image, nullptr);
-		vkFreeMemory(device, _renderTargets[i]->ImageMemory, nullptr);
+		renderTarget->Cleanup();
 	}
 
 	_renderTargets.clear();
@@ -119,9 +118,6 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 		physicalDeviceProperties.limits.framebufferColorSampleCounts &
 		physicalDeviceProperties.limits.framebufferDepthSampleCounts;
 
-	/*if (counts & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
-	if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
-	if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }*/
 	if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
 	if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
 	if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
@@ -129,31 +125,28 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 	return VK_SAMPLE_COUNT_1_BIT;
 }
 
-unique_ptr<RenderTarget> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
+unique_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
 {
-	VkImage image;
-	VkImageView imageView;
-	VkDeviceMemory memory;
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent = { extent.width, extent.height, 1 };
+	imageInfo.format = format;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = _msaaSamples;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage = usageFlags;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	
+	Image* image = new Image(_device, imageInfo, layout, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	Utility::CreateImage(_device, extent.width, extent.height, 1,
-		_msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
-		usageFlags,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
-
-	imageView = Utility::CreateImageView(_device, image, format, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-
-	auto renderTarget = make_unique<RenderTarget>(
-		format, layout, image, memory, imageView, usageFlags, _msaaSamples, _sampler);
-
+	unique_ptr<Texture> renderTarget = make_unique<Texture>("render target", image, _sampler);
 	return move(renderTarget);
 }
 
-unique_ptr<RenderTarget> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount)
+unique_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount)
 {
-	VkImage image;
-	VkImageView imageView;
-	VkDeviceMemory memory;
-
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
@@ -163,41 +156,46 @@ unique_ptr<RenderTarget> Core::ForwardRenderPipeline::CreateDepthRenderTarget(Vk
 	if (isUsedAsSource)
 		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
-	Utility::CreateImage(_device, extent.width, extent.height, 1,
-		sampleCount, depthFormat, VK_IMAGE_TILING_OPTIMAL,
-		flags,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent = { extent.width, extent.height, 1 };
+	imageInfo.format = depthFormat;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = sampleCount;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage = flags;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	imageView = Utility::CreateImageView(_device,
-		image, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+	auto image = new Image(_device, imageInfo, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-	auto renderTarget = make_unique<RenderTarget>(
-		depthFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, image, memory, imageView, flags, sampleCount, _sampler);
-
+	unique_ptr<Texture> renderTarget = make_unique<Texture>("depth target", image, _sampler);
 	return move(renderTarget);
 }
 
-unique_ptr<RenderTarget> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource)
+unique_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource)
 {
-	VkImage image;
-	VkImageView imageView;
-	VkDeviceMemory memory;
-
 	VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if (isUsedAsSource)
 		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	//VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
-	Utility::CreateImage(_device, extent.width, extent.height, 1,
-		_msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
-		flags,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent = { extent.width, extent.height, 1 };
+	imageInfo.format = format;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = _msaaSamples;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage = flags;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	imageView = Utility::CreateImageView(_device,
-		image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+	auto image = new Image(_device, imageInfo, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	auto renderTarget = make_unique<RenderTarget>(
-		format, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, image, memory, imageView, flags, _msaaSamples, _sampler);
+	unique_ptr<Texture> renderTarget = make_unique<Texture>("color target", image, _sampler);
 
 	return move(renderTarget);
 }
@@ -220,8 +218,5 @@ void Core::ForwardRenderPipeline::CreateSampler()
 	samplerInfo.compareEnable = VK_TRUE; //usually used for percentage-closer filtering on shadow maps.
 	//samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
-	if (vkCreateSampler(_device.GetDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS)
-	{
-		throw runtime_error("failed to create texture sampler!");
-	}
+	_sampler = new Sampler(_device, samplerInfo);
 }

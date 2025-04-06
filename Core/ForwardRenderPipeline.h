@@ -6,6 +6,7 @@ namespace Core
 	class RenderPass;
 	class Scene;
 	class SwapChain;
+	class Texture;
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
@@ -24,7 +25,7 @@ namespace Core
 		{ 
 			return _msaaSamples; 
 		}
-		virtual RenderTarget* GetColorRenderTarget() override 
+		virtual Texture* GetColorRenderTarget() override 
 		{ 
 			return _renderTargets[0].get(); 
 		}
@@ -36,10 +37,10 @@ namespace Core
 			_renderPasses.push_back(renderPass);
 		}
 
-		unique_ptr<RenderTarget> CreateRenderTarget(VkExtent2D extent, VkFormat format,
+		unique_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
 			VkImageLayout layout, VkImageUsageFlags usageFlags);
-		unique_ptr<RenderTarget> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
-		unique_ptr<RenderTarget> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
+		unique_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
+		unique_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
 
 		void CreateSampler();
 	private:
@@ -49,9 +50,9 @@ namespace Core
 
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		vector<unique_ptr<RenderTarget>> _renderTargets;
+		vector<unique_ptr<Texture>> _renderTargets;
 		
-		VkSampler _sampler;
+		Sampler* _sampler;
 	};
 }
 

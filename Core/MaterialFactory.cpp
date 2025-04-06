@@ -77,7 +77,7 @@ Material* Core::MaterialFactory::Parse(Device& device, string materialPath)
 
 			auto image = new Image(device, texturePath);
 			auto sampler = Sampler::CreateDefault(device);
-			auto texture = new Texture(device, texturePath,
+			auto texture = new Texture(texturePath,
 				image, sampler);
 
 			material->SetBuffer(binding, texture);

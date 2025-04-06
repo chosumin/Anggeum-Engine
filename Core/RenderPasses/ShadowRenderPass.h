@@ -12,7 +12,7 @@ namespace Core
 	{
 	public:
 		ShadowRenderPass(Device& device,
-			Scene& scene, SwapChain& swapChain, RenderTarget* depthRenderTarget);
+			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget);
 		virtual ~ShadowRenderPass() override;
 
 		virtual void Prepare() override;
@@ -33,7 +33,7 @@ namespace Core
 		RendererBatch* _batch;
 		Material* _material;
 
-		RenderTarget* _shadowMap;
+		Texture* _shadowMap;
 	};
 }
 

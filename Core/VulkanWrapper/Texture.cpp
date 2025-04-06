@@ -1,22 +1,22 @@
 #include "stdafx.h"
 #include "Texture.h"
-#include "Image.h"
-#include "Sampler.h"
 #include "CommandBuffer.h"
 
-Core::Texture::Texture(Device& device, string name, Image* image, Sampler* sampler)
-	:_device(device), _name(name), _image(image), _sampler(sampler)
+Core::Texture::Texture(string name, Image* image, Sampler* sampler)
+	: _name(name), _image(image), _sampler(sampler)
 {
 }
 
 Core::Texture::~Texture()
 {
 	//TODO : Implement a resouce cache system.
-	/*if (_image != nullptr)
-		delete(_image);
+	//Cleanup();
+}
 
-	if (_sampler != nullptr)
-		delete(_sampler);*/
+void Core::Texture::Cleanup()
+{
+	if (_image != nullptr)
+		delete(_image);
 }
 
 VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()
@@ -28,4 +28,14 @@ VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()
 	imageInfo.sampler = _sampler->GetSampler();
 
 	return imageInfo;
+}
+
+uint32_t Core::Texture::GetMipLevels() const
+{
+	return _image->_mipLevels;
+}
+
+uint32_t Core::Texture::GetLayers() const
+{
+	return _image->_layer;
 }

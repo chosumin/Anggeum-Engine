@@ -2,8 +2,6 @@
 #include "RenderPass.h"
 #include "Utils/Utility.h"
 #include "SwapChain.h"
-#include "CommandBuffer.h"
-#include "RenderContext.h"
 #include "Framebuffer.h"
 
 namespace Core
@@ -21,8 +19,11 @@ namespace Core
         vkDestroyRenderPass(_device.GetDevice(), _renderPass, nullptr);
 	}
 
-    VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(VkFramebuffer framebuffer, VkExtent2D swapChainExtent)
+    VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(uint32_t imageIndex)
     {
+        auto framebuffer = _framebuffer->GetHandle(imageIndex);
+        VkExtent2D swapChainExtent = _framebuffer->GetExtent();
+
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = _renderPass;
@@ -68,7 +69,7 @@ namespace Core
 
         if (_color != nullptr)
         {
-            attachments.push_back(_color->RenderTarget->ImageView);
+            attachments.push_back(_color->RenderTarget->GetImageView());
         }
 
         if (_colorResolve != nullptr)
@@ -78,18 +79,18 @@ namespace Core
 
         if (_depth != nullptr)
         {
-            attachments.push_back(_depth->RenderTarget->ImageView);
+            attachments.push_back(_depth->RenderTarget->GetImageView());
         }
 
         for (auto& renderTarget : _inputAttachments)
         {
-            attachments.push_back(renderTarget->RenderTarget->ImageView);
+            attachments.push_back(renderTarget->RenderTarget->GetImageView());
         }
 
         return attachments;
     }
 
-    void RenderPass::CreateAttachment(RenderTarget* renderTarget,
+    void RenderPass::CreateAttachment(Texture* renderTarget,
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
     {
         auto attachment = make_unique<Attachment>();
@@ -100,7 +101,7 @@ namespace Core
 		_inputAttachments.emplace_back(move(attachment));
 	}
 
-	void RenderPass::CreateDepthAttachment(RenderTarget* renderTarget,
+	void RenderPass::CreateDepthAttachment(Texture* renderTarget,
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
 	{
         _depth = make_unique<Attachment>();
@@ -109,7 +110,7 @@ namespace Core
         _depth->StoreOp = storeOp;
     }
 
-    void RenderPass::CreateColorAttachment(RenderTarget* renderTarget,
+    void RenderPass::CreateColorAttachment(Texture* renderTarget,
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
     {
         _color = make_unique<Attachment>();
@@ -135,8 +136,8 @@ namespace Core
         if (_color != nullptr)
         {
             VkAttachmentDescription colorAttachment{};
-            colorAttachment.format = _color->RenderTarget->Format;
-            colorAttachment.samples = _color->RenderTarget->SampleCount;
+            colorAttachment.format = _color->RenderTarget->GetFormat();
+            colorAttachment.samples = _color->RenderTarget->GetSampleCount();
             colorAttachment.loadOp = _color->LoadOp;
             colorAttachment.storeOp = _color->StoreOp;
             colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -152,13 +153,13 @@ namespace Core
 				colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			}
 
-            colorAttachment.finalLayout = _color->RenderTarget->Layout;
+            colorAttachment.finalLayout = _color->RenderTarget->GetLayout();
 
             attachments.push_back(colorAttachment);
 
 			VkAttachmentReference colorAttachmentRef{};
 			colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-			colorAttachmentRef.layout = _color->RenderTarget->Layout;
+			colorAttachmentRef.layout = _color->RenderTarget->GetLayout();
 
 			subpass.colorAttachmentCount = 1;
 			subpass.pColorAttachments = &colorAttachmentRef;
@@ -167,7 +168,7 @@ namespace Core
 		if (_colorResolve != nullptr)
 		{
 			VkAttachmentDescription colorAttachmentResolve{};
-			colorAttachmentResolve.format = _color->RenderTarget->Format;
+			colorAttachmentResolve.format = _color->RenderTarget->GetFormat();
 			colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
 			colorAttachmentResolve.loadOp = _colorResolve->LoadOp;
 			colorAttachmentResolve.storeOp = _colorResolve->StoreOp;
@@ -188,20 +189,20 @@ namespace Core
         if (_depth != nullptr)
         {
             VkAttachmentDescription depthAttachment{};
-            depthAttachment.format = _depth->RenderTarget->Format;
-            depthAttachment.samples = _depth->RenderTarget->SampleCount;
+            depthAttachment.format = _depth->RenderTarget->GetFormat();
+            depthAttachment.samples = _depth->RenderTarget->GetSampleCount();
             depthAttachment.loadOp = _depth->LoadOp;
             depthAttachment.storeOp = _depth->StoreOp;
             depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            depthAttachment.finalLayout = _depth->RenderTarget->Layout;
+            depthAttachment.finalLayout = _depth->RenderTarget->GetLayout();
 
             attachments.push_back(depthAttachment);
 
             VkAttachmentReference depthAttachmentRef{};
             depthAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            depthAttachmentRef.layout = _depth->RenderTarget->Layout;
+            depthAttachmentRef.layout = _depth->RenderTarget->GetLayout();
 
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
@@ -211,20 +212,20 @@ namespace Core
 		for (size_t i = 0; i < _inputAttachments.size(); ++i)
 		{
 			VkAttachmentDescription inputAttachment{};
-			inputAttachment.format = _inputAttachments[i]->RenderTarget->Format;
+			inputAttachment.format = _inputAttachments[i]->RenderTarget->GetFormat();
 			inputAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 			inputAttachment.loadOp = _inputAttachments[i]->LoadOp;
 			inputAttachment.storeOp = _inputAttachments[i]->StoreOp;
 			inputAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			inputAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			inputAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			inputAttachment.finalLayout = _inputAttachments[i]->RenderTarget->Layout;
+			inputAttachment.finalLayout = _inputAttachments[i]->RenderTarget->GetLayout();
 
             attachments.push_back(inputAttachment);
 
             inputDescs[i] = inputAttachment;
             inputRefs[i].attachment = static_cast<uint32_t>(attachments.size() - 1);
-            inputRefs[i].layout = _inputAttachments[i]->RenderTarget->Layout;
+            inputRefs[i].layout = _inputAttachments[i]->RenderTarget->GetLayout();
 		}
 
         subpass.inputAttachmentCount = static_cast<uint32_t>(inputDescs.size());
@@ -256,5 +257,24 @@ namespace Core
 
 		if (vkCreateRenderPass(_device.GetDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
 			throw std::runtime_error("failed to create render pass!");
+	}
+
+    void RenderPass::CreateFrameBuffer(SwapChain& swapChain)
+    {
+        _framebuffer = new Framebuffer(_device, swapChain, *this);
+    }
+
+    VkExtent2D RenderPass::GetBufferExtent2D()
+    {
+		if (_color != nullptr)
+		{
+			auto extent3d = _color->RenderTarget->GetExtent();
+			return VkExtent2D{ extent3d.width, extent3d.height };
+		}
+        else if (_depth != nullptr)
+        {
+            auto extent3d = _depth->RenderTarget->GetExtent();
+            return VkExtent2D{ extent3d.width, extent3d.height };
+        }
 	}
 }

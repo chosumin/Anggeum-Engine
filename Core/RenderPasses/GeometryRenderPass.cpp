@@ -5,7 +5,6 @@
 #include "Components/Light.h"
 #include "Components/Mesh.h"
 #include "VulkanWrapper/CommandBuffer.h"
-#include "VulkanWrapper/Framebuffer.h"
 #include "VulkanWrapper/SwapChain.h"
 #include "VulkanWrapper/CommandPool.h"
 #include "VulkanWrapper/Pipeline.h"
@@ -14,11 +13,12 @@
 #include "RendererBatch.h"
 #include "SubMesh.h"
 #include "Component.h"
+#include "SkyPregenerationRenderPass.h"
 
 namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, 
-		Scene& scene, SwapChain& swapChain, RenderTarget* colorRenderTarget, RenderTarget* depthRenderTarget, RenderTarget* shadowRenderTarget)
+		Scene& scene, SwapChain& swapChain, Texture* colorRenderTarget, Texture* depthRenderTarget, Texture* shadowRenderTarget)
 		:RenderPass(device), _scene(scene), _shadowRenderTarget(shadowRenderTarget)
 	{
 		auto extent = swapChain.GetSwapChainExtent();
@@ -27,8 +27,7 @@ namespace Core
 		CreateDepthAttachment(depthRenderTarget,
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
 		CreateRenderPass();
-
-		_framebuffer = new Framebuffer(device, swapChain, *this);
+		CreateFrameBuffer(swapChain);
 
 		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
@@ -78,13 +77,13 @@ namespace Core
 		UpdateGUI();
 		UpdateLightBuffer();
 
-		_shadowRenderTarget->TransitionImageLayout(commandBuffer,
-			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		commandBuffer.TransitionImageLayout(*_shadowRenderTarget->GetImage(),
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-		auto framebuffer = _framebuffer->GetHandle(imageIndex);
-		auto renderPassBeginInfo = CreateRenderPassBeginInfo(framebuffer, _framebuffer->GetExtent());
+		commandBuffer.SetViewportAndScissor(GetBufferExtent2D());
+
+		auto renderPassBeginInfo = CreateRenderPassBeginInfo(imageIndex);
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
@@ -106,6 +105,10 @@ namespace Core
 		DrawSkybox(commandBuffer, currentFrame);
 
 		commandBuffer.EndRenderPass();
+	}
+
+	void GeometryRenderPass::DrawPregenerationSkybox()
+	{
 	}
 
 	void GeometryRenderPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)
@@ -133,7 +136,6 @@ namespace Core
 				auto pipelineState = *_pipelineState;
 				auto& depthInfo = pipelineState.GetDepthStencilStateCreateInfo();
 				depthInfo.depthWriteEnable = VK_FALSE;
-				//depthInfo.depthCompareOp = VK_COMPARE_OP_GREATER;
 
 				auto& rasterizationInfo = pipelineState.GetRasterizationStateCreateInfo();
 				rasterizationInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
@@ -146,7 +148,7 @@ namespace Core
 			commandBuffer.BindPipeline(_skyboxPipeline);
 
 			commandBuffer.BindDescriptorSets(
-				VK_PIPELINE_BIND_POINT_GRAPHICS, *material, currentFrame);
+				_skyboxPipeline->GetPipelineBindPoint(), *material, currentFrame);
 
 			auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
 
