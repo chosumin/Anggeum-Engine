@@ -17,9 +17,12 @@
 
 namespace Core
 {
-	GeometryRenderPass::GeometryRenderPass(Device& device, 
-		Scene& scene, SwapChain& swapChain, Texture* colorRenderTarget, Texture* depthRenderTarget, Texture* shadowRenderTarget)
-		:RenderPass(device), _scene(scene), _shadowRenderTarget(shadowRenderTarget)
+	GeometryRenderPass::GeometryRenderPass(Device& device, Scene& scene, SwapChain& swapChain,
+		Texture* colorRenderTarget, Texture* depthRenderTarget, 
+		Texture* shadowRenderTarget, 
+		Texture* pregenerationSky, Texture* irradianceCubemap)
+		:RenderPass(device), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
+		_irradianceCubemap(irradianceCubemap), _skyboxPipeline(nullptr)
 	{
 		auto extent = swapChain.GetSwapChainExtent();
 		CreateColorAttachment(colorRenderTarget,
@@ -31,6 +34,8 @@ namespace Core
 
 		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
+
+		PreparePregenerationSkybox(pregenerationSky, irradianceCubemap);
 	}
 
 	GeometryRenderPass::~GeometryRenderPass()
@@ -107,8 +112,19 @@ namespace Core
 		commandBuffer.EndRenderPass();
 	}
 
-	void GeometryRenderPass::DrawPregenerationSkybox()
+	void GeometryRenderPass::PreparePregenerationSkybox(Texture* pregenerationSky, Texture* environmentCubemap)
 	{
+		auto pregenerationSkybox = new SkyPregenerationRenderPass(_device, _scene, pregenerationSky, environmentCubemap);
+
+		pregenerationSkybox->Prepare();
+
+		auto& singleCommand = _device.BeginSingleTimeCommands();
+
+		pregenerationSkybox->Draw(singleCommand, 0, 0);
+		
+		_device.EndSingleTimeCommands(singleCommand);
+
+		delete(pregenerationSkybox);
 	}
 
 	void GeometryRenderPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)
@@ -144,6 +160,7 @@ namespace Core
 			}
 
 			material->SetBuffer(currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(1, _irradianceCubemap);
 
 			commandBuffer.BindPipeline(_skyboxPipeline);
 

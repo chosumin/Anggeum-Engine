@@ -264,6 +264,11 @@ namespace Core
         _framebuffer = new Framebuffer(_device, swapChain, *this);
     }
 
+    void RenderPass::CreateFrameBuffer(Image* image)
+    {
+        _framebuffer = new Framebuffer(_device, *this, *image);
+    }
+
     VkExtent2D RenderPass::GetBufferExtent2D()
     {
 		if (_color != nullptr)

@@ -160,6 +160,7 @@
     <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp" />
     <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp" />
     <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp" />
+    <ClCompile Include="Core\RenderPasses\SkyPregenerationRenderPass.cpp" />
     <ClCompile Include="Core\Scene.cpp" />
     <ClCompile Include="Core\ShaderFactory.cpp" />
     <ClCompile Include="Core\SubMesh.cpp" />
@@ -188,6 +189,7 @@
     <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Sample\Sample\SampleScene.cpp" />
+    <ClCompile Include="Shaders\IrradianceShader.cpp" />
     <ClCompile Include="Shaders\PBRShader.cpp" />
     <ClCompile Include="Shaders\ShadowShader.cpp" />
     <ClCompile Include="Shaders\SkyboxShader.cpp" />
@@ -244,6 +246,7 @@
     <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h" />
     <ClInclude Include="Core\RenderPasses\GUIRenderPass.h" />
     <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h" />
+    <ClInclude Include="Core\RenderPasses\SkyPregenerationRenderPass.h" />
     <ClInclude Include="Core\Scene.h" />
     <ClInclude Include="Core\ShaderFactory.h" />
     <ClInclude Include="Core\SubMesh.h" />
@@ -274,6 +277,7 @@
     <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Sample\Sample\SampleScene.h" />
+    <ClInclude Include="Shaders\IrradianceShader.h" />
     <ClInclude Include="Shaders\lighting.h" />
     <ClInclude Include="Shaders\PBRShader.h" />
     <ClInclude Include="Shaders\ShadowShader.h" />
@@ -290,6 +294,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
+    <None Include="Shaders\irradiance.frag" />
+    <None Include="Shaders\filtercube.vert" />
     <None Include="Shaders\skybox.frag" />
     <None Include="Shaders\skybox.vert" />
     <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />

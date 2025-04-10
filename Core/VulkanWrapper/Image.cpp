@@ -60,10 +60,10 @@ Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo,
     _layout(layout), _layer(imageInfo.arrayLayers)
 {
 	CreateImage(
-		VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
+		VK_IMAGE_TILING_OPTIMAL,
 		_usageFlags,
 		VK_IMAGE_LAYOUT_UNDEFINED,
-		0);
+        imageInfo.flags);
 
 	BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 

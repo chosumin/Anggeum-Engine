@@ -2,7 +2,6 @@
 #include "Material.h"
 #include "VulkanWrapper/Shader.h"
 #include "VulkanWrapper/CommandPool.h"
-#include "VulkanWrapper/RenderTarget.h"
 #include "VulkanWrapper/Texture.h"
 #include "ShaderFactory.h"
 
@@ -72,15 +71,18 @@ namespace Core
 		if (_textureBuffers.find(binding) == _textureBuffers.end())
 			return;
 
+		_textures[binding] = texture;
 		_textureBuffers[binding]->CopyDescriptorImageInfo(texture->GetDescriptorImageInfo());
 	}
 
-	void Material::SetBuffer(uint32_t binding, RenderTarget* renderTarget)
+	Texture* Material::GetTexture(uint32_t binding)
 	{
-		if (_textureBuffers.find(binding) == _textureBuffers.end())
-			return;
-
-		_textureBuffers[binding]->CopyDescriptorImageInfo(renderTarget->GetDescriptorImageInfo());
+		auto it = _textures.find(binding);
+		if (it != _textures.end())
+		{
+			return it->second;
+		}
+		return nullptr;
 	}
 
 	void Core::Material::UpdateDescriptorSets()

@@ -7,6 +7,9 @@
 #include "Scene.h"
 #include "Utils/Utility.h"
 #include "RenderContext.h"
+
+#include "RenderPasses/SkyPregenerationRenderPass.h"
+
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(
@@ -26,12 +29,16 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	_renderTargets.push_back(CreateDepthRenderTarget(extent, false, _msaaSamples));
 	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
 
+	CreatePreSkyTextures();
+
 	auto shadowRenderPass = new ShadowRenderPass(
 		device, scene, swapChain, _renderTargets[2].get());
 	AddRenderPass(shadowRenderPass);
 
 	auto geometryRenderPass = new GeometryRenderPass(
-		device, scene, swapChain, _renderTargets[0].get(), _renderTargets[1].get(), _renderTargets[2].get());
+		device, scene, swapChain, 
+		_renderTargets[0].get(), _renderTargets[1].get(), 
+		_renderTargets[2].get(), _renderTargets[3].get(), _renderTargets[4].get());
 	geometryRenderPass->SetBuffer(shadowRenderPass->GetShadowBuffer());
 
 	AddRenderPass(geometryRenderPass);
@@ -219,4 +226,55 @@ void Core::ForwardRenderPipeline::CreateSampler()
 	//samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
 	_sampler = new Sampler(_device, samplerInfo);
+}
+
+void Core::ForwardRenderPipeline::CreatePreSkyTextures()
+{
+	uint32_t size = 64;
+	const uint32_t numMips = static_cast<uint32_t>(floor(std::log2(size))) + 1;
+	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	
+	{
+		//Offscreen texture to blit to the cubemap
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = format;
+		imageInfo.extent = { size , size , 1 };
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		auto image = new Image(_device, imageInfo,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_ASPECT_COLOR_BIT);
+		unique_ptr<Texture> offscreen = make_unique<Texture>("offscreen", image, _sampler);
+		_renderTargets.push_back(move(offscreen));
+	}
+
+	{
+		//Environment texture
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = format;
+		imageInfo.extent = { size , size , 1 };
+		imageInfo.mipLevels = numMips;
+		imageInfo.arrayLayers = 6;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+		auto image = new Image(_device, imageInfo,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_VIEW_TYPE_CUBE);
+
+		unique_ptr<Texture> cubemap = make_unique<Texture>("cubemap", image, _sampler);
+		_renderTargets.push_back(move(cubemap));
+	}
 }

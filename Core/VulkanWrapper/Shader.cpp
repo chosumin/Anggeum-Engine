@@ -87,6 +87,21 @@ void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStage
 	_textureBufferLayoutBindings.emplace_back(binding, stage);
 }
 
+void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
+{
+	uint32 offset = 0;
+	for (auto&& range : _pushConstantRanges)
+	{
+		offset += range.size;
+	}
+
+	VkPushConstantRange pushConstant{};
+	pushConstant.stageFlags = stage;
+	pushConstant.size = size;
+	pushConstant.offset = offset;
+	_pushConstantRanges.push_back(pushConstant);
+}
+
 vector<char> Core::Shader::ReadFile(const string& filePath)
 {
 	ifstream file{ filePath, ios::ate | ios::binary };
@@ -120,17 +135,27 @@ VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<c
 	return shaderModule;
 }
 
-VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage() const
+VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage(uint32_t index) const
 {
-	VkShaderStageFlags flags{};
-
-	for (auto& pushConstantRange : _pushConstantRanges)
+	if (index >= _pushConstantRanges.size())
 	{
-		flags |= pushConstantRange.stageFlags;
+		throw std::out_of_range("Push constant index out of range");
 	}
 
-	return flags;
+	return _pushConstantRanges[index].stageFlags;
 }
+
+uint32_t Core::Shader::GetPushConstantsOffset(uint32_t index) const
+{
+	if (index >= _pushConstantRanges.size())
+	{
+		throw std::out_of_range("Push constant index out of range");
+	}
+
+	return _pushConstantRanges[index].offset;
+}
+
+
 
 VkDescriptorSetLayout& Core::Shader::GetDescriptorSetLayout()
 {

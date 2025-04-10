@@ -14,7 +14,10 @@ namespace Core
 	{
 	public:
 		GeometryRenderPass(Device& device, 
-			Scene& scene, SwapChain& swapChain, Texture* colorRenderTarget, Texture* depthRenderTarget, Texture* shadowRenderTarget);
+			Scene& scene, SwapChain& swapChain, 
+			Texture* colorRenderTarget, Texture* depthRenderTarget, 
+			Texture* shadowRenderTarget, 
+			Texture* pregenerationSky, Texture* environmentCubemap);
 		virtual ~GeometryRenderPass() override;
 
 		virtual void Prepare() override;
@@ -26,7 +29,7 @@ namespace Core
 			_shadowBuffer = &shadowBuffer;
 		}
 	private:
-		void DrawPregenerationSkybox();
+		void PreparePregenerationSkybox(Texture* pregenerationSky, Texture* environmentCubemap);
 		void DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame);
 		void UpdateGUI();
 		void UpdateLightBuffer();
@@ -36,12 +39,11 @@ namespace Core
 		unordered_map<type_index, RendererBatch*> _batches;
 
 		Texture* _shadowRenderTarget;
-
 		ShadowUniform* _shadowBuffer;
-
 		LightBuffer _lightBuffer;
-
 		Pipeline* _skyboxPipeline;
+
+		Texture* _irradianceCubemap;
 	};
 }
 

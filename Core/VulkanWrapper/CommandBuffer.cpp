@@ -84,18 +84,22 @@ void Core::CommandBuffer::BindDescriptorSets(
         &descriptorSet, 0, nullptr);
 }
 
-void Core::CommandBuffer::PushConstants(Material& material)
+void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
 {
     auto& shader = material.GetShader();
 
     auto pushConstants = material.GetPushConstantsData();
 
     if (pushConstants->empty())
-        return;
+		return;
 
-    vkCmdPushConstants(_commandBuffer, shader.GetPipelineLayout(), shader.GetPushConstantsShaderStage(), 0, static_cast<uint32_t>(pushConstants->size()), pushConstants->data());
+	vkCmdPushConstants(_commandBuffer, shader.GetPipelineLayout(),
+        shader.GetPushConstantsShaderStage(index),
+		shader.GetPushConstantsOffset(index),
+		static_cast<uint32_t>(pushConstants->size()),
+		pushConstants->data());
 
-    material.ClearPushConstantsCache();
+	material.ClearPushConstantsCache();
 }
 
 void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer, uint32_t binding)
@@ -150,8 +154,8 @@ void Core::CommandBuffer::CopyImage(Image& srcImage, Image& dstImage,
     auto extent = srcImage.GetExtent();
 
     VkExtent2D mipExtent;
-    mipExtent.width = extent.width * pow(0.5f, srcMipLevel);
-    mipExtent.height = extent.height * pow(0.5f, srcMipLevel);
+    mipExtent.width = static_cast<uint32_t>(extent.width * pow(0.5f, dstMipLevel));
+    mipExtent.height = static_cast<uint32_t>(extent.height * pow(0.5f, dstMipLevel));
 
     copyRegion.extent.width = static_cast<uint32_t>(mipExtent.width);
     copyRegion.extent.height = static_cast<uint32_t>(mipExtent.height);

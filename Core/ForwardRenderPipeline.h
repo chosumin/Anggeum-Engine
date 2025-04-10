@@ -43,6 +43,7 @@ namespace Core
 		unique_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
 
 		void CreateSampler();
+		void CreatePreSkyTextures();
 	private:
 		Device& _device;
 

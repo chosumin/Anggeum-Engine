@@ -37,3 +37,9 @@ struct LightBuffer
 {
 	LightInfo Light;
 };
+
+struct IrradianceDelta
+{
+	float Phi;
+	float Theta;
+};

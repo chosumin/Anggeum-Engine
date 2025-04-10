@@ -38,7 +38,7 @@ namespace Core
 		void CreateColorResolveAttachment();
 		void CreateRenderPass();
 		void CreateFrameBuffer(SwapChain& swapChain);
-
+		void CreateFrameBuffer(Image* image);
 		VkExtent2D GetBufferExtent2D();
 	protected:
 		Device& _device;

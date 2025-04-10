@@ -7,7 +7,6 @@ namespace Core
 	class Device;
 	class Shader;
 	class Texture;
-	struct RenderTarget;
 
 	enum class AlphaMode
 	{
@@ -44,7 +43,6 @@ namespace Core
 
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
 		void SetBuffer(uint32_t binding, Texture* texture);
-		void SetBuffer(uint32_t binding, RenderTarget* renderTarget);
 
 		void SetBuffer(uint32_t currentImage)
 		{
@@ -53,6 +51,8 @@ namespace Core
 				SetBuffer(currentImage, buffer.first, buffer.second);
 			}
 		}
+
+		Texture* GetTexture(uint32_t binding);
 
 		const VkDescriptorSet& GetDescriptorSet(size_t index) const
 		{
@@ -96,6 +96,7 @@ namespace Core
 		bool _isAlphaCutoff;
 
 		unordered_map<uint32_t, void*> _buffers;
+		unordered_map<uint32_t, Texture*> _textures;
 	};
 }
 

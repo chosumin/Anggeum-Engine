@@ -23,7 +23,7 @@ namespace Core
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
 		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame);
-		void PushConstants(Material& material);
+		void PushConstants(Material& material, uint32_t index = 0);
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);

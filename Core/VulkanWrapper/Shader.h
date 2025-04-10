@@ -28,7 +28,8 @@ namespace Core
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 
-		VkShaderStageFlags GetPushConstantsShaderStage() const;
+		VkShaderStageFlags GetPushConstantsShaderStage(uint32_t index) const;
+		uint32_t GetPushConstantsOffset(uint32_t index) const;
 		vector<VkPushConstantRange>& GetPushConstantRanges() { return _pushConstantRanges; }
 		VkDescriptorSetLayout& GetDescriptorSetLayout();
 		VkDescriptorPool& GetDescriptorPool();
@@ -46,6 +47,7 @@ namespace Core
 	protected:
 		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size);
 		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
+		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size);
 	private:
 		void CreateDescriptorPool();
 

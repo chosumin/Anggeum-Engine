@@ -4,6 +4,7 @@
 #include "Shaders/PBRShader.h"
 #include "Shaders/ShadowShader.h"
 #include "Shaders/SkyboxShader.h"
+#include "Shaders/IrradianceShader.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -51,6 +52,8 @@ Shader* Core::ShaderFactory::CreateShaderInternal(Device& device, size_t hash)
 			return new ShadowShader(device);
 		case Utility::HashCode("Skybox"):
 			return new SkyboxShader(device);
+		case Utility::HashCode("Irradiance"):
+			return new IrradianceShader(device);
 		default:
 			return new PBRShader(device);
 	}
