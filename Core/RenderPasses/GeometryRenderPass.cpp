@@ -101,6 +101,7 @@ namespace Core
 				material.second->SetBuffer(4, _shadowRenderTarget);
 				material.second->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
 				material.second->SetBuffer(currentFrame, 7, &_lightBuffer);
+				material.second->SetBuffer(8, _irradianceCubemap);
 				material.second->SetBuffer(currentFrame);
 			}
 
@@ -160,7 +161,6 @@ namespace Core
 			}
 
 			material->SetBuffer(currentFrame, 0, &camera->Matrices);
-			material->SetBuffer(1, _irradianceCubemap);
 
 			commandBuffer.BindPipeline(_skyboxPipeline);
 

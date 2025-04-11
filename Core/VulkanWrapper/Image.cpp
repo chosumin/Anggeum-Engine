@@ -14,7 +14,7 @@ Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sample
     VkImageViewType imageViewType, VkImageCreateFlags flags)
     :_device(device), _sampleCount(sampleCount)
 {
-    _format = VK_FORMAT_R8G8B8A8_SRGB;
+    _format = VK_FORMAT_R8G8B8A8_UNORM;
     _usageFlags = 
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | 

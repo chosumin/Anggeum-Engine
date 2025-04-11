@@ -13,11 +13,8 @@ layout(location = 3) in vec2 uv;
 layout(location = 0) out vec4 outColor;
 
 layout(binding = 1) uniform sampler2D basemap;
-
 layout(binding = 2) uniform sampler2D normalmap;
-
 layout(binding = 3) uniform sampler2D metallicRoughnessmap;
-
 layout(binding = 4) uniform sampler2D shadowmap;
 
 layout(binding = 5) uniform ShadowUniform
@@ -42,6 +39,8 @@ layout(binding = 7) uniform LightInfo
 {
 	Light light;
 } lightInfo;
+
+layout(binding = 8) uniform samplerCube irradianceMap;
 
 float saturate(float t)
 {
@@ -116,11 +115,10 @@ void main()
 
 	if (pbr.albedoTextureSet == 1)
 	{
-		albedo = texture(basemap, uv);
-		albedo.rgb = pow(albedo.rgb, vec3(2.2));
+		albedo = SRGBtoLINEAR(texture(basemap, uv));
 	}
 	else
-		albedo = pow(pbr.albedo, vec4(2.2));
+		albedo = pbr.albedo;
 
 	vec4 metallicRoughness = vec4(0.0);
 	if (pbr.metallicTextureSet == 1)
@@ -168,7 +166,7 @@ void main()
         vec3 F    = FresnelSchlick(max(dot(H, V), 0.0), F0);       
         
         vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
+        vec3 kD = 1.0 - kS;
         kD *= 1.0 - metallic;	  
         
         vec3 numerator    = NDF * G * F;
@@ -180,36 +178,24 @@ void main()
         Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL; 
     }   
   
-    vec3 ambient = vec3(0.03) * albedo.rgb * ao;
+	// ambient lighting
+	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);
+	vec3 kD = 1.0 - kS;
+	kD *= 1.0 - metallic;
+
+	vec3 irradiance = SRGBtoLINEAR(texture(irradianceMap, N)).rgb;
+	vec3 diffuse = irradiance * albedo.rgb;
+	vec3 ambient = (kD * diffuse) * ao;
+
+	if(pbr.debugMode == 1)
+	{
+		ambient = vec3(0.03) * albedo.rgb * ao;
+	}
+
     vec3 color = ambient + Lo;
 	
+	// tonemapping
     color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2));  
-   
-	if (pbr.debugMode == 1)
-	{
-		vec3 L = normalize(-lightInfo.light.direction.xyz);
-        vec3 H = normalize(V + L);
-		float NDF = DistributionGGX(N, H, roughness);
-		outColor = vec4(NDF, NDF, NDF, 1.0);
-		return;
-	}
-	else if (pbr.debugMode == 2)
-	{
-		vec3 L = normalize(-lightInfo.light.direction.xyz);
-        vec3 H = normalize(V + L);
-		float G   = GeometrySmith(N, V, L, roughness);  
-		outColor = vec4(G, G, G, 1.0);
-		return;
-	}
-	else if (pbr.debugMode == 3)
-	{
-		vec3 L = normalize(-lightInfo.light.direction.xyz);
-        vec3 H = normalize(V + L);
-        vec3 F    = FresnelSchlick(max(dot(H, V), 0.0), F0);       
-		outColor = vec4(F, 1.0);
-		return;
-	}
 
     outColor = vec4(color, 1.0);
 }

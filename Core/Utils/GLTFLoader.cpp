@@ -644,8 +644,8 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 			{
 				auto texture = textures[value.second.TextureIndex()];
 
-				if (NeedSRGB(value.first))
-					texture->GetImage()->SetSRGBFormat();
+				/*if (NeedSRGB(value.first))
+					texture->GetImage()->SetSRGBFormat();*/
 
 				material->SetBuffer(1, texture);
 				
@@ -655,8 +655,8 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 			{
 				auto texture = textures[value.second.TextureIndex()];
 
-				if (NeedSRGB(value.first))
-					texture->GetImage()->SetSRGBFormat();
+				/*if (NeedSRGB(value.first))
+					texture->GetImage()->SetSRGBFormat();*/
 
 				material->SetBuffer(3, texture);
 				
@@ -672,8 +672,8 @@ vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& 
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
 
-				if (NeedSRGB(additionalValue.first))
-					texture->GetImage()->SetSRGBFormat();
+				/*if (NeedSRGB(additionalValue.first))
+					texture->GetImage()->SetSRGBFormat();*/
 
 				material->SetBuffer(2, texture);
 			}
