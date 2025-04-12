@@ -111,12 +111,13 @@ namespace Core
     }
 
     void RenderPass::CreateColorAttachment(Texture* renderTarget,
-        VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
+        VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout)
     {
         _color = make_unique<Attachment>();
         _color->RenderTarget = renderTarget;
         _color->LoadOp = loadOp;
         _color->StoreOp = storeOp;
+		_color->FinalLayout = finalLayout;
     }
 
     void RenderPass::CreateColorResolveAttachment()
@@ -153,13 +154,13 @@ namespace Core
 				colorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			}
 
-            colorAttachment.finalLayout = _color->RenderTarget->GetLayout();
+            colorAttachment.finalLayout = _color->FinalLayout;
 
             attachments.push_back(colorAttachment);
 
 			VkAttachmentReference colorAttachmentRef{};
 			colorAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-			colorAttachmentRef.layout = _color->RenderTarget->GetLayout();
+			colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 			subpass.colorAttachmentCount = 1;
 			subpass.pColorAttachments = &colorAttachmentRef;
@@ -196,13 +197,13 @@ namespace Core
             depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            depthAttachment.finalLayout = _depth->RenderTarget->GetLayout();
+            depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
             attachments.push_back(depthAttachment);
 
             VkAttachmentReference depthAttachmentRef{};
             depthAttachmentRef.attachment = static_cast<uint32_t>(attachments.size() - 1);
-            depthAttachmentRef.layout = _depth->RenderTarget->GetLayout();
+            depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
             subpass.pDepthStencilAttachment = &depthAttachmentRef;
         }
@@ -219,32 +220,52 @@ namespace Core
 			inputAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			inputAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			inputAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			inputAttachment.finalLayout = _inputAttachments[i]->RenderTarget->GetLayout();
+			inputAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
             attachments.push_back(inputAttachment);
 
             inputDescs[i] = inputAttachment;
             inputRefs[i].attachment = static_cast<uint32_t>(attachments.size() - 1);
-            inputRefs[i].layout = _inputAttachments[i]->RenderTarget->GetLayout();
+            inputRefs[i].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		}
 
         subpass.inputAttachmentCount = static_cast<uint32_t>(inputDescs.size());
         subpass.pInputAttachments = subpass.inputAttachmentCount <= 0 ? 
             nullptr : inputRefs.data();
 
-        VkSubpassDependency dependency{};
-        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dependency.dstSubpass = 0;
-        dependency.srcStageMask =
+        array<VkSubpassDependency, 2> dependencies{};
+        dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[0].dstSubpass = 0;
+        dependencies[0].srcStageMask =
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        dependencies[0].dstStageMask =
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.srcAccessMask = 0;
-        dependency.dstStageMask =
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        dependency.dstAccessMask =
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependencies[0].srcAccessMask = 0;
+        dependencies[0].dstAccessMask =
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+        dependencies[1].srcSubpass = 0;
+        dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        dependencies[1].srcStageMask =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependencies[1].srcAccessMask =
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        dependencies[1].dstStageMask =
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        dependencies[1].dstAccessMask =
+            VK_ACCESS_MEMORY_READ_BIT;
+		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -252,8 +273,8 @@ namespace Core
         renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+        renderPassInfo.pDependencies = dependencies.data();
 
 		if (vkCreateRenderPass(_device.GetDevice(), &renderPassInfo, nullptr, &_renderPass) != VK_SUCCESS)
 			throw std::runtime_error("failed to create render pass!");
@@ -269,17 +290,23 @@ namespace Core
         _framebuffer = new Framebuffer(_device, *this, *image);
     }
 
-    VkExtent2D RenderPass::GetBufferExtent2D()
-    {
-		if (_color != nullptr)
-		{
-			auto extent3d = _color->RenderTarget->GetExtent();
-			return VkExtent2D{ extent3d.width, extent3d.height };
-		}
-        else if (_depth != nullptr)
-        {
-            auto extent3d = _depth->RenderTarget->GetExtent();
-            return VkExtent2D{ extent3d.width, extent3d.height };
-        }
-	}
+    VkExtent2D RenderPass::GetBufferExtent2D()  
+    {  
+       if (_color != nullptr)  
+       {  
+           auto extent3d = _color->RenderTarget->GetExtent();  
+           return VkExtent2D{ extent3d.width, extent3d.height };  
+       }  
+       else if (_depth != nullptr)  
+       {  
+           auto extent3d = _depth->RenderTarget->GetExtent();  
+           return VkExtent2D{ extent3d.width, extent3d.height };  
+       }  
+ 
+       const char* errorMessage = 
+           "RenderPass::GetBufferExtent2D() : no color or depth attachment found.";  
+       throw std::runtime_error(errorMessage);  
+
+       return VkExtent2D{};  
+    }
 }

@@ -19,7 +19,7 @@ namespace Core
 		Image(Device& device, string filePath, VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D, VkImageCreateFlags flags = 0);
 
 		//Creates a render target image
-		Image(Device& device, VkImageCreateInfo& imageInfo, VkImageLayout layout, 
+		Image(Device& device, VkImageCreateInfo& imageInfo, 
 			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D);
 
 		~Image();
@@ -34,7 +34,6 @@ namespace Core
 
 		uint32_t GetLayer() { return _layer; }
 		uint32_t GetMipLevel() { return _mipLevels; }
-		VkImageLayout GetLayout() { return _layout; }
 		VkImageAspectFlags GetAspectFlags() const;
 	private:
 		void LoadRawImage(const string& filePath);
@@ -44,9 +43,6 @@ namespace Core
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
 		void CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType, VkImageAspectFlags aspectFlags);
-
-		void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-		void GenerateMipmaps(uint32_t mipLevels);
 	private:
 		Device& _device;
 
@@ -59,7 +55,6 @@ namespace Core
 		uint32_t _mipLevels;
 		VkSampleCountFlagBits _sampleCount;
 		VkImageUsageFlags _usageFlags;
-		VkImageLayout _layout;
 
 		vector<uint8_t> _data;
 	};

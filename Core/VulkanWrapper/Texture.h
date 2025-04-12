@@ -39,11 +39,6 @@ namespace Core
 		{
 			return _image->GetExtent();
 		}
-
-		VkImageLayout GetLayout() const
-		{
-			return _image->GetLayout();
-		}
 	private:
 		string _name;
 		Image* _image;

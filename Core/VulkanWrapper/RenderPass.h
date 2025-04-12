@@ -10,6 +10,7 @@ namespace Core
 		Texture* RenderTarget;
 		VkAttachmentLoadOp LoadOp;
 		VkAttachmentStoreOp StoreOp;
+		VkImageLayout FinalLayout;
 	};
 
 	class SwapChain;
@@ -34,7 +35,7 @@ namespace Core
 		void CreateAttachment(Texture* renderTarget,
 			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
 		void CreateDepthAttachment(Texture* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
-		void CreateColorAttachment(Texture* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
+		void CreateColorAttachment(Texture* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		void CreateColorResolveAttachment();
 		void CreateRenderPass();
 		void CreateFrameBuffer(SwapChain& swapChain);

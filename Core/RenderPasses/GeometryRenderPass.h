@@ -17,7 +17,8 @@ namespace Core
 			Scene& scene, SwapChain& swapChain, 
 			Texture* colorRenderTarget, Texture* depthRenderTarget, 
 			Texture* shadowRenderTarget, 
-			Texture* pregenerationSky, Texture* environmentCubemap);
+			Texture* pregenerationSky, Texture* environmentCubemap,
+			Texture* prefilterCubemap, Texture* brdfLut);
 		virtual ~GeometryRenderPass() override;
 
 		virtual void Prepare() override;
@@ -29,7 +30,8 @@ namespace Core
 			_shadowBuffer = &shadowBuffer;
 		}
 	private:
-		void PreparePregenerationSkybox(Texture* pregenerationSky, Texture* environmentCubemap);
+		void PreparePregenerationSkybox(Texture* pregenerationSky, 
+			Texture* irradianceCubemap, Texture* prefilterCubemap);
 		void DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame);
 		void UpdateGUI();
 		void UpdateLightBuffer();
@@ -44,6 +46,8 @@ namespace Core
 		Pipeline* _skyboxPipeline;
 
 		Texture* _irradianceCubemap;
+		Texture* _prefilteredCubemap;
+		Texture* _brdfLut;
 	};
 }
 

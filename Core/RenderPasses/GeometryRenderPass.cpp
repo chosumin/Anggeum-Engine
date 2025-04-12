@@ -13,16 +13,20 @@
 #include "RendererBatch.h"
 #include "SubMesh.h"
 #include "Component.h"
-#include "SkyPregenerationRenderPass.h"
-
+#include "DiffuseIrradianceRenderPass.h"
+#include "PrefilteredRenderPass.h"
+#include "BrdfLutRenderPass.h"
 namespace Core
 {
 	GeometryRenderPass::GeometryRenderPass(Device& device, Scene& scene, SwapChain& swapChain,
 		Texture* colorRenderTarget, Texture* depthRenderTarget, 
 		Texture* shadowRenderTarget, 
-		Texture* pregenerationSky, Texture* irradianceCubemap)
+		Texture* pregenerationSky, Texture* irradianceCubemap,
+		Texture* prefilterCubemap, Texture* brdfLut)
 		:RenderPass(device), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
-		_irradianceCubemap(irradianceCubemap), _skyboxPipeline(nullptr)
+		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
+		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
+		_skyboxPipeline(nullptr)
 	{
 		auto extent = swapChain.GetSwapChainExtent();
 		CreateColorAttachment(colorRenderTarget,
@@ -32,10 +36,7 @@ namespace Core
 		CreateRenderPass();
 		CreateFrameBuffer(swapChain);
 
-		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
-		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
-
-		PreparePregenerationSkybox(pregenerationSky, irradianceCubemap);
+		PreparePregenerationSkybox(pregenerationSky, irradianceCubemap, prefilterCubemap);
 	}
 
 	GeometryRenderPass::~GeometryRenderPass()
@@ -52,6 +53,9 @@ namespace Core
 
 	void GeometryRenderPass::Prepare()
 	{
+		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
+		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
+
 		auto meshes = _scene.GetComponents<Core::Mesh>();
 		for (auto&& mesh : meshes)
 		{
@@ -102,6 +106,9 @@ namespace Core
 				material.second->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
 				material.second->SetBuffer(currentFrame, 7, &_lightBuffer);
 				material.second->SetBuffer(8, _irradianceCubemap);
+				material.second->SetBuffer(9, _prefilteredCubemap);
+				material.second->SetBuffer(10, _brdfLut);
+
 				material.second->SetBuffer(currentFrame);
 			}
 
@@ -113,19 +120,47 @@ namespace Core
 		commandBuffer.EndRenderPass();
 	}
 
-	void GeometryRenderPass::PreparePregenerationSkybox(Texture* pregenerationSky, Texture* environmentCubemap)
+	void GeometryRenderPass::PreparePregenerationSkybox(Texture* pregenerationSky, 
+		Texture* irradianceCubemap, Texture* prefilterCubemap)
 	{
-		auto pregenerationSkybox = new SkyPregenerationRenderPass(_device, _scene, pregenerationSky, environmentCubemap);
+		{
+			auto& singleCommand = _device.BeginSingleTimeCommands();
 
-		pregenerationSkybox->Prepare();
+			auto irradiance = new IrradianceRenderPass(_device, _scene, pregenerationSky, irradianceCubemap);
 
-		auto& singleCommand = _device.BeginSingleTimeCommands();
+			irradiance->Prepare();
+			irradiance->Draw(singleCommand, 0, 0);
 
-		pregenerationSkybox->Draw(singleCommand, 0, 0);
-		
-		_device.EndSingleTimeCommands(singleCommand);
+			_device.EndSingleTimeCommands(singleCommand);
 
-		delete(pregenerationSkybox);
+			delete(irradiance);
+		}
+
+		{
+			auto& singleCommand = _device.BeginSingleTimeCommands();
+
+			auto prefiltered = new PrefilteredRenderPass(_device, _scene, pregenerationSky, prefilterCubemap);
+
+			prefiltered->Prepare();
+			prefiltered->Draw(singleCommand, 0, 0);
+
+			_device.EndSingleTimeCommands(singleCommand);
+			
+			delete(prefiltered);
+		}
+
+		{
+			auto& singleCommand = _device.BeginSingleTimeCommands();
+
+			auto brdf = new BrdfLutRenderPass(_device, _brdfLut);
+
+			brdf->Prepare();
+			brdf->Draw(singleCommand, 0, 0);
+
+			_device.EndSingleTimeCommands(singleCommand);
+
+			delete(brdf);
+		}
 	}
 
 	void GeometryRenderPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)

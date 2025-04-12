@@ -10,7 +10,7 @@ layout(binding = 1) uniform samplerCube envmap;
 
 void main()
 {
-	vec3 envColor = SRGBtoLINEAR(texture(envmap, pos)).rgb;
+	vec3 envColor = SRGBtoLINEAR(textureLod(envmap, pos, 1.2)).rgb;
 
 	envColor = envColor / (envColor + vec3(1.0));
 

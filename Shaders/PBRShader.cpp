@@ -17,6 +17,8 @@ namespace Core
 		AddUniformBufferLayoutBinding(6, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(PBRBuffer));
 		AddUniformBufferLayoutBinding(7, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(LightBuffer));
 		AddTextureBufferLayoutBinding(8, VK_SHADER_STAGE_FRAGMENT_BIT);
+		AddTextureBufferLayoutBinding(9, VK_SHADER_STAGE_FRAGMENT_BIT);
+		AddTextureBufferLayoutBinding(10, VK_SHADER_STAGE_FRAGMENT_BIT);
 	}
 
 	type_index PBRShader::GetType()

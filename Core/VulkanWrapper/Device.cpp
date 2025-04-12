@@ -91,10 +91,20 @@ void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
 
-    vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    // Create fence to ensure that the command buffer has finished executing
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = 0;
 
-    //hack : optimizable with vkWaitForFences.
-    vkQueueWaitIdle(_graphicsQueue);
+    VkFence fence;
+    vkCreateFence(_device, &fence_info, nullptr, &fence);
+
+    // Submit to the queue
+    VkResult result = vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
+    // Wait for the fence to signal that command buffer has finished executing
+    vkWaitForFences(_device, 1, &fence, VK_TRUE, 100000000000);
+
+    vkDestroyFence(_device, fence, nullptr);
 }
 
 VkFormat Core::Device::FindSupportedFormat(

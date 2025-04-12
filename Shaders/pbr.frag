@@ -4,6 +4,7 @@
 
 #include "lighting.h"
 #include "common.glsl"
+#include "pbr.glsl"
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec4 worldPos;
@@ -40,54 +41,9 @@ layout(binding = 7) uniform LightInfo
 	Light light;
 } lightInfo;
 
-layout(binding = 8) uniform samplerCube irradianceMap;
-
-float saturate(float t)
-{
-	return clamp(t, 0.0, 1.0f);
-}
-
-vec3 FresnelSchlick(float cosTheta, vec3 F0)
-{
-	return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
-}
-
-//the normal distribution function
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
-	float a = roughness * roughness;
-	float a2 = a * a;
-	float NdotH = max(dot(N, H), 0.0);
-	float NdotH2 = NdotH * NdotH;
-
-	float denom = NdotH2 * (a2 - 1.0) + 1.0;
-	denom = PI * denom * denom;
-
-	return a2 / denom;
-}
-
-//the geometry function
-float GeomertySchlickGGX(float NdotV, float roughness)
-{
-	float r = (roughness + 1.0);
-	float k = (r * r) / 8.0;
-
-	float num = NdotV;
-	float denom = NdotV * (1.0 - k) + k;
-
-	return num / denom;
-}
-
-//the geometry function for specular microfacet model
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
-	float NdotV = max(dot(N, V), 0.0000001);
-	float NdotL = max(dot(N, L), 0.0000001);
-	float ggx2 = GeomertySchlickGGX(NdotV, roughness);
-	float ggx1 = GeomertySchlickGGX(NdotL, roughness);
-
-	return ggx1 * ggx2;
-}
+layout(binding = 8) uniform samplerCube irradiancemap;
+layout(binding = 9) uniform samplerCube prefiltermap;
+layout(binding = 10) uniform sampler2D brdfLut;
 
 vec3 Normal()
 {
@@ -140,13 +96,15 @@ void main()
 
 	if (pbr.occlusionTextureSet == 1)
 	{
-		ao = metallicRoughness.r;
+		//fixme : hardcoded. needs occlusion mapping
+		ao = 1;
 	}
 	else
 		ao = pbr.ao;
 
 	vec3 N = normalize(Normal());
     vec3 V = normalize(camera.pos - worldPos.xyz);
+	vec3 R = reflect(-V, N);
 
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo.rgb, metallic);
@@ -183,9 +141,16 @@ void main()
 	vec3 kD = 1.0 - kS;
 	kD *= 1.0 - metallic;
 
-	vec3 irradiance = SRGBtoLINEAR(texture(irradianceMap, N)).rgb;
+	vec3 irradiance = SRGBtoLINEAR(texture(irradiancemap, N)).rgb;
 	vec3 diffuse = irradiance * albedo.rgb;
-	vec3 ambient = (kD * diffuse) * ao;
+	
+	// split-sum approximation to get the IBL specular part.
+	const float MAX_REFLECTION_LOD = 4.0;
+	vec3 prefilteredColor = SRGBtoLINEAR(textureLod(prefiltermap, R, roughness * MAX_REFLECTION_LOD)).rgb;
+	vec2 brdf = texture(brdfLut, vec2(max(dot(N, V), 0.0), roughness)).rg;
+	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
+
+	vec3 ambient = (kD * diffuse + specular) * ao;
 
 	if(pbr.debugMode == 1)
 	{

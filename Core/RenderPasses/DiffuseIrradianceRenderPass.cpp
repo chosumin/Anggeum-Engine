@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "SkyPregenerationRenderPass.h"
+#include "DiffuseIrradianceRenderPass.h"
 #include "Scene.h"
 #include "Entity.h"
 #include "Components/Mesh.h"
@@ -14,10 +14,10 @@ using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
-Core::SkyPregenerationRenderPass::SkyPregenerationRenderPass(Device& device, Scene& scene, Texture* offscreen, Texture* cubemap)
-	:RenderPass(device), _scene(scene), _irradianceCubemap(cubemap), _colorRenderTarget(offscreen)
+Core::IrradianceRenderPass::IrradianceRenderPass(Device& device, Scene& scene,
+	Texture* offscreen, Texture* irradianceCubemap)
+	:RenderPass(device), _scene(scene), _irradianceCubemap(irradianceCubemap), _colorRenderTarget(offscreen)
 {
-	//todo : write two dependencies
 	CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 
 	CreateRenderPass();
@@ -27,13 +27,13 @@ Core::SkyPregenerationRenderPass::SkyPregenerationRenderPass(Device& device, Sce
 	_material = new Material(device, "Irradiance", hash);
 }
 
-Core::SkyPregenerationRenderPass::~SkyPregenerationRenderPass()
+Core::IrradianceRenderPass::~IrradianceRenderPass()
 {
 	delete(_skyboxPipeline);
 	delete(_material);
 }
 
-void Core::SkyPregenerationRenderPass::Prepare()
+void Core::IrradianceRenderPass::Prepare()
 {
 	auto meshes = _scene.GetComponents<Core::Mesh>();
 
@@ -75,7 +75,7 @@ void Core::SkyPregenerationRenderPass::Prepare()
 	_delta.Theta = (0.5f * float(PI)) / 64.0f;
 }
 
-void Core::SkyPregenerationRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::IrradianceRenderPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	{
 		commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage(),

@@ -43,3 +43,9 @@ struct IrradianceDelta
 	float Phi;
 	float Theta;
 };
+
+struct PrefilterEnv
+{
+	float Roughness;
+	uint32_t NumSamples = 32u;
+};

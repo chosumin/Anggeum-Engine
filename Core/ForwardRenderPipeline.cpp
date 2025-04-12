@@ -2,14 +2,11 @@
 #include "ForwardRenderPipeline.h"
 #include "VulkanWrapper/RenderPass.h"
 #include "VulkanWrapper/SwapChain.h"
-#include "Core/RenderPasses/GeometryRenderPass.h"
-#include "Core/RenderPasses/ShadowRenderPass.h"
+#include "RenderPasses/GeometryRenderPass.h"
+#include "RenderPasses/ShadowRenderPass.h"
 #include "Scene.h"
 #include "Utils/Utility.h"
 #include "RenderContext.h"
-
-#include "RenderPasses/SkyPregenerationRenderPass.h"
-
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(
@@ -38,7 +35,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	auto geometryRenderPass = new GeometryRenderPass(
 		device, scene, swapChain, 
 		_renderTargets[0].get(), _renderTargets[1].get(), 
-		_renderTargets[2].get(), _renderTargets[3].get(), _renderTargets[4].get());
+		_renderTargets[2].get(), _renderTargets[3].get(), 
+		_renderTargets[4].get(), _renderTargets[5].get(),
+		_renderTargets[6].get());
 	geometryRenderPass->SetBuffer(shadowRenderPass->GetShadowBuffer());
 
 	AddRenderPass(geometryRenderPass);
@@ -146,7 +145,7 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D e
 	imageInfo.usage = usageFlags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	
-	Image* image = new Image(_device, imageInfo, layout, VK_IMAGE_ASPECT_COLOR_BIT);
+	Image* image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	unique_ptr<Texture> renderTarget = make_unique<Texture>("render target", image, _sampler);
 	return move(renderTarget);
@@ -175,7 +174,7 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExten
 	imageInfo.usage = flags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = new Image(_device, imageInfo, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+	auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 	unique_ptr<Texture> renderTarget = make_unique<Texture>("depth target", image, _sampler);
 	return move(renderTarget);
@@ -200,7 +199,7 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExten
 	imageInfo.usage = flags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = new Image(_device, imageInfo, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	unique_ptr<Texture> renderTarget = make_unique<Texture>("color target", image, _sampler);
 
@@ -225,12 +224,17 @@ void Core::ForwardRenderPipeline::CreateSampler()
 	samplerInfo.compareEnable = VK_TRUE; //usually used for percentage-closer filtering on shadow maps.
 	//samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
+	samplerInfo.minLod = 0.0f;
+
+	//HACK : hardcoded.
+	samplerInfo.maxLod = numeric_limits<float>::max();
+
 	_sampler = new Sampler(_device, samplerInfo);
 }
 
 void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 {
-	uint32_t size = 64;
+	uint32_t size = 128;
 	const uint32_t numMips = static_cast<uint32_t>(floor(std::log2(size))) + 1;
 	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	
@@ -248,15 +252,13 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		auto image = new Image(_device, imageInfo,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			VK_IMAGE_ASPECT_COLOR_BIT);
+		auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 		unique_ptr<Texture> offscreen = make_unique<Texture>("offscreen", image, _sampler);
 		_renderTargets.push_back(move(offscreen));
 	}
 
 	{
-		//Environment texture
+		//Irradiance cubemap
 		VkImageCreateInfo imageInfo{};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -270,11 +272,54 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
 		auto image = new Image(_device, imageInfo,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_VIEW_TYPE_CUBE);
 
-		unique_ptr<Texture> cubemap = make_unique<Texture>("cubemap", image, _sampler);
+		unique_ptr<Texture> cubemap = make_unique<Texture>("irradiance", image, _sampler);
 		_renderTargets.push_back(move(cubemap));
+	}
+
+	{
+		//Prefiltered cubemap
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = format;
+		imageInfo.extent = { size , size , 1 };
+		imageInfo.mipLevels = numMips;
+		imageInfo.arrayLayers = 6;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+		auto image = new Image(_device, imageInfo,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_VIEW_TYPE_CUBE);
+
+		unique_ptr<Texture> cubemap = make_unique<Texture>("prefiltered", image, _sampler);
+		_renderTargets.push_back(move(cubemap));
+	}
+
+	{
+		//BRDF LUT
+		VkFormat format = VK_FORMAT_R16G16_SFLOAT;
+		uint32_t size = 512;
+
+		VkImageCreateInfo imageInfo{};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = format;
+		imageInfo.extent = { size , size , 1 };
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+
+		unique_ptr<Texture> bdrf = make_unique<Texture>("brdflut", image, _sampler);
+		_renderTargets.push_back(move(bdrf));
 	}
 }

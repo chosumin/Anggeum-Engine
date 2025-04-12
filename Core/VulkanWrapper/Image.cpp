@@ -40,24 +40,25 @@ Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sample
     stagingBuffer.CopyBuffer(_data.data(), imageSize);
 
     auto& commandBuffer = _device.BeginSingleTimeCommands();
+    
     commandBuffer.TransitionImageLayout(*this, VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    _device.EndSingleTimeCommands(commandBuffer);
 
-    CopyBufferToImage(stagingBuffer.GetBuffer(),
-        _image, _extent.width, _extent.height);
+    commandBuffer.CopyBufferToImage(stagingBuffer, *this, _extent.width, _extent.height);
 
     //hack : need to be pregenerated and stored in the texture file to improve loading speed.
     if (_mipLevels > 1)
-        GenerateMipmaps(_mipLevels);
+        commandBuffer.GenerateMipmaps(*this, _mipLevels);
+
+    _device.EndSingleTimeCommands(commandBuffer);
 
     CreateImageView(_mipLevels, imageViewType, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
-    VkImageLayout layout, VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
+    VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
 	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
-    _layout(layout), _layer(imageInfo.arrayLayers)
+    _layer(imageInfo.arrayLayers)
 {
 	CreateImage(
 		VK_IMAGE_TILING_OPTIMAL,
@@ -319,129 +320,4 @@ void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewT
     {
         throw runtime_error("failed to create texture image view!");
     }
-}
-
-void Core::Image::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
-{
-    auto& commandBuffer = _device.BeginSingleTimeCommands();
-
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = _layer;
-
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    //dstImageLayout >> 현재 사용 중인 레이아웃, 이 명령 이전에 이 레이아웃으로 트랜지션 되어야 함.
-    vkCmdCopyBufferToImage(
-        commandBuffer.GetHandle(),
-        buffer,
-        image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &region
-    );
-
-    _device.EndSingleTimeCommands(commandBuffer);
-}
-
-void Core::Image::GenerateMipmaps(uint32_t mipLevels)
-{
-    VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(
-        _device.GetPhysicalDevice(), _format, &formatProperties);
-
-    if (!(formatProperties.optimalTilingFeatures &
-        VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
-        throw runtime_error("texture image format doesn't support linear blitting!");
-
-    auto& commandBuffer = _device.BeginSingleTimeCommands();
-
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = _image;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = _layer;
-    barrier.subresourceRange.levelCount = 1; //하나의 밉맵만 레이아웃 변경.
-
-    int32_t mipWidth = _extent.width;
-    int32_t mipHeight = _extent.height;
-
-    for (uint32_t i = 1; i < mipLevels; ++i)
-    {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        //DST에서 SRC로 레이아웃 변경.
-        //Tranfer를 기다린 후 Tranfer에서 실행 >> 이전 Tranfer 스테이지의 커맨드를 모두 수행한 후 이 루프를 실행 함. 
-        vkCmdPipelineBarrier(commandBuffer.GetHandle(),
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        VkImageBlit blit{};
-        blit.srcOffsets[0] = { 0, 0, 0 };
-        blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
-        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.srcSubresource.mipLevel = i - 1;
-        blit.srcSubresource.baseArrayLayer = 0;
-        blit.srcSubresource.layerCount = _layer;
-        blit.dstOffsets[0] = { 0, 0, 0 };
-        blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.dstSubresource.mipLevel = i;
-        blit.dstSubresource.baseArrayLayer = 0;
-        blit.dstSubresource.layerCount = _layer;
-
-        //both the src and dst are the same image, because of blitting between different levels of the same image.
-        vkCmdBlitImage(commandBuffer.GetHandle(),
-            _image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1, &blit, VK_FILTER_LINEAR);
-
-        //i - 1을 쉐이더용 레이아웃으로 변경.
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        //This transition waits on the current blit command to finish.
-        vkCmdPipelineBarrier(commandBuffer.GetHandle(),
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        if (mipWidth > 1)
-            mipWidth /= 2;
-        if (mipHeight > 1)
-            mipHeight /= 2;
-    }
-
-    barrier.subresourceRange.baseMipLevel = mipLevels - 1;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    vkCmdPipelineBarrier(commandBuffer.GetHandle(),
-        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
-
-    _device.EndSingleTimeCommands(commandBuffer);
 }

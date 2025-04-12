@@ -17,3 +17,10 @@
 ..\VulkanSDK\1.3.275.0\Bin\glslc.exe filtercube.vert -g -o ..\x64\Debug\Shaders\filtercube.vert.spv
 ..\VulkanSDK\1.3.275.0\Bin\glslc.exe irradiance.frag -g -o irradiance.frag.spv 
 ..\VulkanSDK\1.3.275.0\Bin\glslc.exe irradiance.frag -g -o ..\x64\Debug\Shaders\irradiance.frag.spv
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe prefilter.frag -g -o prefilter.frag.spv 
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe prefilter.frag -g -o ..\x64\Debug\Shaders\prefilter.frag.spv
+
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe brdf_lut.vert -g -o brdf_lut.vert.spv 
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe brdf_lut.vert -g -o ..\x64\Debug\Shaders\brdf_lut.vert.spv
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe brdf_lut.frag -g -o brdf_lut.frag.spv 
+..\VulkanSDK\1.3.275.0\Bin\glslc.exe brdf_lut.frag -g -o ..\x64\Debug\Shaders\brdf_lut.frag.spv
