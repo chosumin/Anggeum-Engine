@@ -47,9 +47,6 @@
     <ClCompile Include="Core\ForwardRenderPipeline.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Core\JsonParser.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp">
       <Filter>Core\RenderPasses</Filter>
     </ClCompile>
@@ -189,9 +186,6 @@
     <ClInclude Include="Core\InputEvents.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Keycodes.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Material.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -225,9 +219,6 @@
       <Filter>Sample</Filter>
     </ClInclude>
     <ClInclude Include="Core\ForwardRenderPipeline.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\JsonParser.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h">

@@ -2,7 +2,7 @@
 #include "MaterialFactory.h"
 #include "Material.h"
 #include "Utils/Utility.h"
-#include "JsonParser.h"
+#include "Utils/JsonParser.h"
 #include "VulkanWrapper/Texture.h"
 #include "VulkanWrapper/Image.h"
 #include "VulkanWrapper/Sampler.h"

@@ -151,7 +151,6 @@
     <ClCompile Include="Core\Entity.cpp" />
     <ClCompile Include="Core\ForwardRenderPipeline.cpp" />
     <ClCompile Include="Core\InputEvents.cpp" />
-    <ClCompile Include="Core\JsonParser.cpp" />
     <ClCompile Include="Core\Material.cpp" />
     <ClCompile Include="Core\MaterialFactory.cpp" />
     <ClCompile Include="Core\RenderContext.cpp" />
@@ -169,6 +168,7 @@
     <ClCompile Include="Core\timer.cpp" />
     <ClCompile Include="Core\Utils\FileSystem.cpp" />
     <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
+    <ClCompile Include="Core\Utils\JsonParser.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
     <ClCompile Include="Core\VulkanWrapper\Buffer.cpp" />
@@ -240,8 +240,6 @@
     <ClInclude Include="Core\ForwardRenderPipeline.h" />
     <ClInclude Include="Core\InputEvents.h" />
     <ClInclude Include="Core\IRenderPipeline.h" />
-    <ClInclude Include="Core\JsonParser.h" />
-    <ClInclude Include="Core\Keycodes.h" />
     <ClInclude Include="Core\Material.h" />
     <ClInclude Include="Core\MaterialFactory.h" />
     <ClInclude Include="Core\RenderContext.h" />
@@ -259,6 +257,8 @@
     <ClInclude Include="Core\timer.h" />
     <ClInclude Include="Core\Utils\FileSystem.h" />
     <ClInclude Include="Core\Utils\GLTFLoader.h" />
+    <ClInclude Include="Core\Utils\JsonParser.h" />
+    <ClInclude Include="Core\Utils\Keycodes.h" />
     <ClInclude Include="Core\Utils\Log.h" />
     <ClInclude Include="Core\Utils\Math.h" />
     <ClInclude Include="Core\Utils\Utility.h" />
