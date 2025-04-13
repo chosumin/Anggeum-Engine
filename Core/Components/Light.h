@@ -1,5 +1,5 @@
 #pragma once
-#include "Component.h"
+#include "Foundation/Component.h"
 
 namespace Core
 {

@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "FreeCamera.h"
 #include "Transform.h"
-#include "InputEvents.h"
-#include "Entity.h"
+#include "Utils/InputEvents.h"
+#include "Foundation/Entity.h"
 using namespace Core;
 
 const float TOUCH_DOWN_MOVE_FORWARD_WAIT_TIME = 2.0f;

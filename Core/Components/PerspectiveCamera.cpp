@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "PerspectiveCamera.h"
 #include "Transform.h"
-#include "Entity.h"
+#include "Foundation/Entity.h"
 
 Core::PerspectiveCamera::PerspectiveCamera(float width, float height)
 {

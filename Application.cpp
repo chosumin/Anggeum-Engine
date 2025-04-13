@@ -1,14 +1,14 @@
 #include "stdafx.h"
 #include "Application.h"
-#include "VulkanWrapper/SwapChain.h"
-#include "VulkanWrapper/CommandBuffer.h"
-#include "timer.h"
-#include "Sample/Sample/SampleScene.h"
-#include "ForwardRenderPipeline.h"
-#include "RenderContext.h"
-#include "MaterialFactory.h"
-#include "ShaderFactory.h"
-#include "Core/RenderPasses/GUIRenderPass.h"
+#include "Graphics/Vulkans/SwapChain.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Utils/timer.h"
+#include "Sample/SampleScene.h"
+#include "Sample/ForwardRenderPipeline.h"
+#include "Graphics/RenderContext.h"
+#include "Graphics/MaterialFactory.h"
+#include "Graphics/ShaderFactory.h"
+#include "Sample/RendererPasses/GUIRenderPass.h"
 
 Application::Application(const ApplicationOptions& options)
 {

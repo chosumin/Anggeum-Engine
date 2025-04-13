@@ -1,11 +1,11 @@
 #include "stdafx.h"
 #include "Mesh.h"
-#include "VulkanWrapper/Vertex.h"
+#include "Graphics/Vulkans/Vertex.h"
 #include "Utils/Utility.h"
-#include "SubMesh.h"
-#include "Material.h"
-#include "MaterialFactory.h"
-#include "Entity.h"
+#include "Graphics/SubMesh.h"
+#include "Graphics/Material.h"
+#include "Graphics/MaterialFactory.h"
+#include "Foundation/Entity.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>

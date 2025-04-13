@@ -1,6 +1,6 @@
 #pragma once
-#include "Component.h"
-#include "BufferObjects/BufferObjects.h"
+#include "Foundation/Component.h"
+#include "Graphics/BufferObjects.h"
 
 namespace Core
 {

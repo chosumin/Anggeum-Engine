@@ -55,8 +55,8 @@ using namespace rapidjson;
 #include <mutex>
 using namespace std;
 
-#include "VulkanWrapper/Device.h"
-#include "Window.h"
-#include "InputEvents.h"
+#include "Graphics/Vulkans/Device.h"
+#include "Foundation/Window.h"
+#include "Utils/InputEvents.h"
 
 const int MAX_FRAMES_IN_FLIGHT = 2;

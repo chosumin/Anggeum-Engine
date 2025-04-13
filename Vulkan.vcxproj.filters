@@ -4,36 +4,6 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Core\Component.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Entity.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\InputEvents.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Material.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderContext.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RendererBatch.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderFrame.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Scene.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\timer.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Window.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="ThirdParties\imgui\imgui.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp" />
@@ -41,83 +11,11 @@
     <ClCompile Include="ThirdParties\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_tables.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Sample\Sample\SampleScene.cpp">
-      <Filter>Sample</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\ForwardRenderPipeline.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp">
-      <Filter>Core\RenderPasses</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp">
-      <Filter>Core\RenderPasses</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp">
-      <Filter>Core\RenderPasses</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\MaterialFactory.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\ShaderFactory.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Shaders\PBRShader.cpp">
-      <Filter>Shaders</Filter>
-    </ClCompile>
-    <ClCompile Include="Shaders\ShadowShader.cpp">
-      <Filter>Shaders</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Utils\Math.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
     <ClCompile Include="Core\Utils\Utility.cpp">
       <Filter>Core\Utils</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Buffer.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\CommandBuffer.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\CommandPool.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\DescriptorPool.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Device.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Framebuffer.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Pipeline.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\PipelineState.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Shader.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\SwapChain.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Texture.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\TextureBuffer.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\UniformBuffer.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Vertex.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
     </ClCompile>
     <ClCompile Include="Core\Components\FreeCamera.cpp">
       <Filter>Core\Components</Filter>
@@ -131,173 +29,167 @@
     <ClCompile Include="Core\Utils\GLTFLoader.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Image.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\VulkanWrapper\Sampler.cpp">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\SubMesh.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Components\Mesh.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
     <ClCompile Include="Core\Components\Light.cpp">
       <Filter>Core\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Shaders\SkyboxShader.cpp">
-      <Filter>Shaders</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Utils\FileSystem.cpp" />
-    <ClCompile Include="Core\RenderPasses\DiffuseIrradianceRenderPass.cpp">
-      <Filter>Core\RenderPasses</Filter>
-    </ClCompile>
-    <ClCompile Include="Shaders\IrradianceShader.cpp">
-      <Filter>Shaders</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Utils\JsonParser.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
-    <ClCompile Include="Shaders\PrefilterShader.cpp">
-      <Filter>Shaders</Filter>
+    <ClCompile Include="Sample\SampleScene.cpp">
+      <Filter>Sample</Filter>
     </ClCompile>
-    <ClCompile Include="Core\RenderPasses\PrefilteredRenderPass.cpp">
-      <Filter>Core\RenderPasses</Filter>
+    <ClCompile Include="Sample\ForwardRenderPipeline.cpp">
+      <Filter>Sample</Filter>
     </ClCompile>
-    <ClCompile Include="Shaders\BrdfLutShader.cpp">
-      <Filter>Shaders</Filter>
+    <ClCompile Include="Core\Graphics\Vulkans\Buffer.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
-    <ClCompile Include="Core\RenderPasses\BrdfLutRenderPass.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\CommandBuffer.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\CommandPool.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\DescriptorPool.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Device.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Foundation\Entity.cpp">
+      <Filter>Core\Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Utils\FileSystem.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Foundation\Component.cpp">
+      <Filter>Core\Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Framebuffer.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Image.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Material.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\MaterialFactory.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Utils\InputEvents.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\PBRShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Pipeline.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\PipelineState.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\PrefilterShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\IrradianceShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\RenderContext.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\RendererBatch.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\RenderFrame.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\RenderPass.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Sampler.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Shader.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\ShaderFactory.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Foundation\Window.cpp">
+      <Filter>Core\Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Foundation\Scene.cpp">
+      <Filter>Core\Foundation</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Vertex.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\UniformBuffer.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\TextureBuffer.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\Texture.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\SwapChain.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\ShadowShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\SkyboxShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\SubMesh.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Sample\RendererPasses\BrdfLutPass.cpp">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Sample\RendererPasses\PreEnvironmentPass.cpp">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Sample\RendererPasses\GeometryPass.cpp">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Sample\RendererPasses\GUIRenderPass.cpp">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Sample\RendererPasses\ShadowPass.cpp">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Utils\timer.cpp">
+      <Filter>Core\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\Shaders\BrdfLutShader.cpp">
+      <Filter>Assets\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Graphics\RendererPass.cpp">
+      <Filter>Core\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="IRenderPipeline.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Core\Component.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Entity.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\InputEvents.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Material.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderContext.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RendererBatch.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderFrame.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Scene.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\timer.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Window.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\BufferObjects\BufferObjects.h">
-      <Filter>Core\BufferObjects</Filter>
-    </ClInclude>
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
-    <ClInclude Include="Sample\Sample\SampleScene.h">
-      <Filter>Sample</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\ForwardRenderPipeline.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h">
-      <Filter>Core\RenderPasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderPasses\GUIRenderPass.h">
-      <Filter>Core\RenderPasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h">
-      <Filter>Core\RenderPasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\MaterialFactory.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\ShaderFactory.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\PBRShader.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\ShadowShader.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Utils\Math.h">
       <Filter>Core\Utils</Filter>
     </ClInclude>
     <ClInclude Include="Core\Utils\Utility.h">
       <Filter>Core\Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Buffer.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\CommandBuffer.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\CommandPool.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\DescriptorPool.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Device.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Framebuffer.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\IDescriptor.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Pipeline.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\PipelineState.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\RenderPass.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Shader.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\SwapChain.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Texture.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\TextureBuffer.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\UniformBuffer.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Vertex.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\IRenderPipeline.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Core\Components\FreeCamera.h">
       <Filter>Core\Components</Filter>
@@ -314,33 +206,11 @@
     <ClInclude Include="Core\Utils\Log.h">
       <Filter>Core\Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Image.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\VulkanWrapper\Sampler.h">
-      <Filter>Core\VulkanWrapper</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\SubMesh.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Components\Mesh.h">
       <Filter>Core\Components</Filter>
     </ClInclude>
     <ClInclude Include="Core\Components\Light.h">
       <Filter>Core\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\lighting.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\SkyboxShader.h">
-      <Filter>Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Utils\FileSystem.h" />
-    <ClInclude Include="Core\RenderPasses\DiffuseIrradianceRenderPass.h">
-      <Filter>Core\RenderPasses</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\IrradianceShader.h">
-      <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="Core\Utils\JsonParser.h">
       <Filter>Core\Utils</Filter>
@@ -348,58 +218,226 @@
     <ClInclude Include="Core\Utils\Keycodes.h">
       <Filter>Core\Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\PrefilterShader.h">
-      <Filter>Shaders</Filter>
+    <ClInclude Include="Sample\SampleScene.h">
+      <Filter>Sample</Filter>
     </ClInclude>
-    <ClInclude Include="Core\RenderPasses\PrefilteredRenderPass.h">
-      <Filter>Core\RenderPasses</Filter>
+    <ClInclude Include="Sample\ForwardRenderPipeline.h">
+      <Filter>Sample</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\BrdfLutShader.h">
-      <Filter>Shaders</Filter>
+    <ClInclude Include="Core\Graphics\BufferObjects.h">
+      <Filter>Core\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Core\RenderPasses\BrdfLutRenderPass.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Buffer.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\CommandBuffer.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\CommandPool.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\DescriptorPool.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Device.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Foundation\Entity.h">
+      <Filter>Core\Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\FileSystem.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Foundation\Component.h">
+      <Filter>Core\Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Framebuffer.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\IDescriptor.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Image.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\lighting.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Material.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\MaterialFactory.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\InputEvents.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\IRenderPipeline.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\PBRShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Pipeline.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\PipelineState.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\PrefilterShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\IrradianceShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\RenderContext.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\RendererBatch.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\RenderFrame.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\RenderPass.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Sampler.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Shader.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\ShaderFactory.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Foundation\Window.h">
+      <Filter>Core\Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Foundation\Scene.h">
+      <Filter>Core\Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Vertex.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\UniformBuffer.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\TextureBuffer.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\Texture.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\SwapChain.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\ShadowShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\SkyboxShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\SubMesh.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Sample\RendererPasses\BrdfLutPass.h">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Sample\RendererPasses\PreEnvironmentPass.h">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Sample\RendererPasses\GeometryPass.h">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Sample\RendererPasses\GUIRenderPass.h">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Sample\RendererPasses\ShadowPass.h">
+      <Filter>Sample\RendererPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Utils\timer.h">
+      <Filter>Core\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\Shaders\BrdfLutShader.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\RendererPass.h">
+      <Filter>Core\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="cpp.hint" />
-    <None Include="Shaders\pbr.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\brdf_lut.frag">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\shadow.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\brdf_lut.frag.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\shadow.vert">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\brdf_lut.vert">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\pbr.vert">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\brdf_lut.vert.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\common.glsl">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\common.glsl">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
-    <None Include="Shaders\skybox.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\filtercube.vert">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\skybox.vert">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\filtercube.vert.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\irradiance.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\pbr.frag">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\filtercube.vert">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\pbr.frag.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\prefilter.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\pbr.glsl">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\brdf_lut.frag">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\pbr.vert">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\brdf_lut.vert">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\pbr.vert.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
-    <None Include="Shaders\pbr.glsl">
-      <Filter>Shaders</Filter>
+    <None Include="Assets\Shaders\prefilter.frag">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\prefilter.frag.spv">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\irradiance.frag">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\irradiance.frag.spv">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\shadow.frag">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\shadow.frag.spv">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\shadow.vert">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\shadow.vert.spv">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\skybox.frag">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\skybox.frag.spv">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\skybox.vert">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\skybox.vert.spv">
+      <Filter>Assets\Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -409,35 +447,35 @@
     <Filter Include="IMGUI">
       <UniqueIdentifier>{cbdbe374-97c0-4824-9cd1-5c533165dcff}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{58e3dbde-ec2a-4fa5-98a9-00c0dcd46de9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Polygons">
-      <UniqueIdentifier>{b30b5d06-f92b-4e4f-83ee-0eb124a33ca3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\BufferObjects">
-      <UniqueIdentifier>{665c6d6e-0aaa-4386-8ba5-8a74d463508a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Sample">
-      <UniqueIdentifier>{9c04a490-60dd-4427-954d-ae8fbe2cf9a1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\RenderPasses">
-      <UniqueIdentifier>{e649309a-0e9b-4cd3-a513-cdca3c02d1f7}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Utils">
       <UniqueIdentifier>{70c848c7-0b73-402a-98ce-b669fb9cf25e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\VulkanWrapper">
-      <UniqueIdentifier>{e982dd07-29ca-4389-9f48-79b658dd442c}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\Components">
       <UniqueIdentifier>{49ce4538-79c5-4c0c-9c49-abcbcdff5dd9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Graphics">
+      <UniqueIdentifier>{44d4250f-30c8-4da0-9e16-1758d238db1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Foundation">
+      <UniqueIdentifier>{1181ba06-d8be-4b27-a183-a8952bea4e2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Graphics\Vulkans">
+      <UniqueIdentifier>{63ed5799-922e-4587-82df-b600d3699296}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sample">
+      <UniqueIdentifier>{3e512f73-f14f-413d-bdf3-2ce3017729c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sample\RendererPasses">
+      <UniqueIdentifier>{8543359d-de93-446e-849c-29554a0872fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets">
+      <UniqueIdentifier>{76d2cdfa-d60c-45f6-9d93-6d8feaf042ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets\Shaders">
+      <UniqueIdentifier>{bc121875-fd60-4a2a-94af-1485700a967c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="ThirdParties\imgui\misc\debuggers\imgui.natvis" />
   </ItemGroup>
 </Project>

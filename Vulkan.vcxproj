@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;RenderPasses;$(ProjectDir);Core;Components;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)VulkanSDK\1.3.275.0\Include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;$(ProjectDir);Core;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)VulkanSDK\1.3.275.0\Include</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -112,7 +112,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.250.0\Lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.275.0\Lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -142,61 +142,61 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
-    <ClCompile Include="Core\Component.cpp" />
+    <ClCompile Include="Assets\Shaders\BrdfLutShader.cpp" />
+    <ClCompile Include="Assets\Shaders\IrradianceShader.cpp" />
+    <ClCompile Include="Assets\Shaders\PBRShader.cpp" />
+    <ClCompile Include="Assets\Shaders\PrefilterShader.cpp" />
+    <ClCompile Include="Assets\Shaders\ShadowShader.cpp" />
+    <ClCompile Include="Assets\Shaders\SkyboxShader.cpp" />
     <ClCompile Include="Core\Components\FreeCamera.cpp" />
     <ClCompile Include="Core\Components\Light.cpp" />
     <ClCompile Include="Core\Components\Mesh.cpp" />
     <ClCompile Include="Core\Components\PerspectiveCamera.cpp" />
     <ClCompile Include="Core\Components\Transform.cpp" />
-    <ClCompile Include="Core\Entity.cpp" />
-    <ClCompile Include="Core\ForwardRenderPipeline.cpp" />
-    <ClCompile Include="Core\InputEvents.cpp" />
-    <ClCompile Include="Core\Material.cpp" />
-    <ClCompile Include="Core\MaterialFactory.cpp" />
-    <ClCompile Include="Core\RenderContext.cpp" />
-    <ClCompile Include="Core\RendererBatch.cpp" />
-    <ClCompile Include="Core\RenderFrame.cpp" />
-    <ClCompile Include="Core\RenderPasses\BrdfLutRenderPass.cpp" />
-    <ClCompile Include="Core\RenderPasses\GeometryRenderPass.cpp" />
-    <ClCompile Include="Core\RenderPasses\GUIRenderPass.cpp" />
-    <ClCompile Include="Core\RenderPasses\PrefilteredRenderPass.cpp" />
-    <ClCompile Include="Core\RenderPasses\ShadowRenderPass.cpp" />
-    <ClCompile Include="Core\RenderPasses\DiffuseIrradianceRenderPass.cpp" />
-    <ClCompile Include="Core\Scene.cpp" />
-    <ClCompile Include="Core\ShaderFactory.cpp" />
-    <ClCompile Include="Core\SubMesh.cpp" />
-    <ClCompile Include="Core\timer.cpp" />
+    <ClCompile Include="Core\Foundation\Component.cpp" />
+    <ClCompile Include="Core\Foundation\Entity.cpp" />
+    <ClCompile Include="Core\Foundation\Scene.cpp" />
+    <ClCompile Include="Core\Foundation\Window.cpp" />
+    <ClCompile Include="Core\Graphics\Material.cpp" />
+    <ClCompile Include="Core\Graphics\MaterialFactory.cpp" />
+    <ClCompile Include="Core\Graphics\RenderContext.cpp" />
+    <ClCompile Include="Core\Graphics\RendererBatch.cpp" />
+    <ClCompile Include="Core\Graphics\RendererPass.cpp" />
+    <ClCompile Include="Core\Graphics\RenderFrame.cpp" />
+    <ClCompile Include="Core\Graphics\ShaderFactory.cpp" />
+    <ClCompile Include="Core\Graphics\SubMesh.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Buffer.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\CommandBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\CommandPool.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\DescriptorPool.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Device.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Framebuffer.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Image.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Pipeline.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\PipelineState.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\RenderPass.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Sampler.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Shader.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\SwapChain.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Texture.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\TextureBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\UniformBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Vertex.cpp" />
     <ClCompile Include="Core\Utils\FileSystem.cpp" />
     <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
+    <ClCompile Include="Core\Utils\InputEvents.cpp" />
     <ClCompile Include="Core\Utils\JsonParser.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
+    <ClCompile Include="Core\Utils\timer.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Buffer.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\CommandBuffer.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\CommandPool.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\DescriptorPool.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Device.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Framebuffer.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Image.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Pipeline.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\PipelineState.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\RenderPass.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Sampler.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Shader.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\SwapChain.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Texture.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\TextureBuffer.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\UniformBuffer.cpp" />
-    <ClCompile Include="Core\VulkanWrapper\Vertex.cpp" />
-    <ClCompile Include="Core\Window.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
-    <ClCompile Include="Sample\Sample\SampleScene.cpp" />
-    <ClCompile Include="Shaders\BrdfLutShader.cpp" />
-    <ClCompile Include="Shaders\IrradianceShader.cpp" />
-    <ClCompile Include="Shaders\PBRShader.cpp" />
-    <ClCompile Include="Shaders\PrefilterShader.cpp" />
-    <ClCompile Include="Shaders\ShadowShader.cpp" />
-    <ClCompile Include="Shaders\SkyboxShader.cpp" />
+    <ClCompile Include="Sample\ForwardRenderPipeline.cpp" />
+    <ClCompile Include="Sample\RendererPasses\BrdfLutPass.cpp" />
+    <ClCompile Include="Sample\RendererPasses\PreEnvironmentPass.cpp" />
+    <ClCompile Include="Sample\RendererPasses\GeometryPass.cpp" />
+    <ClCompile Include="Sample\RendererPasses\GUIRenderPass.cpp" />
+    <ClCompile Include="Sample\RendererPasses\ShadowPass.cpp" />
+    <ClCompile Include="Sample\SampleScene.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -229,99 +229,104 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
-    <ClInclude Include="Core\BufferObjects\BufferObjects.h" />
-    <ClInclude Include="Core\Component.h" />
+    <ClInclude Include="Assets\Shaders\BrdfLutShader.h" />
+    <ClInclude Include="Assets\Shaders\IrradianceShader.h" />
+    <ClInclude Include="Assets\Shaders\lighting.h" />
+    <ClInclude Include="Assets\Shaders\PBRShader.h" />
+    <ClInclude Include="Assets\Shaders\PrefilterShader.h" />
+    <ClInclude Include="Assets\Shaders\ShadowShader.h" />
+    <ClInclude Include="Assets\Shaders\SkyboxShader.h" />
     <ClInclude Include="Core\Components\FreeCamera.h" />
     <ClInclude Include="Core\Components\Light.h" />
     <ClInclude Include="Core\Components\Mesh.h" />
     <ClInclude Include="Core\Components\PerspectiveCamera.h" />
     <ClInclude Include="Core\Components\Transform.h" />
-    <ClInclude Include="Core\Entity.h" />
-    <ClInclude Include="Core\ForwardRenderPipeline.h" />
-    <ClInclude Include="Core\InputEvents.h" />
-    <ClInclude Include="Core\IRenderPipeline.h" />
-    <ClInclude Include="Core\Material.h" />
-    <ClInclude Include="Core\MaterialFactory.h" />
-    <ClInclude Include="Core\RenderContext.h" />
-    <ClInclude Include="Core\RendererBatch.h" />
-    <ClInclude Include="Core\RenderFrame.h" />
-    <ClInclude Include="Core\RenderPasses\BrdfLutRenderPass.h" />
-    <ClInclude Include="Core\RenderPasses\GeometryRenderPass.h" />
-    <ClInclude Include="Core\RenderPasses\GUIRenderPass.h" />
-    <ClInclude Include="Core\RenderPasses\PrefilteredRenderPass.h" />
-    <ClInclude Include="Core\RenderPasses\ShadowRenderPass.h" />
-    <ClInclude Include="Core\RenderPasses\DiffuseIrradianceRenderPass.h" />
-    <ClInclude Include="Core\Scene.h" />
-    <ClInclude Include="Core\ShaderFactory.h" />
-    <ClInclude Include="Core\SubMesh.h" />
-    <ClInclude Include="Core\timer.h" />
+    <ClInclude Include="Core\Foundation\Component.h" />
+    <ClInclude Include="Core\Foundation\Entity.h" />
+    <ClInclude Include="Core\Foundation\Scene.h" />
+    <ClInclude Include="Core\Foundation\Window.h" />
+    <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
+    <ClInclude Include="Core\Graphics\Material.h" />
+    <ClInclude Include="Core\Graphics\MaterialFactory.h" />
+    <ClInclude Include="Core\Graphics\RenderContext.h" />
+    <ClInclude Include="Core\Graphics\RendererBatch.h" />
+    <ClInclude Include="Core\Graphics\RendererPass.h" />
+    <ClInclude Include="Core\Graphics\RenderFrame.h" />
+    <ClInclude Include="Core\Graphics\ShaderFactory.h" />
+    <ClInclude Include="Core\Graphics\SubMesh.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Buffer.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\CommandBuffer.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\CommandPool.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\DescriptorPool.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Device.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Framebuffer.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\IDescriptor.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Image.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Pipeline.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\PipelineState.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\RenderPass.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Sampler.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Shader.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\SwapChain.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Texture.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\TextureBuffer.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\UniformBuffer.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Vertex.h" />
     <ClInclude Include="Core\Utils\FileSystem.h" />
     <ClInclude Include="Core\Utils\GLTFLoader.h" />
+    <ClInclude Include="Core\Utils\InputEvents.h" />
     <ClInclude Include="Core\Utils\JsonParser.h" />
     <ClInclude Include="Core\Utils\Keycodes.h" />
     <ClInclude Include="Core\Utils\Log.h" />
     <ClInclude Include="Core\Utils\Math.h" />
+    <ClInclude Include="Core\Utils\timer.h" />
     <ClInclude Include="Core\Utils\Utility.h" />
-    <ClInclude Include="Core\VulkanWrapper\Buffer.h" />
-    <ClInclude Include="Core\VulkanWrapper\CommandBuffer.h" />
-    <ClInclude Include="Core\VulkanWrapper\CommandPool.h" />
-    <ClInclude Include="Core\VulkanWrapper\DescriptorPool.h" />
-    <ClInclude Include="Core\VulkanWrapper\Device.h" />
-    <ClInclude Include="Core\VulkanWrapper\Framebuffer.h" />
-    <ClInclude Include="Core\VulkanWrapper\IDescriptor.h" />
-    <ClInclude Include="Core\VulkanWrapper\Image.h" />
-    <ClInclude Include="Core\VulkanWrapper\Pipeline.h" />
-    <ClInclude Include="Core\VulkanWrapper\PipelineState.h" />
-    <ClInclude Include="Core\VulkanWrapper\RenderPass.h" />
-    <ClInclude Include="Core\VulkanWrapper\Sampler.h" />
-    <ClInclude Include="Core\VulkanWrapper\Shader.h" />
-    <ClInclude Include="Core\VulkanWrapper\SwapChain.h" />
-    <ClInclude Include="Core\VulkanWrapper\Texture.h" />
-    <ClInclude Include="Core\VulkanWrapper\TextureBuffer.h" />
-    <ClInclude Include="Core\VulkanWrapper\UniformBuffer.h" />
-    <ClInclude Include="Core\VulkanWrapper\Vertex.h" />
-    <ClInclude Include="Core\Window.h" />
     <ClInclude Include="DebugInfo.h" />
-    <ClInclude Include="Sample\Sample\SampleScene.h" />
-    <ClInclude Include="Shaders\BrdfLutShader.h" />
-    <ClInclude Include="Shaders\IrradianceShader.h" />
-    <ClInclude Include="Shaders\lighting.h" />
-    <ClInclude Include="Shaders\PBRShader.h" />
-    <ClInclude Include="Shaders\PrefilterShader.h" />
-    <ClInclude Include="Shaders\ShadowShader.h" />
-    <ClInclude Include="Shaders\SkyboxShader.h" />
+    <ClInclude Include="Sample\ForwardRenderPipeline.h" />
+    <ClInclude Include="Sample\RendererPasses\BrdfLutPass.h" />
+    <ClInclude Include="Sample\RendererPasses\PreEnvironmentPass.h" />
+    <ClInclude Include="Sample\RendererPasses\GeometryPass.h" />
+    <ClInclude Include="Sample\RendererPasses\GUIRenderPass.h" />
+    <ClInclude Include="Sample\RendererPasses\ShadowPass.h" />
+    <ClInclude Include="Sample\SampleScene.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
-    <ClInclude Include="IRenderPipeline.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="cpp.hint" />
-    <None Include="Shaders\brdf_lut.frag" />
-    <None Include="Shaders\brdf_lut.vert" />
-    <None Include="Shaders\irradiance.frag" />
-    <None Include="Shaders\filtercube.vert" />
-    <None Include="Shaders\pbr.glsl" />
-    <None Include="Shaders\prefilter.frag" />
-    <None Include="Shaders\skybox.frag" />
-    <None Include="Shaders\skybox.vert" />
-    <None Include="ThirdParties\imgui\misc\debuggers\imgui.natstepfilter" />
-    <None Include="Shaders\common.glsl" />
-    <None Include="Shaders\pbr.frag" />
-    <None Include="Shaders\shadow.frag" />
-    <None Include="Shaders\shadow.vert" />
-    <None Include="Shaders\pbr.vert" />
+    <None Include="Assets\Shaders\brdf_lut.frag" />
+    <None Include="Assets\Shaders\brdf_lut.frag.spv" />
+    <None Include="Assets\Shaders\brdf_lut.vert" />
+    <None Include="Assets\Shaders\brdf_lut.vert.spv" />
+    <None Include="Assets\Shaders\common.glsl" />
+    <None Include="Assets\Shaders\filtercube.vert" />
+    <None Include="Assets\Shaders\filtercube.vert.spv" />
+    <None Include="Assets\Shaders\irradiance.frag" />
+    <None Include="Assets\Shaders\irradiance.frag.spv" />
+    <None Include="Assets\Shaders\pbr.frag" />
+    <None Include="Assets\Shaders\pbr.frag.spv" />
+    <None Include="Assets\Shaders\pbr.glsl" />
+    <None Include="Assets\Shaders\pbr.vert" />
+    <None Include="Assets\Shaders\pbr.vert.spv" />
+    <None Include="Assets\Shaders\prefilter.frag" />
+    <None Include="Assets\Shaders\prefilter.frag.spv" />
+    <None Include="Assets\Shaders\shadow.frag" />
+    <None Include="Assets\Shaders\shadow.frag.spv" />
+    <None Include="Assets\Shaders\shadow.vert" />
+    <None Include="Assets\Shaders\shadow.vert.spv" />
+    <None Include="Assets\Shaders\skybox.frag" />
+    <None Include="Assets\Shaders\skybox.frag.spv" />
+    <None Include="Assets\Shaders\skybox.vert" />
+    <None Include="Assets\Shaders\skybox.vert.spv" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Vulkan.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="ThirdParties\imgui\misc\debuggers\imgui.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

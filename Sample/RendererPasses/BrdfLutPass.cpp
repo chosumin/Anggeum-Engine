@@ -1,0 +1,54 @@
+#include "stdafx.h"
+#include "BrdfLutPass.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Material.h"
+#include "Utils/Utility.h"
+using namespace Core;
+
+Core::BrdfLutPass::BrdfLutPass(Device& device, Texture* brdfLut)
+	:RendererPass(device)
+{
+	_renderPass->CreateColorAttachment(brdfLut, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	_renderPass->CreateRenderPass();
+
+	CreateFrameBuffer(brdfLut->GetImage());
+}
+
+Core::BrdfLutPass::~BrdfLutPass()
+{
+	delete(_brdfPipeline);
+	delete(_brdfMaterial);
+}
+
+void Core::BrdfLutPass::Prepare()
+{
+	uint32_t hash = Utility::HashCode("BRDF");
+	_brdfMaterial = new Material(_device, "BRDF", hash);
+
+	auto pipelineState = *_pipelineState;
+
+	auto& rasterization = pipelineState.GetRasterizationStateCreateInfo();
+	rasterization.cullMode = VK_CULL_MODE_NONE;
+
+	auto& depthInfo = pipelineState.GetDepthStencilStateCreateInfo();
+	depthInfo.depthWriteEnable = VK_FALSE;
+	depthInfo.depthTestEnable = VK_FALSE;
+
+	_brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
+	_brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
+}
+
+void Core::BrdfLutPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+{
+	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
+
+	commandBuffer.BeginRenderPass(_renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex));
+
+	commandBuffer.BindPipeline(_brdfPipeline);
+
+	commandBuffer.Draw(3, 1);
+
+	commandBuffer.EndRenderPass();
+}
