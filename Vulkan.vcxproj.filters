@@ -173,6 +173,9 @@
     <ClCompile Include="Core\Graphics\RendererPass.cpp">
       <Filter>Core\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Graphics\Vulkans\MemoryAllocator.cpp">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -364,6 +367,9 @@
     </ClInclude>
     <ClInclude Include="Core\Graphics\RendererPass.h">
       <Filter>Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Graphics\Vulkans\MemoryAllocator.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

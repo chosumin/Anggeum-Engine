@@ -3,7 +3,7 @@
 #include "CommandBuffer.h"
 
 Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
-	:_device(device)
+	:_device(device), _size(size)
 {
 	CreateBuffer(size, usage, properties, _buffer, _bufferMemory);
 }
@@ -14,6 +14,10 @@ Core::Buffer::~Buffer()
 
 	vkDestroyBuffer(device, _buffer, nullptr);
 	vkFreeMemory(device, _bufferMemory, nullptr);
+}
+
+void Core::Buffer::BindMemory(uint32_t blockIndex, uint32_t spanIndex)
+{
 }
 
 void Core::Buffer::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)

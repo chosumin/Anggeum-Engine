@@ -29,6 +29,8 @@ Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sample
         _usageFlags,
         VK_IMAGE_LAYOUT_UNDEFINED,
         flags);
+    
+    //todo : memory alloc
 
     BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 

@@ -48,6 +48,8 @@ void Core::UniformBuffer::CreateUniformBuffer(VkDeviceSize bufferSize)
 			bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
+		//todo : memory alloc
+		
 		//persistent mapping
 		//The uniform data will be used for all draw calls, 
 		//so the buffer containing it should only be destroyed when we stop rendering.

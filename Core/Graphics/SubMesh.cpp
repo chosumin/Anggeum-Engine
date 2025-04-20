@@ -33,10 +33,11 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 
 	stagingBuffer.CopyBuffer(vertexData.data(), bufferSize);
 
-	//todo : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT to use compute shader.
 	auto vertexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	//todo : memory alloc
 
 	//vertex memory is moved from CPU to GPU
 	vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
@@ -57,6 +58,8 @@ void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType in
 	_indexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	//todo : memory alloc
 
 	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
 
