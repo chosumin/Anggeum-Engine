@@ -43,10 +43,14 @@ Core::Device::Device(Window& window)
     auto indices = FindQueueFamilies();
     _commandPool = new CommandPool(*this, 
         indices.GraphicsAndComputeFamily.value());
+
+    CreateMemoryAllocators();
 }
 
 Core::Device::~Device()
 {
+    DeleteMemoryAllocators();
+
     delete(_commandPool);
 
     vkDestroyDevice(_device, nullptr);
@@ -128,6 +132,11 @@ VkFormat Core::Device::FindSupportedFormat(
     }
 
     throw runtime_error("failed to find supported format!");
+}
+
+Core::MemoryAllocator* Core::Device::GetMemoryAllocator(MemoryType memoryType) const
+{
+    return _vertexAndIndexBufferAllocator;
 }
 
 void Core::Device::CreateInstance()
@@ -436,4 +445,36 @@ Core::SwapChainSupportDetails Core::Device::QuerySwapChainSupport(VkPhysicalDevi
     }
 
     return details;
+}
+
+void Core::Device::CreateMemoryAllocators()
+{
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = 1024 * 1024;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | 
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkBuffer dummyBuffer;
+
+    if (vkCreateBuffer(_device, &bufferInfo, nullptr, &dummyBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(_device, dummyBuffer, &memRequirements);
+
+    uint32_t memoryType = memRequirements.memoryTypeBits;
+    uint32_t size = 32 * 1024 * 1024;
+    _vertexAndIndexBufferAllocator = new MemoryAllocator(*this, size, memRequirements, 
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkDestroyBuffer(_device, dummyBuffer, nullptr);
+}
+
+void Core::Device::DeleteMemoryAllocators()
+{
+    delete(_vertexAndIndexBufferAllocator);
 }

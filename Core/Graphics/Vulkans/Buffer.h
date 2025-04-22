@@ -9,6 +9,7 @@ namespace Core
 	{
 	public:
 		Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+		Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, MemoryType memoryType);
 		~Buffer();
 
 		VkBuffer GetBuffer() { return _buffer; }
@@ -19,16 +20,13 @@ namespace Core
 		void MapMemory(void** data, VkDeviceSize size);
 
 		VkDeviceSize GetSize() const { return _size; }
-		
-		void BindMemory(uint32_t blockIndex, uint32_t spanIndex);
-	private:
-		void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-			VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	protected:
 		Device& _device;
 		VkBuffer _buffer;
-		VkDeviceMemory _bufferMemory;
+		VkDeviceMemory _bufferMemory = VK_NULL_HANDLE;
 		VkDeviceSize _size;
+		MemorySpanIndex _allocation;
+		MemoryAllocator* _allocator;
 	};
 }
 

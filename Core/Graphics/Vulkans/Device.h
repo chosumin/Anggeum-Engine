@@ -1,4 +1,5 @@
 #pragma once
+#include "MemoryAllocator.h"
 
 namespace Core
 {
@@ -51,6 +52,8 @@ namespace Core
 			VkFormatFeatureFlags features);
 
 		const VkInstance& GetInstance() const { return _instance; }
+
+		MemoryAllocator* GetMemoryAllocator(MemoryType memoryType) const;
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -64,6 +67,9 @@ namespace Core
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 		void CreateLogicalDevice();
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+
+		void CreateMemoryAllocators();
+		void DeleteMemoryAllocators();
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -85,6 +91,10 @@ namespace Core
 		VkSurfaceKHR _surface;
 
 		CommandPool* _commandPool;
+
+		MemoryAllocator* _vertexAndIndexBufferAllocator;
+
+		//todo : stage / uniform
 
 		const vector<const char*> _validationLayers = 
 		{

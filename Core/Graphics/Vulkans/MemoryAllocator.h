@@ -2,37 +2,49 @@
 
 namespace Core
 {
+	enum class MemoryType
+	{
+		STAGE, DEVICE_LOCAL, UNIFORM
+	};
+
 	struct MemorySpanIndex
 	{
-		uint32_t blockIndex;
-		uint32_t spanIndex;
-	};
-
-	struct OffsetSize
-	{
-		uint64_t offset;
-		uint64_t size;
-	};
-
-	struct MemoryBlock
-	{
-		VkDeviceMemory memory;
-		uint32_t id;
-		VkDeviceSize size;
-		vector<OffsetSize> layout;
+		size_t blockIndex;
+		size_t spanIndex;
 	};
 
 	class Buffer;
 	class Image;
+	class Device;
 	class MemoryAllocator
 	{
+	private:
+		struct OffsetSize
+		{
+			uint64_t offset;
+			VkDeviceSize size;
+
+			OffsetSize(uint64_t offset, VkDeviceSize size)
+				:offset(offset), size(size) 
+			{
+
+			}
+		};
+
+		struct MemoryBlock
+		{
+			VkDeviceMemory memory;
+			uint32_t id;
+			VkDeviceSize size;
+			vector<OffsetSize> layout;
+		};
 	public:
-		MemoryAllocator(Device& device, VkDeviceSize size, VkMemoryPropertyFlags properties);
+		MemoryAllocator(Device& device, VkDeviceSize size, 
+			VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties);
 		~MemoryAllocator();
 
-		void Allocate(Buffer& buffer);
-		bool Deallocate(Buffer const& block);
-		int GetMemoryType() const;
+		MemorySpanIndex Allocate(Buffer& buffer);
+		void Deallocate(VkDeviceSize size, MemorySpanIndex& spanIndex);
 	private:
 		bool FindFreeChunkForAllocation(
 			MemorySpanIndex& indexPair, VkDeviceSize size, bool needsWholePage);
@@ -40,12 +52,11 @@ namespace Core
 		void MarkChunkOfMemoryBlockUsed(MemorySpanIndex indices, VkDeviceSize size);
 	private:
 		Device& _device;
-		size_t _totalSize;
+		size_t _totalAllocSize = 0;
 		VkMemoryRequirements _requirements;
 		VkDeviceSize _blockMinSize;
 		vector<MemoryBlock> _blocks;
-		uint32_t _pageSize;
+		VkDeviceSize _pageSize;
 		uint32_t _memoryType;
-		void* _ptr;
 	};
 }

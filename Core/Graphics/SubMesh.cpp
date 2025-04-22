@@ -28,18 +28,16 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 {
 	VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
 
-	Core::Buffer stagingBuffer(_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	Core::Buffer stagingBuffer(_device, bufferSize, 
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	stagingBuffer.CopyBuffer(vertexData.data(), bufferSize);
 
 	auto vertexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		MemoryType::DEVICE_LOCAL);
 
-	//todo : memory alloc
-
-	//vertex memory is moved from CPU to GPU
 	vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
 
 	_vertexBuffers[name] = vertexBuffer;
@@ -57,9 +55,7 @@ void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType in
 
 	_indexBuffer = new Core::Buffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	//todo : memory alloc
+		MemoryType::DEVICE_LOCAL);
 
 	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
 

@@ -3,22 +3,17 @@
 #include "Buffer.h"
 #include "Image.h"
 
-Core::MemoryAllocator::MemoryAllocator(Device& device, VkDeviceSize size, VkMemoryPropertyFlags properties)
-	:_device(device), _blockMinSize(size)
+Core::MemoryAllocator::MemoryAllocator(Device& device, VkDeviceSize size, 
+	VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties)
+	:_device(device), _blockMinSize(size), _requirements(memRequirements)
 {
-	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(_device.GetPhysicalDevice(), &memProperties);
-
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &deviceProperties);
 
 	_pageSize = deviceProperties.limits.bufferImageGranularity;
-	_blockMinSize = _pageSize * 10;
+	_blockMinSize = size;
 
 	_memoryType = _device.FindMemoryType(_requirements.memoryTypeBits, properties);
-
-	VkBuffer buffer{};
-	vkGetBufferMemoryRequirements(device.GetDevice(), buffer, &_requirements);
 }
 
 Core::MemoryAllocator::~MemoryAllocator()
@@ -29,11 +24,11 @@ Core::MemoryAllocator::~MemoryAllocator()
 	}
 }
 
-void Core::MemoryAllocator::Allocate(Buffer& buffer)
+Core::MemorySpanIndex Core::MemoryAllocator::Allocate(Buffer& buffer)
 {
 	VkDeviceSize size = buffer.GetSize();
 	VkDeviceSize requestedAllocSize = ((size / _pageSize) + 1) * _pageSize;
-	_totalSize += requestedAllocSize;
+	_totalAllocSize += requestedAllocSize;
 
 	MemorySpanIndex location;
 
@@ -45,21 +40,44 @@ void Core::MemoryAllocator::Allocate(Buffer& buffer)
 		location = { AddBlock(requestedAllocSize, needsOwnPage), 0 };
 	}
 
-	buffer.BindMemory(location.blockIndex, location.spanIndex);
+	auto& block = _blocks[location.blockIndex];
+
+	vkBindBufferMemory(_device.GetDevice(), buffer.GetBuffer(),
+		block.memory,
+		block.layout[location.spanIndex].offset);
 
 	MarkChunkOfMemoryBlockUsed(location, requestedAllocSize);
 
-	return false;
+	return location;
 }
 
-bool Core::MemoryAllocator::Deallocate(Buffer const& block)
+void Core::MemoryAllocator::Deallocate(VkDeviceSize size, MemorySpanIndex& memorySpanIndex)
 {
-	return false;
-}
+	VkDeviceSize requestedAllocSize = ((size / _pageSize) + 1) * _pageSize;
 
-int Core::MemoryAllocator::GetMemoryType() const
-{
-	return 0;
+	MemoryBlock block = _blocks[memorySpanIndex.blockIndex];
+
+	OffsetSize span = { block.layout[memorySpanIndex.spanIndex].offset, requestedAllocSize};
+
+	bool found = false;
+
+	for (auto&& layout : block.layout)
+	{
+		if (layout.offset == requestedAllocSize + span.offset)
+		{
+			layout.offset = span.offset;
+			layout.size += requestedAllocSize;
+			found = true;
+
+			break;
+		}
+	}
+
+	if (found == false)
+	{
+		block.layout.emplace_back(span);
+		_totalAllocSize -= requestedAllocSize;
+	}
 }
 
 bool Core::MemoryAllocator::FindFreeChunkForAllocation(MemorySpanIndex& indexPair, VkDeviceSize size, bool needsWholePage)
@@ -94,7 +112,7 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool fitToAlloc)
 
 	VkMemoryAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = _requirements.size;
+	allocInfo.allocationSize = newPoolSize;
 	allocInfo.memoryTypeIndex = _memoryType;
 
 	MemoryBlock newBlock{};
@@ -108,13 +126,16 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool fitToAlloc)
 	}
 
 	newBlock.size = newPoolSize;
+	newBlock.layout.emplace_back(0, size);
 
-	newBlock.layout.emplace_back(0, newPoolSize);
+	_blocks.push_back(newBlock);
 
 	return static_cast<uint32_t>(_blocks.size() - 1);
 }
 
 void Core::MemoryAllocator::MarkChunkOfMemoryBlockUsed(MemorySpanIndex indices, VkDeviceSize size)
 {
-
+	/*auto& offsetSize = _blocks[indices.blockIndex].layout[indices.spanIndex];
+	offsetSize.offset += size;
+	offsetSize.size -= size;*/
 }
