@@ -2,6 +2,7 @@
 #include "Device.h"
 #include "CommandPool.h"
 #include "CommandBuffer.h"
+#include "MemoryAllocator.h"
 
 VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,
@@ -136,7 +137,19 @@ VkFormat Core::Device::FindSupportedFormat(
 
 Core::MemoryAllocator* Core::Device::GetMemoryAllocator(MemoryType memoryType) const
 {
-    return _vertexAndIndexBufferAllocator;
+    switch (memoryType)
+    {
+    case Core::MemoryType::STAGE:
+        return _stagingBufferAllocator;
+    case Core::MemoryType::DEVICE_LOCAL:
+        return _vertexAndIndexBufferAllocator;
+    case Core::MemoryType::UNIFORM:
+        return _uniformBufferAllocator;
+    default:
+        break;
+    }
+    
+    throw runtime_error("failed to find the matched memory allocator!");
 }
 
 void Core::Device::CreateInstance()
@@ -451,7 +464,7 @@ void Core::Device::CreateMemoryAllocators()
 {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = 1024 * 1024;
+    bufferInfo.size = 1;
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | 
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
@@ -467,9 +480,14 @@ void Core::Device::CreateMemoryAllocators()
     vkGetBufferMemoryRequirements(_device, dummyBuffer, &memRequirements);
 
     uint32_t memoryType = memRequirements.memoryTypeBits;
-    uint32_t size = 32 * 1024 * 1024;
-    _vertexAndIndexBufferAllocator = new MemoryAllocator(*this, size, memRequirements, 
+
+    _vertexAndIndexBufferAllocator = new MemoryAllocator(*this, 
+        32 * 1024 * 1024, memRequirements,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    _stagingBufferAllocator = new MemoryAllocator(*this,
+        4 * 1024 * 1024, memRequirements,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     vkDestroyBuffer(_device, dummyBuffer, nullptr);
 }
@@ -477,4 +495,5 @@ void Core::Device::CreateMemoryAllocators()
 void Core::Device::DeleteMemoryAllocators()
 {
     delete(_vertexAndIndexBufferAllocator);
+    delete(_stagingBufferAllocator);
 }

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
+#include "MemoryAllocator.h"
 
 Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
 	:_device(device), _size(size)
@@ -26,8 +27,6 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 	allocInfo.memoryTypeIndex =
 		_device.FindMemoryType(memRequirements.memoryTypeBits, properties);
 
-	//hack : use vkAllocateMemory for a large number of objects at once.
-	//https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 	if (vkAllocateMemory(deviceHandle, &allocInfo, nullptr, &_bufferMemory) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate buffer memory!");
 	}
@@ -51,7 +50,9 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 	}
 
 	_allocator = device.GetMemoryAllocator(memoryType);
-	_allocation = _allocator->Allocate(*this);
+
+	_allocation = make_unique<MemoryAllocation>();
+	_allocator->Allocate(*_allocation , *this);
 }
 
 Core::Buffer::~Buffer()
@@ -63,7 +64,9 @@ Core::Buffer::~Buffer()
 	if (_allocator == nullptr)
 		vkFreeMemory(device, _bufferMemory, nullptr);
 	else
-		_allocator->Deallocate(_size, _allocation);
+	{
+		_allocator->Deallocate(*_allocation);
+	}
 }
 
 void Core::Buffer::CopyBuffer(VkBuffer srcBuffer, VkDeviceSize size)

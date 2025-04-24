@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Graphics/SubMesh.h"
 #include "Core/Graphics/Vulkans/Buffer.h"
+#include "Core/Graphics/Vulkans/MemoryAllocator.h"
 
 Core::SubMesh::SubMesh(Device& device, string name)
 	:_device(device), _indexBuffer(nullptr), _name(name)
@@ -30,7 +31,7 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 
 	Core::Buffer stagingBuffer(_device, bufferSize, 
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		MemoryType::STAGE);
 
 	stagingBuffer.CopyBuffer(vertexData.data(), bufferSize);
 
@@ -49,7 +50,7 @@ void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType in
 
 	Core::Buffer stagingBuffer(_device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		MemoryType::STAGE);
 
 	stagingBuffer.CopyBuffer(indexData.data(), bufferSize);
 

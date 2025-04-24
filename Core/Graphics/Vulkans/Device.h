@@ -1,5 +1,4 @@
 #pragma once
-#include "MemoryAllocator.h"
 
 namespace Core
 {
@@ -18,9 +17,12 @@ namespace Core
 		bool IsComplete() { return GraphicsAndComputeFamily.has_value() && PresentFamily.has_value(); }
 	};
 
+	enum class MemoryType;
+
 	class Window;
 	class CommandPool;
 	class CommandBuffer;
+	class MemoryAllocator;
 	class Device
 	{
 	public:
@@ -93,8 +95,8 @@ namespace Core
 		CommandPool* _commandPool;
 
 		MemoryAllocator* _vertexAndIndexBufferAllocator;
-
-		//todo : stage / uniform
+		MemoryAllocator* _stagingBufferAllocator;
+		MemoryAllocator* _uniformBufferAllocator;
 
 		const vector<const char*> _validationLayers = 
 		{

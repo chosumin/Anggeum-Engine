@@ -2,7 +2,7 @@
 
 namespace Core
 {
-	struct MemorySpanIndex;
+	struct MemoryAllocation;
 	class CommandBuffer;
 	class CommandPool;
 	class Buffer
@@ -25,7 +25,7 @@ namespace Core
 		VkBuffer _buffer;
 		VkDeviceMemory _bufferMemory = VK_NULL_HANDLE;
 		VkDeviceSize _size;
-		MemorySpanIndex _allocation;
+		unique_ptr<MemoryAllocation> _allocation;
 		MemoryAllocator* _allocator;
 	};
 }

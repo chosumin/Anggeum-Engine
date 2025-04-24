@@ -7,10 +7,11 @@ namespace Core
 		STAGE, DEVICE_LOCAL, UNIFORM
 	};
 
-	struct MemorySpanIndex
+	struct MemoryAllocation
 	{
-		size_t blockIndex;
-		size_t spanIndex;
+		size_t id;
+		VkDeviceSize size;
+		VkDeviceSize offset;
 	};
 
 	class Buffer;
@@ -19,44 +20,35 @@ namespace Core
 	class MemoryAllocator
 	{
 	private:
-		struct OffsetSize
-		{
-			uint64_t offset;
-			VkDeviceSize size;
+		struct SpanIndexPair { size_t blockIndex; size_t spanIndex; };
 
-			OffsetSize(uint64_t offset, VkDeviceSize size)
-				:offset(offset), size(size) 
-			{
-
-			}
-		};
+		struct OffsetSizePair { uint64_t offset; VkDeviceSize size; };
 
 		struct MemoryBlock
 		{
 			VkDeviceMemory memory;
-			uint32_t id;
 			VkDeviceSize size;
-			vector<OffsetSize> layout;
+			vector<OffsetSizePair> freeMemories;
 		};
 	public:
 		MemoryAllocator(Device& device, VkDeviceSize size, 
 			VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties);
 		~MemoryAllocator();
 
-		MemorySpanIndex Allocate(Buffer& buffer);
-		void Deallocate(VkDeviceSize size, MemorySpanIndex& spanIndex);
+		void Allocate(MemoryAllocation& outAllocation, Buffer& buffer);
+		void Deallocate(MemoryAllocation& allocation);
 	private:
 		bool FindFreeChunkForAllocation(
-			MemorySpanIndex& indexPair, VkDeviceSize size, bool needsWholePage);
+			SpanIndexPair& indexPair, VkDeviceSize size, bool needsWholePage);
 		uint32_t AddBlock(VkDeviceSize size, bool fitToAlloc);
-		void MarkChunkOfMemoryBlockUsed(MemorySpanIndex indices, VkDeviceSize size);
+		void MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size);
 	private:
 		Device& _device;
-		size_t _totalAllocSize = 0;
+		size_t _totalAllocSize;
 		VkMemoryRequirements _requirements;
 		VkDeviceSize _blockMinSize;
 		vector<MemoryBlock> _blocks;
-		VkDeviceSize _pageSize;
+		VkDeviceSize _alignment;
 		uint32_t _memoryType;
 	};
 }
