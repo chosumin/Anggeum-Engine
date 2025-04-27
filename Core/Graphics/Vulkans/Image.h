@@ -11,6 +11,7 @@ namespace Core
 		Rgb_alpha = 4
 	};*/
 
+	struct MemoryAllocation;
 	class Image
 	{
 	public:
@@ -36,9 +37,9 @@ namespace Core
 		uint32_t GetMipLevel() { return _mipLevels; }
 		VkImageAspectFlags GetAspectFlags() const;
 	private:
-		void LoadRawImage(const string& filePath);
-		void LoadStbImage(const string& filePath);
-		void LoadKtxImage(const string& path);
+		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);
+		void LoadStbImage(vector<uint8_t>& outData, const string& filePath);
+		void LoadKtxImage(vector<uint8_t>& outData, const string& path);
 		void CreateImage(VkImageTiling tiling, 
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
@@ -49,13 +50,13 @@ namespace Core
 		VkFormat _format;
 		VkImage _image;
 		VkImageView _imageView;
-		VkDeviceMemory _imageMemory;
 		VkExtent3D _extent;
 		uint32_t _layer;
 		uint32_t _mipLevels;
 		VkSampleCountFlagBits _sampleCount;
 		VkImageUsageFlags _usageFlags;
 
-		vector<uint8_t> _data;
+		unique_ptr<MemoryAllocation> _allocation;
+		MemoryAllocator* _allocator;
 	};
 }

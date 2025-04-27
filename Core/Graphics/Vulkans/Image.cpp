@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
+#include "MemoryAllocator.h"
 #include "Utils/FileSystem.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -20,7 +21,8 @@ Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sample
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
         VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    LoadRawImage(filePath);
+    vector<uint8_t> data;
+    LoadRawImage(data, filePath);
 
     _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
 
@@ -29,17 +31,15 @@ Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sample
         _usageFlags,
         VK_IMAGE_LAYOUT_UNDEFINED,
         flags);
-    
-    //todo : memory alloc
 
     BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkDeviceSize imageSize = _data.size();
+    VkDeviceSize imageSize = data.size();
 
     Buffer stagingBuffer(_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        MemoryType::STAGE);
 
-    stagingBuffer.CopyBuffer(_data.data(), imageSize);
+    stagingBuffer.CopyBuffer(data.data(), imageSize);
 
     auto& commandBuffer = _device.BeginSingleTimeCommands();
     
@@ -78,8 +78,9 @@ Core::Image::~Image()
     auto device = _device.GetDevice();
 
     vkDestroyImageView(device, _imageView, nullptr);
-    vkFreeMemory(device, _imageMemory, nullptr);
     vkDestroyImage(device, _image, nullptr);
+
+    _allocator->Deallocate(*_allocation);
 }
 
 void Core::Image::SetSRGBFormat()
@@ -172,21 +173,21 @@ VkImageAspectFlags Core::Image::GetAspectFlags() const
     return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
-void Core::Image::LoadRawImage(const string& filePath)
+void Core::Image::LoadRawImage(vector<uint8_t>& data, const string& filePath)
 {
     string extension = FileSystem::GetExtension(filePath);
 
     if (extension == "ktx")
     {
-        LoadKtxImage(filePath);
+        LoadKtxImage(data, filePath);
     }
     else if (extension == "png" || extension == "jpg")
     {
-        LoadStbImage(filePath);
+        LoadStbImage(data, filePath);
     }
 }
 
-void Core::Image::LoadStbImage(const string& filePath)
+void Core::Image::LoadStbImage(vector<uint8_t>& data, const string& filePath)
 {
     int width, height, comp;
     int reqComp = 4;
@@ -197,7 +198,7 @@ void Core::Image::LoadStbImage(const string& filePath)
     if (pixels == nullptr)
         throw runtime_error("failed to load texture image!");
 
-    _data = { pixels, pixels + (width * height * reqComp) };
+    data = { pixels, pixels + (width * height * reqComp) };
 
     _extent.depth = 1u;
     _extent.width = static_cast<uint32_t>(width);
@@ -208,7 +209,7 @@ void Core::Image::LoadStbImage(const string& filePath)
     stbi_image_free(pixels);
 }
 
-void Core::Image::LoadKtxImage(const string& path)
+void Core::Image::LoadKtxImage(vector<uint8_t>& outData, const string& path)
 {
     auto data = FileSystem::Read(path);
 
@@ -227,13 +228,13 @@ void Core::Image::LoadKtxImage(const string& path)
 
     if (texture->pData)
     {
-        _data = { texture->pData , texture->pData + texture->dataSize };
+        outData = { texture->pData , texture->pData + texture->dataSize };
     }
     else
     {
         ktx_size_t dataSize = texture->dataSize;
-		_data.resize(dataSize);
-        auto loadDataResult = ktxTexture_LoadImageData(texture, _data.data(), dataSize);
+        outData.resize(dataSize);
+        auto loadDataResult = ktxTexture_LoadImageData(texture, outData.data(), dataSize);
 
         if (loadDataResult != KTX_SUCCESS)
         {
@@ -277,7 +278,8 @@ void Core::Image::CreateImage(VkImageTiling tiling,
     //related to sparse images, such as 3D texture for a voxel terrain.
     imageInfo.flags = flags;
 
-    if (vkCreateImage(_device.GetDevice(), &imageInfo, nullptr, &_image) != VK_SUCCESS)
+    auto result = vkCreateImage(_device.GetDevice(), &imageInfo, nullptr, &_image);
+    if (result != VK_SUCCESS)
     {
         throw runtime_error("failed to create image!");
     }
@@ -287,21 +289,29 @@ void Core::Image::BindImageMemory(VkMemoryPropertyFlags properties)
 {
     auto device = _device.GetDevice();
 
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(device, _image, &memRequirements);
+    VkMemoryDedicatedRequirements dedicatedReqs{};
+    dedicatedReqs.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS;
+    dedicatedReqs.pNext = nullptr;
 
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex =
-        _device.FindMemoryType(memRequirements.memoryTypeBits, properties);
+	VkMemoryRequirements2 memRequirements{};
+	memRequirements.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+	memRequirements.pNext = &dedicatedReqs;
 
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &_imageMemory) != VK_SUCCESS)
-    {
-        throw runtime_error("failed to allocate image memory!");
-    }
+	VkImageMemoryRequirementsInfo2 imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2;
+    imageInfo.pNext = nullptr;
+	imageInfo.image = _image;
 
-    vkBindImageMemory(device, _image, _imageMemory, 0);
+    vkGetImageMemoryRequirements2(device, &imageInfo, &memRequirements);
+
+    bool needDedicated = dedicatedReqs.prefersDedicatedAllocation ||
+        dedicatedReqs.requiresDedicatedAllocation;
+
+    _allocator = _device.GetMemoryAllocator(MemoryType::IMAGE);
+
+    _allocation = make_unique<MemoryAllocation>();
+    _allocator->Allocate(*_allocation, memRequirements.memoryRequirements.size, needDedicated);
+    _allocator->BindImageMemory(*this, *_allocation);
 }
 
 void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType,

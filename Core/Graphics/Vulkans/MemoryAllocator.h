@@ -1,10 +1,12 @@
 #pragma once
 
+//Based on https://kylehalladay.com/blog/tutorial/2017/12/13/Custom-Allocators-Vulkan.html
+
 namespace Core
 {
 	enum class MemoryType
 	{
-		STAGE, DEVICE_LOCAL, UNIFORM
+		STAGE, DEVICE_LOCAL, UNIFORM, IMAGE
 	};
 
 	struct MemoryAllocation
@@ -26,22 +28,30 @@ namespace Core
 
 		struct MemoryBlock
 		{
+			size_t id;
 			VkDeviceMemory memory;
 			VkDeviceSize size;
+			void* mapped;
 			vector<OffsetSizePair> freeMemories;
+			bool dedicated;
 		};
 	public:
-		MemoryAllocator(Device& device, VkDeviceSize size, 
+		MemoryAllocator(Device& device, MemoryType type, VkDeviceSize size,
 			VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties);
 		~MemoryAllocator();
 
-		void Allocate(MemoryAllocation& outAllocation, Buffer& buffer);
+		void Allocate(MemoryAllocation& outAllocation, VkDeviceSize size, bool needDedicated);
 		void Deallocate(MemoryAllocation& allocation);
+		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
+		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
+		void BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation);
+		void BindImageMemory(Image& image, MemoryAllocation& allocation);
 	private:
 		bool FindFreeChunkForAllocation(
 			SpanIndexPair& indexPair, VkDeviceSize size, bool needsWholePage);
-		uint32_t AddBlock(VkDeviceSize size, bool fitToAlloc);
+		uint32_t AddBlock(VkDeviceSize size, bool needDedicated);
 		void MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size);
+		vector<MemoryBlock>::iterator FindMemoryBlock(size_t id);
 	private:
 		Device& _device;
 		size_t _totalAllocSize;
@@ -50,5 +60,7 @@ namespace Core
 		vector<MemoryBlock> _blocks;
 		VkDeviceSize _alignment;
 		uint32_t _memoryType;
+		MemoryType _allocatorType;
+		uint64_t _idCounter;
 	};
 }

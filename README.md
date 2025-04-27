@@ -12,9 +12,17 @@ Features
 6. PBR rendering (Cook-Torrance BRDF)
 	- Bump, Metallic, Roughness and Occlusion mapping
 	- Image Based Rendering (Irradiance, Prefiltered, BRDF LUT)
-7. Image loading support
-	- KTX and so on.
-
+7. Image
+	- Supports KTX extension
+	- Supports Mipmap generation
+8. Dynamic memory allocator for
+	- Vertex and Index buffers
+	- Staging buffers
+	- Uniform buffers
+	- Image buffers (also support dedicated memory)
+9. Multithreading
+	- Separated queues (Graphics, Compute, Tranfer, Present)
+	
 Third Parties
 - imgui
 - stb

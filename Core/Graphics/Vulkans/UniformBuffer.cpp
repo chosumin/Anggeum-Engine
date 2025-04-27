@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "UniformBuffer.h"
 #include "Buffer.h"
+#include "MemoryAllocator.h"
 
 Core::UniformBuffer::UniformBuffer(Device& device, VkDeviceSize bufferSize)
 	:_device(device)
@@ -46,17 +47,9 @@ void Core::UniformBuffer::CreateUniformBuffer(VkDeviceSize bufferSize)
 	{
 		_buffers[i] = make_unique<Buffer>(_device,
 			bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			MemoryType::UNIFORM);
 
-		//todo : memory alloc
-		
-		//persistent mapping
-		//The uniform data will be used for all draw calls, 
-		//so the buffer containing it should only be destroyed when we stop rendering.
-		auto bufferMemory = _buffers[i]->GetBufferMemory();
-		vkMapMemory(
-			_device.GetDevice(), bufferMemory,
-			0, bufferSize, 0, &_uniformBuffersMapped[i]);
+		_buffers[i]->GetMappedPtr(&_uniformBuffersMapped[i]);
 	}
 }
 

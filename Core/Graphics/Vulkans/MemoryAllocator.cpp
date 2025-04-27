@@ -3,14 +3,11 @@
 #include "Buffer.h"
 #include "Image.h"
 
-Core::MemoryAllocator::MemoryAllocator(Device& device, VkDeviceSize size, 
-	VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties)
+Core::MemoryAllocator::MemoryAllocator(Device& device, MemoryType type, 
+	VkDeviceSize size, VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties)
 	:_device(device), _blockMinSize(size), _requirements(memRequirements),
-	_totalAllocSize(0)
+	_totalAllocSize(0), _allocatorType(type), _idCounter(0)
 {
-	VkPhysicalDeviceProperties deviceProperties;
-	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &deviceProperties);
-
 	_alignment = _requirements.alignment;
 	_blockMinSize = size;
 
@@ -25,21 +22,26 @@ Core::MemoryAllocator::~MemoryAllocator()
 	}
 }
 
-void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation, Buffer& buffer)
+void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation, 
+	VkDeviceSize size, bool needDedicated)
 {
-	VkDeviceSize size = buffer.GetSize();
-
 	VkDeviceSize requestedAllocSize = ((size / _alignment) + 1) * _alignment;
 	_totalAllocSize += requestedAllocSize;
 
 	SpanIndexPair location;
 
-	bool needsOwnPage = false;
-	bool found = FindFreeChunkForAllocation(location, requestedAllocSize, needsOwnPage);
-
-	if (found == false)
+	if (needDedicated)
 	{
-		location = { AddBlock(requestedAllocSize, needsOwnPage), 0 };
+		location = { AddBlock(requestedAllocSize, true), 0 };
+	}
+	else
+	{
+		bool found = FindFreeChunkForAllocation(location, requestedAllocSize, false);
+
+		if (found == false)
+		{
+			location = { AddBlock(requestedAllocSize, false), 0 };
+		}
 	}
 
 	auto& block = _blocks[location.blockIndex];
@@ -48,9 +50,6 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation, Buffer& bu
 	outAllocation.size = requestedAllocSize;
 	outAllocation.offset = block.freeMemories[location.spanIndex].offset;
 
-	vkBindBufferMemory(_device.GetDevice(), buffer.GetBuffer(),
-		block.memory, outAllocation.offset);
-
 	MarkChunkOfMemoryBlockUsed(location, requestedAllocSize);
 }
 
@@ -58,28 +57,74 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 {
 	OffsetSizePair span = { allocation.offset , allocation.size };
 
-	bool found = false;
+	auto block = FindMemoryBlock(allocation.id);
 
-	MemoryBlock& block = _blocks[allocation.id];
-	for (auto&& freeMemory : block.freeMemories)
+	if (block->dedicated)
 	{
-		if (freeMemory.offset == span.size + span.offset)
+		vkFreeMemory(_device.GetDevice(), block->memory, nullptr);
+		_blocks.erase(block);
+	}
+	else
+	{
+		bool found = false;
+		for (auto&& freeMemory : block->freeMemories)
 		{
-			freeMemory.offset = span.offset;
-			freeMemory.size += allocation.size;
-			found = true;
+			if (freeMemory.offset == span.size + span.offset)
+			{
+				freeMemory.offset = span.offset;
+				freeMemory.size += allocation.size;
+				found = true;
 
-			break;
+				break;
+			}
 		}
-	}
 
-	if (found == false)
-	{
-		block.freeMemories.emplace_back(span);
-		_totalAllocSize -= allocation.size;
-	}
+		if (found == false)
+		{
+			block->freeMemories.emplace_back(span);
+			_totalAllocSize -= allocation.size;
+		}
 
-	//todo : merge when multiple blocks are in sequence
+		//todo : merge when multiple blocks are in sequence
+	}
+}
+
+void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocation)
+{
+	auto device = _device.GetDevice();
+
+	void* tempData;
+
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	vkMapMemory(device, block.memory, 
+		allocation.offset, allocation.size, 0, &tempData);
+	memcpy(tempData, srcData, (size_t)allocation.size);
+	vkUnmapMemory(device, block.memory);
+}
+
+void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
+{
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	uint8_t* mappedPtr = static_cast<uint8_t*>(block.mapped);
+	*outMappedPtr = mappedPtr + allocation.offset;
+}
+
+void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation)
+{
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	vkBindBufferMemory(_device.GetDevice(), buffer.GetBuffer(),
+		block.memory, allocation.offset);
+}
+
+void Core::MemoryAllocator::BindImageMemory(Image& image, MemoryAllocation& allocation)
+{
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	vkBindImageMemory(_device.GetDevice(), image.GetImage(),
+		block.memory, allocation.offset);
 }
 
 bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair, VkDeviceSize size, bool needsWholePage)
@@ -96,7 +141,7 @@ bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair,
 
 			if (offsetSizePair.size >= size && validOffset)
 			{
-				indexPair.blockIndex = i;
+				indexPair.blockIndex = block.id;
 				indexPair.spanIndex = j;
 
 				return true;
@@ -107,9 +152,10 @@ bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair,
 	return false;
 }
 
-uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool fitToAlloc)
+uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 {
-	VkDeviceSize newPoolSize = glm::max(size, _blockMinSize);
+	VkDeviceSize newPoolSize = needDedicated ? 
+		size : glm::max(size, _blockMinSize);
 
 	VkMemoryAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -126,17 +172,42 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool fitToAlloc)
 		throw std::runtime_error("failed to allocate buffer memory!");
 	}
 
+	if (_allocatorType == MemoryType::UNIFORM)
+	{
+		//persistent mapping
+		//The uniform data will be used for all draw calls, 
+		//so the buffer containing it should only be destroyed when we stop rendering.
+
+		vkMapMemory(_device.GetDevice(), newBlock.memory,
+			0, newPoolSize, 0, &newBlock.mapped);
+	}
+
 	newBlock.size = newPoolSize;
 	newBlock.freeMemories.push_back({ 0, newPoolSize });
+	newBlock.dedicated = needDedicated;
+	newBlock.id = _idCounter++;
 
 	_blocks.push_back(newBlock);
 
-	return static_cast<uint32_t>(_blocks.size() - 1);
+	return newBlock.id;
 }
 
 void Core::MemoryAllocator::MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size)
 {
-	auto& offsetSize = _blocks[indices.blockIndex].freeMemories[indices.spanIndex];
+	auto& block = *FindMemoryBlock(indices.blockIndex);
+
+	auto& offsetSize = block.freeMemories[indices.spanIndex];
 	offsetSize.offset += size;
 	offsetSize.size -= size;
+}
+
+vector<Core::MemoryAllocator::MemoryBlock>::iterator Core::MemoryAllocator::FindMemoryBlock(size_t id)
+{
+	auto it = find_if(_blocks.begin(), _blocks.end(),
+	[id](MemoryBlock& block)->bool
+	{
+		return block.id == id;
+	});
+
+	return it;
 }

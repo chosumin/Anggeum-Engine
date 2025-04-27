@@ -94,9 +94,7 @@ namespace Core
 
 		CommandPool* _commandPool;
 
-		MemoryAllocator* _vertexAndIndexBufferAllocator;
-		MemoryAllocator* _stagingBufferAllocator;
-		MemoryAllocator* _uniformBufferAllocator;
+		unordered_map<MemoryType, MemoryAllocator*> _memoryAllocators;
 
 		const vector<const char*> _validationLayers = 
 		{

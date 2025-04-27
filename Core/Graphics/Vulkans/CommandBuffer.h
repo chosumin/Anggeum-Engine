@@ -29,6 +29,7 @@ namespace Core
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
+		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);
 		void CopyImage(Image& srcImage, Image& dstImage, uint32_t srcMipLevel, uint32_t srcLayer, uint32_t dstMipLevel, uint32_t dstLayer);
 		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
 		void TransitionImageLayout(Image& image, 

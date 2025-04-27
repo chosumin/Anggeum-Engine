@@ -137,18 +137,12 @@ VkFormat Core::Device::FindSupportedFormat(
 
 Core::MemoryAllocator* Core::Device::GetMemoryAllocator(MemoryType memoryType) const
 {
-    switch (memoryType)
+    auto iter = _memoryAllocators.find(memoryType);
+    if (iter != _memoryAllocators.end())
     {
-    case Core::MemoryType::STAGE:
-        return _stagingBufferAllocator;
-    case Core::MemoryType::DEVICE_LOCAL:
-        return _vertexAndIndexBufferAllocator;
-    case Core::MemoryType::UNIFORM:
-        return _uniformBufferAllocator;
-    default:
-        break;
+        return iter->second;
     }
-    
+
     throw runtime_error("failed to find the matched memory allocator!");
 }
 
@@ -163,7 +157,7 @@ void Core::Device::CreateInstance()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -467,12 +461,14 @@ void Core::Device::CreateMemoryAllocators()
     bufferInfo.size = 1;
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | 
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkBuffer dummyBuffer;
 
-    if (vkCreateBuffer(_device, &bufferInfo, nullptr, &dummyBuffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(_device, &bufferInfo, nullptr, &dummyBuffer) != VK_SUCCESS) 
+    {
         throw std::runtime_error("failed to create buffer!");
     }
 
@@ -481,19 +477,52 @@ void Core::Device::CreateMemoryAllocators()
 
     uint32_t memoryType = memRequirements.memoryTypeBits;
 
-    _vertexAndIndexBufferAllocator = new MemoryAllocator(*this, 
+    _memoryAllocators[MemoryType::DEVICE_LOCAL] = new MemoryAllocator(*this, MemoryType::DEVICE_LOCAL,
         32 * 1024 * 1024, memRequirements,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    _stagingBufferAllocator = new MemoryAllocator(*this,
-        4 * 1024 * 1024, memRequirements,
+    _memoryAllocators[MemoryType::STAGE] = new MemoryAllocator(*this, MemoryType::STAGE,
+        8 * 1024 * 1024, memRequirements,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    _memoryAllocators[MemoryType::UNIFORM] = new MemoryAllocator(*this, MemoryType::UNIFORM,
+        16 * 1024 * 1024, memRequirements,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     vkDestroyBuffer(_device, dummyBuffer, nullptr);
+
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.extent = { 1024, 1024, 1 };
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+
+    VkImage dummyImage;
+
+    if (vkCreateImage(_device, &imageInfo, nullptr, &dummyImage) != VK_SUCCESS)
+    {
+        throw runtime_error("failed to create image!");
+    }
+
+    VkMemoryRequirements imageMemRequirements;
+    vkGetImageMemoryRequirements(_device, dummyImage, &imageMemRequirements);
+    
+    _memoryAllocators[MemoryType::IMAGE] = new MemoryAllocator(*this, MemoryType::IMAGE,
+		128 * 1024 * 1024, imageMemRequirements,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkDestroyImage(_device, dummyImage, nullptr);
 }
 
 void Core::Device::DeleteMemoryAllocators()
 {
-    delete(_vertexAndIndexBufferAllocator);
-    delete(_stagingBufferAllocator);
+    for (auto&& allocator : _memoryAllocators)
+    {
+        delete(allocator.second);
+    }
 }

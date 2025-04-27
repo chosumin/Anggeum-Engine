@@ -139,6 +139,17 @@ void Core::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount)
 	vkCmdDraw(_commandBuffer, vertexCount, instanceCount, 0, 0);
 }
 
+void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer)
+{
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0; // Optional
+    copyRegion.dstOffset = 0; // Optional
+    copyRegion.size = srcBuffer.GetSize();
+
+    vkCmdCopyBuffer(_commandBuffer, srcBuffer.GetBuffer(), dstBuffer.GetBuffer(),
+        1, &copyRegion);
+}
+
 void Core::CommandBuffer::CopyImage(Image& srcImage, Image& dstImage, 
     uint32_t srcMipLevel, uint32_t srcLayer, uint32_t dstMipLevel, uint32_t dstLayer)
 {

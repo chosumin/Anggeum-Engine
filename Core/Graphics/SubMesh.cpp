@@ -1,7 +1,8 @@
 #include "stdafx.h"
 #include "Graphics/SubMesh.h"
-#include "Core/Graphics/Vulkans/Buffer.h"
-#include "Core/Graphics/Vulkans/MemoryAllocator.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/Vulkans/MemoryAllocator.h"
 
 Core::SubMesh::SubMesh(Device& device, string name)
 	:_device(device), _indexBuffer(nullptr), _name(name)
@@ -39,7 +40,11 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
-	vertexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+	auto& buffer = _device.BeginSingleTimeCommands();
+
+	buffer.CopyBuffer(stagingBuffer, *vertexBuffer);
+
+	_device.EndSingleTimeCommands(buffer);
 
 	_vertexBuffers[name] = vertexBuffer;
 }
@@ -58,7 +63,11 @@ void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType in
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
-	_indexBuffer->CopyBuffer(stagingBuffer.GetBuffer(), bufferSize);
+	auto& buffer = _device.BeginSingleTimeCommands();
+
+	buffer.CopyBuffer(stagingBuffer, *_indexBuffer);
+
+	_device.EndSingleTimeCommands(buffer);
 
 	_indexType = indexType;
 }
