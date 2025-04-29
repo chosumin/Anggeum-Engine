@@ -30,46 +30,51 @@ void Core::SubMesh::CreateVertexBuffer(string name, vector<uint8_t>& vertexData)
 {
 	VkDeviceSize bufferSize = sizeof(vertexData[0]) * vertexData.size();
 
-	Core::Buffer stagingBuffer(_device, bufferSize, 
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		MemoryType::STAGE);
+	auto allocatorManager = _device.GetMemoryAllocatorManager();
+	Core::Buffer& stagingBuffer = allocatorManager->CreateStagingBuffer(bufferSize);
 
 	stagingBuffer.CopyBuffer(vertexData.data(), bufferSize);
 
-	auto vertexBuffer = new Core::Buffer(_device, bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
-	auto& buffer = _device.BeginSingleTimeCommands();
-
-	buffer.CopyBuffer(stagingBuffer, *vertexBuffer);
-
-	_device.EndSingleTimeCommands(buffer);
-
-	_vertexBuffers[name] = vertexBuffer;
+	_vertexStagingBuffers[name] = &stagingBuffer;
 }
 
 void Core::SubMesh::CreateIndexBuffer(vector<uint8_t>& indexData, VkIndexType indexType)
 {
 	VkDeviceSize bufferSize = sizeof(indexData[0]) * indexData.size();
 
-	Core::Buffer stagingBuffer(_device, bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		MemoryType::STAGE);
+	auto allocatorManager = _device.GetMemoryAllocatorManager();
+	Core::Buffer& stagingBuffer = allocatorManager->CreateStagingBuffer(bufferSize);
 
 	stagingBuffer.CopyBuffer(indexData.data(), bufferSize);
+	
+	_indexStagingBuffer = &stagingBuffer;
 
-	_indexBuffer = new Core::Buffer(_device, bufferSize,
+	_indexType = indexType;
+}
+
+void Core::SubMesh::Load(CommandBuffer& commandBuffer)
+{
+	for (auto&& stagingBuffer : _vertexStagingBuffers)
+	{
+		auto vertexBuffer = new Core::Buffer(_device, 
+			stagingBuffer.second->GetSize(),
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			MemoryType::DEVICE_LOCAL);
+
+		commandBuffer.CopyBuffer(*stagingBuffer.second, *vertexBuffer);
+
+		_vertexBuffers[stagingBuffer.first] = vertexBuffer;
+	}
+	
+	_vertexStagingBuffers.clear();
+
+	_indexBuffer = new Core::Buffer(_device, _indexStagingBuffer->GetSize(),
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
-	auto& buffer = _device.BeginSingleTimeCommands();
+	commandBuffer.CopyBuffer(*_indexStagingBuffer, *_indexBuffer);
 
-	buffer.CopyBuffer(stagingBuffer, *_indexBuffer);
-
-	_device.EndSingleTimeCommands(buffer);
-
-	_indexType = indexType;
+	_indexStagingBuffer = nullptr;
 }
 
 vector<Core::Buffer*> Core::SubMesh::GetVertexBuffers(vector<string> names) const

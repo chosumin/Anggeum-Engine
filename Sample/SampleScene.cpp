@@ -14,10 +14,9 @@ using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, float width, float height)
 {
-	_gltfLoader = make_unique<GLTFLoader>(device, *this);
-	
-	string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
+	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this);
 
+	string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	_gltfLoader->LoadScene(path);
 
 	string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";

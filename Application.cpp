@@ -27,6 +27,7 @@ bool Application::Prepare()
 	auto& swapChain = _renderContext->GetSwapChain();
 
 	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height);
+	_scene->LoadObjects(*_device);
 
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
@@ -39,6 +40,8 @@ bool Application::Prepare()
 
 void Application::Update()
 {
+	_scene->LoadObjects(*_device);
+
 	_guiRenderPass->Update();
 	
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());

@@ -1,9 +1,11 @@
 #pragma once
+#include "AsyncLoadable.h"
 
 namespace Core
 {
 	class Buffer;
-	class SubMesh
+	class CommandBuffer;
+	class SubMesh : public AsyncLoadable
 	{
 	public:
 		SubMesh(Device& device, string name);
@@ -23,17 +25,21 @@ namespace Core
 
 		void CreateVertexBuffer(string name, vector<uint8_t>& vertexData);
 		void CreateIndexBuffer(vector<uint8_t>& vertexData, VkIndexType indexType);
+
+		virtual void Load(CommandBuffer& commandBuffer) override;
 	private:
 		Device& _device;
 
 		string _name;
 
 		uint32_t _indexCount;
-
 		VkIndexType _indexType;
 
 		//Key: Attribute name, Value: Attribute value
 		unordered_map<string, Buffer*> _vertexBuffers;
+		unordered_map<string, Buffer*> _vertexStagingBuffers;
+
 		Buffer* _indexBuffer;
+		Buffer* _indexStagingBuffer;
 	};
 }

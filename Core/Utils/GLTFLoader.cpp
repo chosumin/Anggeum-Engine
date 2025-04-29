@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Vertex.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Material.h"
 #include "Utils/Utility.h"
 #include "Components/Mesh.h"
@@ -258,16 +259,18 @@ Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
 	: _device(device), _scene(scene)
 {
 	_model = new tinygltf::Model();
+
+	LoadDefaults(device);
 }
 
 Core::GLTFLoader::~GLTFLoader()
 {
+	DeleteDefaults();
+
 	delete(_model);
-	delete(_defaultTexture);
-	delete(_defaultSampler);
 }
 
-void Core::GLTFLoader::LoadScene(const string& path)
+void Core::GLTFLoader::LoadScene(string path)
 {
 	if (LoadFromFile(_model, path) == false)
 		return;
@@ -278,31 +281,62 @@ void Core::GLTFLoader::LoadScene(const string& path)
 	LoadAssets(modelPath);
 }
 
-void Core::GLTFLoader::LoadSkybox(const string& texturePath)
+void Core::GLTFLoader::LoadSkybox(string path)
 {
 	if (LoadFromFile(_model, "./Assets/Models/cube.gltf") == false)
 		return;
 
 	ClearCaches();
-	LoadDefaultTexture();
 
 	//Create a cubemap
-	auto image = new Core::Image(_device, texturePath, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	auto image = new Core::Image(_device, path, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	
+	_scene.QueueLoadableObject(image);
 
-	size_t pos = texturePath.find_last_of('/');
-	string textureName = texturePath.substr(pos + 1, texturePath.length() - 1);
+	size_t pos = path.find_last_of('/');
+	string textureName = path.substr(pos + 1, path.length() - 1);
 
 	auto texture = new Texture(textureName,
-		image, _defaultSampler);
+		image, GLTFLoader::_defaultSampler);
 
 	uint32_t hash = Utility::HashCode("skybox");
-	auto material = new Material(_device, "Skybox", hash, *_defaultTexture);
+	auto material = new Material(_device, "Skybox", hash, *GLTFLoader::_defaultTexture);
 	material->SetBuffer(1, texture);
 
 	vector<Material*> materials = { material };
 	LoadMeshes(materials);
 
 	LoadNodes();
+}
+
+void Core::GLTFLoader::LoadDefaults(Device& device)
+{
+	if (_defaultSampler == nullptr)
+	{
+		tinygltf::Sampler gltfSampler;
+
+		gltfSampler.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+		gltfSampler.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+
+		gltfSampler.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
+		gltfSampler.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
+
+		_defaultSampler = LoadSampler(device, gltfSampler);
+	}
+
+	if (_defaultTexture == nullptr)
+	{
+		auto defaultImage = new Core::Image(device, "Assets/Textures/white.png");
+		defaultImage->LoadImmediate();
+
+		_defaultTexture = new Texture("default", defaultImage, _defaultSampler);
+	}
+}
+
+void Core::GLTFLoader::DeleteDefaults()
+{
+	delete(_defaultTexture);
+	delete(_defaultSampler);
 }
 
 bool Core::GLTFLoader::LoadFromFile(tinygltf::Model* model, const string& path)
@@ -345,8 +379,6 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 	auto images = LoadImages(modelPath);
 
 	auto textures = LoadTextures(samplers, images);
-
-	LoadDefaultTexture();
 
 	auto materials = LoadMaterials(textures);
 	
@@ -483,13 +515,13 @@ vector<Core::Sampler*> Core::GLTFLoader::LoadSamplers()
 	{
 		auto sampler = _model->samplers[i];
 
-		samplers[i] = LoadSampler(sampler);
+		samplers[i] = LoadSampler(_device, sampler);
 	}
 
 	return samplers;
 }
 
-Core::Sampler* Core::GLTFLoader::LoadSampler(tinygltf::Sampler& gltfSampler)
+Core::Sampler* Core::GLTFLoader::LoadSampler(Device& device, tinygltf::Sampler& gltfSampler)
 {
 	VkSamplerCreateInfo samplerInfo{};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -504,7 +536,7 @@ Core::Sampler* Core::GLTFLoader::LoadSampler(tinygltf::Sampler& gltfSampler)
 	samplerInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
 
 	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
+	vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
 
 	samplerInfo.anisotropyEnable = VK_TRUE;
 	//lower value results in better performance, but lower quality results.
@@ -520,7 +552,7 @@ Core::Sampler* Core::GLTFLoader::LoadSampler(tinygltf::Sampler& gltfSampler)
 	//HACK : hardcoded.
 	samplerInfo.maxLod = numeric_limits<float>::max();
 
-	auto sampler = new Core::Sampler(_device, samplerInfo);
+	auto sampler = new Core::Sampler(device, samplerInfo);
 
 	return sampler;
 }
@@ -537,19 +569,11 @@ vector<Core::Image*> Core::GLTFLoader::LoadImages(const string& modelPath)
 
 		Core::Image* vkImage;
 
-		//Embedded data is corrupt so use uri instead.
+		// From URI
+		auto imagePath = modelPath + "/" + image.uri;
+		vkImage = new Core::Image(_device, imagePath);
 		
-		//if (image.image.empty() == false)
-		//{
-		//	// Embedded
-		//	vkImage = make_unique<Core::Image>(device, move(image.image));
-		//}
-		//else
-		{
-			// From URI
-			auto imagePath = modelPath + "/" + image.uri;
-			vkImage = new Core::Image(_device, imagePath);
-		}
+		_scene.QueueLoadableObject(vkImage);
 
 		images[i] = move(vkImage);
 	}
@@ -576,29 +600,6 @@ vector<Core::Texture*> Core::GLTFLoader::LoadTextures(
 	}
 
 	return textures;
-}
-
-void Core::GLTFLoader::LoadDefaultTexture()
-{
-	if (_defaultSampler == nullptr)
-	{
-		tinygltf::Sampler gltfSampler;
-
-		gltfSampler.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-		gltfSampler.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-
-		gltfSampler.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
-		gltfSampler.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
-
-		_defaultSampler = LoadSampler(gltfSampler);
-	}
-
-	if (_defaultTexture == nullptr)
-	{
-		auto defaultImage = new Core::Image(_device, "Assets/Textures/white.png");
-
-		_defaultTexture = new Texture("default", defaultImage, _defaultSampler);
-	}
 }
 
 vector<Core::Material*> Core::GLTFLoader::LoadMaterials(vector<Core::Texture*>& textures)
@@ -742,7 +743,6 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 				
 				count = accessor.count;
 
-
 				VkFormat format = GetAttributeFormat(_model, attribute.second);
 				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
 
@@ -792,6 +792,8 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 
 				subMesh->CreateIndexBuffer(indexData, indexType);
 			}
+
+			_scene.QueueLoadableObject(subMesh);
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);

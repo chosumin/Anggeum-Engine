@@ -13,48 +13,14 @@
 
 Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sampleCount,
     VkImageViewType imageViewType, VkImageCreateFlags flags)
-    :_device(device), _sampleCount(sampleCount)
+    :_device(device), _sampleCount(sampleCount), _createFlags(flags), _viewType(imageViewType),
+    _filePath(filePath)
 {
     _format = VK_FORMAT_R8G8B8A8_UNORM;
     _usageFlags = 
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
         VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    vector<uint8_t> data;
-    LoadRawImage(data, filePath);
-
-    _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
-
-    CreateImage(
-        VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
-        _usageFlags,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        flags);
-
-    BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    VkDeviceSize imageSize = data.size();
-
-    Buffer stagingBuffer(_device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        MemoryType::STAGE);
-
-    stagingBuffer.CopyBuffer(data.data(), imageSize);
-
-    auto& commandBuffer = _device.BeginSingleTimeCommands();
-    
-    commandBuffer.TransitionImageLayout(*this, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    commandBuffer.CopyBufferToImage(stagingBuffer, *this, _extent.width, _extent.height);
-
-    //hack : need to be pregenerated and stored in the texture file to improve loading speed.
-    if (_mipLevels > 1)
-        commandBuffer.GenerateMipmaps(*this, _mipLevels);
-
-    _device.EndSingleTimeCommands(commandBuffer);
-
-    CreateImageView(_mipLevels, imageViewType, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
@@ -307,10 +273,10 @@ void Core::Image::BindImageMemory(VkMemoryPropertyFlags properties)
     bool needDedicated = dedicatedReqs.prefersDedicatedAllocation ||
         dedicatedReqs.requiresDedicatedAllocation;
 
-    _allocator = _device.GetMemoryAllocator(MemoryType::IMAGE);
+    _allocator = _device.GetMemoryAllocatorManager();
 
     _allocation = make_unique<MemoryAllocation>();
-    _allocator->Allocate(*_allocation, memRequirements.memoryRequirements.size, needDedicated);
+    _allocator->Allocate(*_allocation, MemoryType::IMAGE, memRequirements.memoryRequirements.size, needDedicated);
     _allocator->BindImageMemory(*this, *_allocation);
 }
 
@@ -332,4 +298,49 @@ void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewT
     {
         throw runtime_error("failed to create texture image view!");
     }
+}
+
+void Core::Image::Load(CommandBuffer& commandBuffer)
+{
+    if (_filePath.empty())
+        return;
+
+    vector<uint8_t> data;
+    LoadRawImage(data, _filePath);
+
+    _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
+
+    CreateImage(
+        VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
+        _usageFlags,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        _createFlags);
+
+    BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    CreateImageView(_mipLevels, _viewType, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkDeviceSize imageSize = data.size();
+
+    Buffer& stagingBuffer = _allocator->CreateStagingBuffer(imageSize);
+
+    stagingBuffer.CopyBuffer(data.data(), imageSize);
+
+    commandBuffer.TransitionImageLayout(*this, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    commandBuffer.CopyBufferToImage(stagingBuffer, *this, _extent.width, _extent.height);
+
+    //hack : need to be pregenerated and stored in the texture file to improve loading speed.
+    if (_mipLevels > 1)
+        commandBuffer.GenerateMipmaps(*this, _mipLevels);
+}
+
+void Core::Image::LoadImmediate()
+{
+    auto& commandBuffer = _device.BeginSingleTimeCommands(false);
+
+    Load(commandBuffer);
+
+    _device.EndSingleTimeCommands(commandBuffer, false);
 }

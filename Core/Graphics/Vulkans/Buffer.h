@@ -22,7 +22,7 @@ namespace Core
 		VkBuffer _buffer;
 		VkDeviceSize _size;
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocator* _allocator;
+		MemoryAllocatorManager* _allocator;
 	};
 }
 

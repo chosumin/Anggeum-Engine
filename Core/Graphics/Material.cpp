@@ -72,7 +72,6 @@ namespace Core
 			return;
 
 		_textures[binding] = texture;
-		_textureBuffers[binding]->CopyDescriptorImageInfo(texture->GetDescriptorImageInfo());
 	}
 
 	Texture* Material::GetTexture(uint32_t binding)
@@ -107,10 +106,13 @@ namespace Core
 				++index;
 			}
 
-			for (auto iter = _textureBuffers.begin(); iter != _textureBuffers.end(); ++iter)
+			for (auto iter = _textures.begin(); iter != _textures.end(); ++iter)
 			{
+				auto info = iter->second->GetDescriptorImageInfo();
+				_textureBuffers[iter->first]->CopyDescriptorImageInfo(info);
+
 				VkWriteDescriptorSet writeDescriptorSet =
-					iter->second->CreateWriteDescriptorSet(i, iter->first);
+					_textureBuffers[iter->first]->CreateWriteDescriptorSet(i, iter->first);
 
 				descriptorWrites[index] = writeDescriptorSet;
 				descriptorWrites[index].dstSet = descriptorSet;

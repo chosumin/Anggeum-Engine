@@ -18,10 +18,10 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 		throw std::runtime_error("failed to create buffer!");
 	}
 
-	_allocator = device.GetMemoryAllocator(memoryType);
+	_allocator = device.GetMemoryAllocatorManager();
 
 	_allocation = make_unique<MemoryAllocation>();
-	_allocator->Allocate(*_allocation , _size, false);
+	_allocator->Allocate(*_allocation, memoryType, _size, false);
 	_allocator->BindBufferMemory(*this, *_allocation);
 }
 

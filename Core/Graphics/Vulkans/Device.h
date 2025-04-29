@@ -13,8 +13,12 @@ namespace Core
 	{
 		optional<uint32_t> GraphicsAndComputeFamily;
 		optional<uint32_t> PresentFamily;
+		optional<uint32_t> TransferFamily;
 
-		bool IsComplete() { return GraphicsAndComputeFamily.has_value() && PresentFamily.has_value(); }
+		bool IsComplete() { return 
+			GraphicsAndComputeFamily.has_value() && 
+			PresentFamily.has_value() &&
+			TransferFamily.has_value(); }
 	};
 
 	enum class MemoryType;
@@ -22,7 +26,7 @@ namespace Core
 	class Window;
 	class CommandPool;
 	class CommandBuffer;
-	class MemoryAllocator;
+	class MemoryAllocatorManager;
 	class Device
 	{
 	public:
@@ -42,11 +46,13 @@ namespace Core
 
 		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
 		VkQueue GetPresentQueue() { return _presentQueue; }
+		VkQueue GetTransferQueue() { return _transferQueue; }
+
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-		CommandBuffer& BeginSingleTimeCommands() const;
-		void EndSingleTimeCommands(CommandBuffer& commandBuffer) const;
+		CommandBuffer& BeginSingleTimeCommands(bool isGraphics = true) const;
+		void EndSingleTimeCommands(CommandBuffer& commandBuffer, bool isGraphics = true) const;
 
 		VkFormat FindSupportedFormat(
 			const vector<VkFormat>& candidates,
@@ -55,7 +61,7 @@ namespace Core
 
 		const VkInstance& GetInstance() const { return _instance; }
 
-		MemoryAllocator* GetMemoryAllocator(MemoryType memoryType) const;
+		MemoryAllocatorManager* GetMemoryAllocatorManager() const;
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -69,9 +75,6 @@ namespace Core
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 		void CreateLogicalDevice();
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
-
-		void CreateMemoryAllocators();
-		void DeleteMemoryAllocators();
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -87,14 +90,20 @@ namespace Core
 		VkDebugUtilsMessengerEXT _debugMessenger;
 		VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 		VkDevice _device;
+		
 		VkQueue _graphicsQueue;
 		VkQueue _computeQueue;
 		VkQueue _presentQueue;
+
+		//For transfer commands, staging buffers
+		VkQueue _transferQueue;
+
 		VkSurfaceKHR _surface;
 
-		CommandPool* _commandPool;
+		CommandPool* _graphicsCommandPool;
+		CommandPool* _transferCommandPool;
 
-		unordered_map<MemoryType, MemoryAllocator*> _memoryAllocators;
+		MemoryAllocatorManager* _memoryAllocatorManager;
 
 		const vector<const char*> _validationLayers = 
 		{

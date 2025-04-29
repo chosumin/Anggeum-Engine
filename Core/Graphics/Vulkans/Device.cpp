@@ -42,17 +42,21 @@ Core::Device::Device(Window& window)
     CreateLogicalDevice();
 
     auto indices = FindQueueFamilies();
-    _commandPool = new CommandPool(*this, 
+    
+    _graphicsCommandPool = new CommandPool(*this, 
         indices.GraphicsAndComputeFamily.value());
+    _transferCommandPool = new CommandPool(*this,
+        indices.TransferFamily.value());
 
-    CreateMemoryAllocators();
+    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 }
 
 Core::Device::~Device()
 {
-    DeleteMemoryAllocators();
+    delete(_memoryAllocatorManager);
 
-    delete(_commandPool);
+    delete(_graphicsCommandPool);
+    delete(_transferCommandPool);
 
     vkDestroyDevice(_device, nullptr);
 
@@ -80,14 +84,17 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-Core::CommandBuffer& Core::Device::BeginSingleTimeCommands() const
+Core::CommandBuffer& Core::Device::BeginSingleTimeCommands(bool isGraphics) const
 {
-    auto& commandBuffer = _commandPool->RequestCommandBuffer(0);
+    auto& commandBuffer = isGraphics ? 
+        _graphicsCommandPool->RequestCommandBuffer(0):
+        _transferCommandPool->RequestCommandBuffer(0);
+
     commandBuffer.BeginCommandBuffer(true);
     return commandBuffer;
 }
 
-void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
+void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer, bool isGraphics) const
 {
     commandBuffer.EndCommandBuffer();
     
@@ -105,7 +112,8 @@ void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
     vkCreateFence(_device, &fence_info, nullptr, &fence);
 
     // Submit to the queue
-    VkResult result = vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
+    VkQueue queue = isGraphics ? _graphicsQueue : _transferQueue;
+    VkResult result = vkQueueSubmit(queue, 1, &submitInfo, fence);
     // Wait for the fence to signal that command buffer has finished executing
     vkWaitForFences(_device, 1, &fence, VK_TRUE, 100000000000);
 
@@ -135,15 +143,9 @@ VkFormat Core::Device::FindSupportedFormat(
     throw runtime_error("failed to find supported format!");
 }
 
-Core::MemoryAllocator* Core::Device::GetMemoryAllocator(MemoryType memoryType) const
+Core::MemoryAllocatorManager* Core::Device::GetMemoryAllocatorManager() const
 {
-    auto iter = _memoryAllocators.find(memoryType);
-    if (iter != _memoryAllocators.end())
-    {
-        return iter->second;
-    }
-
-    throw runtime_error("failed to find the matched memory allocator!");
+    return _memoryAllocatorManager;
 }
 
 void Core::Device::CreateInstance()
@@ -316,12 +318,16 @@ Core::QueueFamilyIndices Core::Device::FindQueueFamilies(VkPhysicalDevice device
     int i = 0;
     for (const auto& queueFamily : queueFamilies) 
     {
-        if (indices.IsComplete())
-            break;
+		if (indices.IsComplete())
+			break;
 
-        if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
-            (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
-            indices.GraphicsAndComputeFamily = i;
+		if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+			(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			indices.GraphicsAndComputeFamily = i;
+
+		if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+			(queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT))
+			indices.TransferFamily = i;
 
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
@@ -380,8 +386,9 @@ void Core::Device::CreateLogicalDevice()
     QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = 
-        { indices.GraphicsAndComputeFamily.value(), indices.PresentFamily.value() };
+    std::set<uint32_t> uniqueQueueFamilies = { indices.GraphicsAndComputeFamily.value(), 
+        indices.PresentFamily.value(),
+        indices.TransferFamily.value() };
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) 
@@ -422,6 +429,7 @@ void Core::Device::CreateLogicalDevice()
     vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_graphicsQueue);
     vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_computeQueue);
     vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
+    vkGetDeviceQueue(_device, indices.TransferFamily.value(), 0, &_transferQueue);
 }
 
 Core::SwapChainSupportDetails Core::Device::QuerySwapChainSupport(VkPhysicalDevice device)
@@ -452,77 +460,4 @@ Core::SwapChainSupportDetails Core::Device::QuerySwapChainSupport(VkPhysicalDevi
     }
 
     return details;
-}
-
-void Core::Device::CreateMemoryAllocators()
-{
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = 1;
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | 
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VkBuffer dummyBuffer;
-
-    if (vkCreateBuffer(_device, &bufferInfo, nullptr, &dummyBuffer) != VK_SUCCESS) 
-    {
-        throw std::runtime_error("failed to create buffer!");
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(_device, dummyBuffer, &memRequirements);
-
-    uint32_t memoryType = memRequirements.memoryTypeBits;
-
-    _memoryAllocators[MemoryType::DEVICE_LOCAL] = new MemoryAllocator(*this, MemoryType::DEVICE_LOCAL,
-        32 * 1024 * 1024, memRequirements,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    _memoryAllocators[MemoryType::STAGE] = new MemoryAllocator(*this, MemoryType::STAGE,
-        8 * 1024 * 1024, memRequirements,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    _memoryAllocators[MemoryType::UNIFORM] = new MemoryAllocator(*this, MemoryType::UNIFORM,
-        16 * 1024 * 1024, memRequirements,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    vkDestroyBuffer(_device, dummyBuffer, nullptr);
-
-    VkImageCreateInfo imageInfo = {};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.extent = { 1024, 1024, 1 };
-    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-
-    VkImage dummyImage;
-
-    if (vkCreateImage(_device, &imageInfo, nullptr, &dummyImage) != VK_SUCCESS)
-    {
-        throw runtime_error("failed to create image!");
-    }
-
-    VkMemoryRequirements imageMemRequirements;
-    vkGetImageMemoryRequirements(_device, dummyImage, &imageMemRequirements);
-    
-    _memoryAllocators[MemoryType::IMAGE] = new MemoryAllocator(*this, MemoryType::IMAGE,
-		128 * 1024 * 1024, imageMemRequirements,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    vkDestroyImage(_device, dummyImage, nullptr);
-}
-
-void Core::Device::DeleteMemoryAllocators()
-{
-    for (auto&& allocator : _memoryAllocators)
-    {
-        delete(allocator.second);
-    }
 }

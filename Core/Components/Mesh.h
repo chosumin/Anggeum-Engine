@@ -8,7 +8,6 @@ namespace Core
 	class Mesh : public Component
 	{
 	public:
-		Mesh(Device& device, string modelPath);
 		Mesh(Device& device, int polygonType);
 		Mesh(Device& device);
 		~Mesh();
@@ -18,8 +17,6 @@ namespace Core
 
 		string GetModelPath() const { return _modelPath; }
 
-		void AddSubMesh(int polygonType);
-		void AddSubMesh(string path);
 		void AddSubMesh(SubMesh* subMesh);
 		void AddMaterial(Material* material);
 		void AddMaterial(string path);
@@ -28,9 +25,6 @@ namespace Core
 		void UpdateFrame(float deltaTime) override;
 		std::type_index GetType() override;
 		void Resize(uint32_t width, uint32_t height) override;
-	private:
-		void LoadModel(const string& modelPath);
-		void LoadPlane();
 	private:
 		string _name;
 		string _modelPath;

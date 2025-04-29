@@ -11,6 +11,7 @@ namespace Core
 
 	struct MemoryAllocation
 	{
+		MemoryType type;
 		size_t id;
 		VkDeviceSize size;
 		VkDeviceSize offset;
@@ -62,5 +63,31 @@ namespace Core
 		uint32_t _memoryType;
 		MemoryType _allocatorType;
 		uint64_t _idCounter;
+	};
+
+	class MemoryAllocatorManager
+	{
+	public:
+		MemoryAllocatorManager(Device& device);
+		~MemoryAllocatorManager();
+
+		MemoryAllocator* GetMemoryAllocator(MemoryType memoryType) const;
+
+		void Allocate(MemoryAllocation& outAllocation, MemoryType type, VkDeviceSize size, bool needDedicated);
+		void Deallocate(MemoryAllocation& allocation);
+		
+		void BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation);
+		void BindImageMemory(Image& image, MemoryAllocation& allocation);
+		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
+
+		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
+
+		Buffer& CreateStagingBuffer(VkDeviceSize size);
+
+		void FinalizeStaging();
+	private:
+		Device& _device;
+		unordered_map<MemoryType, MemoryAllocator*> _memoryAllocators;
+		vector<Buffer*> _stagingBuffers;
 	};
 }

@@ -371,6 +371,9 @@
     <ClInclude Include="Core\Graphics\Vulkans\MemoryAllocator.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
+    <ClInclude Include="Core\Graphics\AsyncLoadable.h">
+      <Filter>Core\Graphics\Vulkans</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

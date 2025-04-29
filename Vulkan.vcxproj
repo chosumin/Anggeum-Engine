@@ -246,6 +246,7 @@
     <ClInclude Include="Core\Foundation\Entity.h" />
     <ClInclude Include="Core\Foundation\Scene.h" />
     <ClInclude Include="Core\Foundation\Window.h" />
+    <ClInclude Include="Core\Graphics\AsyncLoadable.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />

@@ -3,6 +3,7 @@
 
 namespace Core
 {
+	class AsyncLoadable;
 	class PerspectiveCamera;
 	class Light;
 	class Component;
@@ -94,12 +95,17 @@ namespace Core
 		PerspectiveCamera* GetMainCamera() const;
 		Light* GetMainLight() const;
 
+		void QueueLoadableObject(AsyncLoadable* object);
+		void LoadObjects(Device& device);
+
 		virtual void Update() = 0;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;
 		unique_ptr<Entity> _root;
 		unordered_map<type_index, vector<unique_ptr<Component>>> _components;
+
+		queue<AsyncLoadable*> _objectsToLoad;
 	};
 }
 
