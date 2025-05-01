@@ -19,7 +19,7 @@ namespace Core
 	class PerspectiveCamera;
 	class CommandBuffer;
 	class Light;
-	class TransferThread;
+	class TransferContext;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -39,7 +39,7 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene, TransferThread* transferThread);
+		GLTFLoader(Device& device, Scene& scene, TransferContext* transferContext);
 		~GLTFLoader();
 
 		void LoadScene(string path);
@@ -67,7 +67,7 @@ namespace Core
 		Device& _device;
 		Scene& _scene;
 
-		TransferThread* _transferThread;
+		TransferContext* _transferContext;
 
 		tinygltf::Model* _model;
 		

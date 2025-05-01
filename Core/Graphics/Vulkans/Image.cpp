@@ -323,10 +323,10 @@ void Core::Image::Load(vector<uint8_t>& outImageData)
 
 void Core::Image::LoadImmediate()
 {
-    auto& commandBuffer = _device.BeginSingleTimeCommands(false);
+    auto& commandBuffer = _device.BeginSingleTimeCommands();
 
     VkImageJob job(_device, *this, _filePath);
     job.Execute(commandBuffer);
 
-    _device.EndSingleTimeCommands(commandBuffer, false);
+    _device.EndSingleTimeCommands(commandBuffer);
 }

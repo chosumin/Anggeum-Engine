@@ -3,74 +3,56 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-Core::TransferThread::TransferThread(Device& device)
-	:_device(device)
+Core::TransferContext::WorkerThread::WorkerThread(Device& device, condition_variable* fenceWait, size_t index)
+	:_device(device), _fenceWait(fenceWait), _currentFrame(0), 
+	_shutdown(false), _flushRequested(false)
 {
 	QueueFamilyIndices indices = _device.GetQueueFamilyIndices();
-
-	_commandPool = new CommandPool(device, indices.GraphicsAndComputeFamily.value());
-
-	_workerThread = thread(&TransferThread::Run, this);
-
-	_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-	VkFenceCreateInfo fenceInfo{};
-	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		if (vkCreateFence(_device.GetDevice(), &fenceInfo, nullptr, &_inFlightFences[i]) != VK_SUCCESS)
-			throw runtime_error("failed to create semaphores!");
-	}
+	_commandPool = new CommandPool(device, indices.TransferFamily.value());
 
 	_uploadCompletes.resize(MAX_FRAMES_IN_FLIGHT, false);
+
+	_thread = thread(&WorkerThread::Run, this);
+    SetThreadDescription(_thread.native_handle(), 
+		(L"Transfer Thread " + to_wstring(index)).c_str());
 }
 
-Core::TransferThread::~TransferThread()
+Core::TransferContext::WorkerThread::~WorkerThread()
 {
 	{
-		lock_guard<mutex> lock(_workQueue.lock);
+		lock_guard<mutex> lock(_lock);
 		_shutdown = true;
 		_flushWait.notify_all();
 	}
 
-	_workerThread.join();
-
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vkDestroyFence(_device.GetDevice(), _inFlightFences[i], nullptr);
-	}
+	_thread.join();
 
 	delete(_commandPool);
 }
 
-void Core::TransferThread::Enqueue(const Job* job)
+void Core::TransferContext::WorkerThread::Enqueue(const Job* job)
 {
-	lock_guard<mutex> lock(_workQueue.lock);
+	lock_guard<mutex> lock(_lock);
 	_workQueue.Add(job);
 }
 
-void Core::TransferThread::Flush()
+void Core::TransferContext::WorkerThread::Flush()
 {
-	{
-		lock_guard<mutex> lock(_workQueue.lock);
+	lock_guard<mutex> lock(_lock);
 
-		if (_workQueue.Done())
-			return;
+	if (_workQueue.Done())
+		return;
 
-		_flushRequested = true;
-		_flushWait.notify_one();
-	}
-
-	unique_lock<mutex> lock(_workQueue.lock);
-	_fenceWait.wait(lock, [&] { return _uploadCompletes[_currentFrame]; });
+	_flushRequested = true;
+	_uploadCompletes[_currentFrame] = false;
+	_flushWait.notify_one();
 }
 
-void Core::TransferThread::Run()
+void Core::TransferContext::WorkerThread::Run()
 {
 	while (true)
 	{
-		unique_lock<mutex> lock(_workQueue.lock);
+		unique_lock<mutex> lock(_lock);
 
 		_flushWait.wait(lock, [&] {return _flushRequested || _shutdown; });
 
@@ -83,21 +65,19 @@ void Core::TransferThread::Run()
 
 			lock.unlock();
 			
-			RecordAndSubmit();
+			Record();
 
 			{
-				lock_guard<mutex> lock(_workQueue.lock);
+				lock_guard<mutex> lock(_lock);
 				_uploadCompletes[_currentFrame] = true;
 			}
-			_fenceWait.notify_one();
+			_fenceWait->notify_one();
 		}
 	}
 }
 
-void Core::TransferThread::RecordAndSubmit()
+void Core::TransferContext::WorkerThread::Record()
 {
-	vkResetFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame]);
-
 	_commandPool->ResetCommandBuffers(_currentFrame);
 
 	auto& commandBuffer = _commandPool->RequestCommandBuffer(_currentFrame);
@@ -115,17 +95,114 @@ void Core::TransferThread::RecordAndSubmit()
 	}
 
 	commandBuffer.EndCommandBuffer();
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
 	
 	//todo : wait imageAvailable semaphore
 	//todo : signal renderAvailable semaphore
+}
+
+Core::TransferContext::TransferContext(Device& device)
+	:_device(device)
+{
+	_threadsReadyCount = 0;
 	
+	_threadCount = 3;
+	for (size_t i = 0; i < _threadCount; i++)
+	{
+		auto workerThread = make_unique<WorkerThread>(_device, &_fenceWait, i);
+		_workerThreads.push_back(move(workerThread));
+	}
+
+	_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		if (vkCreateFence(_device.GetDevice(), &fenceInfo, nullptr, &_inFlightFences[i]) != VK_SUCCESS)
+			throw runtime_error("failed to create semaphores!");
+	}
+}
+
+Core::TransferContext::~TransferContext()
+{
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		vkDestroyFence(_device.GetDevice(), _inFlightFences[i], nullptr);
+	}
+}
+
+void Core::TransferContext::UpdateFrame(uint32_t frame)
+{
+	_currentFrame = frame;
+
+	for (auto& thread : _workerThreads)
+	{
+		thread->_currentFrame = frame;
+	}
+}
+
+void Core::TransferContext::Enqueue(const Job* job)
+{
+	_reservedJobs.push_back(job);
+}
+
+void Core::TransferContext::Flush()
+{
+	if (_reservedJobs.size() <= 0)
+		return;
+
+	size_t jobCount = _reservedJobs.size();
+	uint32_t threadIndex = 0;
+	while (_reservedJobs.empty() == false)
+	{
+		auto job = _reservedJobs.back();
+		_reservedJobs.pop_back();
+		_workerThreads[threadIndex]->Enqueue(job);
+		threadIndex = (threadIndex + 1) % _threadCount;
+	}
+
+	_threadsReadyCount = std::min(jobCount, _threadCount);
+
+	for (size_t i = 0; i < _threadsReadyCount; i++)
+	{
+		_workerThreads[i]->Flush();
+	}
+
+	unique_lock<mutex> lock(_lock);
+	_fenceWait.wait(lock, [&]
+	{ 
+		bool complete = true;
+		for (size_t i = 0; i < _threadsReadyCount; i++)
+		{
+			if (_workerThreads[i]->_uploadCompletes[_currentFrame] == false)
+			{
+				complete = false;
+				return false;
+			}
+		}
+		return complete;
+	});
+
+	vkResetFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame]);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = static_cast<uint32_t>(_threadsReadyCount);
+
+	vector<VkCommandBuffer> commandBuffers(_threadsReadyCount);
+	for (size_t i = 0; i < _threadsReadyCount; i++)
+	{
+		commandBuffers[i] = _workerThreads[i]->_commandPool->
+			GetCommandBuffer(_currentFrame).GetHandle();
+	}
+	submitInfo.pCommandBuffers = commandBuffers.data();
+
 	VkQueue queue = _device.GetTransferQueue();
 	vkQueueSubmit(queue, 1, &submitInfo, _inFlightFences[_currentFrame]);
+
+	lock.unlock();
+	_threadsReadyCount = 0;
 
 	vkWaitForFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame], VK_TRUE, 100000000000);
 }

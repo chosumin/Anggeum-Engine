@@ -43,4 +43,9 @@ namespace Core
 		if (currentFrame < _commandBuffers.size())
 			_commandBuffers[currentFrame]->ResetCommandBuffer();
 	}
+
+	CommandBuffer& CommandPool::GetCommandBuffer(uint32_t currentFrame)
+	{
+		return *_commandBuffers[currentFrame];
+	}
 }

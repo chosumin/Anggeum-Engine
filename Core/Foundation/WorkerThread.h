@@ -4,46 +4,66 @@
 namespace Core
 {
 	class CommandPool;
-	class TransferThread
+
+	class TransferContext
 	{
-	public:
-		TransferThread(Device& device);
-		~TransferThread();
-		
-		void UpdateFrame(uint32_t frame)
+	private:
+		class WorkerThread
 		{
-			_currentFrame = frame;
-		}
+		private:
+			friend class TransferContext;
+		public:
+			WorkerThread(Device& device, condition_variable* fenceWait, size_t index);
+			~WorkerThread();
+
+			void Enqueue(const Job* job);
+			void Flush();
+		private:
+			void Run();
+			void Record();
+		private:
+			Device& _device;
+			condition_variable* _fenceWait;
+
+			uint32_t _currentFrame;
+			CommandPool* _commandPool;
+			vector<bool> _uploadCompletes;
+
+			WorkQueue _workQueue;
+
+			bool _shutdown;
+			bool _flushRequested;
+
+			condition_variable _flushWait;
+
+			mutex _lock;
+			thread _thread;
+
+			//todo : secondary command buffer로 동작
+		};
+	public:
+		TransferContext(Device& device);
+		~TransferContext();
+
+		void UpdateFrame(uint32_t frame);
 
 		void Enqueue(const Job* job);
 		void Flush();
 	private:
-		void Run();
-		void RecordAndSubmit();
-	private:
 		Device& _device;
 
-		WorkQueue _workQueue;
-		CommandPool* _commandPool;
+		size_t _threadCount;
+		vector<unique_ptr<WorkerThread>> _workerThreads;
 
-		uint32_t _currentFrame = 0;
+		size_t _threadsReadyCount;
+
+		uint32_t _currentFrame;
 		vector<VkFence> _inFlightFences;
-		vector<bool> _uploadCompletes;
 
-		condition_variable _flushWait;
 		condition_variable _fenceWait;
+		mutex _lock;
 
-		bool _shutdown;
-		bool _flushRequested;
-
-		thread _workerThread;
-
-		//todo : sub threads
-		//todo : secondary command buffer
-		//todo : TransferThread를 TransferMananger로 변경
-		//todo : TransferManager는 메인 스레드에서 동작
-		//todo : sub thread를 만들어서 secondary command buffer로 동작
-		//todo : record and submit
+		vector<const Job*> _reservedJobs;
 	};
 }
 

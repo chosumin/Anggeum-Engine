@@ -257,8 +257,8 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
-Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene, TransferThread* transferThread)
-	: _device(device), _scene(scene), _transferThread(transferThread), _defaultSampler(nullptr), _defaultTexture(nullptr)
+Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene, TransferContext* transferContext)
+	: _device(device), _scene(scene), _transferContext(transferContext), _defaultSampler(nullptr), _defaultTexture(nullptr)
 {
 	_model = new tinygltf::Model();
 
@@ -293,7 +293,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	//Create a cubemap
 	auto image = new Core::Image(_device, path, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
-	_transferThread->Enqueue(new VkImageJob(_device, *image, path));
+	_transferContext->Enqueue(new VkImageJob(_device, *image, path));
 
 	size_t pos = path.find_last_of('/');
 	string textureName = path.substr(pos + 1, path.length() - 1);
@@ -575,7 +575,7 @@ vector<Core::Image*> Core::GLTFLoader::LoadImages(const string& modelPath)
 		auto imagePath = modelPath + "/" + image.uri;
 		vkImage = new Core::Image(_device, imagePath);
 		
-		_transferThread->Enqueue(new VkImageJob(_device, *vkImage, imagePath));
+		_transferContext->Enqueue(new VkImageJob(_device, *vkImage, imagePath));
 
 		images[i] = move(vkImage);
 	}
@@ -748,7 +748,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 				VkFormat format = GetAttributeFormat(_model, attribute.second);
 				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
 
-				_transferThread->Enqueue(new VkBufferJob(
+				_transferContext->Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
 					subMesh->InsertBufferSpace(name), move(vertexData)));
 			}
@@ -765,7 +765,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 					colorData.insert(colorData.end(), bytes.begin(), bytes.end());
 				}
 
-				_transferThread->Enqueue(new VkBufferJob(
+				_transferContext->Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 					subMesh->InsertBufferSpace(VertexAttributeName::Col), move(colorData)));
 			}
@@ -796,7 +796,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 					break;
 				}
 
-				_transferThread->Enqueue(new VkBufferJob(
+				_transferContext->Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 					subMesh->InsertBufferSpace(indexType), move(indexData)));
 			}

@@ -18,7 +18,8 @@ namespace Core
 
 		CommandBuffer& RequestCommandBuffer(uint32_t currentFrame);
 		void ResetCommandBuffers(uint32_t currentFrame);
-	private:
+
+		CommandBuffer& GetCommandBuffer(uint32_t currentFrame);
 	private:
 		Device& _device;
 		VkCommandPool _commandPool;

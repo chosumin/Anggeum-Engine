@@ -83,7 +83,7 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
 
 Core::CommandBuffer& Core::Device::BeginSingleTimeCommands() const
 {
-    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(0):
+    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(0);
 
     commandBuffer.BeginCommandBuffer(true);
     return commandBuffer;

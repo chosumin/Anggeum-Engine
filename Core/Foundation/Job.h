@@ -53,8 +53,6 @@ namespace Core
 
 	struct WorkQueue
 	{
-		mutex lock;
-
 		Job* first = nullptr;
 		Job* last = nullptr;
 

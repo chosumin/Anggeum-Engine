@@ -13,9 +13,9 @@
 #include "Graphics/BufferObjects.h"
 using namespace Core;
 
-SampleScene::SampleScene(Core::Device& device, float width, float height, TransferThread* transferThread)
+SampleScene::SampleScene(Core::Device& device, float width, float height, TransferContext* transferContext)
 {
-	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, transferThread);
+	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, transferContext);
 
 	string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	_gltfLoader->LoadScene(path);
