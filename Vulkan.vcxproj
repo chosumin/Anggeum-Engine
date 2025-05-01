@@ -157,6 +157,7 @@
     <ClCompile Include="Core\Foundation\Entity.cpp" />
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
+    <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
     <ClCompile Include="Core\Graphics\Material.cpp" />
     <ClCompile Include="Core\Graphics\MaterialFactory.cpp" />
     <ClCompile Include="Core\Graphics\RenderContext.cpp" />
@@ -191,6 +192,7 @@
     <ClCompile Include="Core\Utils\timer.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
+    <ClCompile Include="Core\Foundation\Job.cpp" />
     <ClCompile Include="Sample\ForwardRenderPipeline.cpp" />
     <ClCompile Include="Sample\RendererPasses\BrdfLutPass.cpp" />
     <ClCompile Include="Sample\RendererPasses\PreEnvironmentPass.cpp" />
@@ -246,7 +248,8 @@
     <ClInclude Include="Core\Foundation\Entity.h" />
     <ClInclude Include="Core\Foundation\Scene.h" />
     <ClInclude Include="Core\Foundation\Window.h" />
-    <ClInclude Include="Core\Graphics\AsyncLoadable.h" />
+    <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
+    <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />
@@ -286,6 +289,7 @@
     <ClInclude Include="Core\Utils\timer.h" />
     <ClInclude Include="Core\Utils\Utility.h" />
     <ClInclude Include="DebugInfo.h" />
+    <ClInclude Include="Core\Foundation\Job.h" />
     <ClInclude Include="Sample\ForwardRenderPipeline.h" />
     <ClInclude Include="Sample\RendererPasses\BrdfLutPass.h" />
     <ClInclude Include="Sample\RendererPasses\PreEnvironmentPass.h" />

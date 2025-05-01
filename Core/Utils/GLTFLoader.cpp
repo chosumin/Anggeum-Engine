@@ -2,19 +2,21 @@
 #include "GLTFLoader.h"
 #include "Log.h"
 #include "Foundation/Scene.h"
+#include "Foundation/Entity.h"
+#include "Foundation/Job.h"
+#include "Foundation/WorkerThread.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Vertex.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Material.h"
-#include "Utils/Utility.h"
-#include "Components/Mesh.h"
 #include "Graphics/SubMesh.h"
-#include "Foundation/Entity.h"
+#include "Components/Mesh.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
 #include "Components/Light.h"
+#include "Utils/Utility.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -255,8 +257,8 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
-Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
-	: _device(device), _scene(scene)
+Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene, TransferThread* transferThread)
+	: _device(device), _scene(scene), _transferThread(transferThread), _defaultSampler(nullptr), _defaultTexture(nullptr)
 {
 	_model = new tinygltf::Model();
 
@@ -290,8 +292,8 @@ void Core::GLTFLoader::LoadSkybox(string path)
 
 	//Create a cubemap
 	auto image = new Core::Image(_device, path, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
-	
-	_scene.QueueLoadableObject(image);
+
+	_transferThread->Enqueue(new VkImageJob(_device, *image, path));
 
 	size_t pos = path.find_last_of('/');
 	string textureName = path.substr(pos + 1, path.length() - 1);
@@ -573,7 +575,7 @@ vector<Core::Image*> Core::GLTFLoader::LoadImages(const string& modelPath)
 		auto imagePath = modelPath + "/" + image.uri;
 		vkImage = new Core::Image(_device, imagePath);
 		
-		_scene.QueueLoadableObject(vkImage);
+		_transferThread->Enqueue(new VkImageJob(_device, *vkImage, imagePath));
 
 		images[i] = move(vkImage);
 	}
@@ -746,7 +748,9 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 				VkFormat format = GetAttributeFormat(_model, attribute.second);
 				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
 
-				subMesh->CreateVertexBuffer(name, vertexData);
+				_transferThread->Enqueue(new VkBufferJob(
+					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+					subMesh->InsertBufferSpace(name), move(vertexData)));
 			}
 
 			//ADD VERTEX COLOR
@@ -761,7 +765,9 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 					colorData.insert(colorData.end(), bytes.begin(), bytes.end());
 				}
 
-				subMesh->CreateVertexBuffer(VertexAttributeName::Col, colorData);
+				_transferThread->Enqueue(new VkBufferJob(
+					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+					subMesh->InsertBufferSpace(VertexAttributeName::Col), move(colorData)));
 			}
 			
 
@@ -790,10 +796,10 @@ void Core::GLTFLoader::LoadMeshes(vector<Core::Material*>& materials)
 					break;
 				}
 
-				subMesh->CreateIndexBuffer(indexData, indexType);
+				_transferThread->Enqueue(new VkBufferJob(
+					_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+					subMesh->InsertBufferSpace(indexType), move(indexData)));
 			}
-
-			_scene.QueueLoadableObject(subMesh);
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);

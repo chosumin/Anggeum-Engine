@@ -1,5 +1,4 @@
 #pragma once
-#include "Graphics/AsyncLoadable.h"
 
 namespace Core
 {
@@ -13,7 +12,7 @@ namespace Core
 	};*/
 
 	struct MemoryAllocation;
-	class Image : public AsyncLoadable
+	class Image
 	{
 	public:
 		friend class Texture;
@@ -38,7 +37,7 @@ namespace Core
 		uint32_t GetMipLevel() { return _mipLevels; }
 		VkImageAspectFlags GetAspectFlags() const;
 
-		virtual void Load(CommandBuffer& commandBuffer) override;
+		void Load(vector<uint8_t>& outImageData);
 		void LoadImmediate();
 	private:
 		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);

@@ -2,6 +2,7 @@
 #include "SampleScene.h"
 #include "Foundation/Entity.h"
 #include "Foundation/Component.h"
+#include "Foundation/WorkerThread.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
 #include "Components/Light.h"
@@ -12,9 +13,9 @@
 #include "Graphics/BufferObjects.h"
 using namespace Core;
 
-SampleScene::SampleScene(Core::Device& device, float width, float height)
+SampleScene::SampleScene(Core::Device& device, float width, float height, TransferThread* transferThread)
 {
-	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this);
+	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, transferThread);
 
 	string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	_gltfLoader->LoadScene(path);

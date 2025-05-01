@@ -81,13 +81,8 @@ namespace Core
 		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
 
 		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
-
-		Buffer& CreateStagingBuffer(VkDeviceSize size);
-
-		void FinalizeStaging();
 	private:
 		Device& _device;
 		unordered_map<MemoryType, MemoryAllocator*> _memoryAllocators;
-		vector<Buffer*> _stagingBuffers;
 	};
 }

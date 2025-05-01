@@ -190,7 +190,7 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 
 	_blocks.push_back(newBlock);
 
-	return newBlock.id;
+	return static_cast<uint32_t>(newBlock.id);
 }
 
 void Core::MemoryAllocator::MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size)
@@ -283,8 +283,6 @@ Core::MemoryAllocatorManager::MemoryAllocatorManager(Device& device)
 
 Core::MemoryAllocatorManager::~MemoryAllocatorManager()
 {
-	FinalizeStaging();
-
 	for (auto&& allocator : _memoryAllocators)
 	{
 		delete(allocator.second);
@@ -330,24 +328,4 @@ void Core::MemoryAllocatorManager::GetMappedPtr(void** outMappedPtr, MemoryAlloc
 void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation)
 {
 	_memoryAllocators[allocation.type]->CopyBuffer(srcData, allocation);
-}
-
-Core::Buffer& Core::MemoryAllocatorManager::CreateStagingBuffer(VkDeviceSize size)
-{
-	Buffer* stagingBuffer = new Buffer(
-		_device, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
-
-	_stagingBuffers.push_back(stagingBuffer);
-
-	return *stagingBuffer;
-}
-
-void Core::MemoryAllocatorManager::FinalizeStaging()
-{
-	for (auto&& buffer : _stagingBuffers)
-	{
-		delete(buffer);
-	}
-
-	_stagingBuffers.clear();
 }

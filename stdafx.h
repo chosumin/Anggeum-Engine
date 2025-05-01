@@ -53,6 +53,7 @@ using namespace rapidjson;
 #include <assert.h>
 #include <queue>
 #include <mutex>
+#include <thread>
 using namespace std;
 
 #include "Graphics/Vulkans/Device.h"

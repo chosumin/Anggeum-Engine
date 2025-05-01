@@ -4,6 +4,7 @@
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
 #include "Utils/FileSystem.h"
+#include "Foundation/Job.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -300,18 +301,17 @@ void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewT
     }
 }
 
-void Core::Image::Load(CommandBuffer& commandBuffer)
+void Core::Image::Load(vector<uint8_t>& outImageData)
 {
     if (_filePath.empty())
         return;
 
-    vector<uint8_t> data;
-    LoadRawImage(data, _filePath);
+    LoadRawImage(outImageData, _filePath);
 
     _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
 
     CreateImage(
-        VK_IMAGE_TILING_OPTIMAL, //VK_IMAGE_TILING_LINEAR to directly access texels in the memory.
+        VK_IMAGE_TILING_OPTIMAL,
         _usageFlags,
         VK_IMAGE_LAYOUT_UNDEFINED,
         _createFlags);
@@ -319,28 +319,14 @@ void Core::Image::Load(CommandBuffer& commandBuffer)
     BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     CreateImageView(_mipLevels, _viewType, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkDeviceSize imageSize = data.size();
-
-    Buffer& stagingBuffer = _allocator->CreateStagingBuffer(imageSize);
-
-    stagingBuffer.CopyBuffer(data.data(), imageSize);
-
-    commandBuffer.TransitionImageLayout(*this, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-    commandBuffer.CopyBufferToImage(stagingBuffer, *this, _extent.width, _extent.height);
-
-    //hack : need to be pregenerated and stored in the texture file to improve loading speed.
-    if (_mipLevels > 1)
-        commandBuffer.GenerateMipmaps(*this, _mipLevels);
 }
 
 void Core::Image::LoadImmediate()
 {
     auto& commandBuffer = _device.BeginSingleTimeCommands(false);
 
-    Load(commandBuffer);
+    VkImageJob job(_device, *this, _filePath);
+    job.Execute(commandBuffer);
 
     _device.EndSingleTimeCommands(commandBuffer, false);
 }

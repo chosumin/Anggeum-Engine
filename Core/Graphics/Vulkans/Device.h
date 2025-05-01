@@ -51,8 +51,8 @@ namespace Core
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-		CommandBuffer& BeginSingleTimeCommands(bool isGraphics = true) const;
-		void EndSingleTimeCommands(CommandBuffer& commandBuffer, bool isGraphics = true) const;
+		CommandBuffer& BeginSingleTimeCommands() const;
+		void EndSingleTimeCommands(CommandBuffer& commandBuffer) const;
 
 		VkFormat FindSupportedFormat(
 			const vector<VkFormat>& candidates,
@@ -62,6 +62,11 @@ namespace Core
 		const VkInstance& GetInstance() const { return _instance; }
 
 		MemoryAllocatorManager* GetMemoryAllocatorManager() const;
+
+		const QueueFamilyIndices& GetQueueFamilyIndices() const
+		{
+			return _queueFamilyIndices;
+		}
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -100,8 +105,8 @@ namespace Core
 
 		VkSurfaceKHR _surface;
 
+		QueueFamilyIndices _queueFamilyIndices;
 		CommandPool* _graphicsCommandPool;
-		CommandPool* _transferCommandPool;
 
 		MemoryAllocatorManager* _memoryAllocatorManager;
 

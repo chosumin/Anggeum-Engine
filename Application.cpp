@@ -2,12 +2,13 @@
 #include "Application.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
-#include "Utils/timer.h"
 #include "Sample/SampleScene.h"
 #include "Sample/ForwardRenderPipeline.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/MaterialFactory.h"
 #include "Graphics/ShaderFactory.h"
+#include "Foundation/WorkerThread.h"
+#include "Utils/timer.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
 
 Application::Application(const ApplicationOptions& options)
@@ -17,6 +18,7 @@ Application::Application(const ApplicationOptions& options)
 	_timer = make_unique<Core::Timer>();
 
 	_device = new Core::Device(*options.window);
+	_transferThread = new Core::TransferThread(*_device);
 }
 
 bool Application::Prepare()
@@ -26,8 +28,9 @@ bool Application::Prepare()
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
-	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height);
-	_scene->LoadObjects(*_device);
+	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferThread);
+
+	_transferThread->Flush();
 
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
@@ -40,8 +43,6 @@ bool Application::Prepare()
 
 void Application::Update()
 {
-	_scene->LoadObjects(*_device);
-
 	_guiRenderPass->Update();
 	
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
@@ -67,6 +68,8 @@ Application::~Application()
 	delete(_renderPipeline);
 	delete(_scene);
 	delete(_renderContext);
+
+	delete(_transferThread);
 	delete(_device);
 
 	Core::Window::Instance().Delete();
@@ -74,6 +77,9 @@ Application::~Application()
 
 void Application::Draw()
 {
+	_transferThread->UpdateFrame(_renderContext->GetCurrentFrame());
+	_transferThread->Flush();
+
 	auto& commandBuffer = _renderContext->Begin();
 
 	_renderPipeline->Draw(commandBuffer,

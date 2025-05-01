@@ -41,12 +41,10 @@ Core::Device::Device(Window& window)
     PickPhysicalDevice();
     CreateLogicalDevice();
 
-    auto indices = FindQueueFamilies();
+    _queueFamilyIndices = FindQueueFamilies();
     
     _graphicsCommandPool = new CommandPool(*this, 
-        indices.GraphicsAndComputeFamily.value());
-    _transferCommandPool = new CommandPool(*this,
-        indices.TransferFamily.value());
+        _queueFamilyIndices.GraphicsAndComputeFamily.value());
 
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 }
@@ -56,7 +54,6 @@ Core::Device::~Device()
     delete(_memoryAllocatorManager);
 
     delete(_graphicsCommandPool);
-    delete(_transferCommandPool);
 
     vkDestroyDevice(_device, nullptr);
 
@@ -84,17 +81,15 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-Core::CommandBuffer& Core::Device::BeginSingleTimeCommands(bool isGraphics) const
+Core::CommandBuffer& Core::Device::BeginSingleTimeCommands() const
 {
-    auto& commandBuffer = isGraphics ? 
-        _graphicsCommandPool->RequestCommandBuffer(0):
-        _transferCommandPool->RequestCommandBuffer(0);
+    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(0):
 
     commandBuffer.BeginCommandBuffer(true);
     return commandBuffer;
 }
 
-void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer, bool isGraphics) const
+void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
 {
     commandBuffer.EndCommandBuffer();
     
@@ -112,8 +107,7 @@ void Core::Device::EndSingleTimeCommands(CommandBuffer& commandBuffer, bool isGr
     vkCreateFence(_device, &fence_info, nullptr, &fence);
 
     // Submit to the queue
-    VkQueue queue = isGraphics ? _graphicsQueue : _transferQueue;
-    VkResult result = vkQueueSubmit(queue, 1, &submitInfo, fence);
+    VkResult result = vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
     // Wait for the fence to signal that command buffer has finished executing
     vkWaitForFences(_device, 1, &fence, VK_TRUE, 100000000000);
 

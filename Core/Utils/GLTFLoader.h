@@ -1,5 +1,4 @@
 #pragma once
-#include "Graphics/AsyncLoadable.h"
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
 
@@ -20,6 +19,7 @@ namespace Core
 	class PerspectiveCamera;
 	class CommandBuffer;
 	class Light;
+	class TransferThread;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -39,7 +39,7 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene);
+		GLTFLoader(Device& device, Scene& scene, TransferThread* transferThread);
 		~GLTFLoader();
 
 		void LoadScene(string path);
@@ -66,6 +66,8 @@ namespace Core
 	private:
 		Device& _device;
 		Scene& _scene;
+
+		TransferThread* _transferThread;
 
 		tinygltf::Model* _model;
 		

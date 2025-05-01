@@ -35,7 +35,7 @@ namespace Core
 	{
 		_swapChain = new SwapChain(device);
 
-		auto queueFamilyIndices = device.FindQueueFamilies();
+		auto queueFamilyIndices = device.GetQueueFamilyIndices();
 		_commandPool = new CommandPool(device,
 			queueFamilyIndices.GraphicsAndComputeFamily.value());
 

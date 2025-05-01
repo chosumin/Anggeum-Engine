@@ -4,12 +4,13 @@
 namespace Core
 {
 	class GLTFLoader;
+	class TransferThread;
 }
 
 class SampleScene : public Core::Scene
 {
 public:
-	SampleScene(Core::Device& device, float width, float height);
+	SampleScene(Core::Device& device, float width, float height, Core::TransferThread* transferThread);
 	virtual ~SampleScene() override;
 
 	virtual void Update() override;

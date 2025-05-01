@@ -44,7 +44,7 @@ void Core::SwapChain::CreateSwapChain()
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = _device.FindQueueFamilies();
+    QueueFamilyIndices indices = _device.GetQueueFamilyIndices();
     uint32_t queueFamilyIndices[] = { indices.GraphicsAndComputeFamily.value(), indices.PresentFamily.value() };
 
     if (indices.GraphicsAndComputeFamily != indices.PresentFamily)

@@ -9,6 +9,7 @@ namespace Core
 	class Window;
 	class Scene;
 	class RenderContext;
+	class TransferThread;
 	class IRenderPipeline;
 }
 
@@ -38,5 +39,7 @@ private:
 	Core::IRenderPipeline* _renderPipeline;
 	Core::RenderContext* _renderContext;
 	Core::Scene* _scene;
+	Core::TransferThread* _transferThread;
+
 	GUIRenderPass* _guiRenderPass;
 };

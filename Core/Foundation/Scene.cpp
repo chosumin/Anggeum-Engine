@@ -3,8 +3,6 @@
 #include "Foundation/Component.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/Light.h"
-#include "Graphics/AsyncLoadable.h"
-#include "Graphics/Vulkans/MemoryAllocator.h"
 
 namespace Core
 {
@@ -129,30 +127,5 @@ namespace Core
 			return nullptr;
 
 		return lights[0];
-	}
-
-	void Scene::QueueLoadableObject(AsyncLoadable* object)
-	{
-		_objectsToLoad.push(object);
-	}
-
-	void Scene::LoadObjects(Device& device)
-	{
-		if (_objectsToLoad.empty())
-			return;
-
-		auto& commandBuffer = device.BeginSingleTimeCommands(false);
-
-		while (_objectsToLoad.empty() == false)
-		{
-			auto objectToLoad = _objectsToLoad.front();
-			objectToLoad->Load(commandBuffer);
-
-			_objectsToLoad.pop();
-		}
-
-		device.EndSingleTimeCommands(commandBuffer, false);
-
-		device.GetMemoryAllocatorManager()->FinalizeStaging();
 	}
 }
