@@ -22,7 +22,11 @@ Features
 	- Image buffers (also support dedicated memory)
 9. Multithreading
 	- Separated queues (Graphics, Compute, Tranfer, Present)
-	
+	- Loading images and buffers by using
+		- Multiple secondary command buffers
+		- Multiple threads
+		- Getting fence status for thread unblocking
+		
 Third Parties
 - imgui
 - stb

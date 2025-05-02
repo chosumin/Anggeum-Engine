@@ -37,7 +37,8 @@ namespace Core
 
 		auto queueFamilyIndices = device.GetQueueFamilyIndices();
 		_commandPool = new CommandPool(device,
-			queueFamilyIndices.GraphicsAndComputeFamily.value());
+			queueFamilyIndices.GraphicsAndComputeFamily.value(),
+			VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
 		CreateSyncObjects();
 	}

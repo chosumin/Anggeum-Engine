@@ -1,69 +1,38 @@
 #pragma once
 #include "Job.h"
+#include "Utils/timer.h"
 
 namespace Core
 {
 	class CommandPool;
-
-	class TransferContext
+	class WorkerThread
 	{
 	private:
-		class WorkerThread
-		{
-		private:
-			friend class TransferContext;
-		public:
-			WorkerThread(Device& device, condition_variable* fenceWait, size_t index);
-			~WorkerThread();
-
-			void Enqueue(const Job* job);
-			void Flush();
-		private:
-			void Run();
-			void Record();
-		private:
-			Device& _device;
-			condition_variable* _fenceWait;
-
-			uint32_t _currentFrame;
-			CommandPool* _commandPool;
-			vector<bool> _uploadCompletes;
-
-			WorkQueue _workQueue;
-
-			bool _shutdown;
-			bool _flushRequested;
-
-			condition_variable _flushWait;
-
-			mutex _lock;
-			thread _thread;
-
-			//todo : secondary command buffer∑Œ µø¿€
-		};
+		friend class TransferContext;
 	public:
-		TransferContext(Device& device);
-		~TransferContext();
-
-		void UpdateFrame(uint32_t frame);
+		WorkerThread(Device& device, condition_variable* fenceWait, wstring threadName);
+		~WorkerThread();
 
 		void Enqueue(const Job* job);
 		void Flush();
 	private:
+		void Run();
+		void Record();
+	private:
 		Device& _device;
-
-		size_t _threadCount;
-		vector<unique_ptr<WorkerThread>> _workerThreads;
-
-		size_t _threadsReadyCount;
+		condition_variable* _fenceWait;
+		WorkQueue _workQueue;
 
 		uint32_t _currentFrame;
-		vector<VkFence> _inFlightFences;
+		CommandPool* _commandPool;
+		vector<bool> _uploadCompletes;
 
-		condition_variable _fenceWait;
+		bool _flushRequested;
+		condition_variable _flushWait;
+
+		bool _shutdown;
 		mutex _lock;
-
-		vector<const Job*> _reservedJobs;
+		thread _thread;
 	};
 }
 

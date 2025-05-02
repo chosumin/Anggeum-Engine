@@ -1,21 +1,23 @@
 #include "stdafx.h"
 #include "CommandBuffer.h"
+#include "CommandPool.h"
 #include "Pipeline.h"
 #include "SwapChain.h"
 #include "Shader.h"
 #include "Buffer.h"
-#include "Graphics/Material.h"
-#include "CommandPool.h"
 #include "Texture.h"
 #include "Image.h"
+#include "RenderPass.h"
+#include "Framebuffer.h"
+#include "Graphics/Material.h"
 
-Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool)
-    :_device(device)
+Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
+	:_device(device), _level(level)
 {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool.GetHandle();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.level = level;
     allocInfo.commandBufferCount = 1;
 
     if (vkAllocateCommandBuffers(_device.GetDevice(), &allocInfo, &_commandBuffer) != VK_SUCCESS)
@@ -25,6 +27,31 @@ Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool)
 void Core::CommandBuffer::ResetCommandBuffer()
 {
     vkResetCommandBuffer(_commandBuffer, 0);
+}
+
+void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, const RenderPass* renderPass, const Framebuffer* framebuffer, uint32_t subpassIndex, uint32_t imageIndex)
+{
+	VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = flags;
+
+	if (_level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)
+	{
+		VkCommandBufferInheritanceInfo inheritanceInfo{};
+		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+
+		inheritanceInfo.renderPass = renderPass != nullptr ?
+			renderPass->GetHandle() : VK_NULL_HANDLE;
+		inheritanceInfo.framebuffer = framebuffer != nullptr ?
+			framebuffer->GetHandle(imageIndex) : VK_NULL_HANDLE;
+		inheritanceInfo.subpass = subpassIndex;
+
+		beginInfo.pInheritanceInfo = &inheritanceInfo;
+	}
+
+	auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+	if (result != VK_SUCCESS)
+		throw std::runtime_error("failed to begin recording command buffer!");
 }
 
 void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
@@ -38,6 +65,20 @@ void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
     auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
     if (result != VK_SUCCESS)
         throw std::runtime_error("failed to begin recording command buffer!");
+}
+
+void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers)
+{
+    vector<VkCommandBuffer> secondaries(secondaryCommandBuffers.size(), VK_NULL_HANDLE);
+    
+    transform(
+        secondaryCommandBuffers.begin(), secondaryCommandBuffers.end(),
+        secondaries.begin(),
+        [](const CommandBuffer* command) { return command->GetHandle(); });
+    
+    vkCmdExecuteCommands(_commandBuffer, 
+        static_cast<uint32_t>(secondaries.size()),
+        secondaries.data());
 }
 
 void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)

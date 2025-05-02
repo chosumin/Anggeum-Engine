@@ -4,11 +4,8 @@
 
 namespace Core
 {
-	CommandPool::CommandPool(Device& device,
-		uint32_t queueFamilyIndex,
-		size_t threadIndex)
-		:_device(device), _queueFamilyIndex(queueFamilyIndex),
-		_threadIndex(threadIndex)
+	CommandPool::CommandPool(Device& device, uint32_t queueFamilyIndex, VkCommandBufferLevel level)
+		:_device(device), _queueFamilyIndex(queueFamilyIndex), _level(level)
 	{
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -33,7 +30,7 @@ namespace Core
 			return *_commandBuffers[currentFrame];
 		}
 
-		_commandBuffers.emplace_back(make_unique<CommandBuffer>(_device, *this));
+		_commandBuffers.emplace_back(make_unique<CommandBuffer>(_device, *this, _level));
 
 		return *_commandBuffers.back();
 	}

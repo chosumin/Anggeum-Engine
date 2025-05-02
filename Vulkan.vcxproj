@@ -158,6 +158,7 @@
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\GraphicsJob.cpp" />
     <ClCompile Include="Core\Graphics\Material.cpp" />
     <ClCompile Include="Core\Graphics\MaterialFactory.cpp" />
     <ClCompile Include="Core\Graphics\RenderContext.cpp" />
@@ -166,6 +167,7 @@
     <ClCompile Include="Core\Graphics\RenderFrame.cpp" />
     <ClCompile Include="Core\Graphics\ShaderFactory.cpp" />
     <ClCompile Include="Core\Graphics\SubMesh.cpp" />
+    <ClCompile Include="Core\Graphics\TransferContext.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Buffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\CommandBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\CommandPool.cpp" />
@@ -251,6 +253,7 @@
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\GraphicsJob.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />
     <ClInclude Include="Core\Graphics\MaterialFactory.h" />
@@ -260,6 +263,7 @@
     <ClInclude Include="Core\Graphics\RenderFrame.h" />
     <ClInclude Include="Core\Graphics\ShaderFactory.h" />
     <ClInclude Include="Core\Graphics\SubMesh.h" />
+    <ClInclude Include="Core\Graphics\TransferContext.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Buffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\CommandBuffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\CommandPool.h" />

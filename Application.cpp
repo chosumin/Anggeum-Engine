@@ -7,7 +7,7 @@
 #include "Graphics/RenderContext.h"
 #include "Graphics/MaterialFactory.h"
 #include "Graphics/ShaderFactory.h"
-#include "Foundation/WorkerThread.h"
+#include "Graphics/TransferContext.h"
 #include "Utils/timer.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
 
@@ -18,7 +18,7 @@ Application::Application(const ApplicationOptions& options)
 	_timer = make_unique<Core::Timer>();
 
 	_device = new Core::Device(*options.window);
-	_transferThread = new Core::TransferThread(*_device);
+	_transferContext = new Core::TransferContext(*_device);
 }
 
 bool Application::Prepare()
@@ -28,9 +28,9 @@ bool Application::Prepare()
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
-	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferThread);
+	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext);
 
-	_transferThread->Flush();
+	_transferContext->Flush();
 
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
 	_renderPipeline->Prepare();
@@ -69,7 +69,7 @@ Application::~Application()
 	delete(_scene);
 	delete(_renderContext);
 
-	delete(_transferThread);
+	delete(_transferContext);
 	delete(_device);
 
 	Core::Window::Instance().Delete();
@@ -77,8 +77,8 @@ Application::~Application()
 
 void Application::Draw()
 {
-	_transferThread->UpdateFrame(_renderContext->GetCurrentFrame());
-	_transferThread->Flush();
+	_transferContext->UpdateFrame(_renderContext->GetCurrentFrame());
+	_transferContext->Flush();
 
 	auto& commandBuffer = _renderContext->Begin();
 

@@ -9,16 +9,22 @@ namespace Core
 	class CommandPool;
 	class Device;
 	class Image;
+	class RenderPass;
+	class Framebuffer;
 	class CommandBuffer
 	{
 	public:
-		CommandBuffer(Device& device, CommandPool& commandPool);
+		CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level);
 		~CommandBuffer() = default;
 
 		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
 
 		void ResetCommandBuffer();
+		void BeginCommandBuffer(VkCommandBufferUsageFlags flags, 
+			const RenderPass* renderPass, const Framebuffer* framebuffer, 
+			uint32_t subpassIndex, uint32_t imageIndex);
 		void BeginCommandBuffer(bool isSingleTime = false);
+		void ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers);
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
@@ -30,7 +36,9 @@ namespace Core
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);
-		void CopyImage(Image& srcImage, Image& dstImage, uint32_t srcMipLevel, uint32_t srcLayer, uint32_t dstMipLevel, uint32_t dstLayer);
+		void CopyImage(Image& srcImage, Image& dstImage, 
+			uint32_t srcMipLevel, uint32_t srcLayer, 
+			uint32_t dstMipLevel, uint32_t dstLayer);
 		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
 		void TransitionImageLayout(Image& image, 
 			VkImageLayout oldLayout, VkImageLayout newLayout);
@@ -40,6 +48,7 @@ namespace Core
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
+		VkCommandBufferLevel _level;
 	};
 }
 

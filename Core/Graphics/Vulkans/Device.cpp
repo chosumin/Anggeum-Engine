@@ -44,7 +44,8 @@ Core::Device::Device(Window& window)
     _queueFamilyIndices = FindQueueFamilies();
     
     _graphicsCommandPool = new CommandPool(*this, 
-        _queueFamilyIndices.GraphicsAndComputeFamily.value());
+        _queueFamilyIndices.GraphicsAndComputeFamily.value(), 
+        VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 }
