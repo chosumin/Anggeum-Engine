@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Foundation/Job.h"
 
 namespace Core
 {
@@ -17,5 +18,16 @@ namespace Core
 	private:
 		Pipeline* _brdfPipeline;
 		Material* _brdfMaterial;
+	};
+
+	class BrdfLutJob : public Job
+	{
+	public:
+		BrdfLutJob(BrdfLutPass& pass);
+		~BrdfLutJob();
+
+		void Execute(CommandBuffer& commandBuffer) override;
+	private:
+		BrdfLutPass& _pass;
 	};
 }

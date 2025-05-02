@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Foundation/Job.h"
 
 namespace Core
 {
@@ -38,5 +39,16 @@ namespace Core
 		Pipeline* _prefilteredPipeline;
 		Material* _prefilteredMaterial;
 		PrefilterEnv _prefilterEnv;
+	};
+
+	class PreEnvironmentJob : public Job
+	{
+	public:
+		PreEnvironmentJob(PreEnvironmentPass& pass);
+		~PreEnvironmentJob();
+
+		void Execute(CommandBuffer& commandBuffer) override;
+	private:
+		PreEnvironmentPass& _pass;
 	};
 }

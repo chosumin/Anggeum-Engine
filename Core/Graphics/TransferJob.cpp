@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "GraphicsJob.h"
+#include "TransferJob.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/CommandBuffer.h"

@@ -158,7 +158,7 @@
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
-    <ClCompile Include="Core\Graphics\GraphicsJob.cpp" />
+    <ClCompile Include="Core\Graphics\TransferJob.cpp" />
     <ClCompile Include="Core\Graphics\Material.cpp" />
     <ClCompile Include="Core\Graphics\MaterialFactory.cpp" />
     <ClCompile Include="Core\Graphics\RenderContext.cpp" />
@@ -253,7 +253,7 @@
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
-    <ClInclude Include="Core\Graphics\GraphicsJob.h" />
+    <ClInclude Include="Core\Graphics\TransferJob.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />
     <ClInclude Include="Core\Graphics\MaterialFactory.h" />

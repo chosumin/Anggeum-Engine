@@ -3,14 +3,25 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-Core::WorkerThread::WorkerThread(Device& device, condition_variable* fenceWait, wstring threadName)
+Core::WorkerThread::WorkerThread(Device& device, condition_variable* fenceWait, 
+	QueueType type, wstring threadName)
 	:_device(device), _fenceWait(fenceWait), _currentFrame(0), 
 	_shutdown(false), _flushRequested(false)
 {
 	QueueFamilyIndices indices = _device.GetQueueFamilyIndices();
-	_commandPool = new CommandPool(device, 
-		indices.TransferFamily.value(), 
-		VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+	switch (type)
+	{
+	case QueueType::GRAPHICS:
+		_commandPool = new CommandPool(device, indices.GraphicsAndComputeFamily.value());
+		break;
+	case QueueType::COMPUTE:
+		_commandPool = new CommandPool(device, indices.GraphicsAndComputeFamily.value());
+		break;
+	case QueueType::TRANSFER:
+		_commandPool = new CommandPool(device, indices.TransferFamily.value());
+		break;
+	}
 
 	_uploadCompletes.resize(MAX_FRAMES_IN_FLIGHT, false);
 
@@ -38,7 +49,7 @@ void Core::WorkerThread::Enqueue(const Job* job)
 	_workQueue.Add(job);
 }
 
-void Core::WorkerThread::Flush()
+void Core::WorkerThread::Flush(VkCommandBufferLevel level)
 {
 	lock_guard<mutex> lock(_lock);
 
@@ -46,8 +57,19 @@ void Core::WorkerThread::Flush()
 		return;
 
 	_flushRequested = true;
+	_flushCommandLevel = level;
 	_uploadCompletes[_currentFrame] = false;
 	_flushWait.notify_one();
+}
+
+bool Core::WorkerThread::Complete()
+{
+	return _uploadCompletes[_currentFrame];
+}
+
+Core::CommandBuffer& Core::WorkerThread::GetCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level)
+{
+	return _commandPool->GetCommandBuffer(currentFrame, level);
 }
 
 void Core::WorkerThread::Run()
@@ -80,9 +102,9 @@ void Core::WorkerThread::Run()
 
 void Core::WorkerThread::Record()
 {
-	_commandPool->ResetCommandBuffers(_currentFrame);
+	auto& commandBuffer = 
+		_commandPool->RequestCommandBuffer(_currentFrame, _flushCommandLevel);
 
-	auto& commandBuffer = _commandPool->RequestCommandBuffer(_currentFrame);
 	commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		nullptr, nullptr, 0, _currentFrame);
 

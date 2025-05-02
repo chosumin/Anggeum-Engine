@@ -44,8 +44,7 @@ Core::Device::Device(Window& window)
     _queueFamilyIndices = FindQueueFamilies();
     
     _graphicsCommandPool = new CommandPool(*this, 
-        _queueFamilyIndices.GraphicsAndComputeFamily.value(), 
-        VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+        _queueFamilyIndices.GraphicsAndComputeFamily.value());
 
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 }
@@ -84,9 +83,10 @@ uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
 
 Core::CommandBuffer& Core::Device::BeginSingleTimeCommands() const
 {
-    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(0);
+    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(0, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     commandBuffer.BeginCommandBuffer(true);
+
     return commandBuffer;
 }
 

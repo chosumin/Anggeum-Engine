@@ -3,7 +3,7 @@
 #include "Buffer.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
-#include "Graphics/GraphicsJob.h"
+#include "Graphics/TransferJob.h"
 #include "Utils/FileSystem.h"
 
 #define STB_IMAGE_IMPLEMENTATION

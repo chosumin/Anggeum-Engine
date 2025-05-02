@@ -9,10 +9,14 @@ Core::TransferContext::TransferContext(Device& device)
 {
 	_threadsReadyCount = 0;
 	
-	_threadCount = 3;
+	int coreCount = std::thread::hardware_concurrency();
+	_threadCount = std::min(3, coreCount / 2);
+
 	for (size_t i = 0; i < _threadCount; i++)
 	{
-		auto workerThread = make_unique<WorkerThread>(_device, &_fenceWait, (L"Transfer Thread " + to_wstring(i)));
+		auto workerThread = make_unique<WorkerThread>(
+			_device, &_fenceWait, QueueType::TRANSFER,
+			L"Transfer Thread " + to_wstring(i));
 		_workerThreads.push_back(move(workerThread));
 	}
 
@@ -28,8 +32,7 @@ Core::TransferContext::TransferContext(Device& device)
 	}
 
 	_primaryCommandPool = new CommandPool(_device,
-		_device.GetQueueFamilyIndices().TransferFamily.value(),
-		VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		_device.GetQueueFamilyIndices().TransferFamily.value());
 }
 
 Core::TransferContext::~TransferContext()
@@ -68,35 +71,33 @@ void Core::TransferContext::Flush()
 
 	for (size_t i = 0; i < _threadsReadyCount; i++)
 	{
-		_workerThreads[i]->Flush();
+		_workerThreads[i]->Flush(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 	}
 
 	unique_lock<mutex> lock(_lock);
 	_fenceWait.wait(lock, [&]
-	{ 
-		bool complete = true;
+	{
 		for (size_t i = 0; i < _threadsReadyCount; i++)
 		{
-			if (_workerThreads[i]->_uploadCompletes[_currentFrame] == false)
+			if (_workerThreads[i]->Complete() == false)
 			{
-				complete = false;
 				return false;
 			}
 		}
-		return complete;
+		return true;
 	});
 
 	vkResetFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame]);
 
-	auto& primary = _primaryCommandPool->RequestCommandBuffer(_currentFrame);
+	auto& primary = _primaryCommandPool->RequestCommandBuffer(_currentFrame, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		nullptr, nullptr, 0, _currentFrame);
 
 	vector<CommandBuffer*> secondaryCommands(_threadsReadyCount);
 	for (size_t i = 0; i < _threadsReadyCount; i++)
 	{
-		secondaryCommands[i] = 
-			&(_workerThreads[i]->_commandPool->GetCommandBuffer(_currentFrame));
+		secondaryCommands[i] = &(_workerThreads[i]->_commandPool->GetCommandBuffer(
+				_currentFrame, VK_COMMAND_BUFFER_LEVEL_SECONDARY));
 	}
 
 	primary.ExecuteCommands(secondaryCommands);
@@ -115,7 +116,6 @@ void Core::TransferContext::Flush()
 	
 	_threadsReadyCount = 0;
 	_ringIndex = 0;
-
 
 	//todo : wait imageAvailable semaphore
 	//todo : signal renderAvailable semaphore

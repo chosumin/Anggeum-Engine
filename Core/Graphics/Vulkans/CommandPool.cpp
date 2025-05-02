@@ -4,8 +4,8 @@
 
 namespace Core
 {
-	CommandPool::CommandPool(Device& device, uint32_t queueFamilyIndex, VkCommandBufferLevel level)
-		:_device(device), _queueFamilyIndex(queueFamilyIndex), _level(level)
+	CommandPool::CommandPool(Device& device, uint32_t queueFamilyIndex)
+		:_device(device), _queueFamilyIndex(queueFamilyIndex)
 	{
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -18,31 +18,35 @@ namespace Core
 
 	CommandPool::~CommandPool()
 	{
-		_commandBuffers.clear();
+		_primaryCommandBuffers.clear();
+		_secondaryCommandBuffers.clear();
 
 		vkDestroyCommandPool(_device.GetDevice(), _commandPool, nullptr);
 	}
 
-	CommandBuffer& CommandPool::RequestCommandBuffer(uint32_t currentFrame)
+	CommandBuffer& CommandPool::RequestCommandBuffer(
+		uint32_t currentFrame, VkCommandBufferLevel level)
 	{
-		if (currentFrame < _commandBuffers.size())
+		auto& buffers = level == VK_COMMAND_BUFFER_LEVEL_PRIMARY ?
+			_primaryCommandBuffers : _secondaryCommandBuffers;
+
+		if (currentFrame < buffers.size())
 		{
-			return *_commandBuffers[currentFrame];
+			buffers[currentFrame]->ResetCommandBuffer();
+			return *buffers[currentFrame];
 		}
 
-		_commandBuffers.emplace_back(make_unique<CommandBuffer>(_device, *this, _level));
+		buffers.emplace_back(make_unique<CommandBuffer>(_device, *this, level));
 
-		return *_commandBuffers.back();
+		return *buffers.back();
 	}
 
-	void CommandPool::ResetCommandBuffers(uint32_t currentFrame)
+	CommandBuffer& CommandPool::GetCommandBuffer(
+		uint32_t currentFrame, VkCommandBufferLevel level)
 	{
-		if (currentFrame < _commandBuffers.size())
-			_commandBuffers[currentFrame]->ResetCommandBuffer();
-	}
+		auto& buffers = level == VK_COMMAND_BUFFER_LEVEL_PRIMARY ?
+			_primaryCommandBuffers : _secondaryCommandBuffers;
 
-	CommandBuffer& CommandPool::GetCommandBuffer(uint32_t currentFrame)
-	{
-		return *_commandBuffers[currentFrame];
+		return *buffers[currentFrame];
 	}
 }

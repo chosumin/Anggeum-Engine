@@ -3,7 +3,7 @@
 #include "Log.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Entity.h"
-#include "Graphics/GraphicsJob.h"
+#include "Graphics/TransferJob.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Sampler.h"

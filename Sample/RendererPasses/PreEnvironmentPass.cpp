@@ -215,3 +215,19 @@ void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uin
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
+
+Core::PreEnvironmentJob::PreEnvironmentJob(PreEnvironmentPass& pass)
+	:_pass(pass)
+{
+	_pass.Prepare();
+}
+
+Core::PreEnvironmentJob::~PreEnvironmentJob()
+{
+}
+
+void Core::PreEnvironmentJob::Execute(CommandBuffer& commandBuffer)
+{
+	_pass.Draw(commandBuffer, 0, 0);
+	status = JobStatus::COMPLETE;
+}

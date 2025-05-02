@@ -2,8 +2,6 @@
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
 
-class InstanceData;
-
 namespace Core
 {
 	class Scene;

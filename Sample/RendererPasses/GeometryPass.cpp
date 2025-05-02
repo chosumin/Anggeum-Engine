@@ -123,34 +123,47 @@ namespace Core
 	void GeometryPass::PreparePregenerationSkybox(Texture* pregenerationSky,
 		Texture* irradianceCubemap, Texture* prefilterCubemap)
 	{
-		//todo : create separated command buffers.
-		//todo : submit once.
+		auto preEnvironmentPass = new PreEnvironmentPass(_device, _scene, pregenerationSky, irradianceCubemap, prefilterCubemap);
+		auto preEnvironmentJob = new PreEnvironmentJob(*preEnvironmentPass);
+		Enqueue(preEnvironmentJob);
 
+		auto brdf = new BrdfLutPass(_device, _brdfLut);
+		auto brdfJob = new BrdfLutJob(*brdf);
+		Enqueue(brdfJob);
+
+		Flush(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+
+		vector<VkCommandBuffer> commands(_threadsReadyCount);
+		for (size_t i = 0; i < _threadsReadyCount; i++)
 		{
-			auto& singleCommand = _device.BeginSingleTimeCommands();
-
-			auto preEnvironmentPass = new PreEnvironmentPass(_device, _scene, pregenerationSky, irradianceCubemap, prefilterCubemap);
-
-			preEnvironmentPass->Prepare();
-			preEnvironmentPass->Draw(singleCommand, 0, 0);
-
-			_device.EndSingleTimeCommands(singleCommand);
-
-			delete(preEnvironmentPass);
+			commands[i] = _workerThreads[i]->GetCommandBuffer(
+				0, VK_COMMAND_BUFFER_LEVEL_PRIMARY).GetHandle();
 		}
 
-		{
-			auto& singleCommand = _device.BeginSingleTimeCommands();
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = _threadsReadyCount;
+		submitInfo.pCommandBuffers = commands.data();
 
-			auto brdf = new BrdfLutPass(_device, _brdfLut);
+		// Create fence to ensure that the command buffer has finished executing
+		VkFenceCreateInfo fence_info{};
+		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fence_info.flags = 0;
 
-			brdf->Prepare();
-			brdf->Draw(singleCommand, 0, 0);
+		VkFence fence;
+		vkCreateFence(_device.GetDevice(), &fence_info, nullptr, &fence);
 
-			_device.EndSingleTimeCommands(singleCommand);
+		vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, fence);
+		
+		auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
+		cout << "Generation IBL resources time : " << deltaTime << endl;
 
-			delete(brdf);
-		}
+		vkWaitForFences(_device.GetDevice(), 1, &fence, VK_TRUE, 100000000000);
+
+		vkDestroyFence(_device.GetDevice(), fence, nullptr);
+
+		delete(brdf);
+		delete(preEnvironmentPass);
 	}
 
 	void GeometryPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)

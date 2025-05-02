@@ -36,9 +36,8 @@ namespace Core
 		_swapChain = new SwapChain(device);
 
 		auto queueFamilyIndices = device.GetQueueFamilyIndices();
-		_commandPool = new CommandPool(device,
-			queueFamilyIndices.GraphicsAndComputeFamily.value(),
-			VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		_commandPool = new CommandPool(
+			device, queueFamilyIndices.GraphicsAndComputeFamily.value());
 
 		CreateSyncObjects();
 	}
@@ -75,7 +74,8 @@ namespace Core
 	{
 		BeginFrame();
 
-		auto& commandBuffer = _commandPool->RequestCommandBuffer(_currentFrame);
+		auto& commandBuffer = _commandPool->RequestCommandBuffer(
+			_currentFrame, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 		commandBuffer.BeginCommandBuffer();
 
 		return commandBuffer;
@@ -117,8 +117,6 @@ namespace Core
 	void RenderContext::BeginFrame()
 	{
 		AcquireSwapChainAndResetFence(*_swapChain);
-
-		_commandPool->ResetCommandBuffers(_currentFrame);
 	}
 
 	SwapChain& RenderContext::GetSwapChain() const

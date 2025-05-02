@@ -7,24 +7,22 @@ namespace Core
 	class CommandPool
 	{
 	public:
-		CommandPool(Device& device, uint32_t queueFamilyIndex, VkCommandBufferLevel level);
+		CommandPool(Device& device, uint32_t queueFamilyIndex);
 		virtual ~CommandPool();
 
 		VkCommandPool& GetHandle() { return _commandPool; }
 
-		CommandBuffer& RequestCommandBuffer(uint32_t currentFrame);
-		void ResetCommandBuffers(uint32_t currentFrame);
+		CommandBuffer& RequestCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
 
-		CommandBuffer& GetCommandBuffer(uint32_t currentFrame);
+		CommandBuffer& GetCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
 	private:
 		Device& _device;
 		VkCommandPool _commandPool;
 
 		uint32_t _queueFamilyIndex;
 
-		VkCommandBufferLevel _level;
-
-		vector<unique_ptr<CommandBuffer>> _commandBuffers;
+		vector<unique_ptr<CommandBuffer>> _primaryCommandBuffers;
+		vector<unique_ptr<CommandBuffer>> _secondaryCommandBuffers;
 	};
 }
 

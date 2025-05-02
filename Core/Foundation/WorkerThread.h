@@ -4,17 +4,27 @@
 
 namespace Core
 {
+	enum class QueueType
+	{
+		GRAPHICS, COMPUTE, TRANSFER
+	};
+
 	class CommandPool;
+	class CommandBuffer;
 	class WorkerThread
 	{
 	private:
 		friend class TransferContext;
 	public:
-		WorkerThread(Device& device, condition_variable* fenceWait, wstring threadName);
+		WorkerThread(Device& device, condition_variable* fenceWait, 
+			QueueType type, wstring threadName);
 		~WorkerThread();
 
 		void Enqueue(const Job* job);
-		void Flush();
+		void Flush(VkCommandBufferLevel level);
+		bool Complete();
+
+		CommandBuffer& GetCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
 	private:
 		void Run();
 		void Record();
@@ -28,6 +38,7 @@ namespace Core
 		vector<bool> _uploadCompletes;
 
 		bool _flushRequested;
+		VkCommandBufferLevel _flushCommandLevel;
 		condition_variable _flushWait;
 
 		bool _shutdown;

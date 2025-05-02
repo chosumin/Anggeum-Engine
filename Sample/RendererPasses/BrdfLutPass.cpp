@@ -52,3 +52,19 @@ void Core::BrdfLutPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame
 
 	commandBuffer.EndRenderPass();
 }
+
+Core::BrdfLutJob::BrdfLutJob(BrdfLutPass& pass)
+	:_pass(pass)
+{
+	_pass.Prepare();
+}
+
+Core::BrdfLutJob::~BrdfLutJob()
+{
+}
+
+void Core::BrdfLutJob::Execute(CommandBuffer& commandBuffer)
+{
+	_pass.Draw(commandBuffer, 0, 0);
+	status = JobStatus::COMPLETE;
+}
