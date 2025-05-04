@@ -4,46 +4,51 @@
 
 namespace Core
 {
-	enum class QueueType
-	{
-		GRAPHICS, COMPUTE, TRANSFER
-	};
-
 	class CommandPool;
 	class CommandBuffer;
 	class WorkerThread
 	{
 	private:
-		friend class TransferContext;
+		friend class WorkerThreadManager;
 	public:
-		WorkerThread(Device& device, condition_variable* fenceWait, 
-			QueueType type, wstring threadName);
+		WorkerThread(Device& device);
 		~WorkerThread();
 
 		void Enqueue(const Job* job);
-		void Flush(VkCommandBufferLevel level);
 		bool Complete();
-
-		CommandBuffer& GetCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
 	private:
 		void Run();
-		void Record();
+		CommandBuffer* RequestAndBeginCommandBuffer(Job* job);
 	private:
 		Device& _device;
-		condition_variable* _fenceWait;
 		WorkQueue _workQueue;
 
-		uint32_t _currentFrame;
-		CommandPool* _commandPool;
-		vector<bool> _uploadCompletes;
+		CommandPool* _graphicsCommandPool;
+		CommandPool* _computeCommandPool;
+		CommandPool* _transferCommandPool;
 
-		bool _flushRequested;
-		VkCommandBufferLevel _flushCommandLevel;
 		condition_variable _flushWait;
 
 		bool _shutdown;
-		mutex _lock;
 		thread _thread;
+		mutex _lock;
+	};
+
+	class WorkerThreadManager
+	{
+	public:
+		WorkerThreadManager(Device& device);
+		~WorkerThreadManager() = default;
+
+		void Enqueue(const Job* job);
+	private:
+		Device& _device;
+
+		size_t _threadCount;
+		vector<unique_ptr<WorkerThread>> _workerThreads;
+		atomic<size_t> _roundRobinIndex;
+
+		mutex _lock;
 	};
 }
 

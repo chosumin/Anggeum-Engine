@@ -14,9 +14,10 @@ using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
-Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene,
+Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, 
+	WorkerThreadManager& workerThreadManager, Scene& scene,
 	Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
-	:RendererPass(device), _scene(scene), _colorRenderTarget(offscreen),
+	:RendererPass(device, workerThreadManager), _scene(scene), _colorRenderTarget(offscreen),
 	_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilteredCubemap)
 {
 	_renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
@@ -217,7 +218,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uin
 }
 
 Core::PreEnvironmentJob::PreEnvironmentJob(PreEnvironmentPass& pass)
-	:_pass(pass)
+	:Job(JobType::GRAPHICS_PRIMARY), _pass(pass)
 {
 	_pass.Prepare();
 }
@@ -226,8 +227,8 @@ Core::PreEnvironmentJob::~PreEnvironmentJob()
 {
 }
 
-void Core::PreEnvironmentJob::Execute(CommandBuffer& commandBuffer)
+void Core::PreEnvironmentJob::Execute()
 {
-	_pass.Draw(commandBuffer, 0, 0);
+	_pass.Draw(*commandBuffer, 0, 0);
 	status = JobStatus::COMPLETE;
 }

@@ -5,25 +5,11 @@
 #include "Graphics/Vulkans/Framebuffer.h"
 #include "Graphics/Vulkans/RenderPass.h"
 
-Core::RendererPass::RendererPass(Device& device)
-	:_device{ device }
+Core::RendererPass::RendererPass(Device& device, WorkerThreadManager& workerThreadManager)
+	:_device{ device }, _workerThreadManager(workerThreadManager)
 {
 	_renderPass = new RenderPass(device);
 	_pipelineState = new PipelineState();
-
-	_threadsReadyCount = 0;
-
-	int coreCount = std::thread::hardware_concurrency();
-	_threadCount = std::min(3, coreCount / 2);
-
-	string name = typeid(this).name();
-	wstring wName(name.begin(), name.end());
-	for (size_t i = 0; i < _threadCount; i++)
-	{
-		auto workerThread = make_unique<WorkerThread>(_device, &_fenceWait, QueueType::GRAPHICS,
-			wName + to_wstring(i));
-		_workerThreads.push_back(move(workerThread));
-	}
 }
 
 Core::RendererPass::~RendererPass()
@@ -43,32 +29,26 @@ void Core::RendererPass::CreateFrameBuffer(Image* image)
 	_framebuffer = new Framebuffer(_device, *_renderPass, *image);
 }
 
-void Core::RendererPass::Enqueue(const Job* job)
+void Core::RendererPass::Enqueue(Job* job)
 {
-	_workerThreads[_ringIndex]->Enqueue(job);
-	_ringIndex = (_ringIndex + 1) % _threadCount;
-	_threadsReadyCount = std::min(_threadsReadyCount + 1, _threadCount);
+	_pendingJobs.push_back(job);
+	job->completionWait = &_fenceWait;
+	_workerThreadManager.Enqueue(job);
 }
 
-void Core::RendererPass::Flush(VkCommandBufferLevel level)
+void Core::RendererPass::Wait()
 {
-	if (_threadsReadyCount <= 0)
+	if (_pendingJobs.empty())
 		return;
 
 	_timer.tick();
 
-	for (size_t i = 0; i < _threadsReadyCount; i++)
-	{
-		_workerThreads[i]->Flush(level);
-	}
-
-	//todo : split this process from Flush.
 	unique_lock<mutex> lock(_lock);
 	_fenceWait.wait(lock, [&]
 	{
-		for (size_t i = 0; i < _threadsReadyCount; i++)
+		for (size_t i = 0; i < _pendingJobs.size(); i++)
 		{
-			if (_workerThreads[i]->Complete() == false)
+			if (_pendingJobs[i]->status != JobStatus::COMPLETE)
 			{
 				return false;
 			}

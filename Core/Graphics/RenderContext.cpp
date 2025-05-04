@@ -74,8 +74,7 @@ namespace Core
 	{
 		BeginFrame();
 
-		auto& commandBuffer = _commandPool->RequestCommandBuffer(
-			_currentFrame, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 		commandBuffer.BeginCommandBuffer();
 
 		return commandBuffer;
@@ -198,6 +197,7 @@ namespace Core
 		else if (result != VK_SUCCESS)
 			throw runtime_error("failed to present swap chain image!");
 
+		FrameCounter::IncreaseFrame();
 		_currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 }

@@ -25,6 +25,8 @@ Core::MemoryAllocator::~MemoryAllocator()
 void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation, 
 	VkDeviceSize size, bool needDedicated)
 {
+	lock_guard<mutex> lock(_mutex);
+
 	VkDeviceSize requestedAllocSize = ((size / _alignment) + 1) * _alignment;
 	_totalAllocSize += requestedAllocSize;
 
@@ -56,6 +58,8 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation,
 
 void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 {
+	lock_guard<mutex> lock(_mutex);
+
 	OffsetSizePair span = { allocation.offset , allocation.size };
 
 	auto block = FindMemoryBlock(allocation.id);

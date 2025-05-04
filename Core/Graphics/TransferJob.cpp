@@ -7,7 +7,7 @@
 
 Core::VkBufferJob::VkBufferJob(Device& device, VkBufferUsageFlagBits usageFlag, 
 	Buffer** dstBuffer, vector<uint8_t> vertexData)
-	:_device(device), _destination(dstBuffer), _vertexData(vertexData),
+	:Job(JobType::TRANSFER), _device(device), _destination(dstBuffer), _vertexData(vertexData),
 	_usageFlag(usageFlag)
 {
 }
@@ -17,7 +17,7 @@ Core::VkBufferJob::~VkBufferJob()
 	delete(_stagingBuffer);
 }
 
-void Core::VkBufferJob::Execute(CommandBuffer& commandBuffer)
+void Core::VkBufferJob::Execute()
 {
 	VkDeviceSize bufferSize = sizeof(_vertexData[0]) * _vertexData.size();
 
@@ -35,7 +35,7 @@ void Core::VkBufferJob::Execute(CommandBuffer& commandBuffer)
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | _usageFlag,
 		MemoryType::DEVICE_LOCAL);
 
-	commandBuffer.CopyBuffer(*_stagingBuffer, *vertexBuffer);
+	commandBuffer->CopyBuffer(*_stagingBuffer, *vertexBuffer);
 
 	*_destination = vertexBuffer;
 
@@ -43,7 +43,7 @@ void Core::VkBufferJob::Execute(CommandBuffer& commandBuffer)
 }
 
 Core::VkImageJob::VkImageJob(Device& device, Image& dstImage, string filePath)
-	:_device(device), _dstImage(dstImage), _filePath(filePath)
+	:Job(JobType::TRANSFER), _device(device), _dstImage(dstImage), _filePath(filePath)
 {
 }
 
@@ -52,7 +52,7 @@ Core::VkImageJob::~VkImageJob()
 	delete(_stagingBuffer);
 }
 
-void Core::VkImageJob::Execute(CommandBuffer& commandBuffer)
+void Core::VkImageJob::Execute()
 {
 	vector<uint8_t> imageData;
 	_dstImage.Load(imageData);
@@ -66,15 +66,15 @@ void Core::VkImageJob::Execute(CommandBuffer& commandBuffer)
 
 	_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
 
-	commandBuffer.TransitionImageLayout(_dstImage, VK_IMAGE_LAYOUT_UNDEFINED,
+	commandBuffer->TransitionImageLayout(_dstImage, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 	auto extent = _dstImage.GetExtent();
-	commandBuffer.CopyBufferToImage(*_stagingBuffer, _dstImage, extent.width, extent.height);
+	commandBuffer->CopyBufferToImage(*_stagingBuffer, _dstImage, extent.width, extent.height);
 
 	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
 	if (_dstImage.GetMipLevel() > 1)
-		commandBuffer.GenerateMipmaps(_dstImage, _dstImage.GetMipLevel());
+		commandBuffer->GenerateMipmaps(_dstImage, _dstImage.GetMipLevel());
 
 	status = JobStatus::COMPLETE;
 }

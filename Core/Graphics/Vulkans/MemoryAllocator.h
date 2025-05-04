@@ -63,6 +63,7 @@ namespace Core
 		uint32_t _memoryType;
 		MemoryType _allocatorType;
 		uint64_t _idCounter;
+		mutex _mutex;
 	};
 
 	class MemoryAllocatorManager

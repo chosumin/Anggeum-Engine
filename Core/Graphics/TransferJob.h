@@ -11,7 +11,7 @@ namespace Core
 		VkBufferJob(Device& device, VkBufferUsageFlagBits usageFlag, Buffer** dstBuffer, vector<uint8_t> vertexData);
 		~VkBufferJob();
 
-		void Execute(CommandBuffer& commandBuffer) override;
+		void Execute() override;
 	private:
 		Device& _device;
 		vector<uint8_t> _vertexData;
@@ -29,7 +29,7 @@ namespace Core
 		VkImageJob(Device& device, Image& dstImage, string filePath);
 		~VkImageJob();
 
-		void Execute(CommandBuffer& commandBuffer) override;
+		void Execute() override;
 	private:
 		Device& _device;
 		string _filePath;

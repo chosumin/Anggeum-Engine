@@ -11,7 +11,7 @@ namespace Core
 	class ShadowPass : public RendererPass
 	{
 	public:
-		ShadowPass(Device& device,
+		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget);
 		virtual ~ShadowPass() override;
 

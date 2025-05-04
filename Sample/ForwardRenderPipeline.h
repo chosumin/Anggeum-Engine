@@ -6,10 +6,11 @@ namespace Core
 	class RendererPass;
 	class Scene;
 	class SwapChain;
+	class WorkerThreadManager;
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
-		ForwardRenderPipeline(Device& device, 
+		ForwardRenderPipeline(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, SwapChain& swapChain);
 		virtual ~ForwardRenderPipeline() override;
 

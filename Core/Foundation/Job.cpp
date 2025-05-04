@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Job.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 
 void Core::WorkQueue::Add(const Job* job)  
 {  
@@ -15,6 +16,23 @@ void Core::WorkQueue::Add(const Job* job)
    }  
 
    length += 1;  
+}
+
+Core::Job* Core::WorkQueue::Pop()
+{
+	if (length == 0)
+		return nullptr;
+
+	auto job = first;
+	
+	first = first->next;
+	if (length == 1)
+	{
+		last = nullptr;
+	}
+
+	--length;
+	return job;
 }
 
 Core::Job* Core::WorkQueue::GetNext()

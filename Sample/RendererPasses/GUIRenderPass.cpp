@@ -3,9 +3,11 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-GUIRenderPass::GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain,
+GUIRenderPass::GUIRenderPass(Core::Device& device, 
+	Core::WorkerThreadManager& workerThreadManager, 
+	Core::SwapChain& swapChain,
 	Core::Texture* colorRenderTarget)
-	:RendererPass(device)
+	:RendererPass(device, workerThreadManager)
 {
 	_renderPass->CreateColorAttachment(colorRenderTarget,
 		VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);

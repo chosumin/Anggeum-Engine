@@ -45,10 +45,16 @@ namespace Core
 		void GenerateMipmaps(Image& image, uint32_t mipLevels);
 		void EndRenderPass();
 		void EndCommandBuffer();
+
+		void UpdateFrame(uint64_t frame) { _frame = frame; }
+		bool IsBusy();
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
 		VkCommandBufferLevel _level;
+
+		//hack : have to be managed in resource system or something
+		uint64_t _frame;
 	};
 }
 

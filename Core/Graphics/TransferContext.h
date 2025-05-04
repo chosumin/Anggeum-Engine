@@ -5,25 +5,23 @@
 namespace Core
 {
 	class CommandPool;
-	class WorkerThread;
+	class WorkerThreadManager;
 	class TransferContext
 	{
 	public:
-		TransferContext(Device& device);
+		TransferContext(Device& device, WorkerThreadManager& workerThreadManager);
 		~TransferContext();
 
 		void UpdateFrame(uint32_t frame);
 
-		void Enqueue(const Job* job);
-		void Flush();
+		void Enqueue(Job* job);
+		void Wait();
+	private:
+		void ClearJobs();
 	private:
 		Device& _device;
 
-		size_t _threadCount;
-		vector<unique_ptr<WorkerThread>> _workerThreads;
-
-		size_t _threadsReadyCount;
-		size_t _ringIndex = 0;
+		WorkerThreadManager& _workerThreadManager;
 
 		CommandPool* _primaryCommandPool;
 		uint32_t _currentFrame;
@@ -33,6 +31,8 @@ namespace Core
 		mutex _lock;
 
 		Core::Timer _timer;
+
+		vector<Job*> _pendingJobs;
 	};
 }
 

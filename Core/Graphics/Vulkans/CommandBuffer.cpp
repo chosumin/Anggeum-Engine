@@ -9,11 +9,14 @@
 #include "Image.h"
 #include "RenderPass.h"
 #include "Framebuffer.h"
+#include "Graphics/RenderContext.h"
 #include "Graphics/Material.h"
 
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
+    _frame = -2;
+
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool.GetHandle();
@@ -26,6 +29,8 @@ Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkC
 
 void Core::CommandBuffer::ResetCommandBuffer()
 {
+    _frame = Core::FrameCounter::GetFrameNumber();
+
     vkResetCommandBuffer(_commandBuffer, 0);
 }
 
@@ -446,4 +451,9 @@ void Core::CommandBuffer::EndCommandBuffer()
 {
     if (vkEndCommandBuffer(_commandBuffer) != VK_SUCCESS)
         throw std::runtime_error("failed to record command buffer!");
+}
+
+bool Core::CommandBuffer::IsBusy()
+{
+    return _frame + 1 >= Core::FrameCounter::GetFrameNumber();
 }

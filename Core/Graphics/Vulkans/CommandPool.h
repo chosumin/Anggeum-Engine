@@ -12,9 +12,7 @@ namespace Core
 
 		VkCommandPool& GetHandle() { return _commandPool; }
 
-		CommandBuffer& RequestCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
-
-		CommandBuffer& GetCommandBuffer(uint32_t currentFrame, VkCommandBufferLevel level);
+		CommandBuffer& RequestCommandBuffer(VkCommandBufferLevel level);
 	private:
 		Device& _device;
 		VkCommandPool _commandPool;

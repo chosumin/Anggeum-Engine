@@ -13,7 +13,7 @@ namespace Core
 	class PreEnvironmentPass : public RendererPass
 	{
 	public:
-		PreEnvironmentPass(Device& device, Scene& scene, 
+		PreEnvironmentPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, 
 			Texture* renderTarget, Texture* irradianceCubemap, Texture* prefilteredCubemap);
 		virtual ~PreEnvironmentPass() override;
 
@@ -47,7 +47,7 @@ namespace Core
 		PreEnvironmentJob(PreEnvironmentPass& pass);
 		~PreEnvironmentJob();
 
-		void Execute(CommandBuffer& commandBuffer) override;
+		void Execute() override;
 	private:
 		PreEnvironmentPass& _pass;
 	};

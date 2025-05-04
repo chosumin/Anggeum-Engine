@@ -10,7 +10,7 @@ namespace Core
 	class BrdfLutPass : public RendererPass
 	{
 	public:
-		BrdfLutPass(Device& device, Texture* brdfLut);
+		BrdfLutPass(Device& device, WorkerThreadManager& workerThreadManager, Texture* brdfLut);
 		virtual ~BrdfLutPass() override;
 
 		virtual void Prepare() override;
@@ -26,7 +26,7 @@ namespace Core
 		BrdfLutJob(BrdfLutPass& pass);
 		~BrdfLutJob();
 
-		void Execute(CommandBuffer& commandBuffer) override;
+		void Execute() override;
 	private:
 		BrdfLutPass& _pass;
 	};

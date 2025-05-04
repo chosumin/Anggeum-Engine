@@ -17,12 +17,13 @@
 #include "BrdfLutPass.h"
 namespace Core
 {
-	GeometryPass::GeometryPass(Device& device, Scene& scene, SwapChain& swapChain,
+	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
+		Scene& scene, SwapChain& swapChain,
 		Texture* colorRenderTarget, Texture* depthRenderTarget, 
 		Texture* shadowRenderTarget, 
 		Texture* pregenerationSky, Texture* irradianceCubemap,
 		Texture* prefilterCubemap, Texture* brdfLut)
-		:RendererPass(device), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
+		:RendererPass(device, workerThreadManager), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
 		_skyboxPipeline(nullptr)
@@ -123,26 +124,29 @@ namespace Core
 	void GeometryPass::PreparePregenerationSkybox(Texture* pregenerationSky,
 		Texture* irradianceCubemap, Texture* prefilterCubemap)
 	{
-		auto preEnvironmentPass = new PreEnvironmentPass(_device, _scene, pregenerationSky, irradianceCubemap, prefilterCubemap);
+		_timer.tick();
+
+		auto preEnvironmentPass = new PreEnvironmentPass(_device, _workerThreadManager, _scene, pregenerationSky, irradianceCubemap, prefilterCubemap);
 		auto preEnvironmentJob = new PreEnvironmentJob(*preEnvironmentPass);
 		Enqueue(preEnvironmentJob);
 
-		auto brdf = new BrdfLutPass(_device, _brdfLut);
+		auto& buffer = _device.BeginSingleTimeCommands();
+		auto brdf = new BrdfLutPass(_device, _workerThreadManager, _brdfLut);
 		auto brdfJob = new BrdfLutJob(*brdf);
-		Enqueue(brdfJob);
+		brdfJob->commandBuffer = &buffer;
+		brdfJob->Execute();
+		buffer.EndCommandBuffer();
 
-		Flush(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		Wait();
 
-		vector<VkCommandBuffer> commands(_threadsReadyCount);
-		for (size_t i = 0; i < _threadsReadyCount; i++)
-		{
-			commands[i] = _workerThreads[i]->GetCommandBuffer(
-				0, VK_COMMAND_BUFFER_LEVEL_PRIMARY).GetHandle();
-		}
+		const size_t commandSize = 2;
+		vector<VkCommandBuffer> commands(commandSize);
+		commands[0] = preEnvironmentJob->commandBuffer->GetHandle();
+		commands[1] = buffer.GetHandle();
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.commandBufferCount = _threadsReadyCount;
+		submitInfo.commandBufferCount = commandSize;
 		submitInfo.pCommandBuffers = commands.data();
 
 		// Create fence to ensure that the command buffer has finished executing
@@ -163,7 +167,9 @@ namespace Core
 		vkDestroyFence(_device.GetDevice(), fence, nullptr);
 
 		delete(brdf);
+		delete(brdfJob);
 		delete(preEnvironmentPass);
+		delete(preEnvironmentJob);
 	}
 
 	void GeometryPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)

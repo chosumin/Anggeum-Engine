@@ -11,7 +11,7 @@ namespace Core
 	class GeometryPass : public RendererPass
 	{
 	public:
-		GeometryPass(Device& device, 
+		GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, SwapChain& swapChain, 
 			Texture* colorRenderTarget, Texture* depthRenderTarget, 
 			Texture* shadowRenderTarget, 

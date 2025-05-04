@@ -10,6 +10,7 @@ namespace Core
 	class Scene;
 	class RenderContext;
 	class TransferContext;
+	class WorkerThreadManager;
 	class IRenderPipeline;
 }
 
@@ -40,6 +41,6 @@ private:
 	Core::RenderContext* _renderContext;
 	Core::Scene* _scene;
 	Core::TransferContext* _transferContext;
-
+	Core::WorkerThreadManager* _workerThreadManager;
 	GUIRenderPass* _guiRenderPass;
 };

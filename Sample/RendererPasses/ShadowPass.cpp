@@ -12,8 +12,9 @@
 #include "Graphics/Material.h"
 using namespace Core;
 
-Core::ShadowPass::ShadowPass(Device& device, Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget)
-	: RendererPass(device), _scene(scene), _shadowMap(depthRenderTarget), _batch(nullptr)
+Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager, 
+	Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget)
+	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget), _batch(nullptr)
 {
 	_directionalLight.View = lookAt(
 		vec3(-2.0f, 2.0f, 2.0f),

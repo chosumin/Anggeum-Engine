@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "ForwardRenderPipeline.h"
 #include "Foundation/Scene.h"
+#include "Foundation/WorkerThread.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
 #include "Sample/RendererPasses/GeometryPass.h"
@@ -9,7 +10,8 @@
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(
-	Device& device, Scene& scene, SwapChain& swapChain)
+	Device& device, WorkerThreadManager& workerThreadManager, 
+	Scene& scene, SwapChain& swapChain)
 	:_device(device)
 {
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
@@ -28,11 +30,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	CreatePreSkyTextures();
 
 	auto shadowPass = new ShadowPass(
-		device, scene, swapChain, _renderTargets[2].get());
+		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
 	AddRendererPass(shadowPass);
 
 	auto geometryPass = new GeometryPass(
-		device, scene, swapChain, 
+		device, workerThreadManager, scene, swapChain,
 		_renderTargets[0].get(), _renderTargets[1].get(), 
 		_renderTargets[2].get(), _renderTargets[3].get(), 
 		_renderTargets[4].get(), _renderTargets[5].get(),

@@ -4,22 +4,9 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-Core::TransferContext::TransferContext(Device& device)
-	:_device(device)
+Core::TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager)
+	:_device(device), _workerThreadManager(workerThreadManager)
 {
-	_threadsReadyCount = 0;
-	
-	int coreCount = std::thread::hardware_concurrency();
-	_threadCount = std::min(3, coreCount / 2);
-
-	for (size_t i = 0; i < _threadCount; i++)
-	{
-		auto workerThread = make_unique<WorkerThread>(
-			_device, &_fenceWait, QueueType::TRANSFER,
-			L"Transfer Thread " + to_wstring(i));
-		_workerThreads.push_back(move(workerThread));
-	}
-
 	_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
 	VkFenceCreateInfo fenceInfo{};
@@ -48,38 +35,29 @@ Core::TransferContext::~TransferContext()
 void Core::TransferContext::UpdateFrame(uint32_t frame)
 {
 	_currentFrame = frame;
-
-	for (auto& thread : _workerThreads)
-	{
-		thread->_currentFrame = frame;
-	}
 }
 
-void Core::TransferContext::Enqueue(const Job* job)
+void Core::TransferContext::Enqueue(Job* job)
 {
-	_workerThreads[_ringIndex]->Enqueue(job);
-	_ringIndex = (_ringIndex + 1) % _threadCount;
-	_threadsReadyCount = std::min(_threadsReadyCount + 1, _threadCount);
+	_pendingJobs.push_back(job);
+	job->completionWait = &_fenceWait;
+	_workerThreadManager.Enqueue(job);
 }
 
-void Core::TransferContext::Flush()
+void Core::TransferContext::Wait()
 {
-	if (_threadsReadyCount <= 0)
+	if (_pendingJobs.empty())
 		return;
 
 	_timer.tick();
 
-	for (size_t i = 0; i < _threadsReadyCount; i++)
-	{
-		_workerThreads[i]->Flush(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-	}
-
+	//todo : wait jobs instead of threads.
 	unique_lock<mutex> lock(_lock);
 	_fenceWait.wait(lock, [&]
 	{
-		for (size_t i = 0; i < _threadsReadyCount; i++)
+		for (size_t i = 0; i < _pendingJobs.size(); i++)
 		{
-			if (_workerThreads[i]->Complete() == false)
+			if (_pendingJobs[i]->status != JobStatus::COMPLETE)
 			{
 				return false;
 			}
@@ -89,16 +67,15 @@ void Core::TransferContext::Flush()
 
 	vkResetFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame]);
 
-	auto& primary = _primaryCommandPool->RequestCommandBuffer(_currentFrame, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	auto& primary = _primaryCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		nullptr, nullptr, 0, _currentFrame);
 
-	vector<CommandBuffer*> secondaryCommands(_threadsReadyCount);
-	for (size_t i = 0; i < _threadsReadyCount; i++)
-	{
-		secondaryCommands[i] = &(_workerThreads[i]->_commandPool->GetCommandBuffer(
-				_currentFrame, VK_COMMAND_BUFFER_LEVEL_SECONDARY));
-	}
+	size_t commandBufferCount = _pendingJobs.size();
+	vector<CommandBuffer*> secondaryCommands(commandBufferCount);
+	transform(_pendingJobs.begin(), _pendingJobs.end(), 
+		secondaryCommands.begin(),
+		[](Job* job) { return job->commandBuffer; });
 
 	primary.ExecuteCommands(secondaryCommands);
 
@@ -113,9 +90,6 @@ void Core::TransferContext::Flush()
 	vkQueueSubmit(queue, 1, &submitInfo, _inFlightFences[_currentFrame]);
 
 	lock.unlock();
-	
-	_threadsReadyCount = 0;
-	_ringIndex = 0;
 
 	//todo : wait imageAvailable semaphore
 	//todo : signal renderAvailable semaphore
@@ -123,6 +97,21 @@ void Core::TransferContext::Flush()
 	//todo : GetStatus to do unblocking.
 	vkWaitForFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame], VK_TRUE, 100000000000);
 
+	ClearJobs();
+
 	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
 	cout << "Transfer Time : " << deltaTime << endl;
+}
+
+void Core::TransferContext::ClearJobs()
+{
+	for (auto&& job : _pendingJobs)
+	{
+		if (job->status == JobStatus::COMPLETE)
+		{
+			delete(job);
+		}
+	}
+
+	_pendingJobs.clear();
 }

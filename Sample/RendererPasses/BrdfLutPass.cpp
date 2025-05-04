@@ -7,8 +7,9 @@
 #include "Utils/Utility.h"
 using namespace Core;
 
-Core::BrdfLutPass::BrdfLutPass(Device& device, Texture* brdfLut)
-	:RendererPass(device)
+Core::BrdfLutPass::BrdfLutPass(Device& device, WorkerThreadManager& workerThreadManager,
+	Texture* brdfLut)
+	:RendererPass(device, workerThreadManager)
 {
 	_renderPass->CreateColorAttachment(brdfLut, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	_renderPass->CreateRenderPass();
@@ -54,7 +55,7 @@ void Core::BrdfLutPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame
 }
 
 Core::BrdfLutJob::BrdfLutJob(BrdfLutPass& pass)
-	:_pass(pass)
+	:Job(JobType::GRAPHICS_PRIMARY), _pass(pass)
 {
 	_pass.Prepare();
 }
@@ -63,8 +64,8 @@ Core::BrdfLutJob::~BrdfLutJob()
 {
 }
 
-void Core::BrdfLutJob::Execute(CommandBuffer& commandBuffer)
+void Core::BrdfLutJob::Execute()
 {
-	_pass.Draw(commandBuffer, 0, 0);
+	_pass.Draw(*commandBuffer, 0, 0);
 	status = JobStatus::COMPLETE;
 }

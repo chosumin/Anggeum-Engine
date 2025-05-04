@@ -24,29 +24,22 @@ namespace Core
 		vkDestroyCommandPool(_device.GetDevice(), _commandPool, nullptr);
 	}
 
-	CommandBuffer& CommandPool::RequestCommandBuffer(
-		uint32_t currentFrame, VkCommandBufferLevel level)
+	CommandBuffer& CommandPool::RequestCommandBuffer(VkCommandBufferLevel level)
 	{
 		auto& buffers = level == VK_COMMAND_BUFFER_LEVEL_PRIMARY ?
 			_primaryCommandBuffers : _secondaryCommandBuffers;
 
-		if (currentFrame < buffers.size())
+		for (auto&& buffer : buffers)
 		{
-			buffers[currentFrame]->ResetCommandBuffer();
-			return *buffers[currentFrame];
+			if (buffer->IsBusy() == false)
+			{
+				buffer->ResetCommandBuffer();
+				return *buffer;
+			}
 		}
 
 		buffers.emplace_back(make_unique<CommandBuffer>(_device, *this, level));
 
 		return *buffers.back();
-	}
-
-	CommandBuffer& CommandPool::GetCommandBuffer(
-		uint32_t currentFrame, VkCommandBufferLevel level)
-	{
-		auto& buffers = level == VK_COMMAND_BUFFER_LEVEL_PRIMARY ?
-			_primaryCommandBuffers : _secondaryCommandBuffers;
-
-		return *buffers[currentFrame];
 	}
 }

@@ -2,18 +2,31 @@
 
 namespace Core
 {
+	enum class JobType
+	{
+		GRAPHICS_PRIMARY, GRAPHICS_SECONDARY, COMPUTE, TRANSFER
+	};
+
 	enum class JobStatus
 	{
 		PENDING, PROGRESS, COMPLETE
 	};
 
+	class CommandBuffer;
 	class Job
 	{
 	public:
+		Job(JobType type) : type(type) {}
+		virtual ~Job() = default;
+
+		JobType type;
 		JobStatus status = JobStatus::PENDING;
 		Job* next = nullptr;
+		condition_variable* completionWait;
 
-		virtual void Execute(CommandBuffer& commandBuffer) = 0;
+		CommandBuffer* commandBuffer;
+
+		virtual void Execute() = 0;
 	};
 
 	struct WorkQueue
@@ -23,6 +36,7 @@ namespace Core
 
 		size_t length;
 		void Add(const Job* job);
+		Job* Pop();
 		Job* GetNext();
 		void Clear();
 

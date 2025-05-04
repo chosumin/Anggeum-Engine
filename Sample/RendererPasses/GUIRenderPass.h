@@ -4,7 +4,7 @@
 class GUIRenderPass : public Core::RendererPass
 {
 public:
-	GUIRenderPass(Core::Device& device, Core::SwapChain& swapChain, Core::Texture* colorRenderTarget);
+	GUIRenderPass(Core::Device& device, Core::WorkerThreadManager& workerThreadManager, Core::SwapChain& swapChain, Core::Texture* colorRenderTarget);
 	virtual ~GUIRenderPass() override;
 
 	virtual void Prepare() override;

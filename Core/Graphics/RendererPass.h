@@ -13,12 +13,11 @@ namespace Core
 	class Framebuffer;
 	class PipelineState;
 	class CommandBuffer;
-	class WorkerThread;
 	class Job;
 	class RendererPass
 	{
 	public:
-		RendererPass(Device& device);
+		RendererPass(Device& device, WorkerThreadManager& workerThreadManager);
 		virtual ~RendererPass();
 
 		virtual void Prepare() = 0;
@@ -28,20 +27,19 @@ namespace Core
 		void CreateFrameBuffer(SwapChain& swapChain);
 		void CreateFrameBuffer(Image* image);
 
-		void Enqueue(const Job* job);
-		void Flush(VkCommandBufferLevel level);
+		void Enqueue(Job* job);
+		void Wait();
 	protected:
 		Device& _device;
 		RenderPass* _renderPass;
 		Framebuffer* _framebuffer;
 		PipelineState* _pipelineState;
 
-		size_t _threadCount;
-		vector<unique_ptr<WorkerThread>> _workerThreads;
-		size_t _threadsReadyCount;
-		size_t _ringIndex;
+		vector<Job*> _pendingJobs;
+		WorkerThreadManager& _workerThreadManager;
+		Core::Timer _timer;
+	private:
 		condition_variable _fenceWait;
 		mutex _lock;
-		Core::Timer _timer;
 	};
 }

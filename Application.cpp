@@ -18,24 +18,25 @@ Application::Application(const ApplicationOptions& options)
 	_timer = make_unique<Core::Timer>();
 
 	_device = new Core::Device(*options.window);
-	_transferContext = new Core::TransferContext(*_device);
+	_workerThreadManager = new Core::WorkerThreadManager(*_device);
+	_transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
+	_renderContext = new Core::RenderContext(*_device);
 }
 
 bool Application::Prepare()
 {
-	_renderContext = new Core::RenderContext(*_device);
-
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
 	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext);
 
-	_transferContext->Flush();
+	_transferContext->Wait();
 
-	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_scene, swapChain);
+	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
+		*_scene, swapChain);
 	_renderPipeline->Prepare();
 
-	_guiRenderPass = new GUIRenderPass(*_device, swapChain, _renderPipeline->GetColorRenderTarget());
+	_guiRenderPass = new GUIRenderPass(*_device, *_workerThreadManager, swapChain, _renderPipeline->GetColorRenderTarget());
 	_guiRenderPass->Prepare();
 
 	return true;
@@ -67,9 +68,10 @@ Application::~Application()
 
 	delete(_renderPipeline);
 	delete(_scene);
-	delete(_renderContext);
 
+	delete(_renderContext);
 	delete(_transferContext);
+	delete(_workerThreadManager);
 	delete(_device);
 
 	Core::Window::Instance().Delete();
@@ -78,7 +80,7 @@ Application::~Application()
 void Application::Draw()
 {
 	_transferContext->UpdateFrame(_renderContext->GetCurrentFrame());
-	_transferContext->Flush();
+	_transferContext->Wait();
 
 	auto& commandBuffer = _renderContext->Begin();
 

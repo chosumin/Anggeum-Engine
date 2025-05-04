@@ -326,7 +326,8 @@ void Core::Image::LoadImmediate()
     auto& commandBuffer = _device.BeginSingleTimeCommands();
 
     VkImageJob job(_device, *this, _filePath);
-    job.Execute(commandBuffer);
+	job.commandBuffer = &commandBuffer;
+    job.Execute();
 
     _device.EndSingleTimeCommands(commandBuffer);
 }

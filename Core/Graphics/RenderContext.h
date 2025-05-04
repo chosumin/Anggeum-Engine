@@ -7,6 +7,15 @@ namespace Core
 	 * It swaps between RenderFrame objects and forwards a request for vulkan resources to the active frame.
 	 * More than one frame can be in-flight in the GPU, thus the need for per-frame resources.
 	 */
+	class FrameCounter
+	{
+	public:
+		static void IncreaseFrame() { ++_frameNumber; }
+		static uint64_t GetFrameNumber() { return _frameNumber; }
+	private:
+		static inline uint64_t _frameNumber = 0;
+	};
+
 	class CommandBuffer;
 	class SwapChain;
 	class CommandPool;
@@ -40,9 +49,8 @@ namespace Core
 
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
-		uint32_t GetCurrentFrame() { return _currentFrame; }
 
-		CommandPool& GetCommandPool() { return *_commandPool; }
+		uint32_t GetCurrentFrame() { return _currentFrame; }
 
 		uint32_t GetImageIndex() const { return _imageIndex; }
 		//RenderFrame& GetActiveFrame();
@@ -65,9 +73,8 @@ namespace Core
 
 		SwapChain* _swapChain;
 		//vector<unique_ptr<RenderFrame>> _frames;
-		uint32_t _currentFrame = 0;
 
-		size_t _threadCount{ 1 };
+		uint32_t _currentFrame = 0;
 
 		CommandPool* _commandPool;
 
@@ -75,7 +82,5 @@ namespace Core
 		vector<VkSemaphore> _imageAvailableSemaphores;
 		vector<VkSemaphore> _renderFinishedSemaphores;
 		vector<VkFence> _inFlightFences;
-
-		//todo : render target
 	};
 }
