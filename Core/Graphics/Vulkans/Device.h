@@ -27,6 +27,7 @@ namespace Core
 	class CommandPool;
 	class CommandBuffer;
 	class MemoryAllocatorManager;
+	class ResourceCache;
 	class Device
 	{
 	public:
@@ -67,6 +68,8 @@ namespace Core
 		{
 			return _queueFamilyIndices;
 		}
+
+		ResourceCache& GetResourceCache() const { return *_resourceCache; }
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -78,7 +81,9 @@ namespace Core
 		QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 		bool IsDeviceSuitable(VkPhysicalDevice device);
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
-		void CreateLogicalDevice();
+		void CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeatures& indexingFeatures);
+		void CheckBindlessSupport(
+			VkPhysicalDeviceDescriptorIndexingFeatures& outIndexingFeatures);
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
@@ -99,9 +104,11 @@ namespace Core
 		VkQueue _graphicsQueue;
 		VkQueue _computeQueue;
 		VkQueue _presentQueue;
-
-		//For transfer commands, staging buffers
 		VkQueue _transferQueue;
+
+		ResourceCache* _resourceCache;
+
+		bool _bindlessSupport = false;
 
 		VkSurfaceKHR _surface;
 

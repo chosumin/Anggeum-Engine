@@ -3,7 +3,6 @@
 #include "Buffer.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
-#include "Graphics/TransferJob.h"
 #include "Utils/FileSystem.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -12,10 +11,10 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-Core::Image::Image(Device& device, string filePath, VkSampleCountFlagBits sampleCount,
-    VkImageViewType imageViewType, VkImageCreateFlags flags)
-    :_device(device), _sampleCount(sampleCount), _createFlags(flags), _viewType(imageViewType),
-    _filePath(filePath)
+Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
+    :_device(device), _sampleCount(imageCreateInfo.sampleCount), _createFlags(imageCreateInfo.flags), _viewType(imageCreateInfo.imageViewType),
+    _filePath(imageCreateInfo.filePath),
+    _image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE)
 {
     _format = VK_FORMAT_R8G8B8A8_UNORM;
     _usageFlags = 
@@ -44,10 +43,14 @@ Core::Image::~Image()
 {
     auto device = _device.GetDevice();
 
-    vkDestroyImageView(device, _imageView, nullptr);
-    vkDestroyImage(device, _image, nullptr);
+	if (_imageView != VK_NULL_HANDLE)
+		vkDestroyImageView(device, _imageView, nullptr);
 
-    _allocator->Deallocate(*_allocation);
+	if (_image != VK_NULL_HANDLE)
+		vkDestroyImage(device, _image, nullptr);
+
+	if (_allocation != nullptr)
+		_allocator->Deallocate(*_allocation);
 }
 
 void Core::Image::SetSRGBFormat()
@@ -319,15 +322,4 @@ void Core::Image::Load(vector<uint8_t>& outImageData)
     BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     CreateImageView(_mipLevels, _viewType, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
-void Core::Image::LoadImmediate()
-{
-    auto& commandBuffer = _device.BeginSingleTimeCommands();
-
-    VkImageJob job(_device, *this, _filePath);
-	job.commandBuffer = &commandBuffer;
-    job.Execute();
-
-    _device.EndSingleTimeCommands(commandBuffer);
 }

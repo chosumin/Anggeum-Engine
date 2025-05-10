@@ -91,9 +91,6 @@ void Core::TransferContext::Wait()
 
 	lock.unlock();
 
-	//todo : wait imageAvailable semaphore
-	//todo : signal renderAvailable semaphore
-	
 	//todo : GetStatus to do unblocking.
 	vkWaitForFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame], VK_TRUE, 100000000000);
 

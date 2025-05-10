@@ -5,8 +5,6 @@
 #include "Sample/SampleScene.h"
 #include "Sample/ForwardRenderPipeline.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/MaterialFactory.h"
-#include "Graphics/ShaderFactory.h"
 #include "Graphics/TransferContext.h"
 #include "Utils/timer.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
@@ -42,10 +40,25 @@ bool Application::Prepare()
 	return true;
 }
 
+Application::~Application()
+{
+	delete(_guiRenderPass);
+
+	delete(_renderPipeline);
+	delete(_scene);
+
+	delete(_renderContext);
+	delete(_transferContext);
+	delete(_workerThreadManager);
+	delete(_device);
+
+	Core::Window::Instance().Delete();
+}
+
 void Application::Update()
 {
 	_guiRenderPass->Update();
-	
+
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
 
 	auto components = _scene->GetComponents<Core::Component>();
@@ -57,24 +70,6 @@ void Application::Update()
 	_scene->Update();
 
 	//todo : update stats
-}
-
-Application::~Application()
-{
-	delete(_guiRenderPass);
-
-	Core::ShaderFactory::DeleteCache();
-	Core::MaterialFactory::DeleteCache();
-
-	delete(_renderPipeline);
-	delete(_scene);
-
-	delete(_renderContext);
-	delete(_transferContext);
-	delete(_workerThreadManager);
-	delete(_device);
-
-	Core::Window::Instance().Delete();
 }
 
 void Application::Draw()

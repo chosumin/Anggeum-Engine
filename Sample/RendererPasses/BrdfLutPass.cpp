@@ -14,7 +14,7 @@ Core::BrdfLutPass::BrdfLutPass(Device& device, WorkerThreadManager& workerThread
 	_renderPass->CreateColorAttachment(brdfLut, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	_renderPass->CreateRenderPass();
 
-	CreateFrameBuffer(brdfLut->GetImage());
+	CreateFrameBuffer(brdfLut->GetImage().lock().get());
 }
 
 Core::BrdfLutPass::~BrdfLutPass()

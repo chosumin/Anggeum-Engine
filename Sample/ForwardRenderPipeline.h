@@ -36,12 +36,11 @@ namespace Core
 			_rendererPasses.push_back(renderPass);
 		}
 
-		unique_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
+		shared_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
 			VkImageLayout layout, VkImageUsageFlags usageFlags);
-		unique_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
-		unique_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
+		shared_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
+		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
 
-		void CreateSampler();
 		void CreatePreSkyTextures();
 	private:
 		Device& _device;
@@ -50,9 +49,9 @@ namespace Core
 
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-		vector<unique_ptr<Texture>> _renderTargets;
+		vector<shared_ptr<Texture>> _renderTargets;
 		
-		Sampler* _sampler;
+		shared_ptr<Sampler> _sampler;
 	};
 }
 

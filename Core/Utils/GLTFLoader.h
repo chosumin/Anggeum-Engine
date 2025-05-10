@@ -20,6 +20,7 @@ namespace Core
 	class CommandBuffer;
 	class Light;
 	class TransferContext;
+	class ResourceCache;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -39,40 +40,35 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene, TransferContext* transferContext);
+		GLTFLoader(Device& device, Scene& scene, TransferContext& transferContext);
 		~GLTFLoader();
 
 		void LoadScene(string path);
 		void LoadSkybox(string path);
 	private:
-		void LoadDefaults(Device& device);
-		void DeleteDefaults();
-
 		bool LoadFromFile(tinygltf::Model* model, const string& path);
 		void LoadAssets(const string& modelPath);
 		void CheckExtensions();
 		void LoadLights();
-		vector<Core::Sampler*> LoadSamplers();
-		vector<Core::Image*> LoadImages(const string& modelPath);
-		vector<Core::Texture*> LoadTextures(
-			vector<Core::Sampler*>& samplers,
-			vector<Core::Image*>& images);
-		vector<Core::Material*> LoadMaterials(vector<Core::Texture*>& textures);
-		void LoadMeshes(vector<Core::Material*>& materials);
+		vector<shared_ptr<Core::Sampler>> LoadSamplers();
+		vector<shared_ptr<Core::Image>> LoadImages(const string& modelPath);
+		vector<shared_ptr<Core::Texture>> LoadTextures(
+			vector<shared_ptr<Core::Sampler>>& samplers,
+			vector<shared_ptr<Core::Image>>& images);
+		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
+		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();
-		Core::Sampler* LoadSampler(Device& device, tinygltf::Sampler& sampler);
+		shared_ptr<Core::Sampler> LoadSampler(Device& device, tinygltf::Sampler& sampler);
 	private:
 		Device& _device;
 		Scene& _scene;
+		ResourceCache& _resourceCache;
 
-		TransferContext* _transferContext;
+		TransferContext& _transferContext;
 
 		tinygltf::Model* _model;
-		
-		Core::Texture* _defaultTexture;
-		Core::Sampler* _defaultSampler;
 
 		vector<Core::Mesh*> _meshes;
 		vector<Core::PerspectiveCamera*> _cameras;

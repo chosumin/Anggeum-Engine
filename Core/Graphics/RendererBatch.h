@@ -23,13 +23,13 @@ namespace Core
 		void Add(Mesh& mesh);
 
 		//Add batch depending on the parameter material.
-		void Add(Mesh& mesh, Material& material);
+		void Add(Mesh& mesh, weak_ptr<Material> material);
 
-		void Draw(CommandBuffer& commandBuffer,uint32_t currentFrame);
+		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame);
 
 		Pipeline* Pipeline;
 		Shader& SharedShader;
-		unordered_map<uint32_t, Material*> Materials;
+		unordered_map<uint32_t, weak_ptr<Material>> Materials;
 
 		//uint32_t: material hash, string: sub mesh name
 		unordered_map<uint32_t, unordered_map<string, SubMesh*>> SubMeshBatches;

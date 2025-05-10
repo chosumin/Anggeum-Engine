@@ -31,7 +31,7 @@ namespace Core
 		ShadowUniform _shadowBuffer;
 
 		RendererBatch* _batch;
-		Material* _material;
+		shared_ptr<Material> _material;
 
 		Texture* _shadowMap;
 	};

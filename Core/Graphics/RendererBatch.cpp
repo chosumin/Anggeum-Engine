@@ -47,17 +47,17 @@ void Core::RendererBatch::Add(Mesh& mesh)
 	}
 }
 
-void Core::RendererBatch::Add(Mesh& mesh, Material& material)
+void Core::RendererBatch::Add(Mesh& mesh, weak_ptr<Material> material)
 {
 	auto& transform = mesh.GetEntity().GetTransform();
 	auto subMeshes = mesh.GetSubMeshes();
 
-	auto hash = material.GetHash();
+	auto hash = material.lock()->GetHash();
 
 	auto matPtr = Materials.find(hash);
 	if (matPtr == Materials.end())
 	{
-		Materials.insert(make_pair(hash, &material));
+		Materials.insert(make_pair(hash, material));
 	}
 
 	for (size_t i = 0; i < subMeshes.size(); ++i)
@@ -75,10 +75,12 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 	//1. Material batch
 	for (auto&& material : Materials)
 	{
-		commandBuffer.BindDescriptorSets(
-			VK_PIPELINE_BIND_POINT_GRAPHICS, *material.second, currentFrame);
+		auto sharedMaterial = material.second.lock();
 
-		auto vertexAttibuteNames = material.second->GetShader().GetVertexAttirbuteNames();
+		commandBuffer.BindDescriptorSets(
+			VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);
+
+		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
 
 		//2. SubMesh batch
 		auto& subMeshBatches = SubMeshBatches[material.first];
@@ -93,10 +95,10 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 			//3. Transform loop
 			for (size_t i = 0; i < transforms.size(); ++i)
 			{
-				material.second->SetPushConstants<mat4>(transforms[i]->GetMatrix());
+				sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
 			}
 
-			commandBuffer.PushConstants(*material.second);
+			commandBuffer.PushConstants(*sharedMaterial);
 
 			commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
 

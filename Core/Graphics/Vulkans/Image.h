@@ -11,13 +11,21 @@ namespace Core
 		Rgb_alpha = 4
 	};*/
 
+	struct ImageCreateInfo
+	{
+		string filePath;
+		VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+		VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
+		VkImageCreateFlags flags = 0;
+	};
+
 	struct MemoryAllocation;
 	class Image
 	{
 	public:
 		friend class Texture;
 	public:
-		Image(Device& device, string filePath, VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D, VkImageCreateFlags flags = 0);
+		Image(Device& device, ImageCreateInfo imageCreateInfo);
 
 		//Creates a render target image
 		Image(Device& device, VkImageCreateInfo& imageInfo, 
@@ -38,7 +46,8 @@ namespace Core
 		VkImageAspectFlags GetAspectFlags() const;
 
 		void Load(vector<uint8_t>& outImageData);
-		void LoadImmediate();
+
+		string& GetFilePath() { return _filePath; }
 	private:
 		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);
 		void LoadStbImage(vector<uint8_t>& outData, const string& filePath);

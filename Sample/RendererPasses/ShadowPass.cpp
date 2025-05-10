@@ -8,8 +8,8 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
-#include "Graphics/MaterialFactory.h"
 #include "Graphics/Material.h"
+#include "Graphics/ResourceCache.h"
 using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager, 
@@ -31,7 +31,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	//TODO : remove _shadowBuffer  
 	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 
-	_material = MaterialFactory::CreateMaterial(device, "Assets/Materials/Shadow.json");
+	_material = device.GetResourceCache().RequestMaterial("Shadow");
 
 	_renderPass->CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
@@ -55,7 +55,7 @@ void Core::ShadowPass::Prepare()
 	auto meshes = _scene.GetComponents<Core::Mesh>();
 	for (auto&& mesh : meshes)
 	{
-		_batch->Add(*mesh, *_material);
+		_batch->Add(*mesh, _material);
 	}
 }
 
@@ -63,7 +63,7 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame,
 {
 	UpdateGUI();
 
-	commandBuffer.TransitionImageLayout(*_shadowMap->GetImage(),
+	commandBuffer.TransitionImageLayout(*_shadowMap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 

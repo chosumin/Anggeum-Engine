@@ -3,29 +3,58 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/Texture.h"
-#include "ShaderFactory.h"
+#include "Graphics/ResourceCache.h"
 
 namespace Core
 {
-	Material::Material(Device& device, string shaderName, uint32_t hash, Texture& defaultTexture)
+	Material::Material(Device& device, string shaderName, uint32_t hash)
 		:_device(device), _isDirty(true), _hash(hash)
 	{
-		_shader = ShaderFactory::CreateShader(device, shaderName);
+		_shader = device.GetResourceCache().RequestShader(shaderName);
 
 		CreateDescriptorSets();
 		CreateBuffers();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(defaultTexture);
+		SetDefault(*device.GetResourceCache().RequestDefaultTexture());
 	}
 
-	Material::Material(Device& device, string shaderName, uint32_t hash)
-		:_device(device), _isDirty(true), _hash(hash)
+	Material::Material(const Material& other)
+		: _device(other._device),
+		_shader(other._shader),
+		_pushConstants(other._pushConstants),
+		_uniformBuffers(other._uniformBuffers),
+		_textureBuffers(other._textureBuffers),
+		_isDirty(other._isDirty),
+		_hash(other._hash),
+		_descriptorSets(other._descriptorSets),
+		_isDoubledSided(other._isDoubledSided),
+		_alphaMode(other._alphaMode),
+		_isAlphaCutoff(other._isAlphaCutoff),
+		_buffers(other._buffers),
+		_textures(other._textures)
 	{
-		_shader = ShaderFactory::CreateShader(device, shaderName);
+	}
 
-		CreateDescriptorSets();
-		CreateBuffers();
+	Material& Material::operator=(const Material& other)
+	{
+		if (this == &other)
+			return *this;
+
+		_shader = other._shader;
+		_pushConstants = other._pushConstants;
+		_uniformBuffers = other._uniformBuffers;
+		_textureBuffers = other._textureBuffers;
+		_isDirty = other._isDirty;
+		_hash = other._hash;
+		_descriptorSets = other._descriptorSets;
+		_isDoubledSided = other._isDoubledSided;
+		_alphaMode = other._alphaMode;
+		_isAlphaCutoff = other._isAlphaCutoff;
+		_buffers = other._buffers;
+		_textures = other._textures;
+
+		return *this;
 	}
 
 	Core::Material::~Material()
@@ -47,15 +76,19 @@ namespace Core
 			delete(buffer.second);
 		}
 		_buffers.clear();
+
+		for (auto& texture : _textures)
+		{
+			_device.GetResourceCache().ReleaseTexture(texture.second);
+		}
+		_textures.clear();
+
+		_device.GetResourceCache().ReleaseShader(_shader);
 	}
 
 	Shader& Core::Material::GetShader() const
 	{
 		return *_shader;
-	}
-
-	void Core::Material::SetShader(Shader& shader)
-	{
 	}
 
 	void Core::Material::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
@@ -66,7 +99,7 @@ namespace Core
 		_uniformBuffers[binding]->SetBuffer(currentImage, data);
 	}
 
-	void Core::Material::SetBuffer(uint32_t binding, Texture* texture)
+	void Core::Material::SetBuffer(uint32_t binding, shared_ptr<Texture> texture)
 	{
 		if (_textureBuffers.find(binding) == _textureBuffers.end())
 			return;
@@ -74,7 +107,7 @@ namespace Core
 		_textures[binding] = texture;
 	}
 
-	Texture* Material::GetTexture(uint32_t binding)
+	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
 	{
 		auto it = _textures.find(binding);
 		if (it != _textures.end())

@@ -15,6 +15,57 @@ Core::Shader::Shader(Device& device, const string& vertFilePath, const string& f
 	_fragShaderModule = CreateShaderModule(vkDevice, fragShaderCode);
 }
 
+Core::Shader::Shader(Shader&& other) noexcept
+    : _device(other._device),
+      _vertShaderModule(other._vertShaderModule),
+      _fragShaderModule(other._fragShaderModule),
+      _pipelineLayout(other._pipelineLayout),
+      _descriptorPool(other._descriptorPool),
+      _vertexBindings(std::move(other._vertexBindings)),
+      _vertexAttributes(std::move(other._vertexAttributes)),
+      _pushConstantRanges(std::move(other._pushConstantRanges)),
+      _uniformBufferLayoutBindings(std::move(other._uniformBufferLayoutBindings)),
+      _textureBufferLayoutBindings(std::move(other._textureBufferLayoutBindings))
+{
+    other._vertShaderModule = VK_NULL_HANDLE;
+    other._fragShaderModule = VK_NULL_HANDLE;
+    other._pipelineLayout = VK_NULL_HANDLE;
+    other._descriptorPool = nullptr;
+}
+
+Core::Shader& Core::Shader::operator=(Shader&& other) noexcept  
+{  
+   if (this != &other)  
+   {  
+       auto vkDevice = _device.GetDevice();  
+
+       // Clean up existing resources  
+       vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);  
+       vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);  
+       vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);  
+       delete _descriptorPool;  
+
+       // Move resources from the other object
+       _vertShaderModule = other._vertShaderModule;  
+       _fragShaderModule = other._fragShaderModule;  
+       _pipelineLayout = other._pipelineLayout;  
+       _descriptorPool = other._descriptorPool;  
+       _vertexBindings = std::move(other._vertexBindings);  
+       _vertexAttributes = std::move(other._vertexAttributes);  
+       _pushConstantRanges = std::move(other._pushConstantRanges);  
+       _uniformBufferLayoutBindings = std::move(other._uniformBufferLayoutBindings);  
+       _textureBufferLayoutBindings = std::move(other._textureBufferLayoutBindings);  
+
+       // Reset the other object  
+       other._vertShaderModule = VK_NULL_HANDLE;  
+       other._fragShaderModule = VK_NULL_HANDLE;  
+       other._pipelineLayout = VK_NULL_HANDLE;  
+       other._descriptorPool = nullptr;  
+   }  
+
+   return *this;  
+}
+
 Core::Shader::~Shader()
 {
 	auto vkDevice = _device.GetDevice();

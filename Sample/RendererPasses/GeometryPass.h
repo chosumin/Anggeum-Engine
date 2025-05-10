@@ -13,10 +13,10 @@ namespace Core
 	public:
 		GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, SwapChain& swapChain, 
-			Texture* colorRenderTarget, Texture* depthRenderTarget, 
-			Texture* shadowRenderTarget, 
-			Texture* pregenerationSky, Texture* environmentCubemap,
-			Texture* prefilterCubemap, Texture* brdfLut);
+			shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
+			shared_ptr<Texture> shadowRenderTarget, 
+			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
+			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut);
 		virtual ~GeometryPass() override;
 
 		virtual void Prepare() override;
@@ -38,14 +38,14 @@ namespace Core
 
 		unordered_map<type_index, RendererBatch*> _batches;
 
-		Texture* _shadowRenderTarget;
+		shared_ptr<Texture> _shadowRenderTarget;
 		ShadowUniform* _shadowBuffer;
 		LightBuffer _lightBuffer;
 		Pipeline* _skyboxPipeline;
 
-		Texture* _irradianceCubemap;
-		Texture* _prefilteredCubemap;
-		Texture* _brdfLut;
+		shared_ptr<Texture> _irradianceCubemap;
+		shared_ptr<Texture> _prefilteredCubemap;
+		shared_ptr<Texture> _brdfLut;
 	};
 }
 

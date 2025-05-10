@@ -14,6 +14,10 @@ namespace Core
 		Shader(Device& device, 
 			const string& vertFilePath,
 			const string& fragFilePath);
+
+		Shader(Shader&& other) noexcept;
+		Shader& operator=(Shader&& other) noexcept;
+
 		virtual ~Shader();
 
 		virtual std::type_index GetType() = 0;
@@ -22,6 +26,9 @@ namespace Core
 		virtual vector<string> GetVertexAttirbuteNames() const = 0;
 		virtual void Prepare() = 0;
 		
+		void SetHash(uint32_t hash) { _hash = hash; }
+		uint32_t GetHash() const { return _hash; }
+
 		void CreatePipelineLayout();
 
 		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
@@ -60,6 +67,8 @@ namespace Core
 		vector<VkVertexInputAttributeDescription> _vertexAttributes;
 	private:
 		Device& _device;
+
+		uint32_t _hash;
 
 		VkShaderModule _vertShaderModule;
 		VkShaderModule _fragShaderModule;

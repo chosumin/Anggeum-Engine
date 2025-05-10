@@ -9,6 +9,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Material.h"
+#include "Graphics/ResourceCache.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -18,25 +19,24 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device,
 	WorkerThreadManager& workerThreadManager, Scene& scene,
 	Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
 	:RendererPass(device, workerThreadManager), _scene(scene), _colorRenderTarget(offscreen),
-	_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilteredCubemap)
+	_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilteredCubemap),
+	_irradianceMaterial(device.GetResourceCache().RequestMaterial("Irradiance")),
+	_prefilteredMaterial(device.GetResourceCache().RequestMaterial("Prefiltered"))
 {
 	_renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
 
-	CreateFrameBuffer(offscreen->GetImage());
-
-	_irradianceMaterial = new Material(device, "Irradiance", Utility::HashCode("Irradiance"));
-
-	_prefilteredMaterial = new Material(device, "Prefiltered", Utility::HashCode("Prefiltered"));
+	CreateFrameBuffer(offscreen->GetImage().lock().get());
 }
 
 Core::PreEnvironmentPass::~PreEnvironmentPass()
 {
+	auto& resourceCache = _device.GetResourceCache();
+	resourceCache.ReleaseMaterial(_irradianceMaterial);
+	resourceCache.ReleaseMaterial(_prefilteredMaterial);
+	
 	delete(_irradiancePipeline);
-	delete(_irradianceMaterial);
-
 	delete(_prefilteredPipeline);
-	delete(_prefilteredMaterial);
 }
 
 void Core::PreEnvironmentPass::Prepare()
@@ -50,13 +50,15 @@ void Core::PreEnvironmentPass::Prepare()
 		return shader.GetPass() == "Skybox";
 	});
 
+	shared_ptr<Texture> skyCubemap;
+
 	if (it != meshes.end())
 	{
 		auto skybox = *it;
 		
 		_sky = skybox->GetSubMeshes()[0];
 		auto material = skybox->GetMaterials()[0];
-		_skyCubemap = material->GetTexture(1);
+		skyCubemap = material->GetTexture(1);
 
 		auto pipelineState = *_pipelineState;
 
@@ -80,8 +82,8 @@ void Core::PreEnvironmentPass::Prepare()
 	_delta.Phi = (2.0f * float(PI)) / 180.0f;
 	_delta.Theta = (0.5f * float(PI)) / 64.0f;
 
-	_irradianceMaterial->SetBuffer(0, _skyCubemap);
-	_prefilteredMaterial->SetBuffer(0, _skyCubemap);
+	_irradianceMaterial->SetBuffer(0, skyCubemap);
+	_prefilteredMaterial->SetBuffer(0, skyCubemap);
 }
 
 void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -92,7 +94,7 @@ void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, uint32_t curre
 
 void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
-	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage(),
+	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -136,26 +138,26 @@ void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint
 
 			commandBuffer.EndRenderPass();
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage(),
+			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-			commandBuffer.CopyImage(*_colorRenderTarget->GetImage(), *_irradianceCubemap->GetImage(), 0, 0, m, layer);
+			commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), *_irradianceCubemap->GetImage().lock(), 0, 0, m, layer);
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage(),
+			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 	}
 
-	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage(),
+	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
-	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage(),
+	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -200,19 +202,19 @@ void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uin
 
 			commandBuffer.EndRenderPass();
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage(),
+			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-			commandBuffer.CopyImage(*_colorRenderTarget->GetImage(), *_prefilteredCubemap->GetImage(), 0, 0, m, layer);
+			commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), *_prefilteredCubemap->GetImage().lock(), 0, 0, m, layer);
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage(),
+			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}
 	}
 
-	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage(),
+	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

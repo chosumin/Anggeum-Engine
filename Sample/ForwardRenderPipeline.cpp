@@ -4,6 +4,7 @@
 #include "Foundation/WorkerThread.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
+#include "Graphics/ResourceCache.h"
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
 #include "Utils/Utility.h"
@@ -19,7 +20,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 
 	_msaaSamples = GetMaxUsableSampleCount();
 
-	CreateSampler();
+	_sampler = device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
 
 	auto extent = swapChain.GetSwapChainExtent();
 
@@ -35,10 +36,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain,
-		_renderTargets[0].get(), _renderTargets[1].get(), 
-		_renderTargets[2].get(), _renderTargets[3].get(), 
-		_renderTargets[4].get(), _renderTargets[5].get(),
-		_renderTargets[6].get());
+		_renderTargets[0], _renderTargets[1], 
+		_renderTargets[2], _renderTargets[3], 
+		_renderTargets[4], _renderTargets[5],
+		_renderTargets[6]);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 
 	AddRendererPass(geometryPass);
@@ -52,8 +53,6 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	{
 		delete(rendererPass);
 	}
-
-	delete(_sampler);
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
@@ -77,11 +76,6 @@ void ForwardRenderPipeline::Draw(CommandBuffer& commandBuffer, uint32_t currentF
 
 void Core::ForwardRenderPipeline::Cleanup()
 {
-	for (auto&& renderTarget : _renderTargets)
-	{
-		renderTarget->Cleanup();
-	}
-
 	_renderTargets.clear();
 }
 
@@ -125,7 +119,7 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 	return VK_SAMPLE_COUNT_1_BIT;
 }
 
-unique_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
+shared_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
 {
 	VkImageCreateInfo imageInfo{};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -139,13 +133,12 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D e
 	imageInfo.usage = usageFlags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	
-	Image* image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	unique_ptr<Texture> renderTarget = make_unique<Texture>("render target", image, _sampler);
-	return move(renderTarget);
+	shared_ptr<Image> image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+	shared_ptr<Texture> renderTarget = make_shared<Texture>("render target", image, _sampler);
+	return renderTarget;
 }
 
-unique_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount)
+shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount)
 {
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -168,13 +161,13 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExten
 	imageInfo.usage = flags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
+	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-	unique_ptr<Texture> renderTarget = make_unique<Texture>("depth target", image, _sampler);
-	return move(renderTarget);
+	shared_ptr<Texture> renderTarget = make_shared<Texture>("depth target", image, _sampler);
+	return renderTarget;
 }
 
-unique_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource)
+shared_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource)
 {
 	VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if (isUsedAsSource)
@@ -193,37 +186,11 @@ unique_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExten
 	imageInfo.usage = flags;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	unique_ptr<Texture> renderTarget = make_unique<Texture>("color target", image, _sampler);
+	shared_ptr<Texture> renderTarget = make_shared<Texture>("color target", image, _sampler);
 
-	return move(renderTarget);
-}
-
-void Core::ForwardRenderPipeline::CreateSampler()
-{
-	VkSamplerCreateInfo samplerInfo{};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(_device.GetPhysicalDevice(), &properties);
-
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-	samplerInfo.compareEnable = VK_TRUE; //usually used for percentage-closer filtering on shadow maps.
-	//samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-	samplerInfo.minLod = 0.0f;
-
-	//HACK : hardcoded.
-	samplerInfo.maxLod = numeric_limits<float>::max();
-
-	_sampler = new Sampler(_device, samplerInfo);
+	return renderTarget;
 }
 
 void Core::ForwardRenderPipeline::CreatePreSkyTextures()
@@ -246,9 +213,9 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-		unique_ptr<Texture> offscreen = make_unique<Texture>("offscreen", image, _sampler);
-		_renderTargets.push_back(move(offscreen));
+		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+		shared_ptr<Texture> offscreen = make_shared<Texture>("offscreen", image, _sampler);
+		_renderTargets.push_back(offscreen);
 	}
 
 	{
@@ -265,12 +232,12 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-		auto image = new Image(_device, imageInfo,
+		auto image = make_shared<Image>(_device, imageInfo,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_VIEW_TYPE_CUBE);
 
-		unique_ptr<Texture> cubemap = make_unique<Texture>("irradiance", image, _sampler);
-		_renderTargets.push_back(move(cubemap));
+		shared_ptr<Texture> cubemap = make_shared<Texture>("irradiance", image, _sampler);
+		_renderTargets.push_back(cubemap);
 	}
 
 	{
@@ -287,12 +254,12 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-		auto image = new Image(_device, imageInfo,
+		auto image = make_shared<Image>(_device, imageInfo,
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_VIEW_TYPE_CUBE);
 
-		unique_ptr<Texture> cubemap = make_unique<Texture>("prefiltered", image, _sampler);
-		_renderTargets.push_back(move(cubemap));
+		shared_ptr<Texture> cubemap = make_shared<Texture>("prefiltered", image, _sampler);
+		_renderTargets.push_back(cubemap);
 	}
 
 	{
@@ -311,9 +278,9 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		auto image = new Image(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 
-		unique_ptr<Texture> bdrf = make_unique<Texture>("brdflut", image, _sampler);
-		_renderTargets.push_back(move(bdrf));
+		shared_ptr<Texture> bdrf = make_shared<Texture>("brdflut", image, _sampler);
+		_renderTargets.push_back(bdrf);
 	}
 }

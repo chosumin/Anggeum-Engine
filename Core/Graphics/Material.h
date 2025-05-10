@@ -21,15 +21,16 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, string shaderName, uint32_t hash, Texture& defaultTexture);
 		Material(Device& device, string shaderName, uint32_t hash);
-		Material(const Material& other) = default;
+		Material(const Material& other); 
+
+		Material& operator=(const Material& other);
+
 		virtual ~Material();
 
 		const uint32_t GetHash() const { return _hash; }
 
 		Shader& GetShader() const;
-		void SetShader(Shader& shader);
 
 		void* GetBuffer(uint32_t binding)
 		{
@@ -42,7 +43,7 @@ namespace Core
 		}
 
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
-		void SetBuffer(uint32_t binding, Texture* texture);
+		void SetBuffer(uint32_t binding, shared_ptr<Texture> texture);
 
 		void SetBuffer(uint32_t currentImage)
 		{
@@ -52,7 +53,7 @@ namespace Core
 			}
 		}
 
-		Texture* GetTexture(uint32_t binding);
+		shared_ptr<Texture> GetTexture(uint32_t binding);
 
 		const VkDescriptorSet& GetDescriptorSet(size_t index) const
 		{
@@ -80,7 +81,7 @@ namespace Core
 		void SetDefault(Texture& defaultTexture);
 	protected:
 		Device& _device;
-		Shader* _shader;
+		shared_ptr<Shader> _shader;
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
@@ -96,7 +97,7 @@ namespace Core
 		bool _isAlphaCutoff;
 
 		unordered_map<uint32_t, void*> _buffers;
-		unordered_map<uint32_t, Texture*> _textures;
+		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
 	};
 }
 

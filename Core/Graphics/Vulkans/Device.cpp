@@ -3,6 +3,7 @@
 #include "CommandPool.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
+#include "Graphics/ResourceCache.h"
 
 VkResult CreateDebugUtilsMessengerEXT(
     VkInstance instance,
@@ -39,7 +40,10 @@ Core::Device::Device(Window& window)
     SetupDebugMessenger();
     window.CreateSurface(_instance, &_surface);
     PickPhysicalDevice();
-    CreateLogicalDevice();
+
+    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
+    CheckBindlessSupport(indexingFeatures);
+    CreateLogicalDevice(indexingFeatures);
 
     _queueFamilyIndices = FindQueueFamilies();
     
@@ -47,12 +51,14 @@ Core::Device::Device(Window& window)
         _queueFamilyIndices.GraphicsAndComputeFamily.value());
 
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
+
+    _resourceCache = new ResourceCache(*this);
 }
 
 Core::Device::~Device()
 {
+    delete(_resourceCache);
     delete(_memoryAllocatorManager);
-
     delete(_graphicsCommandPool);
 
     vkDestroyDevice(_device, nullptr);
@@ -376,7 +382,7 @@ bool Core::Device::CheckDeviceExtensionSupport(VkPhysicalDevice device)
     return requiredExtensions.empty();
 }
 
-void Core::Device::CreateLogicalDevice()
+void Core::Device::CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeatures& indexingFeatures)
 {
     QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
 
@@ -416,6 +422,17 @@ void Core::Device::CreateLogicalDevice()
     else
         createInfo.enabledLayerCount = 0;
 
+    VkPhysicalDeviceFeatures2 physicalFeatures2{};
+    physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
+
+    createInfo.pNext = &physicalFeatures2;
+
+    if (_bindlessSupport)
+    {
+        physicalFeatures2.pNext = &indexingFeatures;
+    }
+
     if (vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create logical device!");
@@ -425,6 +442,22 @@ void Core::Device::CreateLogicalDevice()
     vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_computeQueue);
     vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
     vkGetDeviceQueue(_device, indices.TransferFamily.value(), 0, &_transferQueue);
+}
+
+void Core::Device::CheckBindlessSupport(VkPhysicalDeviceDescriptorIndexingFeatures& outIndexingFeatures)
+{
+    outIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    outIndexingFeatures.pNext = nullptr;
+
+	VkPhysicalDeviceFeatures2 features2{};
+	features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	features2.pNext = &outIndexingFeatures;
+
+	vkGetPhysicalDeviceFeatures2(_physicalDevice, &features2);
+
+	_bindlessSupport = 
+        outIndexingFeatures.descriptorBindingPartiallyBound &&
+        outIndexingFeatures.runtimeDescriptorArray;
 }
 
 Core::SwapChainSupportDetails Core::Device::QuerySwapChainSupport(VkPhysicalDevice device)

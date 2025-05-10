@@ -9,12 +9,10 @@ namespace Core
 	class Texture
 	{
 	public:
-		Texture(string name, Image* image, Sampler* sampler);
+		Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler);
 		~Texture();
 
-		void Cleanup();
-
-		Image* GetImage() { return _image; }
+		weak_ptr<Image> GetImage() { return _image; }
 		VkDescriptorImageInfo GetDescriptorImageInfo();
 
 		uint32_t GetMipLevels() const;
@@ -39,10 +37,12 @@ namespace Core
 		{
 			return _image->GetExtent();
 		}
+
+		string& GetName() { return _name; }
 	private:
 		string _name;
-		Image* _image;
-		Sampler* _sampler;
+		shared_ptr<Image> _image;
+		shared_ptr<Sampler> _sampler;
 	};
 }
 

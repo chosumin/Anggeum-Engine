@@ -1,22 +1,14 @@
 #include "stdafx.h"
 #include "Texture.h"
-#include "CommandBuffer.h"
+#include "Graphics/ResourceCache.h"
 
-Core::Texture::Texture(string name, Image* image, Sampler* sampler)
-	: _name(name), _image(image), _sampler(sampler)
+Core::Texture::Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler)
+	:_name(name), _image(image), _sampler(sampler)
 {
 }
 
 Core::Texture::~Texture()
 {
-	//TODO : Implement a resouce cache system.
-	//Cleanup();
-}
-
-void Core::Texture::Cleanup()
-{
-	if (_image != nullptr)
-		delete(_image);
 }
 
 VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()

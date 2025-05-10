@@ -27,17 +27,16 @@ namespace Core
 		
 		Texture* _colorRenderTarget;
 		SubMesh* _sky;
-		Texture* _skyCubemap;
 		vector<mat4> _mvpMatrices;
 
 		Texture* _irradianceCubemap;
 		Pipeline* _irradiancePipeline;
-		Material* _irradianceMaterial;
+		shared_ptr<Material> _irradianceMaterial;
 		IrradianceDelta _delta;
 
 		Texture* _prefilteredCubemap;
 		Pipeline* _prefilteredPipeline;
-		Material* _prefilteredMaterial;
+		shared_ptr<Material> _prefilteredMaterial;
 		PrefilterEnv _prefilterEnv;
 	};
 

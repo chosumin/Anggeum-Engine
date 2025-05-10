@@ -19,24 +19,24 @@ namespace Core
 {
 	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 		Scene& scene, SwapChain& swapChain,
-		Texture* colorRenderTarget, Texture* depthRenderTarget, 
-		Texture* shadowRenderTarget, 
-		Texture* pregenerationSky, Texture* irradianceCubemap,
-		Texture* prefilterCubemap, Texture* brdfLut)
+		shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
+		shared_ptr<Texture> shadowRenderTarget, 
+		shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> irradianceCubemap,
+		shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut)
 		:RendererPass(device, workerThreadManager), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
 		_skyboxPipeline(nullptr)
 	{
-		_renderPass->CreateColorAttachment(colorRenderTarget,
+		_renderPass->CreateColorAttachment(colorRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-		_renderPass->CreateDepthAttachment(depthRenderTarget,
+		_renderPass->CreateDepthAttachment(depthRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
 		_renderPass->CreateRenderPass();
 
 		CreateFrameBuffer(swapChain);
 
-		PreparePregenerationSkybox(pregenerationSky, irradianceCubemap, prefilterCubemap);
+		PreparePregenerationSkybox(pregenerationSky.get(), irradianceCubemap.get(), prefilterCubemap.get());
 	}
 
 	GeometryPass::~GeometryPass()
@@ -86,7 +86,7 @@ namespace Core
 		UpdateGUI();
 		UpdateLightBuffer();
 
-		commandBuffer.TransitionImageLayout(*_shadowRenderTarget->GetImage(),
+		commandBuffer.TransitionImageLayout(*_shadowRenderTarget->GetImage().lock(),
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -102,15 +102,16 @@ namespace Core
 		{
 			for (auto&& material : batch.second->Materials)
 			{
-				material.second->SetBuffer(currentFrame, 0, &camera->Matrices);
-				material.second->SetBuffer(4, _shadowRenderTarget);
-				material.second->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
-				material.second->SetBuffer(currentFrame, 7, &_lightBuffer);
-				material.second->SetBuffer(8, _irradianceCubemap);
-				material.second->SetBuffer(9, _prefilteredCubemap);
-				material.second->SetBuffer(10, _brdfLut);
+				auto sharedMat = material.second.lock();
+				sharedMat->SetBuffer(currentFrame, 0, &camera->Matrices);
+				sharedMat->SetBuffer(4, _shadowRenderTarget);
+				sharedMat->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
+				sharedMat->SetBuffer(currentFrame, 7, &_lightBuffer);
+				sharedMat->SetBuffer(8, _irradianceCubemap);
+				sharedMat->SetBuffer(9, _prefilteredCubemap);
+				sharedMat->SetBuffer(10, _brdfLut);
 
-				material.second->SetBuffer(currentFrame);
+				sharedMat->SetBuffer(currentFrame);
 			}
 
 			batch.second->Draw(commandBuffer, currentFrame);
@@ -131,7 +132,7 @@ namespace Core
 		Enqueue(preEnvironmentJob);
 
 		auto& buffer = _device.BeginSingleTimeCommands();
-		auto brdf = new BrdfLutPass(_device, _workerThreadManager, _brdfLut);
+		auto brdf = new BrdfLutPass(_device, _workerThreadManager, _brdfLut.get());
 		auto brdfJob = new BrdfLutJob(*brdf);
 		brdfJob->commandBuffer = &buffer;
 		brdfJob->Execute();

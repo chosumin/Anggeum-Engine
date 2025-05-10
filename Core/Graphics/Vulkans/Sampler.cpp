@@ -1,15 +1,20 @@
 #include "stdafx.h"
 #include "Sampler.h"
 
-Core::Sampler* Core::Sampler::CreateDefault(Device& device)
+Core::Sampler::Sampler(Device& device, SamplerCreateInfo info)
+	:_device(device), _info(info)
 {
 	VkSamplerCreateInfo samplerInfo{};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	samplerInfo.minFilter = info.minFilter;
+	samplerInfo.magFilter = info.magFilter;
+
+	samplerInfo.addressModeU = info.wrapS;
+	samplerInfo.addressModeV = info.wrapT;
 	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	samplerInfo.mipmapMode = info.mipmapMode;
 
 	VkPhysicalDeviceProperties properties{};
 	vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
@@ -22,22 +27,13 @@ Core::Sampler* Core::Sampler::CreateDefault(Device& device)
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
 	samplerInfo.compareEnable = VK_FALSE; //usually used for percentage-closer filtering on shadow maps.
 	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	samplerInfo.mipLodBias = 0.0f;
 	samplerInfo.minLod = 0.0f;
 
-	//HACK : hardcoded
+	//HACK : hardcoded.
 	samplerInfo.maxLod = numeric_limits<float>::max();
 
-	auto sampler = new Sampler(device, samplerInfo);
-
-	return sampler;
-}
-
-Core::Sampler::Sampler(Device& device, VkSamplerCreateInfo& info)
-	:_device(device)
-{
-	if (vkCreateSampler(_device.GetDevice(), &info, nullptr, &_sampler) != VK_SUCCESS)
+	if (vkCreateSampler(_device.GetDevice(), &samplerInfo, nullptr, &_sampler) != VK_SUCCESS)
 	{
 		throw runtime_error("failed to create texture sampler!");
 	}

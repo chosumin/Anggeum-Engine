@@ -1,10 +1,10 @@
 #include "stdafx.h"
 #include "Mesh.h"
-#include "Graphics/Vulkans/Vertex.h"
 #include "Utils/Utility.h"
 #include "Graphics/SubMesh.h"
+#include "Graphics/Vulkans/Vertex.h"
 #include "Graphics/Material.h"
-#include "Graphics/MaterialFactory.h"
+#include "Graphics/ResourceCache.h"
 #include "Foundation/Entity.h"
 
 Core::Mesh::Mesh(Device& device)
@@ -14,11 +14,19 @@ Core::Mesh::Mesh(Device& device)
 
 Core::Mesh::~Mesh()
 {
+	auto& resourceCache = _device.GetResourceCache();
+
 	for (auto&& subMesh : _subMeshes)
 	{
 		delete(subMesh);
 	}
 	_subMeshes.clear();
+
+	for (auto&& material : _materials)
+	{
+		resourceCache.ReleaseMaterial(material);
+	}
+	_materials.clear();
 }
 
 void Core::Mesh::AddSubMesh(SubMesh* subMesh)
@@ -26,14 +34,8 @@ void Core::Mesh::AddSubMesh(SubMesh* subMesh)
 	_subMeshes.push_back(subMesh);
 }
 
-void Core::Mesh::AddMaterial(Material* material)
+void Core::Mesh::AddMaterial(shared_ptr<Material> material)
 {
-	_materials.push_back(material);
-}
-
-void Core::Mesh::AddMaterial(string path)
-{
-	auto material = MaterialFactory::CreateMaterial(_device, path);
 	_materials.push_back(material);
 }
 

@@ -37,6 +37,8 @@ private:
 
 	unique_ptr<Core::Timer> _timer;
 	Core::Device* _device;
+
+	//todo : split render context into frame manager and render context
 	Core::IRenderPipeline* _renderPipeline;
 	Core::RenderContext* _renderContext;
 	Core::Scene* _scene;
