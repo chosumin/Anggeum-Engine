@@ -9,7 +9,7 @@
 
 int main()
 {
-	Core::Window::Instance().Initialize(2000, 1000, "Vulkan");
+	Core::Window::Instance().Initialize(2000, 1000, "Anggeum Engine");
 
 	ApplicationOptions options{ false, &Core::Window::Instance() };
 	Application application(options);

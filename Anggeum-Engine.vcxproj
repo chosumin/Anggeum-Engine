@@ -21,9 +21,10 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{0dc8315e-753e-40bf-b8ed-242507c5baf4}</ProjectGuid>
-    <RootNamespace>Vulkan</RootNamespace>
+    <ProjectGuid>{0E1FB5D2-0FB0-4B70-9BA8-65E8BAE04EC7}</ProjectGuid>
+    <RootNamespace>Anggeum-Engine</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Anggeum-Engine</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -112,7 +113,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.275.0\Lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -125,7 +126,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;RenderPasses;$(ProjectDir);Core;Components;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(ProjectDir)VulkanSDK\1.3.275.0\Include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\ktx\include;RenderPasses;$(ProjectDir);Core;Components;ThirdParties\imgui;$(ProjectDir)ThirdParties\tinyobjloader;$(ProjectDir)ThirdParties\stb;$(ProjectDir)ThirdParties\glm;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\include;$(VULKAN_SDK)\Include</AdditionalIncludeDirectories>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -135,7 +136,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(ProjectDir)VulkanSDK\1.3.250.0\Lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
@@ -158,14 +159,13 @@
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
     <ClCompile Include="Core\Graphics\TransferJob.cpp" />
     <ClCompile Include="Core\Graphics\Material.cpp" />
-    <ClCompile Include="Core\Graphics\MaterialFactory.cpp" />
     <ClCompile Include="Core\Graphics\RenderContext.cpp" />
     <ClCompile Include="Core\Graphics\RendererBatch.cpp" />
     <ClCompile Include="Core\Graphics\RendererPass.cpp" />
     <ClCompile Include="Core\Graphics\RenderFrame.cpp" />
-    <ClCompile Include="Core\Graphics\ShaderFactory.cpp" />
     <ClCompile Include="Core\Graphics\SubMesh.cpp" />
     <ClCompile Include="Core\Graphics\TransferContext.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Buffer.cpp" />
@@ -202,6 +202,7 @@
     <ClCompile Include="Sample\RendererPasses\GUIRenderPass.cpp" />
     <ClCompile Include="Sample\RendererPasses\ShadowPass.cpp" />
     <ClCompile Include="Sample\SampleScene.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Semaphore.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -253,15 +254,14 @@
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\ResourceCache.h" />
     <ClInclude Include="Core\Graphics\TransferJob.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />
-    <ClInclude Include="Core\Graphics\MaterialFactory.h" />
     <ClInclude Include="Core\Graphics\RenderContext.h" />
     <ClInclude Include="Core\Graphics\RendererBatch.h" />
     <ClInclude Include="Core\Graphics\RendererPass.h" />
     <ClInclude Include="Core\Graphics\RenderFrame.h" />
-    <ClInclude Include="Core\Graphics\ShaderFactory.h" />
     <ClInclude Include="Core\Graphics\SubMesh.h" />
     <ClInclude Include="Core\Graphics\TransferContext.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Buffer.h" />
@@ -301,6 +301,7 @@
     <ClInclude Include="Sample\RendererPasses\GUIRenderPass.h" />
     <ClInclude Include="Sample\RendererPasses\ShadowPass.h" />
     <ClInclude Include="Sample\SampleScene.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Semaphore.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
@@ -337,7 +338,7 @@
     <None Include="Assets\Shaders\skybox.vert.spv" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Vulkan.rc" />
+    <ResourceCompile Include="Anggeum-Engine.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

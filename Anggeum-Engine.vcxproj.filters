@@ -77,9 +77,6 @@
     <ClCompile Include="Core\Graphics\Material.cpp">
       <Filter>Core\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Graphics\MaterialFactory.cpp">
-      <Filter>Core\Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Utils\InputEvents.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
@@ -115,9 +112,6 @@
     </ClCompile>
     <ClCompile Include="Core\Graphics\Vulkans\Shader.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\ShaderFactory.cpp">
-      <Filter>Core\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Core\Foundation\Window.cpp">
       <Filter>Core\Foundation</Filter>
@@ -176,6 +170,12 @@
     <ClCompile Include="Core\Graphics\Vulkans\MemoryAllocator.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
+    <ClCompile Include="Core\Foundation\Job.cpp" />
+    <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\TransferContext.cpp" />
+    <ClCompile Include="Core\Graphics\TransferJob.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\Semaphore.cpp" />
+    <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -269,9 +269,6 @@
     <ClInclude Include="Core\Graphics\Material.h">
       <Filter>Core\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Graphics\MaterialFactory.h">
-      <Filter>Core\Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Utils\InputEvents.h">
       <Filter>Core\Utils</Filter>
     </ClInclude>
@@ -310,9 +307,6 @@
     </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\Shader.h">
       <Filter>Core\Graphics\Vulkans</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\ShaderFactory.h">
-      <Filter>Core\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Core\Foundation\Window.h">
       <Filter>Core\Foundation</Filter>
@@ -371,9 +365,15 @@
     <ClInclude Include="Core\Graphics\Vulkans\MemoryAllocator.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Graphics\AsyncLoadable.h">
+    <ClInclude Include="Core\Foundation\AsyncLoadable.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
+    <ClInclude Include="Core\Foundation\Job.h" />
+    <ClInclude Include="Core\Foundation\WorkerThread.h" />
+    <ClInclude Include="Core\Graphics\TransferContext.h" />
+    <ClInclude Include="Core\Graphics\TransferJob.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\Semaphore.h" />
+    <ClInclude Include="Core\Graphics\ResourceCache.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">
@@ -485,6 +485,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Vulkan.rc" />
+    <ResourceCompile Include="Anggeum-Engine.rc" />
   </ItemGroup>
 </Project>
