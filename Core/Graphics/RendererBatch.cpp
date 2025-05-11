@@ -33,16 +33,16 @@ void Core::RendererBatch::Add(Mesh& mesh)
 	{
 		auto material = materials[i];
 
-		auto hash = material->GetHash();
+		auto name = material->GetName();
 
-		auto matPtr = Materials.find(hash);
+		auto matPtr = Materials.find(name);
 		if (matPtr == Materials.end())
 		{
-			Materials.insert(make_pair(hash, material));
+			Materials.insert(make_pair(name, material));
 		}
 
 		auto subMesh = subMeshes[i];
-		SubMeshBatches[hash][subMesh->GetName()] = subMesh;
+		SubMeshBatches[name][subMesh->GetName()] = subMesh;
 		Transforms[subMesh->GetName()].push_back(&transform);
 	}
 }
@@ -52,18 +52,18 @@ void Core::RendererBatch::Add(Mesh& mesh, weak_ptr<Material> material)
 	auto& transform = mesh.GetEntity().GetTransform();
 	auto subMeshes = mesh.GetSubMeshes();
 
-	auto hash = material.lock()->GetHash();
+	auto name = material.lock()->GetName();
 
-	auto matPtr = Materials.find(hash);
+	auto matPtr = Materials.find(name);
 	if (matPtr == Materials.end())
 	{
-		Materials.insert(make_pair(hash, material));
+		Materials.insert(make_pair(name, material));
 	}
 
 	for (size_t i = 0; i < subMeshes.size(); ++i)
 	{
 		auto subMesh = subMeshes[i];
-		SubMeshBatches[hash][subMesh->GetName()] = subMesh;
+		SubMeshBatches[name][subMesh->GetName()] = subMesh;
 		Transforms[subMesh->GetName()].push_back(&transform);
 	}
 }
@@ -89,7 +89,7 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 		{
 			RendererBatch::Sort();
 
-			auto& subMesh = subMeshBatch.second;
+			auto subMesh = subMeshBatch.second.lock();
 			auto& transforms = Transforms[subMesh->GetName()];
 
 			//3. Transform loop

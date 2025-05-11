@@ -36,13 +36,12 @@ Core::ResourceCache::~ResourceCache()
 	_defaultTexture = nullptr;
 }
 
-shared_ptr<Core::Material> Core::ResourceCache::RequestMaterial(const string& shaderName)
+shared_ptr<Core::Material> Core::ResourceCache::RequestMaterial(const string materialName,
+	const string& shaderName)
 {
 	lock_guard<mutex> guard(_materialMutex);
 
-	uint32_t hash = Utility::HashCode(shaderName.c_str());
-	
-	auto it = _materials.find(hash);
+	auto it = _materials.find(materialName);
 	if (it != _materials.end())
 	{
 		if (auto shared = it->second.lock())
@@ -50,25 +49,10 @@ shared_ptr<Core::Material> Core::ResourceCache::RequestMaterial(const string& sh
 	}
 
 	auto material =
-		make_shared<Core::Material>(_device, shaderName, hash);
-	_materials[hash] = material;
+		make_shared<Core::Material>(_device, shaderName, materialName);
+	_materials[materialName] = material;
 
 	return material;
-}
-
-void Core::ResourceCache::ReleaseMaterial(const shared_ptr<Material> material)
-{
-	/*lock_guard<mutex> guard(_materialMutex);
-
-	uint32_t hash = material->GetHash();
-
-	if (_materials.find(hash) != _materials.end())
-	{
-		if (_materials[hash].use_count() <= 0)
-		{
-			_materials.erase(hash);
-		}
-	}*/
 }
 
 shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& shaderPath)
@@ -92,21 +76,6 @@ shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& shader
 	return shader;
 }
 
-void Core::ResourceCache::ReleaseShader(const shared_ptr<Shader> shader)
-{
-	/*lock_guard<mutex> guard(_shaderMutex);
-
-	uint32_t hash = shader->GetHash();
-
-	if (_shaders.find(hash) != _shaders.end())
-	{
-		if (_shaders[hash].use_count() <= 0)
-		{
-			_shaders.erase(hash);
-		}
-	}*/
-}
-
 shared_ptr<Core::Image> Core::ResourceCache::RequestImage(const ImageCreateInfo imageCreateInfo)
 {
 	lock_guard<mutex> guard(_imageMutex);
@@ -125,21 +94,6 @@ shared_ptr<Core::Image> Core::ResourceCache::RequestImage(const ImageCreateInfo 
 	return image;
 }
 
-void Core::ResourceCache::ReleaseImage(const shared_ptr<Core::Image> image)
-{
-	/*lock_guard<mutex> guard(_imageMutex);
-
-	string& path = image->GetFilePath();
-
-	if (_images.find(path) != _images.end())
-	{
-		if (_images[path].use_count() <= 0)
-		{
-			_images.erase(path);
-		}
-	}*/
-}
-
 shared_ptr<Core::Sampler> Core::ResourceCache::RequestSampler(const SamplerCreateInfo info)
 {
 	lock_guard<mutex> guard(_samplerMutex);
@@ -156,21 +110,6 @@ shared_ptr<Core::Sampler> Core::ResourceCache::RequestSampler(const SamplerCreat
 	_samplers[info] = sampler;
 
 	return sampler;
-}
-
-void Core::ResourceCache::ReleaseSampler(const shared_ptr<Core::Sampler> sampler)
-{
-	/*lock_guard<mutex> guard(_samplerMutex);
-
-	auto& info = sampler->GetCreateInfo();
-
-	if (_samplers.find(info) != _samplers.end())
-	{
-		if (_samplers[info].use_count() <= 0)
-		{
-			_samplers.erase(info);
-		}
-	}*/
 }
 
 shared_ptr<Core::Texture> Core::ResourceCache::RequestTexture(const string& textureName,
@@ -221,19 +160,22 @@ shared_ptr<Core::Texture> Core::ResourceCache::RequestTexture(const string& text
 	return texture;
 }
 
-void Core::ResourceCache::ReleaseTexture(const shared_ptr<Core::Texture> texture)
+shared_ptr<Core::SubMesh> Core::ResourceCache::RequestSubMesh(const string& name)
 {
-	/*lock_guard<mutex> guard(_textureMutex);
+	lock_guard<mutex> guard(_subMeshMutex);
 
-	string& path = texture->GetName();
-
-	if (_textures.find(path) != _textures.end())
+	auto it = _subMeshes.find(name);
+	if (it != _subMeshes.end())
 	{
-		if (_textures[path].use_count() <= 0)
-		{
-			_textures.erase(path);
-		}
-	}*/
+		if (auto shared = it->second.lock())
+			return shared;
+	}
+
+	auto subMesh = 
+		make_shared<Core::SubMesh>(_device, name);
+	_subMeshes[name] = subMesh;
+
+	return subMesh;
 }
 
 shared_ptr<Core::Shader> Core::ResourceCache::CreateShaderInternal(uint32_t hash)

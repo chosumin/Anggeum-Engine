@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Material.h"
+#include "Graphics/SubMesh.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Sampler.h"
@@ -11,11 +12,6 @@
 
 namespace Core
 {
-	class Material;
-	class Shader;
-	class Image;
-	class Texture;
-	class Sampler;
 	class ResourceCache
 	{
 	public:
@@ -23,17 +19,14 @@ namespace Core
 		~ResourceCache();
 
 		//todo : needs material hash
-		shared_ptr<Material> RequestMaterial(const string& shaderName);
-		void ReleaseMaterial(const shared_ptr<Material> material);
+		shared_ptr<Material> RequestMaterial(const string materialName, 
+			const string& shaderName);
 
 		shared_ptr<Shader> RequestShader(const string& shaderPath);
-		void ReleaseShader(const shared_ptr<Shader> shader);
 
 		shared_ptr<Core::Image> RequestImage(const ImageCreateInfo imageCreateInfo);
-		void ReleaseImage(const shared_ptr<Core::Image> image);
 
 		shared_ptr<Sampler> RequestSampler(const SamplerCreateInfo info);
-		void ReleaseSampler(const shared_ptr<Core::Sampler> sampler);
 
 		shared_ptr<Texture> RequestTexture(const string& textureName, 
 			const ImageCreateInfo imageCreateInfo,
@@ -46,13 +39,13 @@ namespace Core
 			return _defaultTexture;
 		}
 
-		void ReleaseTexture(const shared_ptr<Core::Texture> texture);
+		shared_ptr<Core::SubMesh> RequestSubMesh(const string& name);
 	private:
 		shared_ptr<Shader> CreateShaderInternal(uint32_t hash);
 	private:
 		Device& _device;
 		
-		unordered_map<uint32_t, weak_ptr<Material>> _materials;
+		unordered_map<string, weak_ptr<Material>> _materials;
 		mutex _materialMutex;
 
 		unordered_map<uint32_t, weak_ptr<Shader>> _shaders;
@@ -65,8 +58,10 @@ namespace Core
 		mutex _samplerMutex;
 
 		unordered_map<string, weak_ptr<Texture>> _textures;
+		shared_ptr<Texture> _defaultTexture;
 		mutex _textureMutex;
 
-		shared_ptr<Texture> _defaultTexture;
+		unordered_map<string, weak_ptr<SubMesh>> _subMeshes;
+		mutex _subMeshMutex;
 	};
 }

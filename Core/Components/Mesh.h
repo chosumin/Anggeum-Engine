@@ -12,11 +12,11 @@ namespace Core
 		~Mesh();
 
 		const vector<shared_ptr<Material>>& GetMaterials() const { return _materials; }
-		const vector<SubMesh*>& GetSubMeshes() const { return _subMeshes; }
+		const vector<shared_ptr<SubMesh>>& GetSubMeshes() const { return _subMeshes; }
 
 		string GetModelPath() const { return _modelPath; }
 
-		void AddSubMesh(SubMesh* subMesh);
+		void AddSubMesh(shared_ptr<SubMesh> subMesh);
 		void AddMaterial(shared_ptr<Material> material);
 
 		void UpdateFrame(float deltaTime) override;
@@ -29,6 +29,6 @@ namespace Core
 		Device& _device;
 
 		vector<shared_ptr<Material>> _materials;
-		vector<SubMesh*> _subMeshes;
+		vector<shared_ptr<SubMesh>> _subMeshes;
 	};
 }

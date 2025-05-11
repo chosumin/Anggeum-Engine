@@ -298,12 +298,11 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		VK_IMAGE_VIEW_TYPE_CUBE,
 		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT };
 
-	auto texture = _device.GetResourceCache().RequestTexture(textureName,
+	auto texture = _resourceCache.RequestTexture(textureName,
 		imageCreateInfo, DEFAULT_SAMPLER);
 	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path));
 
-	uint32_t hash = Utility::HashCode("skybox");
-	auto material = _resourceCache.RequestMaterial("Skybox");
+	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
 	material->SetBuffer(1, texture);
 
 	vector<shared_ptr<Material>> materials = { material };
@@ -504,7 +503,7 @@ shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	samplerCreateInfo.wrapT = FindWrapMode(gltfSampler.wrapT);
 	samplerCreateInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
 
-	auto sampler = _device.GetResourceCache().RequestSampler(samplerCreateInfo);
+	auto sampler = _resourceCache.RequestSampler(samplerCreateInfo);
 
 	return sampler;
 }
@@ -523,8 +522,12 @@ vector<shared_ptr<Core::Image>> Core::GLTFLoader::LoadImages(const string& model
 		ImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.filePath = modelPath + "/" + image.uri;
 
-		auto vkImage = _device.GetResourceCache().RequestImage(imageCreateInfo);
+		auto vkImage = _resourceCache.RequestImage(imageCreateInfo);
 		
+		//Already jobified
+		if (vkImage.use_count() > 1)
+			continue;
+
 		_transferContext.Enqueue(new VkImageJob(_device, vkImage, imageCreateInfo.filePath));
 
 		images[i] = move(vkImage);
@@ -546,7 +549,7 @@ vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		int samplerIndex = _model->textures[i].sampler;
 
 		auto texture = 
-			_device.GetResourceCache().RequestTexture(_model->textures[i].name,
+			_resourceCache.RequestTexture(_model->textures[i].name,
 			images[imageIndex], samplers[samplerIndex]);
 
 		textures[i] = texture;
@@ -565,10 +568,12 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	{
 		auto& gltfMaterial = _model->materials[i];
 
-		uint32_t hash = Utility::HashCode(gltfMaterial.name.c_str());
-
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = _resourceCache.RequestMaterial("PBR");
+		auto material = _resourceCache.RequestMaterial(gltfMaterial.name, "PBR");
+
+		//Already bound
+		if (material.use_count() > 1)
+			continue;
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
 		material->AddBuffer(6, pbrBuffer);
@@ -681,7 +686,13 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 		for (int i = 0; i < primSize; ++i)
 		{
 			string subMeshName = meshName + to_string(i);
-			auto subMesh = new SubMesh(_device, subMeshName);
+
+			auto subMesh = 
+				_resourceCache.RequestSubMesh(subMeshName);
+
+			//Already jobified
+			if (subMesh.use_count() > 1)
+				continue;
 
 			auto primitive = gltfMesh.primitives[i];
 

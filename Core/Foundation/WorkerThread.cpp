@@ -27,6 +27,8 @@ Core::WorkerThread::~WorkerThread()
 	_thread.join();
 
 	delete(_graphicsCommandPool);
+	delete(_computeCommandPool);
+	delete(_transferCommandPool);
 }
 
 void Core::WorkerThread::Enqueue(const Job* job)

@@ -26,7 +26,7 @@ namespace Core
 		Scene& _scene;
 		
 		Texture* _colorRenderTarget;
-		SubMesh* _sky;
+		shared_ptr<SubMesh> _sky;
 		vector<mat4> _mvpMatrices;
 
 		Texture* _irradianceCubemap;

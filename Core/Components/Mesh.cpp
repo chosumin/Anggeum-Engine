@@ -14,22 +14,11 @@ Core::Mesh::Mesh(Device& device)
 
 Core::Mesh::~Mesh()
 {
-	auto& resourceCache = _device.GetResourceCache();
-
-	for (auto&& subMesh : _subMeshes)
-	{
-		delete(subMesh);
-	}
 	_subMeshes.clear();
-
-	for (auto&& material : _materials)
-	{
-		resourceCache.ReleaseMaterial(material);
-	}
 	_materials.clear();
 }
 
-void Core::Mesh::AddSubMesh(SubMesh* subMesh)
+void Core::Mesh::AddSubMesh(shared_ptr<SubMesh> subMesh)
 {
 	_subMeshes.push_back(subMesh);
 }

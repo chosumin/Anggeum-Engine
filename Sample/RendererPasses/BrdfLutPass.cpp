@@ -25,8 +25,7 @@ Core::BrdfLutPass::~BrdfLutPass()
 
 void Core::BrdfLutPass::Prepare()
 {
-	uint32_t hash = Utility::HashCode("BRDF");
-	_brdfMaterial = new Material(_device, "BRDF", hash);
+	_brdfMaterial = new Material(_device, "BRDF", "brdf lut");
 
 	auto pipelineState = *_pipelineState;
 
@@ -37,7 +36,6 @@ void Core::BrdfLutPass::Prepare()
 	depthInfo.depthWriteEnable = VK_FALSE;
 	depthInfo.depthTestEnable = VK_FALSE;
 
-	_brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
 	_brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
 }
 

@@ -21,14 +21,14 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, string shaderName, uint32_t hash);
+		Material(Device& device, string shaderName, string materialName);
 		Material(const Material& other); 
 
 		Material& operator=(const Material& other);
 
 		virtual ~Material();
 
-		const uint32_t GetHash() const { return _hash; }
+		const string GetName() const { return _name; }
 
 		Shader& GetShader() const;
 
@@ -88,7 +88,7 @@ namespace Core
 	private:
 		bool _isDirty;
 
-		uint32_t _hash;
+		string _name;
 
 		vector<VkDescriptorSet> _descriptorSets;
 

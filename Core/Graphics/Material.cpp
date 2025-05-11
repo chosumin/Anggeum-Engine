@@ -7,8 +7,8 @@
 
 namespace Core
 {
-	Material::Material(Device& device, string shaderName, uint32_t hash)
-		:_device(device), _isDirty(true), _hash(hash)
+	Material::Material(Device& device, string shaderName, string materialName)
+		:_device(device), _isDirty(true), _name(materialName)
 	{
 		_shader = device.GetResourceCache().RequestShader(shaderName);
 
@@ -26,7 +26,7 @@ namespace Core
 		_uniformBuffers(other._uniformBuffers),
 		_textureBuffers(other._textureBuffers),
 		_isDirty(other._isDirty),
-		_hash(other._hash),
+		_name(other._name),
 		_descriptorSets(other._descriptorSets),
 		_isDoubledSided(other._isDoubledSided),
 		_alphaMode(other._alphaMode),
@@ -46,7 +46,7 @@ namespace Core
 		_uniformBuffers = other._uniformBuffers;
 		_textureBuffers = other._textureBuffers;
 		_isDirty = other._isDirty;
-		_hash = other._hash;
+		_name = other._name;
 		_descriptorSets = other._descriptorSets;
 		_isDoubledSided = other._isDoubledSided;
 		_alphaMode = other._alphaMode;
@@ -77,13 +77,7 @@ namespace Core
 		}
 		_buffers.clear();
 
-		for (auto& texture : _textures)
-		{
-			_device.GetResourceCache().ReleaseTexture(texture.second);
-		}
 		_textures.clear();
-
-		_device.GetResourceCache().ReleaseShader(_shader);
 	}
 
 	Shader& Core::Material::GetShader() const

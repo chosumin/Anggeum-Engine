@@ -29,10 +29,10 @@ namespace Core
 
 		Pipeline* Pipeline;
 		Shader& SharedShader;
-		unordered_map<uint32_t, weak_ptr<Material>> Materials;
+		unordered_map<string, weak_ptr<Material>> Materials;
 
-		//uint32_t: material hash, string: sub mesh name
-		unordered_map<uint32_t, unordered_map<string, SubMesh*>> SubMeshBatches;
+		//uint32_t: material name, string: sub mesh name
+		unordered_map<string, unordered_map<string, weak_ptr<SubMesh>>> SubMeshBatches;
 
 		//key: sub mesh name
 		unordered_map<string, vector<Transform*>> Transforms;

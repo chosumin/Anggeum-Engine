@@ -20,8 +20,8 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device,
 	Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
 	:RendererPass(device, workerThreadManager), _scene(scene), _colorRenderTarget(offscreen),
 	_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilteredCubemap),
-	_irradianceMaterial(device.GetResourceCache().RequestMaterial("Irradiance")),
-	_prefilteredMaterial(device.GetResourceCache().RequestMaterial("Prefiltered"))
+	_irradianceMaterial(device.GetResourceCache().RequestMaterial("irradiance", "Irradiance")),
+	_prefilteredMaterial(device.GetResourceCache().RequestMaterial("prefiltered", "Prefiltered"))
 {
 	_renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
@@ -31,10 +31,6 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device,
 
 Core::PreEnvironmentPass::~PreEnvironmentPass()
 {
-	auto& resourceCache = _device.GetResourceCache();
-	resourceCache.ReleaseMaterial(_irradianceMaterial);
-	resourceCache.ReleaseMaterial(_prefilteredMaterial);
-	
 	delete(_irradiancePipeline);
 	delete(_prefilteredPipeline);
 }

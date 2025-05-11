@@ -31,7 +31,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	//TODO : remove _shadowBuffer  
 	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
 
-	_material = device.GetResourceCache().RequestMaterial("Shadow");
+	_material = device.GetResourceCache().RequestMaterial("shadow material", "Shadow");
 
 	_renderPass->CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
