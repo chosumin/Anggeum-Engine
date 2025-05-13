@@ -58,8 +58,7 @@ namespace Core
 	private:
 		void CreateDescriptorPool();
 
-		vector<char> ReadFile(const string& filePath);
-		VkShaderModule CreateShaderModule(VkDevice& device, const vector<char>& code) const;
+		VkShaderModule CreateShaderModule(VkDevice& device, const vector<uint32_t>& code, size_t codeSize) const;
 	protected:
 		vector<VkPushConstantRange> _pushConstantRanges;
 

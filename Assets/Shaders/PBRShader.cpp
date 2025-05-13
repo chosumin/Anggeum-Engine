@@ -5,8 +5,8 @@ namespace Core
 {
 	PBRShader::PBRShader(Device& device)
 		:Shader(device,
-			"shaders/pbr.vert.spv",
-			"shaders/pbr.frag.spv")
+			"shaders/pbr.vert",
+			"shaders/pbr.frag")
 	{
 		AddUniformBufferLayoutBinding(0, static_cast<VkShaderStageFlagBits>(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT), sizeof(VPBufferObject));
 		AddTextureBufferLayoutBinding(1, VK_SHADER_STAGE_FRAGMENT_BIT);

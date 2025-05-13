@@ -37,9 +37,13 @@ void Core::TransferContext::UpdateFrame(uint32_t frame)
 	_currentFrame = frame;
 }
 
-void Core::TransferContext::Enqueue(Job* job)
+void Core::TransferContext::Enqueue(Job* job, const string& jobName)
 {
-	_pendingJobs.push_back(job);
+	//Alrady enqueued
+	if (_pendingJobs.find(jobName) != _pendingJobs.end())
+		return;
+
+	_pendingJobs.insert({ jobName, job });
 	job->completionWait = &_fenceWait;
 	_workerThreadManager.Enqueue(job);
 }
@@ -51,13 +55,12 @@ void Core::TransferContext::Wait()
 
 	_timer.tick();
 
-	//todo : wait jobs instead of threads.
 	unique_lock<mutex> lock(_lock);
 	_fenceWait.wait(lock, [&]
 	{
-		for (size_t i = 0; i < _pendingJobs.size(); i++)
+		for (auto&& jobs : _pendingJobs)
 		{
-			if (_pendingJobs[i]->status != JobStatus::COMPLETE)
+			if (jobs.second->status != JobStatus::COMPLETE)
 			{
 				return false;
 			}
@@ -75,7 +78,7 @@ void Core::TransferContext::Wait()
 	vector<CommandBuffer*> secondaryCommands(commandBufferCount);
 	transform(_pendingJobs.begin(), _pendingJobs.end(), 
 		secondaryCommands.begin(),
-		[](Job* job) { return job->commandBuffer; });
+		[](pair<string, Job*> job) { return job.second->commandBuffer; });
 
 	primary.ExecuteCommands(secondaryCommands);
 
@@ -104,9 +107,9 @@ void Core::TransferContext::ClearJobs()
 {
 	for (auto&& job : _pendingJobs)
 	{
-		if (job->status == JobStatus::COMPLETE)
+		if (job.second->status == JobStatus::COMPLETE)
 		{
-			delete(job);
+			delete(job.second);
 		}
 	}
 

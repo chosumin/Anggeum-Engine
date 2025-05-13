@@ -2,17 +2,36 @@
 #include "Shader.h"
 #include "Vertex.h"
 #include "DescriptorPool.h"
+#include "Graphics/SpirvCompiler.h"
+#include "Utils/FileSystem.h"
 
 Core::Shader::Shader(Device& device, const string& vertFilePath, const string& fragFilePath)
 	:_device(device)
 {
 	auto vkDevice = _device.GetDevice();
 
-	auto vertShaderCode = ReadFile(vertFilePath);
-	auto fragShaderCode = ReadFile(fragFilePath);
+	auto vertShaderCode = FileSystem::Read32("Assets/" + vertFilePath);
+	size_t vertCodeSize = vertShaderCode.size();
 
-	_vertShaderModule = CreateShaderModule(vkDevice, vertShaderCode);
-	_fragShaderModule = CreateShaderModule(vkDevice, fragShaderCode);
+	auto fragShaderCode = FileSystem::Read32("Assets/" + fragFilePath);
+	size_t fragCodeSize = fragShaderCode.size();
+
+	if (FileSystem::GetExtension(vertFilePath) != "spv")
+	{
+		const char* vert = reinterpret_cast<const char*>(vertShaderCode.data());
+		vertShaderCode = SpirvCompiler::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath);
+		vertCodeSize = vertShaderCode.size() * sizeof(uint32_t);
+	}
+
+	if (FileSystem::GetExtension(fragFilePath) != "spv")
+	{
+		const char* frag = reinterpret_cast<const char*>(fragShaderCode.data());
+		fragShaderCode = SpirvCompiler::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath);
+		fragCodeSize = fragShaderCode.size() * sizeof(uint32_t);
+	}
+
+	_vertShaderModule = CreateShaderModule(vkDevice, vertShaderCode, vertCodeSize);
+	_fragShaderModule = CreateShaderModule(vkDevice, fragShaderCode, fragCodeSize);
 }
 
 Core::Shader::Shader(Shader&& other) noexcept
@@ -153,29 +172,12 @@ void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size
 	_pushConstantRanges.push_back(pushConstant);
 }
 
-vector<char> Core::Shader::ReadFile(const string& filePath)
-{
-	ifstream file{ "Assets/" + filePath, ios::ate | ios::binary};
-
-	if (!file.is_open())
-		throw runtime_error{ "failed to open file" };
-
-	size_t fileSize{ static_cast<size_t>(file.tellg()) };
-	vector<char> buffer(fileSize);
-
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-	file.close();
-
-	return buffer;
-}
-
-VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<char>& code) const
+VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<uint32_t>& code, size_t codeSize) const
 {
 	VkShaderModuleCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+	createInfo.codeSize = codeSize;
+	createInfo.pCode = code.data();
 
 	VkShaderModule shaderModule;
 	if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)

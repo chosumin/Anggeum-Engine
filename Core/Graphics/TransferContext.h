@@ -14,7 +14,7 @@ namespace Core
 
 		void UpdateFrame(uint32_t frame);
 
-		void Enqueue(Job* job);
+		void Enqueue(Job* job, const string& jobName);
 		void Wait();
 	private:
 		void ClearJobs();
@@ -32,7 +32,7 @@ namespace Core
 
 		Core::Timer _timer;
 
-		vector<Job*> _pendingJobs;
+		unordered_map<string, Job*> _pendingJobs;
 	};
 }
 

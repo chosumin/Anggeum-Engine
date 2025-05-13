@@ -114,7 +114,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Vulkan\x64\Debug;$(ProjectDir)ThirdParties\ktx\Release;$(ProjectDir)ThirdParties\glfw-3.3.8.bin.WIN64\lib-vc2022;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;ktx.lib;glfw3.lib;glslangd.lib;shadercd.lib;shaderc_combinedd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -160,6 +160,7 @@
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
+    <ClCompile Include="Core\Graphics\SpirvCompiler.cpp" />
     <ClCompile Include="Core\Graphics\TransferJob.cpp" />
     <ClCompile Include="Core\Graphics\Material.cpp" />
     <ClCompile Include="Core\Graphics\RenderContext.cpp" />
@@ -255,6 +256,7 @@
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
+    <ClInclude Include="Core\Graphics\SpirvCompiler.h" />
     <ClInclude Include="Core\Graphics\TransferJob.h" />
     <ClInclude Include="Core\Graphics\IRenderPipeline.h" />
     <ClInclude Include="Core\Graphics\Material.h" />

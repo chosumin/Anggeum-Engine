@@ -300,7 +300,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 
 	auto texture = _resourceCache.RequestTexture(textureName,
 		imageCreateInfo, DEFAULT_SAMPLER);
-	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path));
+	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path), textureName);
 
 	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
 	material->SetBuffer(1, texture);
@@ -523,14 +523,7 @@ vector<shared_ptr<Core::Image>> Core::GLTFLoader::LoadImages(const string& model
 		imageCreateInfo.filePath = modelPath + "/" + image.uri;
 
 		auto vkImage = _resourceCache.RequestImage(imageCreateInfo);
-		
-		//Already jobified
-		if (vkImage.use_count() > 1)
-			continue;
-
-		_transferContext.Enqueue(new VkImageJob(_device, vkImage, imageCreateInfo.filePath));
-
-		images[i] = move(vkImage);
+		images[i] = vkImage;
 	}
 
 	return images;
@@ -586,6 +579,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 		for (auto& value : gltfMaterial.values)
 		{
+
 			if (value.first.find("baseColorFactor") != string::npos)
 			{
 				const auto& colorFactor = value.second.ColorFactor();
@@ -606,6 +600,8 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 				/*if (NeedSRGB(value.first))
 					texture->GetImage()->SetSRGBFormat();*/
 
+				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
+
 				material->SetBuffer(1, texture);
 				
 				pbrBuffer->AlbedoTextureSet = 1;
@@ -616,6 +612,8 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				/*if (NeedSRGB(value.first))
 					texture->GetImage()->SetSRGBFormat();*/
+
+				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
 				material->SetBuffer(3, texture);
 				
@@ -633,6 +631,8 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				/*if (NeedSRGB(additionalValue.first))
 					texture->GetImage()->SetSRGBFormat();*/
+
+				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
 				material->SetBuffer(2, texture);
 			}
@@ -712,7 +712,7 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 
 				_transferContext.Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-					subMesh->InsertBufferSpace(name), move(vertexData)));
+					subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
 			}
 
 			//ADD VERTEX COLOR
@@ -729,7 +729,7 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 
 				_transferContext.Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-					subMesh->InsertBufferSpace(VertexAttributeName::Col), move(colorData)));
+					subMesh->InsertBufferSpace(VertexAttributeName::Col), move(colorData)), subMeshName + " color");
 			}
 
 			if (primitive.indices >= 0)
@@ -759,7 +759,7 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 
 				_transferContext.Enqueue(new VkBufferJob(
 					_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-					subMesh->InsertBufferSpace(indexType), move(indexData)));
+					subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
 			}
 
 			mesh->AddSubMesh(subMesh);
