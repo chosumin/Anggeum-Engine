@@ -54,6 +54,7 @@ using namespace rapidjson;
 #include <queue>
 #include <mutex>
 #include <thread>
+#include <sstream>
 using namespace std;
 
 #include "Graphics/Vulkans/Device.h"

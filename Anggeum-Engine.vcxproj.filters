@@ -80,20 +80,11 @@
     <ClCompile Include="Core\Utils\InputEvents.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
-    <ClCompile Include="Assets\Shaders\PBRShader.cpp">
-      <Filter>Assets\Shaders</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Graphics\Vulkans\Pipeline.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
     <ClCompile Include="Core\Graphics\Vulkans\PipelineState.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Shaders\PrefilterShader.cpp">
-      <Filter>Assets\Shaders</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Shaders\IrradianceShader.cpp">
-      <Filter>Assets\Shaders</Filter>
     </ClCompile>
     <ClCompile Include="Core\Graphics\RenderContext.cpp">
       <Filter>Core\Graphics</Filter>
@@ -134,12 +125,6 @@
     <ClCompile Include="Core\Graphics\Vulkans\SwapChain.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
-    <ClCompile Include="Assets\Shaders\ShadowShader.cpp">
-      <Filter>Assets\Shaders</Filter>
-    </ClCompile>
-    <ClCompile Include="Assets\Shaders\SkyboxShader.cpp">
-      <Filter>Assets\Shaders</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Graphics\SubMesh.cpp">
       <Filter>Core\Graphics</Filter>
     </ClCompile>
@@ -161,9 +146,6 @@
     <ClCompile Include="Core\Utils\timer.cpp">
       <Filter>Core\Utils</Filter>
     </ClCompile>
-    <ClCompile Include="Assets\Shaders\BrdfLutShader.cpp">
-      <Filter>Assets\Shaders</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Graphics\RendererPass.cpp">
       <Filter>Core\Graphics</Filter>
     </ClCompile>
@@ -176,6 +158,7 @@
     <ClCompile Include="Core\Graphics\TransferJob.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Semaphore.cpp" />
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
+    <ClCompile Include="Core\Graphics\SpirvUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -275,20 +258,11 @@
     <ClInclude Include="Core\Graphics\IRenderPipeline.h">
       <Filter>Core\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Shaders\PBRShader.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\Pipeline.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\PipelineState.h">
       <Filter>Core\Graphics\Vulkans</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Shaders\PrefilterShader.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Shaders\IrradianceShader.h">
-      <Filter>Assets\Shaders</Filter>
     </ClInclude>
     <ClInclude Include="Core\Graphics\RenderContext.h">
       <Filter>Core\Graphics</Filter>
@@ -329,12 +303,6 @@
     <ClInclude Include="Core\Graphics\Vulkans\SwapChain.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Shaders\ShadowShader.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Assets\Shaders\SkyboxShader.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Graphics\SubMesh.h">
       <Filter>Core\Graphics</Filter>
     </ClInclude>
@@ -356,9 +324,6 @@
     <ClInclude Include="Core\Utils\timer.h">
       <Filter>Core\Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\Shaders\BrdfLutShader.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Graphics\RendererPass.h">
       <Filter>Core\Graphics</Filter>
     </ClInclude>
@@ -374,6 +339,7 @@
     <ClInclude Include="Core\Graphics\TransferJob.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Semaphore.h" />
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
+    <ClInclude Include="Core\Graphics\SpirvUtility.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

@@ -32,6 +32,15 @@ namespace Core
 
 			return static_cast<uint32_t>(value);
 		}
+
+		static void ConvertLowerCase(const string& src, string& dst)
+		{
+			transform(src.begin(), src.end(), dst.begin(), 
+			[](unsigned char c) 
+			{
+				return tolower(c);
+			});
+		}
 	};
 }
 

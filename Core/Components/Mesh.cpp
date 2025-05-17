@@ -1,11 +1,7 @@
 #include "stdafx.h"
 #include "Mesh.h"
-#include "Utils/Utility.h"
 #include "Graphics/SubMesh.h"
-#include "Graphics/Vulkans/Vertex.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
-#include "Foundation/Entity.h"
 
 Core::Mesh::Mesh(Device& device)
 	:_device(device)

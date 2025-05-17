@@ -36,7 +36,7 @@ namespace Core
 	private:
 		Scene& _scene;
 
-		unordered_map<type_index, RendererBatch*> _batches;
+		unordered_map<uint32_t, RendererBatch*> _batches;
 
 		shared_ptr<Texture> _shadowRenderTarget;
 		ShadowUniform* _shadowBuffer;

@@ -1,12 +1,6 @@
 #include "stdafx.h"
 #include "ResourceCache.h"
 #include "Utils/Utility.h"
-#include "Assets/Shaders/PBRShader.h"
-#include "Assets/Shaders/ShadowShader.h"
-#include "Assets/Shaders/SkyboxShader.h"
-#include "Assets/Shaders/IrradianceShader.h"
-#include "Assets/Shaders/PrefilterShader.h"
-#include "Assets/Shaders/BrdfLutShader.h"
 #include "Graphics/TransferJob.h"
 
 Core::ResourceCache::ResourceCache(Device& device)
@@ -55,23 +49,27 @@ shared_ptr<Core::Material> Core::ResourceCache::RequestMaterial(const string mat
 	return material;
 }
 
-shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& shaderPath)
+shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& shaderName)
 {
 	lock_guard<mutex> guard(_shaderMutex);
 
-	uint32_t hash = Utility::HashCode(shaderPath.c_str());
+	string pass;
+	string vertShaderPath, fragShaderPath;
 
-	auto it = _shaders.find(hash);
+	uint32_t hash = Utility::HashCode(shaderName.c_str());
+	GetShaderFiles(hash, pass, vertShaderPath, fragShaderPath);
+
+	auto it = _shaders.find(shaderName);
 	if (it != _shaders.end())
 	{
 		if (auto shared = it->second.lock())
 			return shared;
 	}
 
-	auto shader = CreateShaderInternal(hash);
-	shader->Prepare();
+	shared_ptr<Core::Shader> shader = make_shared<Shader>(_device, pass,
+		vertShaderPath, fragShaderPath);
 	shader->CreatePipelineLayout();
-	_shaders[hash] = shader;
+	_shaders[shaderName] = shader;
 
 	return shader;
 }
@@ -178,36 +176,45 @@ shared_ptr<Core::SubMesh> Core::ResourceCache::RequestSubMesh(const string& name
 	return subMesh;
 }
 
-shared_ptr<Core::Shader> Core::ResourceCache::CreateShaderInternal(uint32_t hash)
+void Core::ResourceCache::GetShaderFiles(const uint32_t hash,
+	string& pass, string& vert, string& frag)
 {
-	shared_ptr<Core::Shader> shader;
-	
 	switch (hash)
 	{
 	case Utility::HashCode("PBR"):
-		shader = make_shared<PBRShader>(_device);
+		pass = "Geometry";
+		vert = "shaders/pbr.vert";
+		frag = "shaders/pbr.frag";
 		break;
 	case Utility::HashCode("Shadow"):
-		shader = make_shared<ShadowShader>(_device);
+		pass = "Shadow";
+		vert = "shaders/shadow.vert.spv";
+		frag = "shaders/shadow.frag.spv";
 		break;
 	case Utility::HashCode("Skybox"):
-		shader = make_shared<SkyboxShader>(_device);
+		pass = "Skybox";
+		vert = "shaders/skybox.vert.spv";
+		frag = "shaders/skybox.frag.spv";
 		break;
 	case Utility::HashCode("Irradiance"):
-		shader = make_shared<IrradianceShader>(_device);
+		pass = "PreSky";
+		vert = "shaders/filtercube.vert.spv";
+		frag = "shaders/irradiance.frag.spv";
 		break;
 	case Utility::HashCode("Prefiltered"):
-		shader = make_shared<PrefilterShader>(_device);
+		pass = "PreSky";
+		vert = "shaders/filtercube.vert.spv";
+		frag = "shaders/prefilter.frag.spv";
 		break;
 	case Utility::HashCode("BRDF"):
-		shader = make_shared<BrdfLutShader>(_device);
+		pass = "PreSky";
+		vert = "shaders/brdf_lut.vert.spv";
+		frag = "shaders/brdf_lut.frag.spv";
 		break;
 	default:
-		shader = make_shared<PBRShader>(_device);
+		pass = "Geometry";
+		vert = "shaders/pbr.vert";
+		frag = "shaders/pbr.frag";
 		break;
 	}
-
-	shader->SetHash(hash);
-
-	return shader;
 }

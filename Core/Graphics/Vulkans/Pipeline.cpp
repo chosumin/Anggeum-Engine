@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "Pipeline.h"
 #include "RenderPass.h"
-#include "Vertex.h"
 #include "Shader.h"
 #include "PipelineState.h"
 

@@ -1,50 +1,69 @@
 #include "stdafx.h"
 #include "Shader.h"
-#include "Vertex.h"
 #include "DescriptorPool.h"
-#include "Graphics/SpirvCompiler.h"
+#include "Graphics/SpirvUtility.h"
 #include "Utils/FileSystem.h"
+#include "Utils/Utility.h"
+#include "spirv_cross/spirv_cross.hpp"
 
-Core::Shader::Shader(Device& device, const string& vertFilePath, const string& fragFilePath)
-	:_device(device)
+Core::Shader::Shader(Device& device, const string pass,
+	const string& vertFilePath,
+	const string& fragFilePath)
+	:_device(device), _pass(pass)
 {
 	auto vkDevice = _device.GetDevice();
 
-	auto vertShaderCode = FileSystem::Read32("Assets/" + vertFilePath);
-	size_t vertCodeSize = vertShaderCode.size();
-
-	auto fragShaderCode = FileSystem::Read32("Assets/" + fragFilePath);
-	size_t fragCodeSize = fragShaderCode.size();
+	vector<uint32_t> vertShaderCode;
+	vector<uint32_t> fragShaderCode;
 
 	if (FileSystem::GetExtension(vertFilePath) != "spv")
 	{
+		vertShaderCode = FileSystem::Read32("Assets/" + vertFilePath);
 		const char* vert = reinterpret_cast<const char*>(vertShaderCode.data());
-		vertShaderCode = SpirvCompiler::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath);
-		vertCodeSize = vertShaderCode.size() * sizeof(uint32_t);
+		vertShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath);
 	}
+	else
+	{
+		vertShaderCode = FileSystem::Read32Fast("Assets/" + vertFilePath);
+	}
+
+	size_t vertCodeSize = vertShaderCode.size() * sizeof(uint32_t);
 
 	if (FileSystem::GetExtension(fragFilePath) != "spv")
 	{
+		fragShaderCode = FileSystem::Read32("Assets/" + fragFilePath);
 		const char* frag = reinterpret_cast<const char*>(fragShaderCode.data());
-		fragShaderCode = SpirvCompiler::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath);
-		fragCodeSize = fragShaderCode.size() * sizeof(uint32_t);
+		fragShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath);
 	}
+	else
+	{
+		fragShaderCode = FileSystem::Read32Fast("Assets/" + fragFilePath);
+	}
+
+	size_t fragCodeSize = fragShaderCode.size() * sizeof(uint32_t);
+	
+	SetResources(vertFilePath, vertShaderCode,
+		fragFilePath, fragShaderCode);
 
 	_vertShaderModule = CreateShaderModule(vkDevice, vertShaderCode, vertCodeSize);
 	_fragShaderModule = CreateShaderModule(vkDevice, fragShaderCode, fragCodeSize);
+
+	_hash = Utility::HashCode((vertFilePath + fragFilePath).c_str());
 }
 
 Core::Shader::Shader(Shader&& other) noexcept
-    : _device(other._device),
-      _vertShaderModule(other._vertShaderModule),
-      _fragShaderModule(other._fragShaderModule),
-      _pipelineLayout(other._pipelineLayout),
-      _descriptorPool(other._descriptorPool),
-      _vertexBindings(std::move(other._vertexBindings)),
-      _vertexAttributes(std::move(other._vertexAttributes)),
-      _pushConstantRanges(std::move(other._pushConstantRanges)),
-      _uniformBufferLayoutBindings(std::move(other._uniformBufferLayoutBindings)),
-      _textureBufferLayoutBindings(std::move(other._textureBufferLayoutBindings))
+	: _device(other._device),
+	_vertShaderModule(other._vertShaderModule),
+	_fragShaderModule(other._fragShaderModule),
+	_pipelineLayout(other._pipelineLayout),
+	_descriptorPool(other._descriptorPool),
+	_vertexBindings(std::move(other._vertexBindings)),
+	_vertexAttributes(std::move(other._vertexAttributes)),
+	_pushConstantRanges(std::move(other._pushConstantRanges)),
+	_uniformBufferLayoutBindings(std::move(other._uniformBufferLayoutBindings)),
+	_textureBufferLayoutBindings(std::move(other._textureBufferLayoutBindings)),
+	_pass(other._pass),
+	_hash(other._hash)
 {
     other._vertShaderModule = VK_NULL_HANDLE;
     other._fragShaderModule = VK_NULL_HANDLE;
@@ -74,6 +93,8 @@ Core::Shader& Core::Shader::operator=(Shader&& other) noexcept
        _pushConstantRanges = std::move(other._pushConstantRanges);  
        _uniformBufferLayoutBindings = std::move(other._uniformBufferLayoutBindings);  
        _textureBufferLayoutBindings = std::move(other._textureBufferLayoutBindings);  
+	   _pass = other._pass;
+	   _hash = other._hash;
 
        // Reset the other object  
        other._vertShaderModule = VK_NULL_HANDLE;  
@@ -149,12 +170,38 @@ void Core::Shader::CreatePipelineLayout()
 
 void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size)
 {
-	_uniformBufferLayoutBindings.emplace_back(binding, stage, size);
+	bool isNew = true;
+	for (auto&& layoutBinding : _uniformBufferLayoutBindings)
+	{
+		if (layoutBinding.Binding == binding)
+		{
+			layoutBinding.Stage = 
+				static_cast<VkShaderStageFlagBits>(layoutBinding.Stage | stage);
+			isNew = false;
+			break;
+		}
+	}
+
+	if (isNew)
+		_uniformBufferLayoutBindings.emplace_back(binding, stage, size);
 }
 
 void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage)
 {
-	_textureBufferLayoutBindings.emplace_back(binding, stage);
+	bool isNew = true;
+	for (auto&& layoutBinding : _textureBufferLayoutBindings)
+	{
+		if (layoutBinding.Binding == binding)
+		{
+			layoutBinding.Stage =
+				static_cast<VkShaderStageFlagBits>(layoutBinding.Stage | stage);
+			isNew = false;
+			break;
+		}
+	}
+
+	if (isNew)
+		_textureBufferLayoutBindings.emplace_back(binding, stage);
 }
 
 void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
@@ -208,8 +255,6 @@ uint32_t Core::Shader::GetPushConstantsOffset(uint32_t index) const
 	return _pushConstantRanges[index].offset;
 }
 
-
-
 VkDescriptorSetLayout& Core::Shader::GetDescriptorSetLayout()
 {
 	return _descriptorPool->GetDescriptorSetLayout();
@@ -235,4 +280,12 @@ void Core::Shader::CreateDescriptorPool()
 	}
 
 	_descriptorPool = new DescriptorPool(_device, descriptors);
+}
+
+void Core::Shader::SetResources(const string vertPath, const vector<uint32_t>& vertSpirvBinary, const string fragPath, const vector<uint32_t>& fragSpirvBinary)
+{
+	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_VERTEX_BIT, 
+		vertPath, vertSpirvBinary);
+	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_FRAGMENT_BIT, 
+		fragPath, fragSpirvBinary);
 }

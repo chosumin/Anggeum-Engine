@@ -22,7 +22,7 @@ namespace Core
 		shared_ptr<Material> RequestMaterial(const string materialName, 
 			const string& shaderName);
 
-		shared_ptr<Shader> RequestShader(const string& shaderPath);
+		shared_ptr<Shader> RequestShader(const string& shaderName);
 
 		shared_ptr<Core::Image> RequestImage(const ImageCreateInfo imageCreateInfo);
 
@@ -41,14 +41,15 @@ namespace Core
 
 		shared_ptr<Core::SubMesh> RequestSubMesh(const string& name);
 	private:
-		shared_ptr<Shader> CreateShaderInternal(uint32_t hash);
+		void GetShaderFiles(const uint32_t hash, 
+			string& pass, string& vert, string& frag);
 	private:
 		Device& _device;
 		
 		unordered_map<string, weak_ptr<Material>> _materials;
 		mutex _materialMutex;
 
-		unordered_map<uint32_t, weak_ptr<Shader>> _shaders;
+		unordered_map<string, weak_ptr<Shader>> _shaders;
 		mutex _shaderMutex;
 
 		unordered_map<string, weak_ptr<Image>> _images;
