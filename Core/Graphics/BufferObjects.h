@@ -1,5 +1,7 @@
 #pragma once
 
+#define MAX_FORWARD_LIGHT_COUNT 8
+
 struct alignas(16) VPBufferObject
 {
 	mat4 View;
@@ -35,7 +37,8 @@ struct alignas(16) LightInfo
 
 struct LightBuffer
 {
-	LightInfo Light;
+	LightInfo Light[MAX_FORWARD_LIGHT_COUNT];
+	uint32_t Count;
 };
 
 struct IrradianceDelta

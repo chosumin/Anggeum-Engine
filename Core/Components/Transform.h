@@ -20,7 +20,7 @@ namespace Core
 		void SetRotation(const glm::quat& rotation);
 		void SetRotation(const glm::vec3& eulerAngles);
 		void SetScale(const glm::vec3& scale);
-		const vec3& GetTranslation() const;
+		vec3& GetTranslation();
 		const quat& GetRotation() const;
 		const vec3& GetScale() const;
 		void SetMatrix(const glm::mat4& matrix);

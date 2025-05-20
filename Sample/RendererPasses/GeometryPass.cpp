@@ -224,42 +224,33 @@ namespace Core
 
 	void GeometryPass::UpdateGUI()
 	{
-		auto mainLight = _scene.GetMainLight();
-
-		auto& properties = mainLight->GetProperties();
-		auto& transform = mainLight->GetEntity().GetTransform();
-
-		auto& rotation = transform.GetRotation();
-		glm::vec3 euler = glm::eulerAngles(rotation);
-		euler = glm::degrees(euler);
-
-		ImGui::Begin("Directional Light");
-
-		ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
-		ImGui::SliderFloat3("Direction", &euler[0], -90.0f, 90.0f);
-
-		ImGui::End();
-
-		transform.SetRotation(euler);
 	}
 
 	void GeometryPass::UpdateLightBuffer()
 	{
-		auto mainLight = _scene.GetMainLight();
+		auto lights = _scene.GetComponents<Light>();
 
-		auto& properties = mainLight->GetProperties();
-		auto& transform = mainLight->GetEntity().GetTransform();
+		uint32_t size = std::min((uint32_t)lights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
+		for (uint32_t i = 0; i < size; ++i)
+		{
+			auto light = lights[i];
 
-		LightInfo lightInfo{};
-		lightInfo.Position = vec4(transform.GetTranslation(), 
-			static_cast<float>(mainLight->GetLightType()));
-		lightInfo.Color = vec4(properties.Color, properties.Intensity);
+			auto& properties = light->GetProperties();
+			auto& transform = light->GetEntity().GetTransform();
 
-		auto direction = transform.GetRotation() * properties.Direction;
-		lightInfo.Direction = 
-			vec4(direction, properties.Range);
-		lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
+			LightInfo lightInfo{};
+			lightInfo.Position = vec4(transform.GetTranslation(),
+				static_cast<float>(light->GetLightType()));
+			lightInfo.Color = vec4(properties.Color, properties.Intensity);
 
-		_lightBuffer.Light = lightInfo;
+			auto direction = transform.GetRotation() * properties.Direction;
+			lightInfo.Direction =
+				vec4(direction, properties.Range);
+			lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
+
+			_lightBuffer.Light[i] = lightInfo;
+		}
+
+		_lightBuffer.Count = size;
 	}
 }

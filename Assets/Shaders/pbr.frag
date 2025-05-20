@@ -38,7 +38,8 @@ layout(binding = 6) uniform PBR
 
 layout(binding = 7) uniform LightInfo
 {
-	Light light;
+	Light lights[MAX_FORWARD_LIGHT_COUNT];
+	uint count;
 } lightInfo;
 
 layout(binding = 8) uniform samplerCube irradiancemap;
@@ -111,29 +112,28 @@ void main()
 	           
     // reflectance equation
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 1; ++i) 
+    for(int i = 0; i < lightInfo.count; ++i) 
     {
         // calculate per-light radiance
-        vec3 L = normalize(-lightInfo.light.direction.xyz);
+        vec3 L = normalize(GetLightDirection(lightInfo.lights[i], worldPos.xyz));
         vec3 H = normalize(V + L);
-        vec3 radiance     = lightInfo.light.color.w * lightInfo.light.color.rgb;        
+        vec3 radiance = ApplyLight(lightInfo.lights[i], worldPos.xyz, N);        
         
         // cook-torrance brdf
         float NDF = DistributionGGX(N, H, roughness);        
-        float G   = GeometrySmith(N, V, L, roughness);      
-        vec3 F    = FresnelSchlick(max(dot(H, V), 0.0), F0);       
+        float G = GeometrySmith(N, V, L, roughness);      
+        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);       
         
         vec3 kS = F;
         vec3 kD = 1.0 - kS;
         kD *= 1.0 - metallic;	  
         
-        vec3 numerator    = NDF * G * F;
+        vec3 numerator = NDF * G * F;
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-        vec3 specular     = numerator / denominator;  
+        vec3 specular = numerator / denominator;  
             
-        // add to outgoing radiance Lo
-        float NdotL = max(dot(N, L), 0.0);                
-        Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL; 
+        // add to outgoing radiance Lo             
+        Lo += (kD * albedo.rgb / PI + specular) * radiance; 
     }   
   
 	// ambient lighting

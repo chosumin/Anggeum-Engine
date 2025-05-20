@@ -19,6 +19,8 @@
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
 
+#define MAX_FORWARD_LIGHT_COUNT 8
+
 struct Light
 {
 	vec4 position;         // position.w represents type of light
@@ -38,7 +40,7 @@ vec3 ApplyDirectionalLight(Light light, vec3 normal)
 vec3 ApplyPointLight(Light light, vec3 pos, vec3 normal)
 {
 	vec3  worldToLight = light.position.xyz - pos;
-	float dist = length(worldToLight) * 0.005;
+	float dist = length(worldToLight);
 	float atten = 1.0 / (dist * dist);
 	worldToLight = normalize(worldToLight);
 	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
@@ -71,7 +73,7 @@ vec3 ApplyLight(Light light, vec3 pos, vec3 normal)
 {
 	if (light.position.w == DIRECTIONAL_LIGHT)
 	{
-		return ApplyDirectionalLight(light, pos);
+		return ApplyDirectionalLight(light, normal);
 	}
 	else if (light.position.w == POINT_LIGHT)
 	{

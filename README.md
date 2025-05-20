@@ -24,6 +24,11 @@ Features
 	- Loading images and buffers by using secondary command buffers and a single primary buffer
 	- Round-robin scheduling
 9. Resource cache
+10. Shader system
+	- Runtime shader compile using shaderc
+	- Runtime shader reflection using SPIRV_Cross
+11. Lighting
+	- Directional, Point, Spot
 
 Third Parties
 - imgui

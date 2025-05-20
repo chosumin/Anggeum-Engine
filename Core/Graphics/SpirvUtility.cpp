@@ -74,8 +74,8 @@ vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderS
     options.SetIncluder(std::make_unique<FileIncluder>());
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-    // Enable optimization (optional)
     options.SetOptimizationLevel(shaderc_optimization_level_zero);
+    options.SetGenerateDebugInfo();
 
     shaderc_shader_kind kind = shaderc_vertex_shader;
 
@@ -168,8 +168,6 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         uint32_t size = Utility::ToU32(compiler.get_declared_struct_size(type));
 
         shader.AddPushConstantsRange(shaderStage, size);
-
-        cout << "Push Constant: " << name << " | Size: " << size << endl;
     }
 
 	if (shaderStage == VK_SHADER_STAGE_VERTEX_BIT)
@@ -190,8 +188,6 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
             uint32_t inputSize = Utility::ToU32(GetTypeSizeBytes(compiler, type));
 
             vertexInputs[location] = { name, inputSize };
-
-			cout << name << " | Location: " << location << " | Size: " << inputSize << endl;
 		}
 
         for (auto&& input : vertexInputs)

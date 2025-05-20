@@ -34,7 +34,7 @@ void Core::Transform::SetScale(const glm::vec3& scale)
 	InvalidateWorldMatrix();
 }
 
-const glm::vec3& Core::Transform::GetTranslation() const
+glm::vec3& Core::Transform::GetTranslation()
 {
 	return _translation;
 }

@@ -4,11 +4,11 @@ namespace Core
 {
 	struct SamplerCreateInfo
 	{
-		VkFilter minFilter;
-		VkFilter magFilter;
-		VkSamplerAddressMode wrapS;
-		VkSamplerAddressMode wrapT;
-		VkSamplerMipmapMode mipmapMode;
+		VkFilter minFilter = VK_FILTER_LINEAR;
+		VkFilter magFilter = VK_FILTER_LINEAR;
+		VkSamplerAddressMode wrapS = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		VkSamplerAddressMode wrapT = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
         bool operator==(const SamplerCreateInfo& other) const
         {

@@ -56,6 +56,45 @@ SampleScene::SampleScene(Core::Device& device, float width, float height, Transf
 		AddComponent(move(light), *lightEntity);
 		AddEntity(move(lightEntity));
 	}
+
+	{
+		LightProperties lightProperties{};
+		lightProperties.Range = 1.0f;
+		lightProperties.InnerConeAngle = 10.0f;
+		lightProperties.OuterConeAngle = 100.0f;
+
+		auto lightEntity = make_unique<Entity>(-1, "point light");
+		auto light = make_unique<Core::Light>("point light");
+		light->SetLightType(LightType::Point);
+		light->SetProperties(lightProperties);
+
+		auto& transform = lightEntity->GetTransform();
+		transform.SetRotation(vec3(45, 45, 0));
+
+		mainLight = light.get();
+		mainLight->SetEntity(lightEntity.get());
+		AddComponent(move(light), *lightEntity);
+		AddEntity(move(lightEntity));
+	}
+	{
+		LightProperties lightProperties{};
+		lightProperties.Range = 1.0f;
+		lightProperties.InnerConeAngle = 10.0f;
+		lightProperties.OuterConeAngle = 100.0f;
+
+		auto lightEntity = make_unique<Entity>(-1, "spot light");
+		auto light = make_unique<Core::Light>("spot light");
+		light->SetLightType(LightType::Spot);
+		light->SetProperties(lightProperties);
+
+		auto& transform = lightEntity->GetTransform();
+		transform.SetRotation(vec3(45, 45, 0));
+
+		mainLight = light.get();
+		mainLight->SetEntity(lightEntity.get());
+		AddComponent(move(light), *lightEntity);
+		AddEntity(move(lightEntity));
+	}
 }
 
 SampleScene::~SampleScene()
@@ -101,4 +140,45 @@ void SampleScene::Update()
 		transform.SetRotation(euler);
 	}
 	ImGui::End();
+
+	auto lights = GetComponents<Light>();
+
+	for (size_t i = 0; i < lights.size(); ++i)
+	{
+		string label;
+		if (i == 0)
+			label = "Directional light";
+		else if (i == 1)
+			label = "Point light";
+		else if (i == 2)
+			label = "Spot light";
+
+		ImGui::Begin(label.c_str());
+
+		auto& properties = lights[i]->GetProperties();
+		auto& transform = lights[i]->GetEntity().GetTransform();
+
+		auto& rotation = transform.GetRotation();
+		glm::vec3 euler = glm::eulerAngles(rotation);
+		euler = glm::degrees(euler);
+
+		auto& position = transform.GetTranslation();
+
+		ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
+		ImGui::InputFloat3("Position", &position[0]);
+		transform.SetTranslation(position);
+		ImGui::SliderFloat3("Direction", &euler[0], -90.0f, 90.0f);
+		transform.SetRotation(euler);
+
+		if(i != 0)
+			ImGui::SliderFloat("Range", &properties.Range, 0, 10);
+
+		if (i == 2)
+		{
+			ImGui::SliderFloat("Inner cone angle", &properties.InnerConeAngle, 0, 360);
+			ImGui::SliderFloat("Outer cone angle", &properties.OuterConeAngle, 0, 360);
+		}
+
+		ImGui::End();
+	}
 }
