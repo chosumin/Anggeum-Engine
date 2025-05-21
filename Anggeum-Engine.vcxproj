@@ -153,6 +153,7 @@
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
     <ClCompile Include="Core\Graphics\SpirvUtility.cpp" />
     <ClCompile Include="Core\Graphics\TransferJob.cpp" />
@@ -243,6 +244,7 @@
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
     <ClInclude Include="Core\Graphics\SpirvUtility.h" />
     <ClInclude Include="Core\Graphics\TransferJob.h" />

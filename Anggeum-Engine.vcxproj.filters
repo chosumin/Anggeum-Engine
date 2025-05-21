@@ -159,6 +159,7 @@
     <ClCompile Include="Core\Graphics\Vulkans\Semaphore.cpp" />
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
     <ClCompile Include="Core\Graphics\SpirvUtility.cpp" />
+    <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -340,6 +341,7 @@
     <ClInclude Include="Core\Graphics\Vulkans\Semaphore.h" />
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
     <ClInclude Include="Core\Graphics\SpirvUtility.h" />
+    <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

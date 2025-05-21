@@ -7,6 +7,7 @@
 #include "Graphics/ResourceCache.h"
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
+#include "Graphics/RendererPasses/DepthPrePass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -29,6 +30,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
 
 	CreatePreSkyTextures();
+
+	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
+
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[7].get());
+	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
