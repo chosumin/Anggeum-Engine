@@ -11,14 +11,16 @@ namespace Core
 
 	struct QueueFamilyIndices
 	{
-		optional<uint32_t> GraphicsAndComputeFamily;
+		optional<uint32_t> GraphicsFamily;
+		optional<uint32_t> ComputeFamily;
 		optional<uint32_t> PresentFamily;
 		optional<uint32_t> TransferFamily;
 
 		bool IsComplete() { return 
-			GraphicsAndComputeFamily.has_value() && 
+			GraphicsFamily.has_value() && 
 			PresentFamily.has_value() &&
-			TransferFamily.has_value(); }
+			TransferFamily.has_value() &&
+			ComputeFamily.has_value(); }
 	};
 
 	enum class MemoryType;
@@ -46,6 +48,7 @@ namespace Core
 		}
 
 		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
+		VkQueue GetComputeQueue() { return _computeQueue; }
 		VkQueue GetPresentQueue() { return _presentQueue; }
 		VkQueue GetTransferQueue() { return _transferQueue; }
 
@@ -124,9 +127,9 @@ namespace Core
 
 		const vector<const char*> _deviceExtensions =
 		{
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
 		};
-
 #ifdef NDEBUG
 		const bool _enableValidationLayers = false;
 #else

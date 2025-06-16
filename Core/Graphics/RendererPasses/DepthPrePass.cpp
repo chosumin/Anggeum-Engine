@@ -38,7 +38,7 @@ void Core::DepthPrePass::Prepare()
 	}
 }
 
-void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	commandBuffer.TransitionImageLayout(*_depthMap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,

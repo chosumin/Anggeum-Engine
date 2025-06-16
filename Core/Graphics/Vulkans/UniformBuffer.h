@@ -25,13 +25,13 @@ namespace Core
 	struct UniformBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize bufferSize);
+		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
 	
 		uint32_t Binding;
-		VkShaderStageFlagBits Stage;
+		VkShaderStageFlags Stage;
 		VkDeviceSize BufferSize;
 	};
 }

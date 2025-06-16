@@ -77,19 +77,20 @@ void Application::Draw()
 	_transferContext->UpdateFrame(_renderContext->GetCurrentFrame());
 	_transferContext->Wait();
 
-	auto& commandBuffer = _renderContext->Begin();
+	auto commandBuffers = _renderContext->Begin();
 
-	_renderPipeline->Draw(commandBuffer,
+	_renderPipeline->Draw(commandBuffers[0], commandBuffers[1],
 		_renderContext->GetCurrentFrame(), 
 		_renderContext->GetImageIndex());
 
-	_guiRenderPass->Draw(commandBuffer, 
+	_guiRenderPass->Draw(commandBuffers[0], commandBuffers[1],
 		_renderContext->GetCurrentFrame(),
 		_renderContext->GetImageIndex());
 
-	commandBuffer.EndCommandBuffer();
+	commandBuffers[0].EndCommandBuffer();
+	commandBuffers[1].EndCommandBuffer();
 
-	_renderContext->Submit(commandBuffer);
+	_renderContext->Submit(commandBuffers[0], commandBuffers[1]);
 }
 
 void Application::WaitIdle()

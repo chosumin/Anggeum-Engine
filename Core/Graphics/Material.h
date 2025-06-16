@@ -1,6 +1,8 @@
 #pragma once
+#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/UniformBuffer.h"
 #include "Graphics/Vulkans/TextureBuffer.h"
+#include "Graphics/Vulkans/StorageBuffer.h"
 
 namespace Core
 {
@@ -22,6 +24,7 @@ namespace Core
 	{
 	public:
 		Material(Device& device, string shaderName, string materialName);
+		Material(Device& device, string materialName, string vertPath, string fragPath);
 		Material(const Material& other); 
 
 		Material& operator=(const Material& other);
@@ -44,6 +47,7 @@ namespace Core
 
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
 		void SetBuffer(uint32_t binding, shared_ptr<Texture> texture);
+		void SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer);
 
 		void SetBuffer(uint32_t currentImage)
 		{
@@ -85,6 +89,7 @@ namespace Core
 		vector<uint8_t> _pushConstants;
 		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
+		unordered_map<uint32_t, StorageBuffer*> _storageBuffers;
 	private:
 		bool _isDirty;
 

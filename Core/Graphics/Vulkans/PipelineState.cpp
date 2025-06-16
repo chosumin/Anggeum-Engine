@@ -8,6 +8,7 @@ namespace Core
 		InitRasterizationStateCreateInfo();
 		InitMultisampleStateCreateInfo();
 		InitDepthStencilStateCreateInfo();
+		InitInputAssemblyStateCreateInfo();
 	}
 	
 	void PipelineState::InitRasterizationStateCreateInfo()
@@ -45,5 +46,11 @@ namespace Core
 		_depthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 		_depthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE;
 		_depthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
+	}
+	void PipelineState::InitInputAssemblyStateCreateInfo()
+	{
+		_inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		_inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		_inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 	}
 }

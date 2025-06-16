@@ -15,7 +15,7 @@ namespace Core
 		virtual ~DepthPrePass() override;
 
 		void Prepare() override;
-		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 	private:
 		Scene& _scene;
 

@@ -74,7 +74,7 @@ void GUIRenderPass::Prepare()
 	ImGui_ImplVulkan_Init(&init_info);
 }
 
-void GUIRenderPass::Draw(Core::CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void GUIRenderPass::Draw(Core::CommandBuffer& commandBuffer, Core::CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
 

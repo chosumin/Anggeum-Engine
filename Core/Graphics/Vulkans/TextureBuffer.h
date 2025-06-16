@@ -18,13 +18,13 @@ namespace Core
 	struct TextureBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		TextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
+		TextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
 
 		uint32_t Binding;
-		VkShaderStageFlagBits Stage;
+		VkShaderStageFlags Stage;
 	};
 }
 

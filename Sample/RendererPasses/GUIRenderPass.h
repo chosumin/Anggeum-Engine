@@ -8,7 +8,7 @@ public:
 	virtual ~GUIRenderPass() override;
 
 	virtual void Prepare() override;
-	virtual void Draw(Core::CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+	virtual void Draw(Core::CommandBuffer& commandBuffer, Core::CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 
 	void Update();
 private:

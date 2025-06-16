@@ -53,7 +53,7 @@ void Core::UniformBuffer::CreateUniformBuffer(VkDeviceSize bufferSize)
 	}
 }
 
-Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize bufferSize)
+Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize)
 	:Binding(binding), Stage(stage), BufferSize(bufferSize)
 {
 }

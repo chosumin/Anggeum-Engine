@@ -177,6 +177,7 @@
     <ClCompile Include="Core\Graphics\Vulkans\RenderPass.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Sampler.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Shader.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\StorageBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\SwapChain.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Texture.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\TextureBuffer.cpp" />
@@ -193,6 +194,7 @@
     <ClCompile Include="Core\Foundation\Job.cpp" />
     <ClCompile Include="Sample\ForwardRenderPipeline.cpp" />
     <ClCompile Include="Sample\RendererPasses\BrdfLutPass.cpp" />
+    <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
     <ClCompile Include="Sample\RendererPasses\PreEnvironmentPass.cpp" />
     <ClCompile Include="Sample\RendererPasses\GeometryPass.cpp" />
     <ClCompile Include="Sample\RendererPasses\GUIRenderPass.cpp" />
@@ -270,6 +272,7 @@
     <ClInclude Include="Core\Graphics\Vulkans\RenderPass.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Sampler.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Shader.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\StorageBuffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\SwapChain.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Texture.h" />
     <ClInclude Include="Core\Graphics\Vulkans\TextureBuffer.h" />
@@ -288,6 +291,7 @@
     <ClInclude Include="Core\Foundation\Job.h" />
     <ClInclude Include="Sample\ForwardRenderPipeline.h" />
     <ClInclude Include="Sample\RendererPasses\BrdfLutPass.h" />
+    <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
     <ClInclude Include="Sample\RendererPasses\PreEnvironmentPass.h" />
     <ClInclude Include="Sample\RendererPasses\GeometryPass.h" />
     <ClInclude Include="Sample\RendererPasses\GUIRenderPass.h" />
@@ -304,6 +308,8 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\Shaders\particle.frag" />
+    <None Include="Assets\Shaders\particle.vert" />
     <None Include="Assets\Shaders\brdf_lut.frag" />
     <None Include="Assets\Shaders\brdf_lut.frag.spv" />
     <None Include="Assets\Shaders\brdf_lut.vert" />
@@ -313,6 +319,7 @@
     <None Include="Assets\Shaders\filtercube.vert.spv" />
     <None Include="Assets\Shaders\irradiance.frag" />
     <None Include="Assets\Shaders\irradiance.frag.spv" />
+    <None Include="Assets\Shaders\particle.comp" />
     <None Include="Assets\Shaders\pbr.frag" />
     <None Include="Assets\Shaders\pbr.frag.spv" />
     <None Include="Assets\Shaders\pbr.glsl" />

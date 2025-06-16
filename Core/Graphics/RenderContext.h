@@ -41,11 +41,9 @@ namespace Core
 
 		void RecreateSwapChain();
 
-		CommandBuffer& Begin();
+		vector<CommandBuffer> Begin();
 
-		void Submit(CommandBuffer& commandBuffer);
-
-		void BeginFrame();
+		void Submit(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer);
 
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
@@ -66,21 +64,26 @@ namespace Core
 		void CreateSyncObjects();
 
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
-		void Submit(const vector<CommandBuffer*>& commandBuffers);
 		void EndFrame(VkSemaphore* semaphore);
+		void SubmitComputeBuffer(CommandBuffer& computeBuffer);
 	private:
 		Device& _device;
 
 		SwapChain* _swapChain;
 		//vector<unique_ptr<RenderFrame>> _frames;
 
-		uint32_t _currentFrame = 0;
-
 		CommandPool* _commandPool;
+		CommandPool* _computeCommandPool;
 
+		uint32_t _currentFrame;
 		uint32_t _imageIndex;
+		u64 _lastComputeSemaphoreValue;
+		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT - 1;
+
 		vector<VkSemaphore> _imageAvailableSemaphores;
 		vector<VkSemaphore> _renderFinishedSemaphores;
-		vector<VkFence> _inFlightFences;
+
+		VkSemaphore _graphicsSemaphore;
+		VkSemaphore _computeSemaphore;
 	};
 }

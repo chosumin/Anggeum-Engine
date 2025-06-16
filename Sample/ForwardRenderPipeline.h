@@ -15,7 +15,7 @@ namespace Core
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 
 		void Cleanup();
 		void Resize(SwapChain& swapChain);
@@ -38,8 +38,8 @@ namespace Core
 
 		shared_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
 			VkImageLayout layout, VkImageUsageFlags usageFlags);
-		shared_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount);
-		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource);
+		shared_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage = false);
+		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);
 
 		void CreatePreSkyTextures();
 	private:

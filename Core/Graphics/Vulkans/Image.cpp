@@ -20,7 +20,8 @@ Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
     _usageFlags = 
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
-        VK_IMAGE_USAGE_SAMPLED_BIT;
+        VK_IMAGE_USAGE_SAMPLED_BIT |
+        VK_IMAGE_USAGE_STORAGE_BIT;
 }
 
 Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 

@@ -7,7 +7,6 @@
 #include "Components/Mesh.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/SwapChain.h"
-#include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Material.h"
@@ -80,7 +79,7 @@ namespace Core
 		}
 	}
 
-	void GeometryPass::Draw(CommandBuffer& commandBuffer,
+	void GeometryPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,
 		uint32_t currentFrame, uint32_t imageIndex)
 	{
 		UpdateGUI();

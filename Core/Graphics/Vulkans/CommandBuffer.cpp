@@ -93,7 +93,7 @@ void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)
 
 void Core::CommandBuffer::BindPipeline(const Pipeline* pipeline)
 {
-    vkCmdBindPipeline(_commandBuffer, pipeline->GetPipelineBindPoint(), pipeline->GetGraphicsPipeline());
+    vkCmdBindPipeline(_commandBuffer, pipeline->GetPipelineBindPoint(), pipeline->GetPipeline());
 }
 
 void Core::CommandBuffer::SetViewportAndScissor(VkExtent2D extent)
@@ -183,6 +183,11 @@ void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCoun
 void Core::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount)
 {
 	vkCmdDraw(_commandBuffer, vertexCount, instanceCount, 0, 0);
+}
+
+void Core::CommandBuffer::Dispatch(uint32_t x, uint32_t y, uint32_t z)
+{
+    vkCmdDispatch(_commandBuffer, x, y, z);
 }
 
 void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer)

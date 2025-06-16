@@ -21,7 +21,7 @@ namespace Core
 		virtual ~RendererPass();
 
 		virtual void Prepare() = 0;
-		virtual void Draw(CommandBuffer& commandBuffer,
+		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,
 			uint32_t currentFrame, uint32_t imageIndex) = 0;
 	protected:
 		void CreateFrameBuffer(SwapChain& swapChain);

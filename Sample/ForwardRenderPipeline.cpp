@@ -8,6 +8,7 @@
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
+#include "Sample/RendererPasses/ParticlePass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -31,10 +32,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 
 	CreatePreSkyTextures();
 
-	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
+	/*_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
 
 	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[7].get());
-	AddRendererPass(depthPrePass);
+	AddRendererPass(depthPrePass);*/
 
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
@@ -47,8 +48,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 		_renderTargets[4], _renderTargets[5],
 		_renderTargets[6]);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
-
 	AddRendererPass(geometryPass);
+
+	auto particlePass = new Sample::ParticlePass(
+		device, workerThreadManager, scene, swapChain, _renderTargets[0]);
+	AddRendererPass(particlePass);
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()
@@ -72,11 +76,11 @@ void ForwardRenderPipeline::Prepare()
 	}
 }
 
-void ForwardRenderPipeline::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void ForwardRenderPipeline::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	for (auto&& rendererPass : _rendererPasses)
 	{
-		rendererPass->Draw(commandBuffer, currentFrame, imageIndex);
+		rendererPass->Draw(commandBuffer, computeBuffer, currentFrame, imageIndex);
 	}
 }
 
@@ -144,7 +148,7 @@ shared_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D e
 	return renderTarget;
 }
 
-shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount)
+shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage)
 {
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -154,6 +158,8 @@ shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExten
 	VkImageUsageFlags flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	if (isUsedAsSource)
 		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	if (isStorageImage)
+		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
 
 	VkImageCreateInfo imageInfo{};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -173,11 +179,13 @@ shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExten
 	return renderTarget;
 }
 
-shared_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource)
+shared_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage)
 {
 	VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	if (isUsedAsSource)
 		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+	if (isStorageImage)
+		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
 
 	//VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
 	VkImageCreateInfo imageInfo{};

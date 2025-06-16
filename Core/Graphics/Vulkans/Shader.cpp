@@ -9,7 +9,7 @@
 Core::Shader::Shader(Device& device, const string pass,
 	const string& vertFilePath,
 	const string& fragFilePath)
-	:_device(device), _pass(pass)
+	:_device(device), _pass(pass), _computeShaderModule(VK_NULL_HANDLE)
 {
 	auto vkDevice = _device.GetDevice();
 
@@ -51,10 +51,39 @@ Core::Shader::Shader(Device& device, const string pass,
 	_hash = Utility::HashCode((vertFilePath + fragFilePath).c_str());
 }
 
+Core::Shader::Shader(Device& device, const string pass, const string& computeFilePath)
+	:_device(device), _pass(pass), _vertShaderModule(VK_NULL_HANDLE), _fragShaderModule(VK_NULL_HANDLE)
+{
+	auto vkDevice = _device.GetDevice();
+
+	vector<uint32_t> computeShaderCode;
+
+	if (FileSystem::GetExtension(computeFilePath) != "spv")
+	{
+		computeShaderCode = FileSystem::Read32("Assets/" + computeFilePath);
+		const char* compute = reinterpret_cast<const char*>(computeShaderCode.data());
+		computeShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, compute, computeFilePath);
+	}
+	else
+	{
+		computeShaderCode = FileSystem::Read32Fast("Assets/" + computeFilePath);
+	}
+
+	size_t codeSize = computeShaderCode.size() * sizeof(uint32_t);
+
+	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_COMPUTE_BIT,
+		computeFilePath, computeShaderCode);
+
+	_computeShaderModule = CreateShaderModule(vkDevice, computeShaderCode, codeSize);
+
+	_hash = Utility::HashCode(computeFilePath.c_str());
+}
+
 Core::Shader::Shader(Shader&& other) noexcept
 	: _device(other._device),
 	_vertShaderModule(other._vertShaderModule),
 	_fragShaderModule(other._fragShaderModule),
+	_computeShaderModule(other._computeShaderModule),
 	_pipelineLayout(other._pipelineLayout),
 	_descriptorPool(other._descriptorPool),
 	_vertexBindings(std::move(other._vertexBindings)),
@@ -67,6 +96,7 @@ Core::Shader::Shader(Shader&& other) noexcept
 {
     other._vertShaderModule = VK_NULL_HANDLE;
     other._fragShaderModule = VK_NULL_HANDLE;
+	other._computeShaderModule = VK_NULL_HANDLE;
     other._pipelineLayout = VK_NULL_HANDLE;
     other._descriptorPool = nullptr;
 }
@@ -77,15 +107,20 @@ Core::Shader& Core::Shader::operator=(Shader&& other) noexcept
    {  
        auto vkDevice = _device.GetDevice();  
 
-       // Clean up existing resources  
-       vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);  
-       vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);  
+	   // Clean up existing resources  
+	   if (_fragShaderModule)
+		   vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);
+	   if (_vertShaderModule)
+		   vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);
+	   if (_computeShaderModule)
+		   vkDestroyShaderModule(vkDevice, _computeShaderModule, nullptr);
        vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);  
        delete _descriptorPool;  
 
        // Move resources from the other object
        _vertShaderModule = other._vertShaderModule;  
        _fragShaderModule = other._fragShaderModule;  
+	   _computeShaderModule = other._computeShaderModule;
        _pipelineLayout = other._pipelineLayout;  
        _descriptorPool = other._descriptorPool;  
        _vertexBindings = std::move(other._vertexBindings);  
@@ -99,6 +134,7 @@ Core::Shader& Core::Shader::operator=(Shader&& other) noexcept
        // Reset the other object  
        other._vertShaderModule = VK_NULL_HANDLE;  
        other._fragShaderModule = VK_NULL_HANDLE;  
+	   other._computeShaderModule = VK_NULL_HANDLE;
        other._pipelineLayout = VK_NULL_HANDLE;  
        other._descriptorPool = nullptr;  
    }  
@@ -110,8 +146,12 @@ Core::Shader::~Shader()
 {
 	auto vkDevice = _device.GetDevice();
 
-	vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);
-	vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);
+	if (_fragShaderModule)
+		vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);
+	if (_vertShaderModule)
+		vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);
+	if (_computeShaderModule)
+		vkDestroyShaderModule(vkDevice, _computeShaderModule, nullptr);
 
 	vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);
 
@@ -135,6 +175,17 @@ vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo()
 	vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertShaderStageInfo, fragShaderStageInfo };
 
 	return shaderStages;
+}
+
+VkPipelineShaderStageCreateInfo Core::Shader::GetComputeShaderStageCreateInfo() const
+{
+	VkPipelineShaderStageCreateInfo shaderStageInfo{};
+	shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	shaderStageInfo.module = _computeShaderModule;
+	shaderStageInfo.pName = "main";
+
+	return shaderStageInfo;
 }
 
 VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo()
@@ -168,15 +219,14 @@ void Core::Shader::CreatePipelineLayout()
 		throw std::runtime_error("failed to create pipeline layout!");
 }
 
-void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size)
+void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size)
 {
 	bool isNew = true;
 	for (auto&& layoutBinding : _uniformBufferLayoutBindings)
 	{
 		if (layoutBinding.Binding == binding)
 		{
-			layoutBinding.Stage = 
-				static_cast<VkShaderStageFlagBits>(layoutBinding.Stage | stage);
+			layoutBinding.Stage = layoutBinding.Stage | stage;
 			isNew = false;
 			break;
 		}
@@ -186,15 +236,14 @@ void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStage
 		_uniformBufferLayoutBindings.emplace_back(binding, stage, size);
 }
 
-void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage)
+void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage)
 {
 	bool isNew = true;
 	for (auto&& layoutBinding : _textureBufferLayoutBindings)
 	{
 		if (layoutBinding.Binding == binding)
 		{
-			layoutBinding.Stage =
-				static_cast<VkShaderStageFlagBits>(layoutBinding.Stage | stage);
+			layoutBinding.Stage = layoutBinding.Stage | stage;
 			isNew = false;
 			break;
 		}
@@ -202,6 +251,23 @@ void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStage
 
 	if (isNew)
 		_textureBufferLayoutBindings.emplace_back(binding, stage);
+}
+
+void Core::Shader::AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size)
+{
+	bool isNew = true;
+	for (auto&& layoutBinding : _storageBufferLayoutBindings)
+	{
+		if (layoutBinding.Binding == binding)
+		{
+			layoutBinding.Stage = layoutBinding.Stage | stage;
+			isNew = false;
+			break;
+		}
+	}
+
+	if (isNew)
+		_storageBufferLayoutBindings.emplace_back(binding, stage, size);
 }
 
 void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
@@ -275,6 +341,11 @@ void Core::Shader::CreateDescriptorPool()
 	}
 
 	for (auto& binding : _textureBufferLayoutBindings)
+	{
+		descriptors.push_back(&binding);
+	}
+
+	for (auto& binding : _storageBufferLayoutBindings)
 	{
 		descriptors.push_back(&binding);
 	}

@@ -59,7 +59,7 @@ void Core::ShadowPass::Prepare()
 	}
 }
 
-void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	UpdateGUI();
 

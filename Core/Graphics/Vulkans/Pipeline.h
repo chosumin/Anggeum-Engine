@@ -9,12 +9,12 @@ namespace Core
 	{
 	public:
 		Pipeline(Device& device, RenderPass& renderPass, Shader& shader, PipelineState& pipelineState);
+		Pipeline(Device& device, Shader& shader);
 		~Pipeline();
 
-		VkPipeline GetGraphicsPipeline() const { return _graphicsPipeline; }
+		VkPipeline GetPipeline() const { return _pipeline; }
 		VkPipelineBindPoint GetPipelineBindPoint() const { return _pipelineBindPoint; }
 	private:
-		VkPipelineInputAssemblyStateCreateInfo GetInputAssemblyStateCreateInfo();
 		VkPipelineViewportStateCreateInfo GetViewportStateCreateInfo();
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
@@ -22,7 +22,7 @@ namespace Core
 	private:
 		Device& _device;
 
-		VkPipeline _graphicsPipeline;
+		VkPipeline _pipeline;
 		VkPipelineBindPoint _pipelineBindPoint;
 
 		vector<VkDynamicState> _dynamicStates =

@@ -36,8 +36,12 @@ namespace Core
 		_swapChain = new SwapChain(device);
 
 		auto queueFamilyIndices = device.GetQueueFamilyIndices();
+		
 		_commandPool = new CommandPool(
-			device, queueFamilyIndices.GraphicsAndComputeFamily.value());
+			device, queueFamilyIndices.GraphicsFamily.value());
+
+		_computeCommandPool = new CommandPool(
+			device, queueFamilyIndices.ComputeFamily.value());
 
 		CreateSyncObjects();
 	}
@@ -50,11 +54,14 @@ namespace Core
 		{
 			vkDestroySemaphore(device, _imageAvailableSemaphores[i], nullptr);
 			vkDestroySemaphore(device, _renderFinishedSemaphores[i], nullptr);
-			vkDestroyFence(device, _inFlightFences[i], nullptr);
 		}
+
+		vkDestroySemaphore(device, _graphicsSemaphore, nullptr);
+		vkDestroySemaphore(device, _computeSemaphore, nullptr);
 
 		delete(_swapChain);
 		delete(_commandPool);
+		delete(_computeCommandPool);
 	}
 
 	void RenderContext::Prepare(size_t threadCount)
@@ -70,52 +77,127 @@ namespace Core
 		}
 	}
 
-	CommandBuffer& RenderContext::Begin()
+	vector<CommandBuffer> RenderContext::Begin()
 	{
-		BeginFrame();
+		AcquireSwapChainAndResetFence(*_swapChain);
 
 		auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 		commandBuffer.BeginCommandBuffer();
 
-		return commandBuffer;
+		auto& computeBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		computeBuffer.BeginCommandBuffer();
+
+		vector<CommandBuffer> buffers;
+		buffers.push_back(commandBuffer);
+		buffers.push_back(computeBuffer);
+
+		return buffers;
 	}
 
-	void RenderContext::Submit(CommandBuffer& commandBuffer)
+	void RenderContext::Submit(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer)
 	{
-		Submit({ &commandBuffer });
-	}
+		u32 waitSemaphoreCount = 1;
 
-	void RenderContext::Submit(const vector<CommandBuffer*>& commandBuffers)
-	{
-		std::vector<VkCommandBuffer> cmdHandles(commandBuffers.size(), VK_NULL_HANDLE);
-		std::transform(commandBuffers.begin(), commandBuffers.end(),
-			cmdHandles.begin(), [](const CommandBuffer* cmd) { return cmd->GetHandle(); });
+		bool waitForComputeSemaphore = _lastComputeSemaphoreValue > 0;
+		if (waitForComputeSemaphore)
+			waitSemaphoreCount++;
+
+		bool waitForTimelineSemaphore = FrameCounter::GetFrameNumber() >= _maxFramesInFlight;
+		if (waitForTimelineSemaphore)
+			waitSemaphoreCount++;
+
+		VkSemaphore waitSemaphores[] = 
+		{
+			_imageAvailableSemaphores[_currentFrame],
+			_computeSemaphore,
+			_graphicsSemaphore 
+		};
+
+		VkPipelineStageFlags waitStages[] =
+		{
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+		};
+
+		VkSemaphore signalSemaphores[] =
+		{
+			_renderFinishedSemaphores[_currentFrame],
+			_graphicsSemaphore
+		};
+
+		u64 signalValues[] = { 0, FrameCounter::GetFrameNumber() + 1 };
+
+		VkTimelineSemaphoreSubmitInfo semaphoreSubmitInfo{};
+		semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		semaphoreSubmitInfo.signalSemaphoreValueCount = 2;
+		semaphoreSubmitInfo.pSignalSemaphoreValues = signalValues;
+
+		u64 waitValues[] = 
+		{ 
+			0, _lastComputeSemaphoreValue, 
+			FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1)
+		};
+
+		semaphoreSubmitInfo.waitSemaphoreValueCount = waitSemaphoreCount;
+		semaphoreSubmitInfo.pWaitSemaphoreValues = waitValues;
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.waitSemaphoreCount = waitSemaphoreCount;
 		submitInfo.pWaitSemaphores = waitSemaphores;
 		submitInfo.pWaitDstStageMask = waitStages;
-
-		submitInfo.commandBufferCount = static_cast<uint32_t>(cmdHandles.size());
-		submitInfo.pCommandBuffers = cmdHandles.data();
-
-		VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
-		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
+		submitInfo.signalSemaphoreCount = 2;
 		submitInfo.pSignalSemaphores = signalSemaphores;
 
-		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS)
+		submitInfo.pNext = &semaphoreSubmitInfo;
+
+		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
 			throw runtime_error("failed to submit draw command buffer!");
+
+		SubmitComputeBuffer(computeBuffer);
 
 		EndFrame(signalSemaphores);
 	}
 
-	void RenderContext::BeginFrame()
+	void RenderContext::SubmitComputeBuffer(CommandBuffer& computeBuffer)
 	{
-		AcquireSwapChainAndResetFence(*_swapChain);
+		bool has_wait_semaphore = _lastComputeSemaphoreValue > 0;
+
+		VkSemaphore waitSemaphores[] = { _computeSemaphore };
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+
+		VkSemaphore signalSemaphores[] = { _computeSemaphore };
+
+		VkTimelineSemaphoreSubmitInfo semaphore_info{};
+		semaphore_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+
+		u64 waitValues[] = { _lastComputeSemaphoreValue };
+		semaphore_info.waitSemaphoreValueCount = has_wait_semaphore ? 1 : 0;
+		semaphore_info.pWaitSemaphoreValues = waitValues;
+
+		++_lastComputeSemaphoreValue;
+
+		u64 signalValues[] = { _lastComputeSemaphoreValue };
+		semaphore_info.signalSemaphoreValueCount = 1;
+		semaphore_info.pSignalSemaphoreValues = signalValues;
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.waitSemaphoreCount = has_wait_semaphore ? 1 : 0;
+		submitInfo.pWaitSemaphores = waitSemaphores;
+		submitInfo.pWaitDstStageMask = waitStages;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &computeBuffer.GetHandle();
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = signalSemaphores;
+		submitInfo.pNext = &semaphore_info;
+
+		if (vkQueueSubmit(_device.GetComputeQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+			throw runtime_error("failed to submit compute command buffer!");
 	}
 
 	SwapChain& RenderContext::GetSwapChain() const
@@ -132,31 +214,50 @@ namespace Core
 	{
 		_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-		_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
 		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-		VkFenceCreateInfo fenceInfo{};
-		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 		auto device = _device.GetDevice();
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
-			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_imageAvailableSemaphores[i]) != VK_SUCCESS ||
-				vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_renderFinishedSemaphores[i]) != VK_SUCCESS ||
-				vkCreateFence(device, &fenceInfo, nullptr, &_inFlightFences[i]) != VK_SUCCESS)
+			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_imageAvailableSemaphores[i]) != VK_SUCCESS)
+				throw runtime_error("failed to create semaphores!");
+			
+			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_renderFinishedSemaphores[i]) != VK_SUCCESS)
 				throw runtime_error("failed to create semaphores!");
 		}
+
+		VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
+		semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+		semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+		semaphoreInfo.pNext = &semaphoreTypeInfo;
+
+		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_graphicsSemaphore);
+		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_computeSemaphore);
 	}
 
 	void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	{
 		auto device = _device.GetDevice();
 
-		vkWaitForFences(device, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
+		if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
+		{
+			u64 graphicsTimelineValue = FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1);
+			u64 computeTimelineValue = _lastComputeSemaphoreValue;
+
+			u64 waitValues[] = { graphicsTimelineValue, computeTimelineValue };
+			VkSemaphore waitSemaphores[] = { _graphicsSemaphore, _computeSemaphore };
+
+			VkSemaphoreWaitInfo waitInfo{};
+			waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+			waitInfo.semaphoreCount = 2;
+			waitInfo.pSemaphores = waitSemaphores;
+			waitInfo.pValues = waitValues;
+
+			vkWaitSemaphores(device, &waitInfo, UINT64_MAX);
+		}
 
 		auto swapChainHandle = swapChain.GetSwapChain();
 		VkResult result = vkAcquireNextImageKHR(
@@ -170,8 +271,6 @@ namespace Core
 		}
 		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 			throw runtime_error("failed to acquire swap chain image!");
-
-		vkResetFences(device, 1, &_inFlightFences[_currentFrame]);
 	}
 
 	void RenderContext::EndFrame(VkSemaphore* semaphore)

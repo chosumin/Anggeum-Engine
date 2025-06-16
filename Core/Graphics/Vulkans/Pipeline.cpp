@@ -4,7 +4,7 @@
 #include "Shader.h"
 #include "PipelineState.h"
 
-Core::Pipeline::Pipeline(Device& device, 
+Core::Pipeline::Pipeline(Device& device,
 	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
 	:_device(device)
 {
@@ -12,7 +12,7 @@ Core::Pipeline::Pipeline(Device& device,
 	auto vertexInputState =
 		shader.GetVertexInputStateCreateInfo();
 	auto inputAssemblyState =
-		GetInputAssemblyStateCreateInfo();
+		pipelineState.GetInputAssemblyStateCreateInfo();
 	auto viewportState = GetViewportStateCreateInfo();
 
 	auto depthStencilState = pipelineState.GetDepthStencilStateCreateInfo();
@@ -39,24 +39,29 @@ Core::Pipeline::Pipeline(Device& device,
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
 	pipelineInfo.basePipelineIndex = -1; // Optional
 
-	if (vkCreateGraphicsPipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS)
+	if (vkCreateGraphicsPipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS)
 		throw std::runtime_error("failed to create graphics pipeline!");
+}
+
+Core::Pipeline::Pipeline(Device& device, Shader& shader)
+	:_device(device)
+{
+	_pipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+
+	VkComputePipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.layout = shader.GetPipelineLayout();
+	pipelineInfo.stage = shader.GetComputeShaderStageCreateInfo();
+
+	if (vkCreateComputePipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create compute pipeline!");
+	}
 }
 
 Core::Pipeline::~Pipeline()
 {
 	auto device = _device.GetDevice();
-	vkDestroyPipeline(device, _graphicsPipeline, nullptr);
-}
-
-VkPipelineInputAssemblyStateCreateInfo Core::Pipeline::GetInputAssemblyStateCreateInfo()
-{
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-	return inputAssembly;
+	vkDestroyPipeline(device, _pipeline, nullptr);
 }
 
 VkPipelineViewportStateCreateInfo Core::Pipeline::GetViewportStateCreateInfo()

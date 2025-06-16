@@ -82,7 +82,7 @@ void Core::PreEnvironmentPass::Prepare()
 	_prefilteredMaterial->SetBuffer(0, skyCubemap);
 }
 
-void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	DrawIrradiance(commandBuffer, currentFrame, imageIndex);
 	DrawPrefiltered(commandBuffer, currentFrame, imageIndex);
@@ -227,6 +227,6 @@ Core::PreEnvironmentJob::~PreEnvironmentJob()
 
 void Core::PreEnvironmentJob::Execute()
 {
-	_pass.Draw(*commandBuffer, 0, 0);
+	_pass.Draw(*commandBuffer, *commandBuffer, 0, 0);
 	status = JobStatus::COMPLETE;
 }

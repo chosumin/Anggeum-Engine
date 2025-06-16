@@ -48,7 +48,7 @@ Core::Device::Device(Window& window)
     _queueFamilyIndices = FindQueueFamilies();
     
     _graphicsCommandPool = new CommandPool(*this, 
-        _queueFamilyIndices.GraphicsAndComputeFamily.value());
+        _queueFamilyIndices.GraphicsFamily.value());
 
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 
@@ -322,12 +322,16 @@ Core::QueueFamilyIndices Core::Device::FindQueueFamilies(VkPhysicalDevice device
 		if (indices.IsComplete())
 			break;
 
-		if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
-			(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
-			indices.GraphicsAndComputeFamily = i;
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			indices.GraphicsFamily = i;
+
+        if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+            (queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT))
+            indices.ComputeFamily = i;
 
 		if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-			(queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT))
+			(queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT) &&
+            (queueFamily.queueFlags & ~VK_QUEUE_COMPUTE_BIT))
 			indices.TransferFamily = i;
 
         VkBool32 presentSupport = false;
@@ -384,15 +388,35 @@ bool Core::Device::CheckDeviceExtensionSupport(VkPhysicalDevice device)
 
 void Core::Device::CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeatures& indexingFeatures)
 {
+    VkPhysicalDeviceFeatures2 physicalFeatures2{};
+    physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    VkPhysicalDeviceFeatures deviceFeatures{};
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.sampleRateShading = VK_TRUE;
+    physicalFeatures2.features = deviceFeatures;
+
+	VkPhysicalDeviceTimelineSemaphoreFeatures timelineSempahoreFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
+    physicalFeatures2.pNext = &timelineSempahoreFeatures;
+
+    if (_bindlessSupport)
+    {
+        timelineSempahoreFeatures.pNext = &indexingFeatures;
+    }
+
+    vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
+
     QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = { indices.GraphicsAndComputeFamily.value(), 
+    std::set<uint32_t> uniqueQueueFamilies = {
+        indices.GraphicsFamily.value(),
         indices.PresentFamily.value(),
-        indices.TransferFamily.value() };
+        indices.TransferFamily.value(),
+        indices.ComputeFamily.value() };
 
     float queuePriority = 1.0f;
-    for (uint32_t queueFamily : uniqueQueueFamilies) 
+    for (uint32_t queueFamily : uniqueQueueFamilies)
     {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -402,17 +426,13 @@ void Core::Device::CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeature
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
-    deviceFeatures.sampleRateShading = VK_TRUE;
-
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());;
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = static_cast<uint32_t>(_deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = _deviceExtensions.data();
+    createInfo.pNext = &physicalFeatures2;
 
     if (_enableValidationLayers)
     {
@@ -422,24 +442,13 @@ void Core::Device::CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeature
     else
         createInfo.enabledLayerCount = 0;
 
-    VkPhysicalDeviceFeatures2 physicalFeatures2{};
-    physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
-
-    createInfo.pNext = &physicalFeatures2;
-
-    if (_bindlessSupport)
-    {
-        physicalFeatures2.pNext = &indexingFeatures;
-    }
-
     if (vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_graphicsQueue);
-    vkGetDeviceQueue(_device, indices.GraphicsAndComputeFamily.value(), 0, &_computeQueue);
+    vkGetDeviceQueue(_device, indices.GraphicsFamily.value(), 0, &_graphicsQueue);
+    vkGetDeviceQueue(_device, indices.ComputeFamily.value(), 0, &_computeQueue);
     vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
     vkGetDeviceQueue(_device, indices.TransferFamily.value(), 0, &_transferQueue);
 }

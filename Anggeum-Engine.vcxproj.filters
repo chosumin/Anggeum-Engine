@@ -160,6 +160,8 @@
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
     <ClCompile Include="Core\Graphics\SpirvUtility.cpp" />
     <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\StorageBuffer.cpp" />
+    <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -342,6 +344,8 @@
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
     <ClInclude Include="Core\Graphics\SpirvUtility.h" />
     <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\StorageBuffer.h" />
+    <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">
@@ -416,6 +420,9 @@
     <None Include="Assets\Shaders\skybox.vert.spv">
       <Filter>Assets\Shaders</Filter>
     </None>
+    <None Include="Assets\Shaders\particle.comp" />
+    <None Include="Assets\Shaders\particle.vert" />
+    <None Include="Assets\Shaders\particle.frag" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

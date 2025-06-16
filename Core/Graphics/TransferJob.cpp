@@ -5,11 +5,15 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Image.h"
 
-Core::VkBufferJob::VkBufferJob(Device& device, VkBufferUsageFlagBits usageFlag, 
-	Buffer** dstBuffer, vector<uint8_t> vertexData)
+Core::VkBufferJob::VkBufferJob(Device& device, VkBufferUsageFlags usageFlag,
+	Buffer** dstBuffer, vector<uint8_t> vertexData, bool isStorageBuffer)
 	:Job(JobType::TRANSFER), _device(device), _destination(dstBuffer), _vertexData(vertexData),
 	_usageFlag(usageFlag)
 {
+	if (isStorageBuffer)
+	{
+		_usageFlag |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	}
 }
 
 Core::VkBufferJob::~VkBufferJob()

@@ -8,8 +8,8 @@ Core::WorkerThread::WorkerThread(Device& device)
 {
 	QueueFamilyIndices indices = _device.GetQueueFamilyIndices();
 
-	_graphicsCommandPool = new CommandPool(device, indices.GraphicsAndComputeFamily.value());
-	_computeCommandPool = new CommandPool(device, indices.GraphicsAndComputeFamily.value());
+	_graphicsCommandPool = new CommandPool(device, indices.GraphicsFamily.value());
+	_computeCommandPool = new CommandPool(device, indices.ComputeFamily.value());
 	_transferCommandPool = new CommandPool(device, indices.TransferFamily.value());
 
 	_thread = thread(&WorkerThread::Run, this);

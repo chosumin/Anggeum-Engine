@@ -16,7 +16,7 @@ namespace Core
 		virtual ~ShadowPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
 
 		ShadowUniform& GetShadowBuffer()
 		{

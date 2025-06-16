@@ -27,7 +27,7 @@ VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(size_t index,
 }
 
 Core::TextureBufferLayoutBinding::TextureBufferLayoutBinding(
-	uint32_t binding, VkShaderStageFlagBits stage)
+	uint32_t binding, VkShaderStageFlags stage)
 	:Binding(binding), Stage(stage)
 {
 }

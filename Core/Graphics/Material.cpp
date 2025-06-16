@@ -19,6 +19,18 @@ namespace Core
 		SetDefault(*device.GetResourceCache().RequestDefaultTexture());
 	}
 
+	Material::Material(Device& device, string materialName, string vertPath, string fragPath)
+		:_device(device), _isDirty(true), _name(materialName)
+	{
+		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
+
+		CreateDescriptorSets();
+		CreateBuffers();
+
+		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
+		SetDefault(*device.GetResourceCache().RequestDefaultTexture());
+	}
+
 	Material::Material(const Material& other)
 		: _device(other._device),
 		_shader(other._shader),
@@ -71,6 +83,12 @@ namespace Core
 		}
 		_textureBuffers.clear();
 
+		for (auto& storageBuffer : _storageBuffers)
+		{
+			delete(storageBuffer.second);
+		}
+		_storageBuffers.clear();
+
 		for (auto& buffer : _buffers)
 		{
 			delete(buffer.second);
@@ -101,6 +119,14 @@ namespace Core
 		_textures[binding] = texture;
 	}
 
+	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer)
+	{
+		if (_storageBuffers.find(binding) == _storageBuffers.end())
+			return;
+
+		_storageBuffers[binding]->SetBuffer(currentImage, buffer);
+	}
+
 	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
 	{
 		auto it = _textures.find(binding);
@@ -113,7 +139,10 @@ namespace Core
 
 	void Core::Material::UpdateDescriptorSets()
 	{
-		uint32_t size = static_cast<uint32_t>(_uniformBuffers.size() + _textureBuffers.size());
+		uint32_t size = static_cast<uint32_t>(
+			_uniformBuffers.size() + 
+			_textureBuffers.size() + 
+			_storageBuffers.size());
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 		{
@@ -140,6 +169,16 @@ namespace Core
 
 				VkWriteDescriptorSet writeDescriptorSet =
 					_textureBuffers[iter->first]->CreateWriteDescriptorSet(i, iter->first);
+
+				descriptorWrites[index] = writeDescriptorSet;
+				descriptorWrites[index].dstSet = descriptorSet;
+				++index;
+			}
+
+			for (auto iter = _storageBuffers.begin(); iter != _storageBuffers.end(); ++iter)
+			{
+				VkWriteDescriptorSet writeDescriptorSet =
+					iter->second->CreateWriteDescriptorSet(i, iter->first);
 
 				descriptorWrites[index] = writeDescriptorSet;
 				descriptorWrites[index].dstSet = descriptorSet;
@@ -199,6 +238,14 @@ namespace Core
 			auto buffer = new Core::TextureBuffer();
 			_textureBuffers[binding.Binding] = buffer;
 		}
+
+		auto& storageBindings = _shader->GetStorageBufferLayoutBindings();
+
+		for (auto& binding : storageBindings)
+		{
+			auto buffer = new Core::StorageBuffer(_device, binding.BufferSize);
+			_storageBuffers[binding.Binding] = buffer;
+		}
 	}
 
 	void Material::SetDefault(Texture& defaultTexture)
@@ -208,7 +255,6 @@ namespace Core
 		for (auto&& textureBuffer : _textureBuffers)
 		{
 			textureBuffer.second->CopyDescriptorImageInfo(descriptor);
-
 		}
 	}
 }

@@ -66,8 +66,38 @@ shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& shader
 			return shared;
 	}
 
+	shared_ptr<Core::Shader> shader;
+	if (vertShaderPath.empty() || fragShaderPath.empty())
+		shader = make_shared<Shader>(_device, pass,
+			shaderName);
+	else
+		shader = make_shared<Shader>(_device, pass,
+			vertShaderPath, fragShaderPath);
+
+	shader->CreatePipelineLayout();
+	_shaders[shaderName] = shader;
+
+	return shader;
+}
+
+shared_ptr<Core::Shader> Core::ResourceCache::RequestShader(const string& vertPath, const string& fragPath)
+{
+	lock_guard<mutex> guard(_shaderMutex);
+
+	string pass = "Geometry";
+
+	string shaderName = vertPath + fragPath; // Create a unique name based on paths
+
+	auto it = _shaders.find(shaderName);
+	if (it != _shaders.end())
+	{
+		if (auto shared = it->second.lock())
+			return shared;
+	}
+
 	shared_ptr<Core::Shader> shader = make_shared<Shader>(_device, pass,
-		vertShaderPath, fragShaderPath);
+		vertPath, fragPath);
+
 	shader->CreatePipelineLayout();
 	_shaders[shaderName] = shader;
 
@@ -213,8 +243,7 @@ void Core::ResourceCache::GetShaderFiles(const uint32_t hash,
 		break;
 	default:
 		pass = "Geometry";
-		vert = "shaders/pbr.vert";
-		frag = "shaders/pbr.frag";
+		//Default is compute shader.
 		break;
 	}
 }

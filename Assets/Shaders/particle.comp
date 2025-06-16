@@ -1,0 +1,49 @@
+#version 450
+
+layout (binding = 0) uniform Time
+{
+	float deltaTime;
+} time;
+
+layout(constant_id = 1) const uint Count1 = 8192u;
+layout (binding = 1) readonly buffer InPosition
+{
+	vec2 inPosition[];
+};
+
+layout(constant_id = 2) const uint Count2 = 8192u;
+layout (binding = 2) readonly buffer InVelocity
+{
+	vec2 inVelocity[];
+};
+
+layout(constant_id = 3) const uint Count3 = 8192u;
+layout (binding = 3) buffer OutPosition
+{
+	vec2 outPosition[];
+};
+
+layout(constant_id = 4) const uint Count4 = 8192u;
+layout (binding = 4) buffer OutVelocity
+{
+	vec2 outVelocity[];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;  
+
+    outPosition[index] = inPosition[index] + inVelocity[index] * time.deltaTime;
+    outVelocity[index] = inVelocity[index];
+
+    // Flip movement at window border
+    if ((outPosition[index].x <= -1.0) || (outPosition[index].x >= 1.0)) 
+    {
+        outVelocity[index].x = -outVelocity[index].x;
+    }
+    if ((outPosition[index].y <= -1.0) || (outPosition[index].y >= 1.0)) 
+    {
+        outVelocity[index].y = -outVelocity[index].y;
+    }
+}

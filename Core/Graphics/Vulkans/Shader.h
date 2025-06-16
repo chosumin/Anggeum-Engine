@@ -1,6 +1,7 @@
 #pragma once
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
+#include "StorageBuffer.h"
 #include "Graphics/Vulkans/Vertex.h"
 #include "Graphics/BufferObjects.h"
 
@@ -17,6 +18,9 @@ namespace Core
 			const string pass,
 			const string& vertFilePath,
 			const string& fragFilePath);
+		Shader(Device& device,
+			const string pass,
+			const string& computeFilePath);
 		Shader(Shader&& other) noexcept;
 		Shader& operator=(Shader&& other) noexcept;
 
@@ -39,6 +43,7 @@ namespace Core
 		VkPipelineVertexInputStateCreateInfo GetVertexInputStateCreateInfo();
 
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
+		VkPipelineShaderStageCreateInfo GetComputeShaderStageCreateInfo() const;
 
 		VkShaderStageFlags GetPushConstantsShaderStage(uint32_t index) const;
 		uint32_t GetPushConstantsOffset(uint32_t index) const;
@@ -56,9 +61,15 @@ namespace Core
 		{
 			return _textureBufferLayoutBindings;
 		}
+
+		const vector<StorageBufferLayoutBinding>& GetStorageBufferLayoutBindings() const
+		{
+			return _storageBufferLayoutBindings;
+		}
 	protected:
-		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage, VkDeviceSize size);
-		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlagBits stage);
+		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
+		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
+		void AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
 		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size);
 	private:
 		void CreateDescriptorPool();
@@ -80,6 +91,7 @@ namespace Core
 
 		VkShaderModule _vertShaderModule;
 		VkShaderModule _fragShaderModule;
+		VkShaderModule _computeShaderModule;
 
 		DescriptorPool* _descriptorPool;
 
@@ -87,6 +99,7 @@ namespace Core
 
 		vector<UniformBufferLayoutBinding> _uniformBufferLayoutBindings;
 		vector<TextureBufferLayoutBinding> _textureBufferLayoutBindings;
+		vector<StorageBufferLayoutBinding> _storageBufferLayoutBindings;
 
 		vector<string> _vertexAttributeNames;
 	};

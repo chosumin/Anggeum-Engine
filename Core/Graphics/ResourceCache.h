@@ -23,6 +23,7 @@ namespace Core
 			const string& shaderName);
 
 		shared_ptr<Shader> RequestShader(const string& shaderName);
+		shared_ptr<Shader> RequestShader(const string& vertPath, const string& fragPath);
 
 		shared_ptr<Core::Image> RequestImage(const ImageCreateInfo imageCreateInfo);
 

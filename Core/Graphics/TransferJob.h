@@ -8,7 +8,7 @@ namespace Core
 	class VkBufferJob : public Job
 	{
 	public:
-		VkBufferJob(Device& device, VkBufferUsageFlagBits usageFlag, Buffer** dstBuffer, vector<uint8_t> vertexData);
+		VkBufferJob(Device& device, VkBufferUsageFlags usageFlag, Buffer** dstBuffer, vector<uint8_t> vertexData, bool isStorageBuffer = false);
 		~VkBufferJob();
 
 		void Execute() override;
@@ -16,7 +16,7 @@ namespace Core
 		Device& _device;
 		vector<uint8_t> _vertexData;
 
-		VkBufferUsageFlagBits _usageFlag;
+		VkBufferUsageFlags _usageFlag;
 
 		Buffer** _destination;
 		Buffer* _stagingBuffer;
