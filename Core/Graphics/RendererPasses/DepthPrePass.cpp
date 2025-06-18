@@ -11,11 +11,8 @@
 #include "Graphics/ResourceCache.h"
 
 Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget)
-	:RendererPass(device, workerThreadManager), _scene(scene), _batch(nullptr),
-	_depthMap(depthRenderTarget)
+	:RendererPass(device, workerThreadManager), _scene(scene)
 {
-	_material = device.GetResourceCache().RequestMaterial("pre depth", "Shadow");
-
 	_renderPass->CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
 
@@ -29,6 +26,11 @@ Core::DepthPrePass::~DepthPrePass()
 
 void Core::DepthPrePass::Prepare()
 {
+	_material = _device.GetResourceCache().RequestMaterial("depth prepass", "Shadow");
+
+	auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
+	multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
+
 	_batch = new RendererBatch(_device, _material->GetShader(), *_renderPass, *_pipelineState);
 
 	auto meshes = _scene.GetComponents<Core::Mesh>();
@@ -40,16 +42,13 @@ void Core::DepthPrePass::Prepare()
 
 void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
-	commandBuffer.TransitionImageLayout(*_depthMap->GetImage().lock(),
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	PerspectiveCamera* camera = _scene.GetMainCamera();
 
 	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
 
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	PerspectiveCamera* camera = _scene.GetMainCamera();
 	_material->SetBuffer(currentFrame, 0, &camera->Matrices);
 
 	_batch->Draw(commandBuffer, currentFrame);

@@ -21,7 +21,6 @@ namespace Core
 
 		RendererBatch* _batch;
 		shared_ptr<Material> _material;
-		Texture* _depthMap;
 	};
 }
 

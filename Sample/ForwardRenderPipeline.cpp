@@ -32,10 +32,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 
 	CreatePreSkyTextures();
 
-	/*_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
-
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[7].get());
-	AddRendererPass(depthPrePass);*/
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get());
+	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
@@ -49,10 +47,6 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 		_renderTargets[6]);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
-
-	auto particlePass = new Sample::ParticlePass(
-		device, workerThreadManager, scene, swapChain, _renderTargets[0]);
-	AddRendererPass(particlePass);
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()

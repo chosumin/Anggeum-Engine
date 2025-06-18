@@ -30,7 +30,7 @@ namespace Core
 		_renderPass->CreateColorAttachment(colorRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 		_renderPass->CreateDepthAttachment(depthRenderTarget.get(),
-			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+			VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE);
 		_renderPass->CreateRenderPass();
 
 		CreateFrameBuffer(swapChain);
@@ -54,6 +54,9 @@ namespace Core
 	{
 		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
+
+		auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
+		depthStencil.depthWriteEnable = VK_FALSE;
 
 		auto meshes = _scene.GetComponents<Core::Mesh>();
 		for (auto&& mesh : meshes)
