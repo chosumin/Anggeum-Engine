@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/IRenderPipeline.h"
+#include "Graphics/BufferObjects.h"
 
 namespace Core
 {
@@ -7,11 +8,13 @@ namespace Core
 	class Scene;
 	class SwapChain;
 	class WorkerThreadManager;
+	class TransferContext;
+	class Buffer;
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
-		ForwardRenderPipeline(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain);
+		ForwardRenderPipeline(Device& device, 
+			WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain);
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Prepare() override;
@@ -42,15 +45,13 @@ namespace Core
 		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);
 
 		void CreatePreSkyTextures();
+		void CreateLightCullingBuffers(VkExtent2D extent, ivec2 tileNums);
 	private:
 		Device& _device;
-
 		vector<RendererPass*> _rendererPasses;
-
-		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-
 		vector<shared_ptr<Texture>> _renderTargets;
-		
+		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+		vector<Buffer*> _storageBuffers;
 		shared_ptr<Sampler> _sampler;
 	};
 }

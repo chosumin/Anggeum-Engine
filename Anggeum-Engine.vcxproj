@@ -192,6 +192,7 @@
     <ClCompile Include="Core\Utils\Utility.cpp" />
     <ClCompile Include="DebugInfo.cpp" />
     <ClCompile Include="Core\Foundation\Job.cpp" />
+    <ClCompile Include="Core\Graphics\RendererPasses\LightCullingPass.cpp" />
     <ClCompile Include="Sample\ForwardRenderPipeline.cpp" />
     <ClCompile Include="Sample\RendererPasses\BrdfLutPass.cpp" />
     <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
@@ -289,6 +290,7 @@
     <ClInclude Include="Core\Utils\Utility.h" />
     <ClInclude Include="DebugInfo.h" />
     <ClInclude Include="Core\Foundation\Job.h" />
+    <ClInclude Include="Core\Graphics\RendererPasses\LightCullingPass.h" />
     <ClInclude Include="Sample\ForwardRenderPipeline.h" />
     <ClInclude Include="Sample\RendererPasses\BrdfLutPass.h" />
     <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
@@ -308,6 +310,7 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\Shaders\lightCulling.comp" />
     <None Include="Assets\Shaders\particle.frag" />
     <None Include="Assets\Shaders\particle.vert" />
     <None Include="Assets\Shaders\brdf_lut.frag" />

@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/RenderPass.h"
 #include "Graphics/Vulkans/Framebuffer.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Foundation/WorkerThread.h"
 #include "Utils/timer.h"
 

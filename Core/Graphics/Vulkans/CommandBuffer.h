@@ -50,6 +50,8 @@ namespace Core
 		void UpdateFrame(uint64_t frame) { _frame = frame; }
 		bool IsBusy();
 	private:
+		void GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
+	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
 		VkCommandBufferLevel _level;

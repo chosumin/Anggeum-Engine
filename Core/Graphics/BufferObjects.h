@@ -1,6 +1,8 @@
 #pragma once
 
-#define MAX_FORWARD_LIGHT_COUNT 8
+#define MAX_FORWARD_LIGHT_COUNT 1000
+#define MAX_POINT_LIGHT_PER_TILE 1023
+#define TILE_SIZE 16
 
 struct alignas(16) VPBufferObject
 {
@@ -51,4 +53,16 @@ struct PrefilterEnv
 {
 	float Roughness;
 	uint32_t NumSamples = 32u;
+};
+
+struct VisibleLightsForTile
+{
+	uint32_t count;
+	std::array<uint32_t, MAX_POINT_LIGHT_PER_TILE> lightindices;
+};
+
+struct TileInfo
+{
+	ivec2 viewportSize;
+	ivec2 tileNums;
 };

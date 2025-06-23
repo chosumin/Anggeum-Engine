@@ -3,20 +3,19 @@
 #include "Buffer.h"
 #include "MemoryAllocator.h"
 
-Core::StorageBuffer::StorageBuffer(Device& device, VkDeviceSize bufferSize)
-	:_device(device)
+Core::StorageBuffer::StorageBuffer()
 {
 	_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-	_bufferInfo.range = bufferSize;
 }
 
 Core::StorageBuffer::~StorageBuffer()
 {
 }
 
-void Core::StorageBuffer::SetBuffer(uint32_t currentImage, Buffer* data)
+void Core::StorageBuffer::SetBuffer(uint32_t currentImage, Buffer* data, u32 arrayLength)
 {
 	_buffers[currentImage] = data;
+	_bufferInfo.range = arrayLength;
 }
 
 VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)
@@ -35,8 +34,8 @@ VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(size_t index,
 	return descriptorWrite;
 }
 
-Core::StorageBufferLayoutBinding::StorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize)
-	:Binding(binding), Stage(stage), BufferSize(bufferSize)
+Core::StorageBufferLayoutBinding::StorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage)
+	:Binding(binding), Stage(stage)
 {
 }
 

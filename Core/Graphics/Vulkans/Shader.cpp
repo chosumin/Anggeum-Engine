@@ -253,7 +253,7 @@ void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStage
 		_textureBufferLayoutBindings.emplace_back(binding, stage);
 }
 
-void Core::Shader::AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size)
+void Core::Shader::AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage)
 {
 	bool isNew = true;
 	for (auto&& layoutBinding : _storageBufferLayoutBindings)
@@ -267,7 +267,7 @@ void Core::Shader::AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStage
 	}
 
 	if (isNew)
-		_storageBufferLayoutBindings.emplace_back(binding, stage, size);
+		_storageBufferLayoutBindings.emplace_back(binding, stage);
 }
 
 void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)

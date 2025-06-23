@@ -19,7 +19,7 @@
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
 
-#define MAX_FORWARD_LIGHT_COUNT 8
+#define MAX_FORWARD_LIGHT_COUNT 1000
 
 struct Light
 {

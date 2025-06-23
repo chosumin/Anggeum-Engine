@@ -162,6 +162,7 @@
     <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\StorageBuffer.cpp" />
     <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
+    <ClCompile Include="Core\Graphics\RendererPasses\LightCullingPass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -346,6 +347,7 @@
     <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />
     <ClInclude Include="Core\Graphics\Vulkans\StorageBuffer.h" />
     <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
+    <ClInclude Include="Core\Graphics\RendererPasses\LightCullingPass.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">
@@ -423,6 +425,7 @@
     <None Include="Assets\Shaders\particle.comp" />
     <None Include="Assets\Shaders\particle.vert" />
     <None Include="Assets\Shaders\particle.frag" />
+    <None Include="Assets\Shaders\lightCulling.comp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

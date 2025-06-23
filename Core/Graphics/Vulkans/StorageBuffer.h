@@ -7,13 +7,13 @@ namespace Core
 	class StorageBuffer
 	{
 	public:
-		StorageBuffer(Device& device, VkDeviceSize bufferSize);
+		StorageBuffer();
 		~StorageBuffer();
 
-		void SetBuffer(uint32_t currentImage, Buffer* data);
+		void SetBuffer(uint32_t currentImage, Buffer* data, u32 arrayLength);
+
 		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
 	private:
-		Device& _device;
 		vector<Buffer*> _buffers;
 		VkDescriptorBufferInfo _bufferInfo;
 	};
@@ -21,14 +21,12 @@ namespace Core
 	struct StorageBufferLayoutBinding : public IDescriptor
 	{
 	public:
-		StorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize);
+		StorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
 
 		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
 		VkDescriptorType GetDescriptorType();
 
 		uint32_t Binding;
 		VkShaderStageFlags Stage;
-		VkDeviceSize BufferSize;
 	};
 }
-

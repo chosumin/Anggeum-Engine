@@ -119,12 +119,21 @@ namespace Core
 		_textures[binding] = texture;
 	}
 
-	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer)
+	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer, u32 arrayLength)
 	{
 		if (_storageBuffers.find(binding) == _storageBuffers.end())
 			return;
 
-		_storageBuffers[binding]->SetBuffer(currentImage, buffer);
+		_storageBuffers[binding]->SetBuffer(currentImage, buffer, arrayLength);
+	}
+
+	void Material::SetStorageBuffer(uint32_t binding, Buffer* buffer, u32 arrayLength)
+	{
+		if (_storageBuffers.find(binding) == _storageBuffers.end())
+			return;
+
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+			_storageBuffers[binding]->SetBuffer(i, buffer, arrayLength);
 	}
 
 	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
@@ -243,7 +252,7 @@ namespace Core
 
 		for (auto& binding : storageBindings)
 		{
-			auto buffer = new Core::StorageBuffer(_device, binding.BufferSize);
+			auto buffer = new Core::StorageBuffer();
 			_storageBuffers[binding.Binding] = buffer;
 		}
 	}

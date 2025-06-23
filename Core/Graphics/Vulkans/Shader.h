@@ -69,7 +69,7 @@ namespace Core
 	protected:
 		void AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
 		void AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
-		void AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
+		void AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
 		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size);
 	private:
 		void CreateDescriptorPool();

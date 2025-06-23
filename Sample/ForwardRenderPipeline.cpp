@@ -2,18 +2,19 @@
 #include "ForwardRenderPipeline.h"
 #include "Foundation/Scene.h"
 #include "Foundation/WorkerThread.h"
+#include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/ResourceCache.h"
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
-#include "Sample/RendererPasses/ParticlePass.h"
+#include "Graphics/RendererPasses/LightCullingPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
-Core::ForwardRenderPipeline::ForwardRenderPipeline(
-	Device& device, WorkerThreadManager& workerThreadManager, 
+Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
+	WorkerThreadManager& workerThreadManager,
 	Scene& scene, SwapChain& swapChain)
 	:_device(device)
 {
@@ -27,10 +28,15 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	auto extent = swapChain.GetSwapChainExtent();
 
 	_renderTargets.push_back(CreateColorRenderTarget(extent, swapChain.GetImageFormat(), false));
-	_renderTargets.push_back(CreateDepthRenderTarget(extent, false, _msaaSamples));
+	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, _msaaSamples));
 	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
 
 	CreatePreSkyTextures();
+
+	ivec2 tileNums = ivec2(
+		(extent.width - 1) / TILE_SIZE + 1,
+		(extent.height - 1) / TILE_SIZE + 1);
+	CreateLightCullingBuffers(extent, tileNums);
 
 	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get());
 	AddRendererPass(depthPrePass);
@@ -38,6 +44,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
 	AddRendererPass(shadowPass);
+
+	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, 
+		_renderTargets[1], _storageBuffers[0]);
+	AddRendererPass(lightCullingPass);
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain,
@@ -52,6 +62,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
+
+	for (auto&& storageBuffer : _storageBuffers)
+	{
+		delete(storageBuffer);
+	}
 
 	for (auto&& rendererPass : _rendererPasses)
 	{
@@ -291,4 +306,16 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 		shared_ptr<Texture> bdrf = make_shared<Texture>("brdflut", image, _sampler);
 		_renderTargets.push_back(bdrf);
 	}
+}
+
+void Core::ForwardRenderPipeline::CreateLightCullingBuffers(VkExtent2D extent, ivec2 tileNums)
+{
+	u32 lightVisiblityBufferSize = sizeof(VisibleLightsForTile) * tileNums.x * tileNums.y;
+
+	auto lightVisibilityBuffer = new Core::Buffer(_device,
+		lightVisiblityBufferSize,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		MemoryType::DEVICE_LOCAL);
+
+	_storageBuffers.push_back(lightVisibilityBuffer);
 }

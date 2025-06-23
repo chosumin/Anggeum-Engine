@@ -47,7 +47,8 @@ namespace Core
 
 		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
 		void SetBuffer(uint32_t binding, shared_ptr<Texture> texture);
-		void SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer);
+		void SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer, u32 arrayLength);
+		void SetStorageBuffer(uint32_t binding, Buffer* buffer, u32 arrayLength);
 
 		void SetBuffer(uint32_t currentImage)
 		{

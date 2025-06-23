@@ -101,15 +101,15 @@ void Sample::ParticlePass::Prepare()
 
 	_device.EndSingleTimeCommands(commandBuffer);
 
-	_computeMaterial->SetStorageBuffer(0, 1, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(0, 2, _buffers[1]);
-	_computeMaterial->SetStorageBuffer(0, 3, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(0, 4, _buffers[4]);
+	_computeMaterial->SetStorageBuffer(0, 1, _buffers[0], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(0, 2, _buffers[1], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(0, 3, _buffers[3], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(0, 4, _buffers[4], PARTICLE_COUNT);
 
-	_computeMaterial->SetStorageBuffer(1, 1, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(1, 2, _buffers[4]);
-	_computeMaterial->SetStorageBuffer(1, 3, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(1, 4, _buffers[1]);
+	_computeMaterial->SetStorageBuffer(1, 1, _buffers[3], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(1, 2, _buffers[4], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(1, 3, _buffers[0], PARTICLE_COUNT);
+	_computeMaterial->SetStorageBuffer(1, 4, _buffers[1], PARTICLE_COUNT);
 }
 
 void Sample::ParticlePass::Draw(Core::CommandBuffer& commandBuffer, Core::CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)

@@ -160,7 +160,7 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         auto& storageBuffer = resources.storage_buffers[i];
 
         unsigned binding = compiler.get_decoration(storageBuffer.id, spv::DecorationBinding);
-        const spirv_cross::SPIRType& type = compiler.get_type(storageBuffer.base_type_id);
+        /*const spirv_cross::SPIRType& type = compiler.get_type(storageBuffer.base_type_id);
         uint32_t runtime_array_type_id = type.member_types[0];
         const spirv_cross::SPIRType& runtime_array_type = compiler.get_type(runtime_array_type_id);
 
@@ -173,9 +173,9 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
 
         const spirv_cross::SPIRConstant& arraySize = compiler.get_constant(specConstant->id);
 
-        size_t size = compiler.get_declared_struct_size_runtime_array(type, arraySize.scalar_i32());
+        size_t size = compiler.get_declared_struct_size_runtime_array(type, arraySize.scalar_i32());*/
 
-        shader.AddStorageBufferLayoutBinding(binding, shaderStage, size);
+        shader.AddStorageBufferLayoutBinding(binding, shaderStage);
     }
 
     for (const auto& resource : resources.sampled_images) 
