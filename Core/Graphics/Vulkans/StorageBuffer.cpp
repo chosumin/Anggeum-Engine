@@ -12,10 +12,10 @@ Core::StorageBuffer::~StorageBuffer()
 {
 }
 
-void Core::StorageBuffer::SetBuffer(uint32_t currentImage, Buffer* data, u32 arrayLength)
+void Core::StorageBuffer::SetBuffer(uint32_t currentImage, Buffer* data)
 {
 	_buffers[currentImage] = data;
-	_bufferInfo.range = arrayLength;
+	_bufferInfo.range = data->GetSize();
 }
 
 VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/Vulkans/Buffer.h"
 
 namespace Core
 {
@@ -16,7 +17,8 @@ namespace Core
 			shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
 			shared_ptr<Texture> shadowRenderTarget, 
 			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
-			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut);
+			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
+			Buffer* lightVisibilityBuffer, ivec2 tileNums);
 		virtual ~GeometryPass() override;
 
 		virtual void Prepare() override;
@@ -46,6 +48,9 @@ namespace Core
 		shared_ptr<Texture> _irradianceCubemap;
 		shared_ptr<Texture> _prefilteredCubemap;
 		shared_ptr<Texture> _brdfLut;
+
+		Core::Buffer* _lightVisibilityBuffer;
+		TileInfo _tileInfo;
 	};
 }
 

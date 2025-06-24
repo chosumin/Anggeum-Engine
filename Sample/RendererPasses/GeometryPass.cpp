@@ -5,7 +5,6 @@
 #include "Components/PerspectiveCamera.h"
 #include "Components/Light.h"
 #include "Components/Mesh.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
@@ -14,6 +13,7 @@
 #include "Graphics/SubMesh.h"
 #include "PreEnvironmentPass.h"
 #include "BrdfLutPass.h"
+
 namespace Core
 {
 	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
@@ -21,7 +21,8 @@ namespace Core
 		shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
 		shared_ptr<Texture> shadowRenderTarget, 
 		shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> irradianceCubemap,
-		shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut)
+		shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
+		Buffer* lightVisibilityBuffer, ivec2 tileNums)
 		:RendererPass(device, workerThreadManager), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
@@ -36,6 +37,10 @@ namespace Core
 		CreateFrameBuffer(swapChain);
 
 		PreparePregenerationSkybox(pregenerationSky.get(), irradianceCubemap.get(), prefilterCubemap.get());
+
+		auto swapChainExtents = swapChain.GetSwapChainExtent();
+		_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
+		_tileInfo.tileNums = tileNums;
 	}
 
 	GeometryPass::~GeometryPass()
@@ -109,9 +114,12 @@ namespace Core
 				sharedMat->SetBuffer(4, _shadowRenderTarget);
 				sharedMat->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
 				sharedMat->SetBuffer(currentFrame, 7, &_lightBuffer);
-				sharedMat->SetBuffer(8, _irradianceCubemap);
-				sharedMat->SetBuffer(9, _prefilteredCubemap);
-				sharedMat->SetBuffer(10, _brdfLut);
+
+				sharedMat->SetStorageBuffer(8, _lightVisibilityBuffer);
+
+				sharedMat->SetBuffer(9, _irradianceCubemap);
+				sharedMat->SetBuffer(10, _prefilteredCubemap);
+				sharedMat->SetBuffer(11, _brdfLut);
 
 				sharedMat->SetBuffer(currentFrame);
 			}

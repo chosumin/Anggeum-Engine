@@ -10,7 +10,7 @@ namespace Core
 		StorageBuffer();
 		~StorageBuffer();
 
-		void SetBuffer(uint32_t currentImage, Buffer* data, u32 arrayLength);
+		void SetBuffer(uint32_t currentImage, Buffer* data);
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
 	private:

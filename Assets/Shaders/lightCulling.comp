@@ -5,15 +5,6 @@
 #include "lighting.h"
 #include "common.glsl"
 
-const int TILE_SIZE = 16;
-const int MAX_POINT_LIGHT_PER_TILE = 1023;
-
-struct LightVisiblity
-{
-	uint count;
-	uint lightIndices[MAX_POINT_LIGHT_PER_TILE];
-};
-
 layout(push_constant) uniform TileInfo
 {
 	ivec2 viewportSize;
@@ -27,11 +18,7 @@ layout(binding = 1) writeonly buffer TileLightVisiblities
 
 layout(binding = 2) uniform sampler2DMS depthBuffer;
 
-layout(binding = 3) uniform LightInfo
-{
-	Light lights[MAX_FORWARD_LIGHT_COUNT];
-	uint count;
-} lightInfo;
+layout(binding = 3) uniform LightInfo lightInfo;
 
 // vulkan ndc, minDepth = 0.0, maxDepth = 1.0
 const vec2 ndc_upper_left = vec2(-1.0, -1.0);
@@ -43,8 +30,6 @@ struct ViewFrustum
 	vec4 planes[6];
 	vec3 points[8]; // 0-3 near 4-7 far
 };
-
-layout(local_size_x = 32) in;
 
 shared ViewFrustum frustum;
 shared uint light_count_for_tile;
@@ -133,7 +118,7 @@ bool isCollided(Light light, ViewFrustum frustum)
 	return true;
 }
 
-layout (local_size_x = 32) in;
+layout (local_size_x = 1, local_size_y = 1) in;
 void main()
 {
 	ivec2 tileId = ivec2(gl_WorkGroupID.xy);
@@ -148,7 +133,7 @@ void main()
 		{
 			for (int x = 0; x < TILE_SIZE; x++)
 			{
-				ivec2 sample_loc = (ivec2(TILE_SIZE, TILE_SIZE) * tileId + ivec2(x, y) ) / tileInfo.viewportSize;
+				ivec2 sample_loc = ivec2(TILE_SIZE, TILE_SIZE) * tileId + ivec2(x, y);
 				float pre_depth = texelFetch(depthBuffer, sample_loc, 0).x;
 				min_depth = min(min_depth, pre_depth);
 				max_depth = max(max_depth, pre_depth); //TODO: parallize this
@@ -164,22 +149,19 @@ void main()
 		light_count_for_tile = 0;
 	}
 
-	barrier();
-
-	for (uint i = gl_LocalInvocationIndex; i < lightInfo.count && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; i += gl_WorkGroupSize.x)
+	for (uint i = 0; i < lightInfo.count && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; ++i)
 	{
 		if (isCollided(lightInfo.lights[i], frustum))
 		{
 			uint slot = atomicAdd(light_count_for_tile, 1);
-			if (slot >= MAX_POINT_LIGHT_PER_TILE) {break;}
+			if (slot >= MAX_POINT_LIGHT_PER_TILE) 
+				break;
 			light_visiblities[tileIndex].lightIndices[slot] = i;
 		}
 	}
 
-	barrier();
-
 	if (gl_LocalInvocationIndex == 0)
 	{
-		light_visiblities[tileIndex].count = min(MAX_POINT_LIGHT_PER_TILE, light_count_for_tile);
+		light_visiblities[tileIndex].count = light_count_for_tile;
 	}
 }

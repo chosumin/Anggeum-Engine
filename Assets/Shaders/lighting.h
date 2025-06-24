@@ -21,12 +21,27 @@
 
 #define MAX_FORWARD_LIGHT_COUNT 1000
 
+#define TILE_SIZE 16
+#define MAX_POINT_LIGHT_PER_TILE 128
+
+struct LightVisiblity
+{
+	uint count;
+	uint lightIndices[MAX_POINT_LIGHT_PER_TILE];
+};
+
 struct Light
 {
 	vec4 position;         // position.w represents type of light
 	vec4 color;            // color.w represents light intensity
 	vec4 direction;        // direction.w represents range
 	vec2 info;             // (only used for spot lights) info.x represents light inner cone angle, info.y represents light outer cone angle
+};
+
+struct LightInfo
+{
+	Light lights[MAX_FORWARD_LIGHT_COUNT];
+	uint count;
 };
 
 vec3 ApplyDirectionalLight(Light light, vec3 normal)

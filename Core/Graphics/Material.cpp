@@ -119,21 +119,21 @@ namespace Core
 		_textures[binding] = texture;
 	}
 
-	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer, u32 arrayLength)
+	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer)
 	{
 		if (_storageBuffers.find(binding) == _storageBuffers.end())
 			return;
 
-		_storageBuffers[binding]->SetBuffer(currentImage, buffer, arrayLength);
+		_storageBuffers[binding]->SetBuffer(currentImage, buffer);
 	}
 
-	void Material::SetStorageBuffer(uint32_t binding, Buffer* buffer, u32 arrayLength)
+	void Material::SetStorageBuffer(uint32_t binding, Buffer* buffer)
 	{
 		if (_storageBuffers.find(binding) == _storageBuffers.end())
 			return;
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-			_storageBuffers[binding]->SetBuffer(i, buffer, arrayLength);
+			_storageBuffers[binding]->SetBuffer(i, buffer);
 	}
 
 	shared_ptr<Texture> Material::GetTexture(uint32_t binding)

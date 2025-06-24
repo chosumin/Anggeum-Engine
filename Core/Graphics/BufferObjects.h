@@ -1,7 +1,7 @@
 #pragma once
 
 #define MAX_FORWARD_LIGHT_COUNT 1000
-#define MAX_POINT_LIGHT_PER_TILE 1023
+#define MAX_POINT_LIGHT_PER_TILE 128
 #define TILE_SIZE 16
 
 struct alignas(16) VPBufferObject

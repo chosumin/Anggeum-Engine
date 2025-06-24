@@ -28,7 +28,7 @@ Core::LightCullingPass::~LightCullingPass()
 
 void Core::LightCullingPass::Prepare()
 {
-	_computeMaterial->SetStorageBuffer(1, _lightVisibilityBuffer, _tileInfo.tileNums.x * _tileInfo.tileNums.y);
+	_computeMaterial->SetStorageBuffer(1, _lightVisibilityBuffer);
 	_computeMaterial->SetBuffer(2, _depthPrepassRenderTarget);
 }
 
