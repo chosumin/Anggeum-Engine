@@ -68,7 +68,8 @@ void Core::RendererBatch::Add(Mesh& mesh, weak_ptr<Material> material)
 	}
 }
 
-void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame)
+void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame,
+	function<void(shared_ptr<Material>, shared_ptr<SubMesh>, vector<Transform*>&)> loop)
 {
 	commandBuffer.BindPipeline(Pipeline);
 
@@ -80,8 +81,6 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 		commandBuffer.BindDescriptorSets(
 			VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);
 
-		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
-
 		//2. SubMesh batch
 		auto& subMeshBatches = SubMeshBatches[material.first];
 
@@ -92,19 +91,7 @@ void Core::RendererBatch::Draw(CommandBuffer& commandBuffer, uint32_t currentFra
 			auto subMesh = subMeshBatch.second.lock();
 			auto& transforms = Transforms[subMesh->GetName()];
 
-			//3. Transform loop
-			for (size_t i = 0; i < transforms.size(); ++i)
-			{
-				sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
-			}
-
-			commandBuffer.PushConstants(*sharedMaterial);
-
-			commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
-
-			commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
-
-			commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
+			loop(sharedMaterial, subMesh, transforms);
 		}
 	}
 }

@@ -38,12 +38,6 @@ struct Light
 	vec2 info;             // (only used for spot lights) info.x represents light inner cone angle, info.y represents light outer cone angle
 };
 
-struct LightInfo
-{
-	Light lights[MAX_FORWARD_LIGHT_COUNT];
-	uint count;
-};
-
 vec3 ApplyDirectionalLight(Light light, vec3 normal)
 {
 	vec3 worldToLight = -light.direction.xyz;
@@ -56,7 +50,7 @@ vec3 ApplyPointLight(Light light, vec3 pos, vec3 normal)
 {
 	vec3  worldToLight = light.position.xyz - pos;
 	float dist = length(worldToLight);
-	float atten = 1.0 / (dist * dist);
+	float atten = light.direction.w / (dist * dist);
 	worldToLight = normalize(worldToLight);
 	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
 	return ndotl * light.color.w * atten * light.color.rgb;

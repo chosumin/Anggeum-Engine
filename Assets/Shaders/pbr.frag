@@ -36,7 +36,12 @@ layout(binding = 6) uniform PBR
 	int debugMode;
 } pbr;
 
-layout(binding = 7) uniform LightInfo lights;
+layout(binding = 7) uniform Lights 
+{
+	Light lights[MAX_FORWARD_LIGHT_COUNT];
+	uint count;
+} lights;
+
 layout(binding = 8) buffer readonly TileLightVisiblities
 {
     LightVisiblity lightVisiblities[];
@@ -46,9 +51,9 @@ layout(binding = 9) uniform samplerCube irradiancemap;
 layout(binding = 10) uniform samplerCube prefiltermap;
 layout(binding = 11) uniform sampler2D brdfLut;
 
-layout(push_constant) uniform TileInfo
+layout(std140, push_constant) uniform TileInfo
 {
-	ivec2 viewportSize;
+	layout(offset = 64) ivec2 viewportSize;
 	ivec2 tileNums;
 } tileInfo;
 
@@ -124,10 +129,12 @@ void main()
 	uint tileLightCount = lightVisiblities[tileIndex].count;
     for(int i = 0; i < tileLightCount; ++i) 
     {
+		uint index = lightVisiblities[tileIndex].lightIndices[i];
+
         // calculate per-light radiance
-        vec3 L = normalize(GetLightDirection(lights.lights[i], worldPos.xyz));
+        vec3 L = normalize(GetLightDirection(lights.lights[index], worldPos.xyz));
         vec3 H = normalize(V + L);
-        vec3 radiance = ApplyLight(lights.lights[i], worldPos.xyz, N);        
+        vec3 radiance = ApplyLight(lights.lights[index], worldPos.xyz, N);        
         
         // cook-torrance brdf
         float NDF = DistributionGGX(N, H, roughness);        
@@ -164,7 +171,9 @@ void main()
 
 	if(pbr.debugMode == 1)
 	{
-		ambient = vec3(0.03) * albedo.rgb * ao;
+		float intensity = float(lightVisiblities[tileIndex].count) / 64;
+		outColor = vec4(intensity, intensity, intensity, 1.0);
+		return;
 	}
 
     vec3 color = ambient + Lo;

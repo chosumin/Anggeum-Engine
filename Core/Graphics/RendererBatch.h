@@ -25,7 +25,8 @@ namespace Core
 		//Add batch depending on the parameter material.
 		void Add(Mesh& mesh, weak_ptr<Material> material);
 
-		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame);
+		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, 
+			function<void(shared_ptr<Material>, shared_ptr<SubMesh>, vector<Transform*>&)> loop);
 
 		Pipeline* Pipeline;
 		Shader& SharedShader;

@@ -18,7 +18,11 @@ layout(binding = 1) writeonly buffer TileLightVisiblities
 
 layout(binding = 2) uniform sampler2DMS depthBuffer;
 
-layout(binding = 3) uniform LightInfo lightInfo;
+layout(binding = 3) uniform Lights
+{
+	Light lights[MAX_FORWARD_LIGHT_COUNT];
+	uint count;
+} lights;
 
 // vulkan ndc, minDepth = 0.0, maxDepth = 1.0
 const vec2 ndc_upper_left = vec2(-1.0, -1.0);
@@ -149,9 +153,10 @@ void main()
 		light_count_for_tile = 0;
 	}
 
-	for (uint i = 0; i < lightInfo.count && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; ++i)
+	for (uint i = 0; i < lights.count && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; ++i)
 	{
-		if (isCollided(lightInfo.lights[i], frustum))
+		if (lights.lights[i].position.w == DIRECTIONAL_LIGHT ||
+			isCollided(lights.lights[i], frustum))
 		{
 			uint slot = atomicAdd(light_count_for_tile, 1);
 			if (slot >= MAX_POINT_LIGHT_PER_TILE) 

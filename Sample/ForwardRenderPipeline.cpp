@@ -54,7 +54,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_renderTargets[0], _renderTargets[1], 
 		_renderTargets[2], _renderTargets[3], 
 		_renderTargets[4], _renderTargets[5],
-		_renderTargets[6]);
+		_renderTargets[6],
+		_storageBuffers[0], tileNums);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
 }

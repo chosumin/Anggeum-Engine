@@ -26,7 +26,8 @@ namespace Core
 		:RendererPass(device, workerThreadManager), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
-		_skyboxPipeline(nullptr)
+		_skyboxPipeline(nullptr),
+		_lightVisibilityBuffer(lightVisibilityBuffer)
 	{
 		_renderPass->CreateColorAttachment(colorRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
@@ -124,7 +125,24 @@ namespace Core
 				sharedMat->SetBuffer(currentFrame);
 			}
 
-			batch.second->Draw(commandBuffer, currentFrame);
+			batch.second->Draw(commandBuffer, currentFrame, 
+			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh, vector<Transform*>& transforms)
+			{
+				for (size_t i = 0; i < transforms.size(); ++i)
+					sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
+				commandBuffer.PushConstants(*sharedMaterial);
+
+				sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+				commandBuffer.PushConstants(*sharedMaterial, 1);
+
+				auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
+
+				commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+
+				commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+
+				commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
+			});
 		}
 
 		DrawSkybox(commandBuffer, currentFrame);

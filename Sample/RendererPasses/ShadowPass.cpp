@@ -74,7 +74,24 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compute
 
 	_material->SetBuffer(currentFrame, 0, &_directionalLight);
 
-	_batch->Draw(commandBuffer, currentFrame);
+	_batch->Draw(commandBuffer, currentFrame,
+	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh, vector<Transform*>& transforms)
+	{
+		for (size_t i = 0; i < transforms.size(); ++i)
+		{
+			sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
+		}
+
+		commandBuffer.PushConstants(*sharedMaterial);
+
+		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
+
+		commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+
+		commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+
+		commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
+	});
 
 	commandBuffer.EndRenderPass();
 }

@@ -153,27 +153,11 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         shader.AddUniformBufferLayoutBinding(binding, shaderStage, size);
     }
 
-	//HACK: Use specialization constants to get array size of storage buffers. Should use another way.
     spirv_cross::SmallVector<spirv_cross::SpecializationConstant> specConstants = compiler.get_specialization_constants();
 	for (size_t i = 0; i < resources.storage_buffers.size(); ++i)
 	{
         auto& storageBuffer = resources.storage_buffers[i];
-
         unsigned binding = compiler.get_decoration(storageBuffer.id, spv::DecorationBinding);
-        /*const spirv_cross::SPIRType& type = compiler.get_type(storageBuffer.base_type_id);
-        uint32_t runtime_array_type_id = type.member_types[0];
-        const spirv_cross::SPIRType& runtime_array_type = compiler.get_type(runtime_array_type_id);
-
-		auto specConstant = find_if(specConstants.begin(), specConstants.end(), [&](spirv_cross::SpecializationConstant c)
-		{
-			return c.constant_id == binding;
-		});
-		if(specConstant == specConstants.end())
-			throw runtime_error("Storage buffer specialization constant not found for " + storageBuffer.name);
-
-        const spirv_cross::SPIRConstant& arraySize = compiler.get_constant(specConstant->id);
-
-        size_t size = compiler.get_declared_struct_size_runtime_array(type, arraySize.scalar_i32());*/
 
         shader.AddStorageBufferLayoutBinding(binding, shaderStage);
     }
