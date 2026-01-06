@@ -278,6 +278,7 @@ void Core::GLTFLoader::LoadScene(string path)
 	size_t pos = path.find_last_of('/');
 	string modelPath = path.substr(0, pos);
 
+	_modelPath = modelPath;
 	LoadAssets(modelPath);
 }
 
@@ -561,8 +562,11 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	{
 		auto& gltfMaterial = _model->materials[i];
 
+		string matName = gltfMaterial.name.empty() ? 
+			_modelPath + to_string(i) : gltfMaterial.name;
+
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = _resourceCache.RequestMaterial(gltfMaterial.name, "PBR");
+		auto material = _resourceCache.RequestMaterial(matName, "PBR");
 
 		//Already bound
 		if (material.use_count() > 1)
@@ -715,23 +719,6 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 					subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
 			}
 
-			//ADD VERTEX COLOR
-			if (subMesh->HasVertexAttribute(VertexAttributeName::Col) == false)
-			{
-				vector<uint8_t> colorData;
-
-				float color[3] = {1.0f, 1.0f, 1.0f};
-				auto bytes = Core::Utility::ToBytes(color);
-				for (size_t i = 0; i < count; ++i)
-				{
-					colorData.insert(colorData.end(), bytes.begin(), bytes.end());
-				}
-
-				_transferContext.Enqueue(new VkBufferJob(
-					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-					subMesh->InsertBufferSpace(VertexAttributeName::Col), move(colorData)), subMeshName + " color");
-			}
-
 			if (primitive.indices >= 0)
 			{
 				subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
@@ -764,10 +751,10 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
-
-			_meshes.push_back(mesh.get());
-			_scene.AddComponent(move(mesh));
 		}
+
+		_meshes.push_back(mesh.get());
+		_scene.AddComponent(move(mesh));
 	}
 }
 

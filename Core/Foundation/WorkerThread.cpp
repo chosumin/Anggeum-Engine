@@ -127,7 +127,8 @@ Core::WorkerThreadManager::WorkerThreadManager(Device& device)
 
 void Core::WorkerThreadManager::Enqueue(const Job* job)
 {
-	_roundRobinIndex = (_roundRobinIndex++) % _threadCount;
+	_roundRobinIndex = _roundRobinIndex % _threadCount;
 	WorkerThread& thread = *_workerThreads[_roundRobinIndex];
 	_workerThreads[_roundRobinIndex]->Enqueue(job);
+	++_roundRobinIndex;
 }

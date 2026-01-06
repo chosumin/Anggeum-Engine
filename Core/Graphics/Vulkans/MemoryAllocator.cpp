@@ -96,6 +96,8 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 
 void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocation)
 {
+	lock_guard<mutex> lock(_mutex);
+
 	auto device = _device.GetDevice();
 
 	void* tempData;
@@ -118,6 +120,8 @@ void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& 
 
 void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation)
 {
+	lock_guard<mutex> lock(_mutex);
+
 	auto& block = *FindMemoryBlock(allocation.id);
 
 	vkBindBufferMemory(_device.GetDevice(), buffer.GetBuffer(),
@@ -126,6 +130,8 @@ void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& a
 
 void Core::MemoryAllocator::BindImageMemory(Image& image, MemoryAllocation& allocation)
 {
+	lock_guard<mutex> lock(_mutex);
+
 	auto& block = *FindMemoryBlock(allocation.id);
 
 	vkBindImageMemory(_device.GetDevice(), image.GetImage(),

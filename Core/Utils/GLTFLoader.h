@@ -65,11 +65,10 @@ namespace Core
 		Device& _device;
 		Scene& _scene;
 		ResourceCache& _resourceCache;
-
 		TransferContext& _transferContext;
 
+		string _modelPath;
 		tinygltf::Model* _model;
-
 		vector<Core::Mesh*> _meshes;
 		vector<Core::PerspectiveCamera*> _cameras;
 		vector<Core::Light*> _lights;
