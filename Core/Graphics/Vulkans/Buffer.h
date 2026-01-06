@@ -1,4 +1,5 @@
 #pragma once
+#include "MemoryAllocator.h"
 
 namespace Core
 {

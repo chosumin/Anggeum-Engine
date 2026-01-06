@@ -2,11 +2,12 @@
 #include "RendererPass.h"
 #include "Utils/Utility.h"
 #include "Graphics/Vulkans/SwapChain.h"
-#include "Graphics/Vulkans/Framebuffer.h"
 #include "Graphics/Vulkans/RenderPass.h"
+#include "Graphics/Vulkans/Buffer.h"
 
 Core::RendererPass::RendererPass(Device& device, WorkerThreadManager& workerThreadManager)
-	:_device{ device }, _workerThreadManager(workerThreadManager)
+	:_device{ device }, _workerThreadManager(workerThreadManager),
+	_instanceBuffer(nullptr), _framebuffer(nullptr)
 {
 	_renderPass = new RenderPass(device);
 	_pipelineState = new PipelineState();
@@ -14,6 +15,7 @@ Core::RendererPass::RendererPass(Device& device, WorkerThreadManager& workerThre
 
 Core::RendererPass::~RendererPass()
 {
+	delete(_instanceBuffer);
 	delete(_renderPass);
 	delete(_pipelineState);
 	delete(_framebuffer);
@@ -27,6 +29,16 @@ void Core::RendererPass::CreateFrameBuffer(SwapChain& swapChain)
 void Core::RendererPass::CreateFrameBuffer(Image* image)
 {
 	_framebuffer = new Framebuffer(_device, *_renderPass, *image);
+}
+
+void Core::RendererPass::CreateInstanceBuffer()
+{
+	//TODO: adjust size
+	VkDeviceSize bufferSize = 1024;
+	VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	MemoryType memoryType = MemoryType::DEVICE_LOCAL;
+
+	_instanceBuffer = new Core::Buffer(_device, bufferSize, usage, memoryType);
 }
 
 void Core::RendererPass::Enqueue(Job* job)

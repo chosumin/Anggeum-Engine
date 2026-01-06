@@ -49,6 +49,8 @@ namespace Core
 
 		void UpdateFrame(uint64_t frame) { _frame = frame; }
 		bool IsBusy();
+
+		static void ImmediateSubmit(Device& device, function<void(CommandBuffer& commandBuffer)> function);
 	private:
 		void GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 	private:

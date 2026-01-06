@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
-#include "MemoryAllocator.h"
 
 Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, MemoryType memoryType)
 	:_device(device), _size(size)

@@ -45,14 +45,17 @@ namespace Core
 		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);
 
 		void CreatePreSkyTextures();
-		void CreateLightCullingBuffers(VkExtent2D extent, ivec2 tileNums);
+		void CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums);
+		void CreateTransformBuffer(Scene& scene);
 	private:
 		Device& _device;
 		vector<RendererPass*> _rendererPasses;
 		vector<shared_ptr<Texture>> _renderTargets;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-		vector<Buffer*> _storageBuffers;
+		Buffer* _lightBuffer;
 		shared_ptr<Sampler> _sampler;
+
+		Buffer* _transformBuffer;
 	};
 }
 

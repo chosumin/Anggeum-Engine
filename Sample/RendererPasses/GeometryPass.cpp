@@ -86,6 +86,8 @@ namespace Core
 				}
 			}
 		}
+
+		CreateInstanceBuffer();
 	}
 
 	void GeometryPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,

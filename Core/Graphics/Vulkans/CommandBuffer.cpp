@@ -407,6 +407,15 @@ bool Core::CommandBuffer::IsBusy()
     return _frame + 1 >= Core::FrameCounter::GetFrameNumber();
 }
 
+void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, function<void(CommandBuffer& commandBuffer)> function)
+{
+	auto& commandBuffer = device.BeginSingleTimeCommands();
+	
+    function(commandBuffer);
+    
+    device.EndSingleTimeCommands(commandBuffer);
+}
+
 void Core::CommandBuffer::GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags)
 {
     switch (inImageLayout)

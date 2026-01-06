@@ -2,6 +2,7 @@
 #include "ResourceCache.h"
 #include "Utils/Utility.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 
 Core::ResourceCache::ResourceCache(Device& device)
 	: _device(device)
@@ -10,13 +11,12 @@ Core::ResourceCache::ResourceCache(Device& device)
 	imageCreateInfo.filePath = DEFAULT_IMAGE;
 	_defaultTexture = RequestTexture(DEFAULT_TEXTURE, imageCreateInfo, DEFAULT_SAMPLER);
 
-	auto& commandBuffer = _device.BeginSingleTimeCommands();
-
-	VkImageJob job(_device, _defaultTexture->GetImage(), _defaultTexture->GetName());
-	job.commandBuffer = &commandBuffer;
-	job.Execute();
-
-	_device.EndSingleTimeCommands(commandBuffer);
+	Core::CommandBuffer::ImmediateSubmit(_device, [&](Core::CommandBuffer& commandBuffer)
+	{
+		VkImageJob job(_device, _defaultTexture->GetImage(), _defaultTexture->GetName());
+		job.commandBuffer = &commandBuffer;
+		job.Execute();
+	});
 }
 
 Core::ResourceCache::~ResourceCache()

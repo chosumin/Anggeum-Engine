@@ -2,6 +2,8 @@
 #include "ForwardRenderPipeline.h"
 #include "Foundation/Scene.h"
 #include "Foundation/WorkerThread.h"
+#include "Foundation/Entity.h"
+#include "Components/Mesh.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
@@ -11,6 +13,7 @@
 #include "Graphics/RendererPasses/DepthPrePass.h"
 #include "Graphics/RendererPasses/LightCullingPass.h"
 #include "Utils/Utility.h"
+#include <Graphics/TransferJob.h>
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
@@ -36,7 +39,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	ivec2 tileNums = ivec2(
 		(extent.width - 1) / TILE_SIZE + 1,
 		(extent.height - 1) / TILE_SIZE + 1);
-	CreateLightCullingBuffers(extent, tileNums);
+	CreateLightCullingBuffer(extent, tileNums);
+
+	CreateTransformBuffer(scene);
 
 	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get());
 	AddRendererPass(depthPrePass);
@@ -46,7 +51,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	AddRendererPass(shadowPass);
 
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, 
-		_renderTargets[1], _storageBuffers[0]);
+		_renderTargets[1], _lightBuffer);
 	AddRendererPass(lightCullingPass);
 
 	auto geometryPass = new GeometryPass(
@@ -55,7 +60,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_renderTargets[2], _renderTargets[3], 
 		_renderTargets[4], _renderTargets[5],
 		_renderTargets[6],
-		_storageBuffers[0], tileNums);
+		_lightBuffer, tileNums);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
 }
@@ -64,10 +69,7 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
 
-	for (auto&& storageBuffer : _storageBuffers)
-	{
-		delete(storageBuffer);
-	}
+	delete(_lightBuffer);
 
 	for (auto&& rendererPass : _rendererPasses)
 	{
@@ -309,7 +311,7 @@ void Core::ForwardRenderPipeline::CreatePreSkyTextures()
 	}
 }
 
-void Core::ForwardRenderPipeline::CreateLightCullingBuffers(VkExtent2D extent, ivec2 tileNums)
+void Core::ForwardRenderPipeline::CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums)
 {
 	u32 lightVisiblityBufferSize = sizeof(VisibleLightsForTile) * tileNums.x * tileNums.y;
 
@@ -318,5 +320,33 @@ void Core::ForwardRenderPipeline::CreateLightCullingBuffers(VkExtent2D extent, i
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
-	_storageBuffers.push_back(lightVisibilityBuffer);
+	_lightBuffer = lightVisibilityBuffer;
+}
+
+void Core::ForwardRenderPipeline::CreateTransformBuffer(Scene& scene)
+{
+	auto meshes = scene.GetComponents<Core::Mesh>();
+	
+	u32 meshCount = meshes.size();
+	u32 bufferSize = sizeof(mat4) * meshCount;
+
+	vector<mat4> transforms(meshCount);
+
+	for (u32 i = 0; i < meshCount; ++i)
+	{
+		auto& transform = meshes[i]->GetEntity().GetTransform();
+		transforms[i] = transform.GetMatrix();
+	}
+
+	_transformBuffer = new Core::Buffer(_device,
+		bufferSize,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		MemoryType::DEVICE_LOCAL);
+
+	Core::CommandBuffer::ImmediateSubmit(_device, [&](Core::CommandBuffer& commandBuffer)
+	{
+		Core::VkBufferJob<mat4> job1(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_transformBuffer, transforms, true);
+		job1.commandBuffer = &commandBuffer;
+		job1.Execute();
+	});
 }
