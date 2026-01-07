@@ -60,7 +60,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_renderTargets[2], _renderTargets[3], 
 		_renderTargets[4], _renderTargets[5],
 		_renderTargets[6],
-		_lightBuffer, tileNums);
+		_lightBuffer, tileNums,
+		_transformBuffer);
+
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
 }
@@ -69,12 +71,13 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
 
-	delete(_lightBuffer);
-
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		delete(rendererPass);
 	}
+
+	delete(_lightBuffer);
+	delete(_transformBuffer);
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);

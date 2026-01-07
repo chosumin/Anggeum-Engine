@@ -6,7 +6,6 @@ namespace Core
 {
 	class Scene;
 	class Pipeline;
-	class RendererBatch;
 	class Buffer;
 	class Material;
 	class LightCullingPass : public RendererPass

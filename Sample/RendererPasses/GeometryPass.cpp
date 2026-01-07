@@ -22,12 +22,14 @@ namespace Core
 		shared_ptr<Texture> shadowRenderTarget, 
 		shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> irradianceCubemap,
 		shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
-		Buffer* lightVisibilityBuffer, ivec2 tileNums)
+		Buffer* lightVisibilityBuffer, ivec2 tileNums,
+		Buffer* transformBuffer)
 		:RendererPass(device, workerThreadManager), _scene(scene), _shadowRenderTarget(shadowRenderTarget),
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
 		_skyboxPipeline(nullptr),
-		_lightVisibilityBuffer(lightVisibilityBuffer)
+		_lightVisibilityBuffer(lightVisibilityBuffer),
+		_transformBuffer(transformBuffer)
 	{
 		_renderPass->CreateColorAttachment(colorRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
@@ -46,13 +48,6 @@ namespace Core
 
 	GeometryPass::~GeometryPass()
 	{
-		for (auto&& batch : _batches)
-		{
-			delete(batch.second);
-		}
-
-		_batches.clear();
-
 		delete(_skyboxPipeline);
 	}
 
@@ -64,30 +59,8 @@ namespace Core
 		auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
 		depthStencil.depthWriteEnable = VK_FALSE;
 
-		auto meshes = _scene.GetComponents<Core::Mesh>();
-		for (auto&& mesh : meshes)
-		{
-			auto materials = mesh->GetMaterials();
-			for (size_t i = 0; i < materials.size(); ++i)
-			{
-				auto& shader = materials[i]->GetShader();
-
-				if (shader.GetPass() == "Geometry")
-				{
-					auto key = shader.GetType();
-					auto batch = _batches[key];
-					if (batch == nullptr)
-					{
-						batch = new RendererBatch(_device, shader, *_renderPass, *_pipelineState);
-						_batches[key] = batch;
-					}
-
-					batch->Add(*mesh);
-				}
-			}
-		}
-
-		CreateInstanceBuffer();
+		_rendererBatches = make_unique<RendererBatches>();
+		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, _scene);
 	}
 
 	void GeometryPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,
@@ -108,44 +81,35 @@ namespace Core
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
-		for (auto&& batch : _batches)
+		_rendererBatches->Draw(commandBuffer, currentFrame, 
+		[&](shared_ptr<Material> material) 
 		{
-			for (auto&& material : batch.second->Materials)
-			{
-				auto sharedMat = material.second.lock();
-				sharedMat->SetBuffer(currentFrame, 0, &camera->Matrices);
-				sharedMat->SetBuffer(4, _shadowRenderTarget);
-				sharedMat->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
-				sharedMat->SetBuffer(currentFrame, 7, &_lightBuffer);
+			material->SetBuffer(currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(4, _shadowRenderTarget);
+			material->SetBuffer(currentFrame, 5, &_shadowBuffer->Projection);
+			material->SetBuffer(currentFrame, 7, &_lightBuffer);
 
-				sharedMat->SetStorageBuffer(8, _lightVisibilityBuffer);
+			material->SetStorageBuffer(8, _lightVisibilityBuffer);
 
-				sharedMat->SetBuffer(9, _irradianceCubemap);
-				sharedMat->SetBuffer(10, _prefilteredCubemap);
-				sharedMat->SetBuffer(11, _brdfLut);
+			material->SetBuffer(9, _irradianceCubemap);
+			material->SetBuffer(10, _prefilteredCubemap);
+			material->SetBuffer(11, _brdfLut);
 
-				sharedMat->SetBuffer(currentFrame);
-			}
+			material->SetBuffer(currentFrame);
+		},
+		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+		{
+			sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+			commandBuffer.PushConstants(*sharedMaterial, 1);
 
-			batch.second->Draw(commandBuffer, currentFrame, 
-			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh, vector<Transform*>& transforms)
-			{
-				for (size_t i = 0; i < transforms.size(); ++i)
-					sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
-				commandBuffer.PushConstants(*sharedMaterial);
+			auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
 
-				sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-				commandBuffer.PushConstants(*sharedMaterial, 1);
+			commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
 
-				auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
+			commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
 
-				commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
-
-				commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
-
-				commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
-			});
-		}
+			commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
+		});
 
 		DrawSkybox(commandBuffer, currentFrame);
 
@@ -191,7 +155,7 @@ namespace Core
 		vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, fence);
 		
 		auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
-		cout << "Generation IBL resources time : " << deltaTime << endl;
+		std::cout << "Generation IBL resources time : " << deltaTime << endl;
 
 		vkWaitForFences(_device.GetDevice(), 1, &fence, VK_TRUE, 100000000000);
 

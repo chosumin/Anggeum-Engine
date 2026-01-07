@@ -26,7 +26,6 @@ namespace Core
 	protected:
 		void CreateFrameBuffer(SwapChain& swapChain);
 		void CreateFrameBuffer(Image* image);
-		void CreateInstanceBuffer();
 
 		void Enqueue(Job* job);
 		void Wait();
@@ -35,8 +34,6 @@ namespace Core
 		RenderPass* _renderPass;
 		Framebuffer* _framebuffer;
 		PipelineState* _pipelineState;
-
-		Core::Buffer* _instanceBuffer;
 
 		vector<Job*> _pendingJobs;
 		WorkerThreadManager& _workerThreadManager;

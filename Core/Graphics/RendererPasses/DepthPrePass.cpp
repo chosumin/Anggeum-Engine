@@ -21,7 +21,6 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 
 Core::DepthPrePass::~DepthPrePass()
 {
-	delete(_batch);
 }
 
 void Core::DepthPrePass::Prepare()
@@ -31,13 +30,8 @@ void Core::DepthPrePass::Prepare()
 	auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 	multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
 
-	_batch = new RendererBatch(_device, _material->GetShader(), *_renderPass, *_pipelineState);
-
-	auto meshes = _scene.GetComponents<Core::Mesh>();
-	for (auto&& mesh : meshes)
-	{
-		_batch->Add(*mesh, _material);
-	}
+	_rendererBatches = make_unique<RendererBatches>();
+	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, _scene);
 }
 
 void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -49,18 +43,13 @@ void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compu
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_material->SetBuffer(currentFrame, 0, &camera->Matrices);
-
-	_batch->Draw(commandBuffer, currentFrame, 
-	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh, vector<Transform*>& transforms)
+	_rendererBatches->Draw(commandBuffer, currentFrame,
+	[&](shared_ptr<Material> material)
 	{
-		for (size_t i = 0; i < transforms.size(); ++i)
-		{
-			sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
-		}
-
-		commandBuffer.PushConstants(*sharedMaterial);
-
+		material->SetBuffer(currentFrame, 0, &camera->Matrices);
+	},
+	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+	{
 		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
 
 		commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);

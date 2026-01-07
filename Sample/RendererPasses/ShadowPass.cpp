@@ -14,7 +14,7 @@ using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager, 
 	Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget)
-	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget), _batch(nullptr)
+	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget)
 {
 	_directionalLight.View = lookAt(
 		vec3(-2.0f, 2.0f, 2.0f),
@@ -45,18 +45,12 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 
 Core::ShadowPass::~ShadowPass()
 {
-	delete(_batch);
 }
 
 void Core::ShadowPass::Prepare()
 {
-	_batch = new RendererBatch(_device, _material->GetShader(), *_renderPass, *_pipelineState);
-	
-	auto meshes = _scene.GetComponents<Core::Mesh>();
-	for (auto&& mesh : meshes)
-	{
-		_batch->Add(*mesh, _material);
-	}
+	_rendererBatches = make_unique<RendererBatches>();
+	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, _scene);
 }
 
 void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -72,18 +66,13 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compute
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_material->SetBuffer(currentFrame, 0, &_directionalLight);
-
-	_batch->Draw(commandBuffer, currentFrame,
-	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh, vector<Transform*>& transforms)
+	_rendererBatches->Draw(commandBuffer, currentFrame,
+	[&](shared_ptr<Material> material)
 	{
-		for (size_t i = 0; i < transforms.size(); ++i)
-		{
-			sharedMaterial->SetPushConstants<mat4>(transforms[i]->GetMatrix());
-		}
-
-		commandBuffer.PushConstants(*sharedMaterial);
-
+		material->SetBuffer(currentFrame, 0, &_directionalLight);
+	},
+	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+	{
 		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
 
 		commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);

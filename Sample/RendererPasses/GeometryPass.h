@@ -7,7 +7,7 @@ namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatch;
+	class RendererBatches;
 	class Pipeline;
 	class GeometryPass : public RendererPass
 	{
@@ -18,7 +18,8 @@ namespace Core
 			shared_ptr<Texture> shadowRenderTarget, 
 			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
 			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
-			Buffer* lightVisibilityBuffer, ivec2 tileNums);
+			Buffer* lightVisibilityBuffer, ivec2 tileNums,
+			Buffer* transformBuffer);
 		virtual ~GeometryPass() override;
 
 		virtual void Prepare() override;
@@ -38,7 +39,7 @@ namespace Core
 	private:
 		Scene& _scene;
 
-		unordered_map<uint32_t, RendererBatch*> _batches;
+		unique_ptr<RendererBatches> _rendererBatches;
 
 		shared_ptr<Texture> _shadowRenderTarget;
 		ShadowUniform* _shadowBuffer;
@@ -51,6 +52,8 @@ namespace Core
 
 		Core::Buffer* _lightVisibilityBuffer;
 		TileInfo _tileInfo;
+
+		Core::Buffer* _transformBuffer;
 	};
 }
 

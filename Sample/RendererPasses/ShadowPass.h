@@ -6,7 +6,7 @@ namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatch;
+	class RendererBatches;
 	class Material;
 	class ShadowPass : public RendererPass
 	{
@@ -30,7 +30,7 @@ namespace Core
 		VPBufferObject _directionalLight;
 		ShadowUniform _shadowBuffer;
 
-		RendererBatch* _batch;
+		unique_ptr<RendererBatches> _rendererBatches;
 		shared_ptr<Material> _material;
 
 		Texture* _shadowMap;

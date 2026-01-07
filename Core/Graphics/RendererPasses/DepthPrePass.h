@@ -5,7 +5,7 @@ namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatch;
+	class RendererBatches;
 	class Material;
 	class DepthPrePass : public RendererPass
 	{
@@ -19,7 +19,8 @@ namespace Core
 	private:
 		Scene& _scene;
 
-		RendererBatch* _batch;
+		unique_ptr<RendererBatches> _rendererBatches;
+
 		shared_ptr<Material> _material;
 	};
 }
