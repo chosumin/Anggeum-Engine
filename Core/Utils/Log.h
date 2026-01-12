@@ -14,5 +14,5 @@ void PrintLog(const char* file, const char* func, int line, const char* fmt, ...
 
     va_end(ap);
 
-    printf("\\n");
+    printf("\n");
 }

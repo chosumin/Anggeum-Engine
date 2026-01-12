@@ -323,17 +323,17 @@ bool Core::GLTFLoader::LoadFromFile(tinygltf::Model* model, const string& path)
 
 	if (ret == false)
 	{
-		LOG("Failed to load gltf file {}.", path);
+		LOG("Failed to load gltf file %s.", path.c_str());
 	}
 
 	if (err.empty() == false)
 	{
-		LOG("Error loading gltf file {}.", path);
+		LOG("Error loading gltf file %s.", path.c_str());
 	}
 
 	if (warn.empty() == false)
 	{
-		LOG("Warning loading gltf file {}.", path);
+		LOG("Warning loading gltf file %s.", path.c_str());
 	}
 
 	return ret;
