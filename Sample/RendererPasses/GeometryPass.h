@@ -2,12 +2,12 @@
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
 #include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatches;
 	class Pipeline;
 	class GeometryPass : public RendererPass
 	{
@@ -19,7 +19,7 @@ namespace Core
 			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
 			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
 			Buffer* lightVisibilityBuffer, ivec2 tileNums,
-			Buffer* transformBuffer);
+			TransformBatch& transformBatch);
 		virtual ~GeometryPass() override;
 
 		virtual void Prepare() override;
@@ -52,8 +52,6 @@ namespace Core
 
 		Core::Buffer* _lightVisibilityBuffer;
 		TileInfo _tileInfo;
-
-		Core::Buffer* _transformBuffer;
 	};
 }
 

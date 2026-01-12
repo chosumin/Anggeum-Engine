@@ -82,23 +82,20 @@ void Sample::ParticlePass::Prepare()
 	vector<uint8_t> colorBytes(colorByteSize);
 	memcpy(colorBytes.data(), colors.data(), colorByteSize);
 
-	Core::CommandBuffer::ImmediateSubmit(_device, [&](Core::CommandBuffer& commandBuffer)
+	vector<Core::Job*> jobs;
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-		{
-			Core::VkBufferJob job1(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[0 + 3 * i], positionBytes, true);
-			job1.commandBuffer = &commandBuffer;
-			job1.Execute();
+		jobs.push_back(new Core::VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[0 + 3 * i], positionBytes, true));
+		jobs.push_back(new Core::VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[1 + 3 * i], velocityBytes, true));
+		jobs.push_back(new Core::VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[2 + 3 * i], colorBytes, true));
+	}
 
-			Core::VkBufferJob job2(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[1 + 3 * i], velocityBytes, true);
-			job2.commandBuffer = &commandBuffer;
-			job2.Execute();
+	Core::CommandBuffer::ImmediateSubmit(_device, jobs);
 
-			Core::VkBufferJob job3(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[2 + 3 * i], colorBytes, true);
-			job3.commandBuffer = &commandBuffer;
-			job3.Execute();
-		}
-	});
+	for (auto& job : jobs)
+	{
+		delete(job);
+	}
 
 	_computeMaterial->SetStorageBuffer(0, 1, _buffers[0]);
 	_computeMaterial->SetStorageBuffer(0, 2, _buffers[1]);

@@ -8,12 +8,12 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/ResourceCache.h"
-#include "Sample/RendererPasses/GeometryPass.h"
-#include "Sample/RendererPasses/ShadowPass.h"
+#include "Graphics/TransferJob.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
 #include "Graphics/RendererPasses/LightCullingPass.h"
+#include "Sample/RendererPasses/GeometryPass.h"
+#include "Sample/RendererPasses/ShadowPass.h"
 #include "Utils/Utility.h"
-#include <Graphics/TransferJob.h>
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
@@ -43,11 +43,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	CreateTransformBuffer(scene);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get());
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get(), _transformBatch);
 	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, swapChain, _renderTargets[2].get());
+		device, workerThreadManager, scene, swapChain, _renderTargets[2].get(), _transformBatch);
 	AddRendererPass(shadowPass);
 
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, 
@@ -61,7 +61,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_renderTargets[4], _renderTargets[5],
 		_renderTargets[6],
 		_lightBuffer, tileNums,
-		_transformBuffer);
+		_transformBatch);
 
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
@@ -77,7 +77,7 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	}
 
 	delete(_lightBuffer);
-	delete(_transformBuffer);
+	delete(_transformBatch.TransformBuffer);
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
@@ -330,26 +330,25 @@ void Core::ForwardRenderPipeline::CreateTransformBuffer(Scene& scene)
 {
 	auto meshes = scene.GetComponents<Core::Mesh>();
 	
-	u32 meshCount = meshes.size();
-	u32 bufferSize = sizeof(mat4) * meshCount;
+	uint meshCount = meshes.size();
+	uint bufferSize = sizeof(mat4) * meshCount;
 
 	vector<mat4> transforms(meshCount);
+	_transformBatch.EntityIds.resize(meshCount);
 
-	for (u32 i = 0; i < meshCount; ++i)
+	for (uint i = 0; i < meshCount; ++i)
 	{
-		auto& transform = meshes[i]->GetEntity().GetTransform();
+		auto& entity = meshes[i]->GetEntity();
+		auto& transform = entity.GetTransform();
 		transforms[i] = transform.GetMatrix();
+		_transformBatch.EntityIds[i] = entity.GetId();
 	}
 
-	_transformBuffer = new Core::Buffer(_device,
+	_transformBatch.TransformBuffer = new Core::Buffer(_device,
 		bufferSize,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
-	Core::CommandBuffer::ImmediateSubmit(_device, [&](Core::CommandBuffer& commandBuffer)
-	{
-		Core::VkBufferJob<mat4> job1(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_transformBuffer, transforms, true);
-		job1.commandBuffer = &commandBuffer;
-		job1.Execute();
-	});
+	Core::VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_transformBatch.TransformBuffer, transforms, true);
+	Core::CommandBuffer::ImmediateSubmit(_device, job);
 }

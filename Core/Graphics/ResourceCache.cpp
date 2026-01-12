@@ -11,12 +11,9 @@ Core::ResourceCache::ResourceCache(Device& device)
 	imageCreateInfo.filePath = DEFAULT_IMAGE;
 	_defaultTexture = RequestTexture(DEFAULT_TEXTURE, imageCreateInfo, DEFAULT_SAMPLER);
 
-	Core::CommandBuffer::ImmediateSubmit(_device, [&](Core::CommandBuffer& commandBuffer)
-	{
-		VkImageJob job(_device, _defaultTexture->GetImage(), _defaultTexture->GetName());
-		job.commandBuffer = &commandBuffer;
-		job.Execute();
-	});
+	VkImageJob job(_device, _defaultTexture->GetImage(), _defaultTexture->GetName());
+
+	Core::CommandBuffer::ImmediateSubmit(_device, job);
 }
 
 Core::ResourceCache::~ResourceCache()

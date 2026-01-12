@@ -573,7 +573,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			continue;
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
-		material->AddBuffer(6, pbrBuffer);
+		material->AddBuffer(8, pbrBuffer);
 
 		pbrBuffer->Albedo = glm::vec4(1);
 
@@ -606,7 +606,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(1, texture);
+				material->SetBuffer(3, texture);
 				
 				pbrBuffer->AlbedoTextureSet = 1;
 			}
@@ -619,7 +619,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(3, texture);
+				material->SetBuffer(5, texture);
 				
 				pbrBuffer->RoughnessTextureSet = 1;
 				pbrBuffer->MetallicTextureSet = 1;
@@ -638,7 +638,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(2, texture);
+				material->SetBuffer(4, texture);
 			}
 			else if (additionalValue.first.find("emissiveTexture") != string::npos)
 			{

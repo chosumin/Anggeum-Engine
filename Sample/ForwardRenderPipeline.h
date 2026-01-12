@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/IRenderPipeline.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
@@ -10,6 +11,7 @@ namespace Core
 	class WorkerThreadManager;
 	class TransferContext;
 	class Buffer;
+
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
@@ -55,7 +57,7 @@ namespace Core
 		Buffer* _lightBuffer;
 		shared_ptr<Sampler> _sampler;
 
-		Buffer* _transformBuffer;
+		TransformBatch _transformBatch;
 	};
 }
 

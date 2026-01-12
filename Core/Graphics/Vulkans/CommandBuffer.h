@@ -11,6 +11,7 @@ namespace Core
 	class Image;
 	class RenderPass;
 	class Framebuffer;
+	class Job;
 	class CommandBuffer
 	{
 	public:
@@ -50,7 +51,8 @@ namespace Core
 		void UpdateFrame(uint64_t frame) { _frame = frame; }
 		bool IsBusy();
 
-		static void ImmediateSubmit(Device& device, function<void(CommandBuffer& commandBuffer)> function);
+		static void ImmediateSubmit(Device& device, Job& job);
+		static void ImmediateSubmit(Device& device, std::vector<Job*>& jobs);
 	private:
 		void GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 	private:

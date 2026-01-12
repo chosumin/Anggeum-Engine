@@ -11,6 +11,7 @@
 #include "Framebuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Material.h"
+#include "Foundation/Job.h"
 
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
@@ -407,12 +408,26 @@ bool Core::CommandBuffer::IsBusy()
     return _frame + 1 >= Core::FrameCounter::GetFrameNumber();
 }
 
-void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, function<void(CommandBuffer& commandBuffer)> function)
+void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, Core::Job& job)
 {
 	auto& commandBuffer = device.BeginSingleTimeCommands();
-	
-    function(commandBuffer);
+
+    job.commandBuffer = &commandBuffer;
+    job.Execute();
     
+    device.EndSingleTimeCommands(commandBuffer);
+}
+
+void Core::CommandBuffer::ImmediateSubmit(Device& device, vector<Job*>& jobs)
+{
+    auto& commandBuffer = device.BeginSingleTimeCommands();
+
+	for (auto& job : jobs)
+	{
+		job->commandBuffer = &commandBuffer;
+		job->Execute();
+	}
+
     device.EndSingleTimeCommands(commandBuffer);
 }
 

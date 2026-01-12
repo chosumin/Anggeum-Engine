@@ -34,6 +34,7 @@ namespace Core
 		const string GetName() const { return _name; }
 
 		Shader& GetShader() const;
+		weak_ptr<Shader> GetShaderPtr() const { return _shader; }
 
 		void* GetBuffer(uint32_t binding)
 		{
@@ -83,7 +84,7 @@ namespace Core
 	private:
 		void CreateDescriptorSets();
 		void CreateBuffers();
-		void SetDefault(Texture& defaultTexture);
+		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:
 		Device& _device;
 		shared_ptr<Shader> _shader;

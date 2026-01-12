@@ -2,9 +2,8 @@
 #include "ShadowPass.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Entity.h"
-#include "Graphics/RendererBatch.h"
-#include "Components/Mesh.h"
 #include "Components/Light.h"
+#include "Components/Mesh.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -13,7 +12,7 @@
 using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager, 
-	Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget)
+	Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch)
 	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget)
 {
 	_directionalLight.View = lookAt(
@@ -41,6 +40,8 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
 	rasterization.depthBiasEnable = VK_TRUE;
 	rasterization.depthBiasSlopeFactor = 1.5f;
+
+	_rendererBatches = make_unique<RendererBatches>(transformBatch);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -49,8 +50,8 @@ Core::ShadowPass::~ShadowPass()
 
 void Core::ShadowPass::Prepare()
 {
-	_rendererBatches = make_unique<RendererBatches>();
-	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, _scene);
+	auto meshes = _scene.GetComponents<Core::Mesh>();
+	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 }
 
 void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -73,13 +74,6 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compute
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{
-		auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
-
-		commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
-
-		commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
-
-		commandBuffer.DrawIndexed(subMesh->GetIndexCount(), static_cast<uint32_t>(transforms.size()));
 	});
 
 	commandBuffer.EndRenderPass();

@@ -1,18 +1,18 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatches;
 	class Material;
 	class ShadowPass : public RendererPass
 	{
 	public:
 		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget);
+			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch);
 		virtual ~ShadowPass() override;
 
 		virtual void Prepare() override;

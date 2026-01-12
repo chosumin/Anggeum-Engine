@@ -11,52 +11,54 @@ namespace Core
 	class PipelineState;
 	class Transform;
 	class CommandBuffer;
-	class Scene;
 	class Buffer;
 
-	class RendererBatch
+	struct TransformBatch
 	{
-	public:
-		static void Sort();
+		Buffer* TransformBuffer;
+		vector<uint> EntityIds;
+	};
 
-		RendererBatch(Device& device, Shader& shader, RenderPass& renderPass, PipelineState& pipelineState);
-		~RendererBatch();
+	struct SubMeshBatch
+	{
+		weak_ptr<SubMesh> SubMesh;
+		vector<uint> Transforms;
+	};
 
-		//Add batch depending on the mesh's materials.
-		void Add(Mesh& mesh);
+	struct MaterialBatch
+	{
+		weak_ptr<Material> Material;
+		unordered_map<string, SubMeshBatch> SubMeshBatches;
+	};
 
-		//Add batch depending on the parameter material.
-		void Add(Mesh& mesh, weak_ptr<Material> material);
-
-		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, 
-			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> loop);
-
+	struct ShaderBatch
+	{
 		Pipeline* Pipeline;
-		Shader& SharedShader;
-		unordered_map<string, weak_ptr<Material>> Materials;
-
-		//uint32_t: material name, string: sub mesh name
-		unordered_map<string, unordered_map<string, weak_ptr<SubMesh>>> SubMeshBatches;
-
-		//key: sub mesh name
-		unordered_map<string, vector<uint>> Transforms;
+		weak_ptr<Shader> SharedShader;
+		unordered_map<string, MaterialBatch> MaterialBatches;
 	};
 
 	class RendererBatches
 	{
 	public:
-		RendererBatches();
+		RendererBatches(TransformBatch& transformBatch);
 		~RendererBatches();
 
-		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, Scene& scene);
-		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, Scene& scene);
+		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
+		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 
 		void Draw(CommandBuffer& commandBuffer, uint32_t currentFrame,
 			function<void(shared_ptr<Material>)> setMaterial,
 			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> loop);
 	private:
-		unordered_map<uint32_t, RendererBatch*> _batches;
+		//Add batch depending on the mesh's materials.
+		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
+		void CreateInstanceBuffer(Device& device);
+	private:
+		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
+		TransformBatch& _transformBatch;
 		Core::Buffer* _instanceBuffer;
+		uint _instanceCount;
 	};
 }
 

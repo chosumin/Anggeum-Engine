@@ -1,17 +1,17 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
 	class Scene;
 	class SwapChain;
-	class RendererBatches;
 	class Material;
 	class DepthPrePass : public RendererPass
 	{
 	public:
 		DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget);
+			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch);
 		virtual ~DepthPrePass() override;
 
 		void Prepare() override;

@@ -16,7 +16,7 @@ namespace Core
 		CreateBuffers();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(*device.GetResourceCache().RequestDefaultTexture());
+		SetDefault(device.GetResourceCache().RequestDefaultTexture());
 	}
 
 	Material::Material(Device& device, string materialName, string vertPath, string fragPath)
@@ -28,7 +28,7 @@ namespace Core
 		CreateBuffers();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(*device.GetResourceCache().RequestDefaultTexture());
+		SetDefault(device.GetResourceCache().RequestDefaultTexture());
 	}
 
 	Material::Material(const Material& other)
@@ -257,13 +257,15 @@ namespace Core
 		}
 	}
 
-	void Material::SetDefault(Texture& defaultTexture)
+	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
 	{
-		auto descriptor = defaultTexture.GetDescriptorImageInfo();
+		auto descriptor = defaultTexture->GetDescriptorImageInfo();
 
 		for (auto&& textureBuffer : _textureBuffers)
 		{
 			textureBuffer.second->CopyDescriptorImageInfo(descriptor);
+
+			_textures[textureBuffer.first] = defaultTexture;
 		}
 	}
 }
