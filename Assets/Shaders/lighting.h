@@ -48,22 +48,59 @@ vec3 ApplyDirectionalLight(Light light, vec3 normal)
 
 vec3 ApplyPointLight(Light light, vec3 pos, vec3 normal)
 {
-	vec3  worldToLight = light.position.xyz - pos;
+	vec3 worldToLight = light.position.xyz - pos;
 	float dist = length(worldToLight);
-	float atten = light.direction.w / (dist * dist);
+	float radius = light.direction.w; // Using w as the maximum light influence radius
+
+	// 1. Distance Attenuation (Standard inverse square law)
+	if (dist > radius) return vec3(0.0);
+
+	float atten = 1.0 / (max(dist * dist, 0.01));
+
+	// 2. Window function to smoothly fade out at the radius boundary
+	// Prevents tiling artifacts caused by sudden culling
+	float factor = dist / radius;
+	float window = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
+	atten *= (window * window);
+
+	// 3. Diffuse lighting calculation (Lambertian)
 	worldToLight = normalize(worldToLight);
 	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
-	return ndotl * light.color.w * atten * light.color.rgb;
+
+	// Final result: Color * Intensity * Diffuse * Attenuation
+	return light.color.rgb * (light.color.w * ndotl * atten);
 }
 
 vec3 ApplySpotLight(Light light, vec3 pos, vec3 normal)
 {
-	vec3  lightToPixel = normalize(pos - light.position.xyz);
-	float theta = dot(lightToPixel, normalize(light.direction.xyz));
-	float innerConeAngle = light.info.x;
-	float outerConeAngle = light.info.y;
-	float intensity = (theta - outerConeAngle) / (innerConeAngle - outerConeAngle);
-	return smoothstep(0.0, 1.0, intensity) * light.color.w * light.color.rgb;
+	vec3 worldToLight = light.position.xyz - pos;
+	float dist = length(worldToLight);
+	float radius = light.direction.w; // Radius matches the culling bounding box
+
+	// 1. Distance Attenuation (Same logic as Point Light for consistency)
+	if (dist > radius) return vec3(0.0);
+
+	float atten = 1.0 / (max(dist * dist, 0.01));
+	float factor = dist / radius;
+	float window = clamp(1.0 - factor * factor * factor * factor, 0.0, 1.0);
+	atten *= (window * window);
+
+	// 2. Cone Attenuation (Angular falloff)
+	worldToLight = normalize(worldToLight);
+	// Calculate cosine of the angle between light direction and pixel-to-light vector
+	float cosTheta = dot(worldToLight, normalize(-light.direction.xyz));
+
+	float innerCos = light.info.x; // cos(innerAngle) passed from CPU
+	float outerCos = light.info.y; // cos(outerAngle) passed from CPU
+
+	// Calculate intensity based on the angle between inner and outer cones
+	float angleAttenuation = clamp((cosTheta - outerCos) / (innerCos - outerCos), 0.0, 1.0);
+	angleAttenuation = smoothstep(0.0, 1.0, angleAttenuation);
+
+	// 3. Diffuse lighting calculation
+	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
+
+	return light.color.rgb * (light.color.w * ndotl * atten * angleAttenuation);
 }
 
 vec3 GetLightDirection(Light light, vec3 worldPos)

@@ -4,12 +4,20 @@
 
 layout(location = 0) in vec3 inPosition;
 
-layout(push_constant) uniform instanceData
+layout(binding = 1) buffer readonly TransformBuffer
 {
-    mat4 world;
-} instance;
+    mat4 transforms[];
+} transformBuffer;
+
+layout(binding = 2) buffer readonly InstanceBuffer
+{
+    uint IDs[];
+} instanceBuffer;
 
 void main() 
 {
-    gl_Position = camera.proj * camera.view * instance.world * vec4(inPosition, 1.0);
+    uint id = instanceBuffer.IDs[gl_InstanceIndex];
+    mat4 world = transformBuffer.transforms[id];
+
+    gl_Position = camera.proj * camera.view * world * vec4(inPosition, 1.0);
 }
