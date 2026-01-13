@@ -14,6 +14,13 @@ namespace Core
 		}
 
 		template <typename T>
+		static inline void HashCombine(size_t& seed, const T& value)
+		{
+			std::hash<T> hasher;
+			seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		}
+
+		template <typename T>
 		static inline std::vector<uint8_t> ToBytes(const T& value)
 		{
 			return std::vector<uint8_t>{reinterpret_cast<const uint8_t*>(&value),

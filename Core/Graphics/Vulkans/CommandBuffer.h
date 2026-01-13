@@ -34,7 +34,7 @@ namespace Core
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
-		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount);
+		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstInstance = 0);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);

@@ -23,6 +23,7 @@ namespace Core
 	{
 		weak_ptr<SubMesh> SubMesh;
 		vector<uint> Transforms;
+		uint32_t FirstInstance;
 	};
 
 	struct MaterialBatch

@@ -689,16 +689,36 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 		size_t primSize = gltfMesh.primitives.size();
 		for (int i = 0; i < primSize; ++i)
 		{
-			string subMeshName = meshName + to_string(i);
+			auto primitive = gltfMesh.primitives[i];
+
+			// Generate hash based on primitive data
+			size_t subMeshHash = 0;
+			
+			// Hash vertex attributes
+			for (auto& attribute : primitive.attributes)
+			{
+				Core::Utility::HashCombine(subMeshHash, attribute.first);
+				Core::Utility::HashCombine(subMeshHash, attribute.second);
+			}
+			
+			// Hash indices
+			if (primitive.indices >= 0)
+			{
+				Core::Utility::HashCombine(subMeshHash, primitive.indices);
+			}
+			
+			string subMeshName = meshName + "_" + std::to_string(subMeshHash);
 
 			auto subMesh = 
 				_resourceCache.RequestSubMesh(subMeshName);
 
 			//Already jobified
 			if (subMesh.use_count() > 1)
+			{
+				mesh->AddSubMesh(subMesh);
+				mesh->AddMaterial(materials[primitive.material]);
 				continue;
-
-			auto primitive = gltfMesh.primitives[i];
+			}
 
 			size_t count = 0;
 			for (auto& attribute : primitive.attributes)

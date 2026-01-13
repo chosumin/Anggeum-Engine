@@ -176,9 +176,9 @@ void Core::CommandBuffer::BindIndexBuffer(Buffer& buffer, VkIndexType indexType)
     vkCmdBindIndexBuffer(_commandBuffer, buffer.GetBuffer(), 0, indexType);
 }
 
-void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount)
+void Core::CommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstInstance)
 {
-    vkCmdDrawIndexed(_commandBuffer, indexCount, instanceCount, 0, 0, 0);
+    vkCmdDrawIndexed(_commandBuffer, indexCount, instanceCount, 0, 0, firstInstance);
 }
 
 void Core::CommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount)

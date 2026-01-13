@@ -37,8 +37,6 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 	{
 		uint entityId = mesh->GetEntity().GetId();
 
-		_instanceCount += mesh->GetSubMeshes().size();
-
 		auto materials = mesh->GetMaterials();
 		for (size_t i = 0; i < materials.size(); ++i)
 		{
@@ -63,8 +61,6 @@ void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material
 	{
 		uint entityId = mesh->GetEntity().GetId();
 		auto& subMeshes = mesh->GetSubMeshes();
-
-		_instanceCount += subMeshes.size();
 
 		for (auto& subMesh : subMeshes)
 		{
@@ -112,8 +108,10 @@ void Core::RendererBatches::Draw(CommandBuffer& commandBuffer, uint32_t currentF
 
 				commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
 
-				//todo : need the first index
-				commandBuffer.DrawIndexed(subMesh->GetIndexCount(), subMeshBatch.second.Transforms.size());
+				commandBuffer.DrawIndexed(
+					subMesh->GetIndexCount(), 
+					subMeshBatch.second.Transforms.size(),
+					subMeshBatch.second.FirstInstance);
 			}
 		}
 	}
@@ -155,8 +153,16 @@ void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, Pip
 	string subMeshName = subMeshPtr->GetName();
 
 	auto& subMeshBatch = subMeshBatches[subMeshName];
-	subMeshBatch.SubMesh = subMesh;
+	
+	// Set the firstInstance if its the first time adding this submesh batch
+	if (subMeshBatch.Transforms.empty())
+	{
+		subMeshBatch.SubMesh = subMesh;
+		subMeshBatch.FirstInstance = _instanceCount;
+	}
+
 	subMeshBatch.Transforms.push_back(entityId);
+	_instanceCount++;
 }
 
 void Core::RendererBatches::CreateInstanceBuffer(Device& device)
