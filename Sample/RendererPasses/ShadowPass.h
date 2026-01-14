@@ -27,7 +27,7 @@ namespace Core
 	private:
 		Scene& _scene;
 
-		VPBufferObject _directionalLight;
+		CameraBuffer _directionalLight;
 		ShadowUniform _shadowBuffer;
 
 		unique_ptr<RendererBatches> _rendererBatches;

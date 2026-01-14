@@ -31,7 +31,7 @@ namespace Core
 	private:
 		void SetPerspective();
 	public:
-		VPBufferObject Matrices;
+		CameraBuffer Matrices;
 	private:
 		float _aspectRatio{ 1.0f };
 		float _fov{ glm::radians(60.0f) };

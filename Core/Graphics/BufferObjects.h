@@ -4,7 +4,7 @@
 #define MAX_POINT_LIGHT_PER_TILE 128
 #define TILE_SIZE 16
 
-struct alignas(16) VPBufferObject
+struct alignas(16) CameraBuffer
 {
 	mat4 View;
 	mat4 Perspective;

@@ -190,6 +190,7 @@
     <ClCompile Include="Core\Utils\GLTFLoader.cpp" />
     <ClCompile Include="Core\Utils\InputEvents.cpp" />
     <ClCompile Include="Core\Utils\JsonParser.cpp" />
+    <ClCompile Include="Core\Utils\Log.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp" />
     <ClCompile Include="Core\Utils\timer.cpp" />
     <ClCompile Include="Core\Utils\Utility.cpp" />
