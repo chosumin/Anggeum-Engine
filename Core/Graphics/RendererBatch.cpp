@@ -89,8 +89,8 @@ void Core::RendererBatches::Draw(CommandBuffer& commandBuffer, uint32_t currentF
 		{
 			auto sharedMaterial = materialBatch.second.Material.lock();
 
-			sharedMaterial->SetStorageBuffer(1, _transformBatch.TransformBuffer);
-			sharedMaterial->SetStorageBuffer(2, _instanceBuffer);
+			sharedMaterial->SetStorageBuffer(1, 1, _transformBatch.TransformBuffer);
+			sharedMaterial->SetStorageBuffer(1, 2, _instanceBuffer);
 
 			commandBuffer.BindDescriptorSets(
 				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);

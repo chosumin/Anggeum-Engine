@@ -84,18 +84,18 @@ namespace Core
 		_rendererBatches->Draw(commandBuffer, currentFrame, 
 		[&](shared_ptr<Material> material) 
 		{
-			material->SetBuffer(currentFrame, 0, &camera->Matrices);
-			material->SetBuffer(6, _shadowRenderTarget);
-			material->SetBuffer(currentFrame, 7, &_shadowBuffer->Projection);
-			material->SetBuffer(currentFrame, 9, &_lightBuffer);
+			material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(1, 6, _shadowRenderTarget);
+			material->SetBuffer(1, currentFrame, 7, &_shadowBuffer->Projection);
+			material->SetBuffer(1, currentFrame, 9, &_lightBuffer);
 
-			material->SetStorageBuffer(10, _lightVisibilityBuffer);
+			material->SetStorageBuffer(1, 10, _lightVisibilityBuffer);
 
-			material->SetBuffer(11, _irradianceCubemap);
-			material->SetBuffer(12, _prefilteredCubemap);
-			material->SetBuffer(13, _brdfLut);
+			material->SetBuffer(1, 11, _irradianceCubemap);
+			material->SetBuffer(1, 12, _prefilteredCubemap);
+			material->SetBuffer(1, 13, _brdfLut);
 
-			material->SetBuffer(currentFrame);
+			material->SetBuffer(1, currentFrame);
 		},
 		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 		{
@@ -191,7 +191,7 @@ namespace Core
 				_skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
 			}
 
-			material->SetBuffer(currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
 
 			commandBuffer.BindPipeline(_skyboxPipeline);
 

@@ -36,34 +36,71 @@ namespace Core
 		Shader& GetShader() const;
 		weak_ptr<Shader> GetShaderPtr() const { return _shader; }
 
-		void* GetBuffer(uint32_t binding)
+		void* GetBuffer(uint32_t setIndex, uint32_t binding)
 		{
-			return _buffers[binding];
+			auto setIt = _buffers.find(setIndex);
+			if (setIt == _buffers.end())
+				return nullptr;
+			
+			auto bindingIt = setIt->second.find(binding);
+			if (bindingIt == setIt->second.end())
+				return nullptr;
+			
+			return bindingIt->second;
 		}
 
-		void AddBuffer(uint32_t binding, void* data)
+		void AddBuffer(uint32_t setIndex, uint32_t binding, void* data)
 		{
-			_buffers[binding] = data;
+			_buffers[setIndex][binding] = data;
 		}
 
-		void SetBuffer(uint32_t currentImage, uint32_t binding, void* data);
-		void SetBuffer(uint32_t binding, shared_ptr<Texture> texture);
-		void SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer);
-		void SetStorageBuffer(uint32_t binding, Buffer* buffer);
+		void SetBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data);
+		void SetBuffer(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture);
+		void SetStorageBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer);
+		void SetStorageBuffer(uint32_t setIndex, uint32_t binding, Buffer* buffer);
 
-		void SetBuffer(uint32_t currentImage)
+		void SetBuffer(uint32_t setIndex, uint32_t currentImage)
 		{
-			for (auto&& buffer : _buffers)
+			auto setIt = _buffers.find(setIndex);
+			if (setIt == _buffers.end())
+				return;
+			
+			for (auto&& [binding, buffer] : setIt->second)
 			{
-				SetBuffer(currentImage, buffer.first, buffer.second);
+				SetBuffer(setIndex, currentImage, binding, buffer);
 			}
 		}
 
-		shared_ptr<Texture> GetTexture(uint32_t binding);
+		shared_ptr<Texture> GetTexture(uint32_t setIndex, uint32_t binding);
 
-		const VkDescriptorSet& GetDescriptorSet(size_t index) const
+		// Get the descriptor set indices that exist
+		vector<uint32_t> GetDescriptorSetIndices() const
 		{
-			return _descriptorSets[index];
+			vector<uint32_t> indices;
+			indices.reserve(_descriptorSets.size());
+			
+			for (const auto& [setIndex, _] : _descriptorSets)
+			{
+				indices.push_back(setIndex);
+			}
+			
+			return indices;
+		}
+
+		// Get descriptor sets ready for binding (cached per frame in material)
+		const vector<VkDescriptorSet>& GetDescriptorSetsForBinding(
+			const vector<uint32_t>& setIndices, uint32_t currentFrame)
+		{
+			auto& frameCache = _cachedDescriptorSetsForBinding[currentFrame];
+			frameCache.clear();
+			frameCache.reserve(setIndices.size());
+
+			for (auto setIndex : setIndices)
+			{
+				frameCache.push_back(_descriptorSets.at(setIndex)[currentFrame]);
+			}
+
+			return frameCache;
 		}
 
 		void UpdateDescriptorSets();
@@ -89,22 +126,28 @@ namespace Core
 		Device& _device;
 		shared_ptr<Shader> _shader;
 		vector<uint8_t> _pushConstants;
-		unordered_map<uint32_t, UniformBuffer*> _uniformBuffers;
-		unordered_map<uint32_t, TextureBuffer*> _textureBuffers;
-		unordered_map<uint32_t, StorageBuffer*> _storageBuffers;
+		
+		// Nested map: setIndex -> (binding -> buffer)
+		unordered_map<uint32_t, unordered_map<uint32_t, UniformBuffer*>> _uniformBuffers;
+		unordered_map<uint32_t, unordered_map<uint32_t, TextureBuffer*>> _textureBuffers;
+		unordered_map<uint32_t, unordered_map<uint32_t, StorageBuffer*>> _storageBuffers;
 	private:
 		bool _isDirty;
 
 		string _name;
 
-		vector<VkDescriptorSet> _descriptorSets;
+		// Map of set index to descriptor sets (per frame)
+		unordered_map<uint32_t, vector<VkDescriptorSet>> _descriptorSets;
+		
+		// Cached descriptor sets for binding (per frame, persists until next binding)
+		vector<vector<VkDescriptorSet>> _cachedDescriptorSetsForBinding;
 
 		bool _isDoubledSided;
 		AlphaMode _alphaMode = AlphaMode::Opaque;
 		bool _isAlphaCutoff;
 
-		unordered_map<uint32_t, void*> _buffers;
-		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
+		unordered_map<uint32_t, unordered_map<uint32_t, void*>> _buffers;
+		unordered_map<uint32_t, unordered_map<uint32_t, shared_ptr<Texture>>> _textures;
 	};
 }
 

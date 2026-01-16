@@ -79,67 +79,107 @@ Core::Shader::Shader(Device& device, const string pass, const string& computeFil
 	_hash = Utility::HashCode(computeFilePath.c_str());
 }
 
+void Core::Shader::CreatePipelineLayout()
+{
+	// Finalize all descriptor set layouts
+	for (auto& [setIndex, layout] : _descriptorSetLayouts)
+	{
+		layout->Finalize();
+	}
+
+	// Create VkDescriptorSetLayout array sorted by set index for pipeline layout
+	vector<VkDescriptorSetLayout> setLayoutsArray;
+	
+	if (!_descriptorSetLayouts.empty())
+	{
+		uint32_t maxSet = 0;
+		for (auto& [setIndex, layout] : _descriptorSetLayouts)
+		{
+			maxSet = std::max(maxSet, setIndex);
+		}
+		
+		setLayoutsArray.resize(maxSet + 1, VK_NULL_HANDLE);
+		
+		for (auto& [setIndex, layout] : _descriptorSetLayouts)
+		{
+			setLayoutsArray[setIndex] = layout->GetDescriptorSetLayout();
+		}
+	}
+
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayoutsArray.size());
+	pipelineLayoutInfo.pSetLayouts = setLayoutsArray.empty() ? nullptr : setLayoutsArray.data();
+
+	pipelineLayoutInfo.pushConstantRangeCount =
+		static_cast<uint32_t>(_pushConstantRanges.size());
+	pipelineLayoutInfo.pPushConstantRanges = _pushConstantRanges.data();
+
+	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
+		throw std::runtime_error("failed to create pipeline layout!");
+}
+
+// Move constructor
 Core::Shader::Shader(Shader&& other) noexcept
 	: _device(other._device),
 	_vertShaderModule(other._vertShaderModule),
 	_fragShaderModule(other._fragShaderModule),
 	_computeShaderModule(other._computeShaderModule),
 	_pipelineLayout(other._pipelineLayout),
-	_descriptorPool(other._descriptorPool),
+	_descriptorSetLayouts(std::move(other._descriptorSetLayouts)),
 	_vertexBindings(std::move(other._vertexBindings)),
 	_vertexAttributes(std::move(other._vertexAttributes)),
 	_pushConstantRanges(std::move(other._pushConstantRanges)),
-	_uniformBufferLayoutBindings(std::move(other._uniformBufferLayoutBindings)),
-	_textureBufferLayoutBindings(std::move(other._textureBufferLayoutBindings)),
 	_pass(other._pass),
-	_hash(other._hash)
+	_hash(other._hash),
+	_vertexAttributeNames(std::move(other._vertexAttributeNames))
 {
-    other._vertShaderModule = VK_NULL_HANDLE;
-    other._fragShaderModule = VK_NULL_HANDLE;
+	other._vertShaderModule = VK_NULL_HANDLE;
+	other._fragShaderModule = VK_NULL_HANDLE;
 	other._computeShaderModule = VK_NULL_HANDLE;
-    other._pipelineLayout = VK_NULL_HANDLE;
-    other._descriptorPool = nullptr;
+	other._pipelineLayout = VK_NULL_HANDLE;
 }
 
-Core::Shader& Core::Shader::operator=(Shader&& other) noexcept  
-{  
-   if (this != &other)  
-   {  
-       auto vkDevice = _device.GetDevice();  
+// Move assignment operator
+Core::Shader& Core::Shader::operator=(Shader&& other) noexcept
+{
+	if (this != &other)
+	{
+		auto vkDevice = _device.GetDevice();
 
-	   // Clean up existing resources  
-	   if (_fragShaderModule)
-		   vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);
-	   if (_vertShaderModule)
-		   vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);
-	   if (_computeShaderModule)
-		   vkDestroyShaderModule(vkDevice, _computeShaderModule, nullptr);
-       vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);  
-       delete _descriptorPool;  
+		// Clean up existing resources
+		if (_fragShaderModule)
+			vkDestroyShaderModule(vkDevice, _fragShaderModule, nullptr);
+		if (_vertShaderModule)
+			vkDestroyShaderModule(vkDevice, _vertShaderModule, nullptr);
+		if (_computeShaderModule)
+			vkDestroyShaderModule(vkDevice, _computeShaderModule, nullptr);
+		vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);
+		
+		for (auto& [setIndex, layout] : _descriptorSetLayouts)
+			delete layout;
 
-       // Move resources from the other object
-       _vertShaderModule = other._vertShaderModule;  
-       _fragShaderModule = other._fragShaderModule;  
-	   _computeShaderModule = other._computeShaderModule;
-       _pipelineLayout = other._pipelineLayout;  
-       _descriptorPool = other._descriptorPool;  
-       _vertexBindings = std::move(other._vertexBindings);  
-       _vertexAttributes = std::move(other._vertexAttributes);  
-       _pushConstantRanges = std::move(other._pushConstantRanges);  
-       _uniformBufferLayoutBindings = std::move(other._uniformBufferLayoutBindings);  
-       _textureBufferLayoutBindings = std::move(other._textureBufferLayoutBindings);  
-	   _pass = other._pass;
-	   _hash = other._hash;
+		// Move resources
+		_vertShaderModule = other._vertShaderModule;
+		_fragShaderModule = other._fragShaderModule;
+		_computeShaderModule = other._computeShaderModule;
+		_pipelineLayout = other._pipelineLayout;
+		_descriptorSetLayouts = std::move(other._descriptorSetLayouts);
+		_vertexBindings = std::move(other._vertexBindings);
+		_vertexAttributes = std::move(other._vertexAttributes);
+		_pushConstantRanges = std::move(other._pushConstantRanges);
+		_pass = other._pass;
+		_hash = other._hash;
+		_vertexAttributeNames = std::move(other._vertexAttributeNames);
 
-       // Reset the other object  
-       other._vertShaderModule = VK_NULL_HANDLE;  
-       other._fragShaderModule = VK_NULL_HANDLE;  
-	   other._computeShaderModule = VK_NULL_HANDLE;
-       other._pipelineLayout = VK_NULL_HANDLE;  
-       other._descriptorPool = nullptr;  
-   }  
+		// Reset other object
+		other._vertShaderModule = VK_NULL_HANDLE;
+		other._fragShaderModule = VK_NULL_HANDLE;
+		other._computeShaderModule = VK_NULL_HANDLE;
+		other._pipelineLayout = VK_NULL_HANDLE;
+	}
 
-   return *this;  
+	return *this;
 }
 
 Core::Shader::~Shader()
@@ -155,7 +195,12 @@ Core::Shader::~Shader()
 
 	vkDestroyPipelineLayout(vkDevice, _pipelineLayout, nullptr);
 
-	delete(_descriptorPool);
+	// Delete all descriptor set layouts
+	for (auto& [setIndex, layout] : _descriptorSetLayouts)
+	{
+		delete layout;
+	}
+	_descriptorSetLayouts.clear();
 }
 
 vector<VkPipelineShaderStageCreateInfo> Core::Shader::GetShaderStageCreateInfo() const
@@ -202,87 +247,36 @@ VkPipelineVertexInputStateCreateInfo Core::Shader::GetVertexInputStateCreateInfo
 	return vertexInputInfo;
 }
 
-void Core::Shader::CreatePipelineLayout()
+void Core::Shader::AddUniformBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size)
 {
-	CreateDescriptorPool();
-
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &_descriptorPool->GetDescriptorSetLayout();
-
-	pipelineLayoutInfo.pushConstantRangeCount =
-		static_cast<uint32_t>(_pushConstantRanges.size());
-	pipelineLayoutInfo.pPushConstantRanges = _pushConstantRanges.data();
-
-	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
-		throw std::runtime_error("failed to create pipeline layout!");
+	auto* layout = GetOrCreateDescriptorSetLayout(set);
+	layout->AddUniformBufferBinding(binding, stage, size);
 }
 
-void Core::Shader::AddUniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size)
+void Core::Shader::AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)
 {
-	bool isNew = true;
-	for (auto&& layoutBinding : _uniformBufferLayoutBindings)
-	{
-		if (layoutBinding.Binding == binding)
-		{
-			layoutBinding.Stage = layoutBinding.Stage | stage;
-			isNew = false;
-			break;
-		}
-	}
-
-	if (isNew)
-		_uniformBufferLayoutBindings.emplace_back(binding, stage, size);
+	auto* layout = GetOrCreateDescriptorSetLayout(set);
+	layout->AddTextureBufferBinding(binding, stage);
 }
 
-void Core::Shader::AddTextureBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage)
+void Core::Shader::AddStorageBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)
 {
-	bool isNew = true;
-	for (auto&& layoutBinding : _textureBufferLayoutBindings)
-	{
-		if (layoutBinding.Binding == binding)
-		{
-			layoutBinding.Stage = layoutBinding.Stage | stage;
-			isNew = false;
-			break;
-		}
-	}
-
-	if (isNew)
-		_textureBufferLayoutBindings.emplace_back(binding, stage);
+	auto* layout = GetOrCreateDescriptorSetLayout(set);
+	layout->AddStorageBufferBinding(binding, stage);
 }
 
-void Core::Shader::AddStorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage)
+Core::DescriptorSetLayout* Core::Shader::GetOrCreateDescriptorSetLayout(uint32_t setIndex)
 {
-	bool isNew = true;
-	for (auto&& layoutBinding : _storageBufferLayoutBindings)
+	auto it = _descriptorSetLayouts.find(setIndex);
+	if (it != _descriptorSetLayouts.end())
 	{
-		if (layoutBinding.Binding == binding)
-		{
-			layoutBinding.Stage = layoutBinding.Stage | stage;
-			isNew = false;
-			break;
-		}
+		return it->second;
 	}
-
-	if (isNew)
-		_storageBufferLayoutBindings.emplace_back(binding, stage);
-}
-
-void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
-{
-	uint32 offset = 0;
-	for (auto&& range : _pushConstantRanges)
-	{
-		offset += range.size;
-	}
-
-	VkPushConstantRange pushConstant{};
-	pushConstant.stageFlags = stage;
-	pushConstant.size = size;
-	pushConstant.offset = offset;
-	_pushConstantRanges.push_back(pushConstant);
+	
+	// Create new DescriptorSetLayout if not exists
+	auto* newLayout = new DescriptorSetLayout(_device);
+	_descriptorSetLayouts[setIndex] = newLayout;
+	return newLayout;
 }
 
 VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<uint32_t>& code, size_t codeSize) const
@@ -321,42 +315,25 @@ uint32_t Core::Shader::GetPushConstantsOffset(uint32_t index) const
 	return _pushConstantRanges[index].offset;
 }
 
-VkDescriptorSetLayout& Core::Shader::GetDescriptorSetLayout()
-{
-	return _descriptorPool->GetDescriptorSetLayout();
-}
-
-VkDescriptorPool& Core::Shader::GetDescriptorPool()
-{
-	return _descriptorPool->AllocateDescriptorPool();
-}
-
-void Core::Shader::CreateDescriptorPool()
-{
-	vector<IDescriptor*> descriptors;
-	
-	for (auto& binding : _uniformBufferLayoutBindings)
-	{
-		descriptors.push_back(&binding);
-	}
-
-	for (auto& binding : _textureBufferLayoutBindings)
-	{
-		descriptors.push_back(&binding);
-	}
-
-	for (auto& binding : _storageBufferLayoutBindings)
-	{
-		descriptors.push_back(&binding);
-	}
-
-	_descriptorPool = new DescriptorPool(_device, descriptors);
-}
-
 void Core::Shader::SetResources(const string vertPath, const vector<uint32_t>& vertSpirvBinary, const string fragPath, const vector<uint32_t>& fragSpirvBinary)
 {
 	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_VERTEX_BIT, 
 		vertPath, vertSpirvBinary);
 	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_FRAGMENT_BIT, 
 		fragPath, fragSpirvBinary);
+}
+
+void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
+{
+	uint32_t offset = 0;
+	for (auto&& range : _pushConstantRanges)
+	{
+		offset += range.size;
+	}
+
+	VkPushConstantRange pushConstant{};
+	pushConstant.stageFlags = stage;
+	pushConstant.size = size;
+	pushConstant.offset = offset;
+	_pushConstantRanges.push_back(pushConstant);
 }

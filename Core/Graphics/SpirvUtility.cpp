@@ -150,16 +150,17 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         const spirv_cross::SPIRType& type = compiler.get_type(uniformBuffer.base_type_id);
         size_t size = compiler.get_declared_struct_size(type);
 
-        shader.AddUniformBufferLayoutBinding(binding, shaderStage, size);
+        shader.AddUniformBufferLayoutBinding(set, binding, shaderStage, size);
     }
 
     spirv_cross::SmallVector<spirv_cross::SpecializationConstant> specConstants = compiler.get_specialization_constants();
 	for (size_t i = 0; i < resources.storage_buffers.size(); ++i)
 	{
         auto& storageBuffer = resources.storage_buffers[i];
+        unsigned set = compiler.get_decoration(storageBuffer.id, spv::DecorationDescriptorSet);
         unsigned binding = compiler.get_decoration(storageBuffer.id, spv::DecorationBinding);
 
-        shader.AddStorageBufferLayoutBinding(binding, shaderStage);
+        shader.AddStorageBufferLayoutBinding(set, binding, shaderStage);
     }
 
     for (const auto& resource : resources.sampled_images) 
@@ -167,7 +168,7 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
         uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 
-        shader.AddTextureBufferLayoutBinding(binding, shaderStage);
+        shader.AddTextureBufferLayoutBinding(set, binding, shaderStage);
     }
 
     for (const auto& resource : resources.push_constant_buffers) 

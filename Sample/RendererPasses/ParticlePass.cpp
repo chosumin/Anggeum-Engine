@@ -111,7 +111,7 @@ void Sample::ParticlePass::Prepare()
 void Sample::ParticlePass::Draw(Core::CommandBuffer& commandBuffer, Core::CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	_deltaTime.deltaTime += 0.01f;
-	_computeMaterial->SetBuffer(currentFrame, 0, &_deltaTime.deltaTime);
+	_computeMaterial->SetBuffer(0, currentFrame, 0, &_deltaTime.deltaTime);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 

@@ -47,7 +47,7 @@ void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compu
 	_rendererBatches->Draw(commandBuffer, currentFrame,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(currentFrame, 0, &camera->Matrices);
+		material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

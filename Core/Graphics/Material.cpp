@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/Texture.h"
+#include "Graphics/Vulkans/DescriptorPool.h"
 #include "Graphics/ResourceCache.h"
 
 namespace Core
@@ -11,6 +12,9 @@ namespace Core
 		:_device(device), _isDirty(true), _name(materialName)
 	{
 		_shader = device.GetResourceCache().RequestShader(shaderName);
+
+		// Initialize per-frame cache
+		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
 
 		CreateDescriptorSets();
 		CreateBuffers();
@@ -46,6 +50,8 @@ namespace Core
 		_buffers(other._buffers),
 		_textures(other._textures)
 	{
+		// Initialize per-frame cache
+		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
 	}
 
 	Material& Material::operator=(const Material& other)
@@ -71,30 +77,34 @@ namespace Core
 
 	Core::Material::~Material()
 	{
-		for (auto& uniformBuffer : _uniformBuffers)
+		for (auto& [setIndex, bindingMap] : _uniformBuffers)
 		{
-			delete(uniformBuffer.second);
+			for (auto& [binding, buffer] : bindingMap)
+			{
+				delete buffer;
+			}
 		}
 		_uniformBuffers.clear();
 
-		for (auto& textureBuffer : _textureBuffers)
+		for (auto& [setIndex, bindingMap] : _textureBuffers)
 		{
-			delete(textureBuffer.second);
+			for (auto& [binding, buffer] : bindingMap)
+			{
+				delete buffer;
+			}
 		}
 		_textureBuffers.clear();
 
-		for (auto& storageBuffer : _storageBuffers)
+		for (auto& [setIndex, bindingMap] : _storageBuffers)
 		{
-			delete(storageBuffer.second);
+			for (auto& [binding, buffer] : bindingMap)
+			{
+				delete buffer;
+			}
 		}
 		_storageBuffers.clear();
 
-		for (auto& buffer : _buffers)
-		{
-			delete(buffer.second);
-		}
 		_buffers.clear();
-
 		_textures.clear();
 	}
 
@@ -103,45 +113,69 @@ namespace Core
 		return *_shader;
 	}
 
-	void Core::Material::SetBuffer(uint32_t currentImage, uint32_t binding, void* data)
+	void Core::Material::SetBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data)
 	{
-		if (_uniformBuffers.find(binding) == _uniformBuffers.end())
+		auto setIt = _uniformBuffers.find(setIndex);
+		if (setIt == _uniformBuffers.end())
 			return;
 
-		_uniformBuffers[binding]->SetBuffer(currentImage, data);
-	}
-
-	void Core::Material::SetBuffer(uint32_t binding, shared_ptr<Texture> texture)
-	{
-		if (_textureBuffers.find(binding) == _textureBuffers.end())
+		auto bindingIt = setIt->second.find(binding);
+		if (bindingIt == setIt->second.end())
 			return;
 
-		_textures[binding] = texture;
+		bindingIt->second->SetBuffer(currentImage, data);
 	}
 
-	void Material::SetStorageBuffer(uint32_t currentImage, uint32_t binding, Buffer* buffer)
+	void Core::Material::SetBuffer(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture)
 	{
-		if (_storageBuffers.find(binding) == _storageBuffers.end())
+		auto setIt = _textureBuffers.find(setIndex);
+		if (setIt == _textureBuffers.end())
 			return;
 
-		_storageBuffers[binding]->SetBuffer(currentImage, buffer);
+		auto bindingIt = setIt->second.find(binding);
+		if (bindingIt == setIt->second.end())
+			return;
+
+		_textures[setIndex][binding] = texture;
 	}
 
-	void Material::SetStorageBuffer(uint32_t binding, Buffer* buffer)
+	void Material::SetStorageBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer)
 	{
-		if (_storageBuffers.find(binding) == _storageBuffers.end())
+		auto setIt = _storageBuffers.find(setIndex);
+		if (setIt == _storageBuffers.end())
+			return;
+
+		auto bindingIt = setIt->second.find(binding);
+		if (bindingIt == setIt->second.end())
+			return;
+
+		bindingIt->second->SetBuffer(currentImage, buffer);
+	}
+
+	void Material::SetStorageBuffer(uint32_t setIndex, uint32_t binding, Buffer* buffer)
+	{
+		auto setIt = _storageBuffers.find(setIndex);
+		if (setIt == _storageBuffers.end())
+			return;
+
+		auto bindingIt = setIt->second.find(binding);
+		if (bindingIt == setIt->second.end())
 			return;
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-			_storageBuffers[binding]->SetBuffer(i, buffer);
+			bindingIt->second->SetBuffer(i, buffer);
 	}
 
-	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
+	shared_ptr<Texture> Material::GetTexture(uint32_t setIndex, uint32_t binding)
 	{
-		auto it = _textures.find(binding);
-		if (it != _textures.end())
+		auto setIt = _textures.find(setIndex);
+		if (setIt != _textures.end())
 		{
-			return it->second;
+			auto bindingIt = setIt->second.find(binding);
+			if (bindingIt != setIt->second.end())
+			{
+				return bindingIt->second;
+			}
 		}
 		return nullptr;
 	}
@@ -153,51 +187,75 @@ namespace Core
 			_textureBuffers.size() + 
 			_storageBuffers.size());
 
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+		// Collect all write operations first
+		vector<VkWriteDescriptorSet> allDescriptorWrites;
+		allDescriptorWrites.reserve(_descriptorSets.size() * MAX_FRAMES_IN_FLIGHT * size);
+
+		for (auto& [setIndex, descriptorSetVector] : _descriptorSets)
 		{
-			vector<VkWriteDescriptorSet> descriptorWrites(size);
-			
-			uint32_t index = 0;
-
-			auto descriptorSet = _descriptorSets[i];
-
-			for (auto iter = _uniformBuffers.begin(); iter != _uniformBuffers.end(); ++iter)
+			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 			{
-				VkWriteDescriptorSet writeDescriptorSet =
-					iter->second->CreateWriteDescriptorSet(i, iter->first);
+				auto descriptorSet = descriptorSetVector[i];
 
-				descriptorWrites[index] = writeDescriptorSet;
-				descriptorWrites[index].dstSet = descriptorSet;
-				++index;
+				// Process uniform buffers for this set
+				auto uniformSetIt = _uniformBuffers.find(setIndex);
+				if (uniformSetIt != _uniformBuffers.end())
+				{
+					for (auto& [binding, buffer] : uniformSetIt->second)
+					{
+						VkWriteDescriptorSet writeDescriptorSet =
+							buffer->CreateWriteDescriptorSet(i, binding);
+
+						writeDescriptorSet.dstSet = descriptorSet;
+						allDescriptorWrites.push_back(writeDescriptorSet);
+					}
+				}
+
+				// Process texture buffers for this set
+				auto textureSetIt = _textures.find(setIndex);
+				auto textureBufferSetIt = _textureBuffers.find(setIndex);
+				if (textureSetIt != _textures.end() && textureBufferSetIt != _textureBuffers.end())
+				{
+					for (auto& [binding, texture] : textureSetIt->second)
+					{
+						auto bufferIt = textureBufferSetIt->second.find(binding);
+						if (bufferIt != textureBufferSetIt->second.end())
+						{
+							auto info = texture->GetDescriptorImageInfo();
+							bufferIt->second->CopyDescriptorImageInfo(info);
+
+							VkWriteDescriptorSet writeDescriptorSet =
+								bufferIt->second->CreateWriteDescriptorSet(i, binding);
+
+							writeDescriptorSet.dstSet = descriptorSet;
+							allDescriptorWrites.push_back(writeDescriptorSet);
+						}
+					}
+				}
+
+				// Process storage buffers for this set
+				auto storageSetIt = _storageBuffers.find(setIndex);
+				if (storageSetIt != _storageBuffers.end())
+				{
+					for (auto& [binding, buffer] : storageSetIt->second)
+					{
+						VkWriteDescriptorSet writeDescriptorSet =
+							buffer->CreateWriteDescriptorSet(i, binding);
+
+						writeDescriptorSet.dstSet = descriptorSet;
+						allDescriptorWrites.push_back(writeDescriptorSet);
+					}
+				}
 			}
+		}
 
-			for (auto iter = _textures.begin(); iter != _textures.end(); ++iter)
-			{
-				auto info = iter->second->GetDescriptorImageInfo();
-				_textureBuffers[iter->first]->CopyDescriptorImageInfo(info);
-
-				VkWriteDescriptorSet writeDescriptorSet =
-					_textureBuffers[iter->first]->CreateWriteDescriptorSet(i, iter->first);
-
-				descriptorWrites[index] = writeDescriptorSet;
-				descriptorWrites[index].dstSet = descriptorSet;
-				++index;
-			}
-
-			for (auto iter = _storageBuffers.begin(); iter != _storageBuffers.end(); ++iter)
-			{
-				VkWriteDescriptorSet writeDescriptorSet =
-					iter->second->CreateWriteDescriptorSet(i, iter->first);
-
-				descriptorWrites[index] = writeDescriptorSet;
-				descriptorWrites[index].dstSet = descriptorSet;
-				++index;
-			}
-
+		// Single batched update call
+		if (!allDescriptorWrites.empty())
+		{
 			vkUpdateDescriptorSets(
 				_device.GetDevice(),
-				static_cast<uint32_t>(descriptorWrites.size()),
-				descriptorWrites.data(), 0, nullptr);
+				static_cast<uint32_t>(allDescriptorWrites.size()),
+				allDescriptorWrites.data(), 0, nullptr);
 		}
 
 		_isDirty = false;
@@ -215,45 +273,71 @@ namespace Core
 
 	void Material::CreateDescriptorSets()
 	{
-		vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, _shader->GetDescriptorSetLayout());
-		VkDescriptorSetAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = _shader->GetDescriptorPool();
-		allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-		allocInfo.pSetLayouts = layouts.data();
-
-		_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-		if (vkAllocateDescriptorSets(_device.GetDevice(),
-			&allocInfo, _descriptorSets.data()) != VK_SUCCESS)
+		// Get all descriptor set layouts from shader
+		auto& layouts = _shader->GetDescriptorSetLayouts();
+		
+		// Allocate descriptor sets for each set index
+		for (auto& [setIndex, descriptorLayout] : layouts)
 		{
-			throw runtime_error("failed to allocate descriptor sets!");
+			VkDescriptorSetLayout vkLayout = descriptorLayout->GetDescriptorSetLayout();
+			vector<VkDescriptorSetLayout> perFrameLayouts(MAX_FRAMES_IN_FLIGHT, vkLayout);
+			
+			VkDescriptorSetAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = _device.GetGlobalDescriptorPool();
+			allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+			allocInfo.pSetLayouts = perFrameLayouts.data();
+
+			_descriptorSets[setIndex].resize(MAX_FRAMES_IN_FLIGHT);
+			
+			VkResult result = vkAllocateDescriptorSets(_device.GetDevice(),
+				&allocInfo, _descriptorSets[setIndex].data());
+
+			if (result != VK_SUCCESS)
+			{
+				if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
+				{
+					throw runtime_error("Global descriptor pool out of memory! Increase pool size.");
+				}
+				else if (result == VK_ERROR_FRAGMENTED_POOL)
+				{
+					throw runtime_error("Global descriptor pool fragmented!");
+				}
+				throw runtime_error("Failed to allocate descriptor sets for set index " + std::to_string(setIndex));
+			}
 		}
 	}
 
 	void Material::CreateBuffers()
 	{
-		auto& uniformBindings = _shader->GetUniformBufferLayoutBindings();
-
-		for (auto& binding : uniformBindings)
-		{
-			auto buffer = new Core::UniformBuffer(_device, binding.BufferSize);
-			_uniformBuffers[binding.Binding] = buffer;
-		}
-
-		auto& textureBindings = _shader->GetTextureBufferLayoutBindings();
+		auto& layouts = _shader->GetDescriptorSetLayouts();
 		
-		for (auto& binding : textureBindings)
+		// Iterate through all descriptor set layouts
+		for (auto& [setIndex, descriptorLayout] : layouts)
 		{
-			auto buffer = new Core::TextureBuffer();
-			_textureBuffers[binding.Binding] = buffer;
-		}
+			// Create uniform buffers
+			auto& uniformBindings = descriptorLayout->GetUniformBufferBindings();
+			for (auto& binding : uniformBindings)
+			{
+				auto buffer = new Core::UniformBuffer(_device, binding.BufferSize);
+				_uniformBuffers[setIndex][binding.Binding] = buffer;
+			}
 
-		auto& storageBindings = _shader->GetStorageBufferLayoutBindings();
+			// Create texture buffers
+			auto& textureBindings = descriptorLayout->GetTextureBufferBindings();
+			for (auto& binding : textureBindings)
+			{
+				auto buffer = new Core::TextureBuffer();
+				_textureBuffers[setIndex][binding.Binding] = buffer;
+			}
 
-		for (auto& binding : storageBindings)
-		{
-			auto buffer = new Core::StorageBuffer();
-			_storageBuffers[binding.Binding] = buffer;
+			// Create storage buffers
+			auto& storageBindings = descriptorLayout->GetStorageBufferBindings();
+			for (auto& binding : storageBindings)
+			{
+				auto buffer = new Core::StorageBuffer();
+				_storageBuffers[setIndex][binding.Binding] = buffer;
+			}
 		}
 	}
 
@@ -261,11 +345,13 @@ namespace Core
 	{
 		auto descriptor = defaultTexture->GetDescriptorImageInfo();
 
-		for (auto&& textureBuffer : _textureBuffers)
+		for (auto& [setIndex, bindingMap] : _textureBuffers)
 		{
-			textureBuffer.second->CopyDescriptorImageInfo(descriptor);
-
-			_textures[textureBuffer.first] = defaultTexture;
+			for (auto& [binding, textureBuffer] : bindingMap)
+			{
+				textureBuffer->CopyDescriptorImageInfo(descriptor);
+				_textures[setIndex][binding] = defaultTexture;
+			}
 		}
 	}
 }

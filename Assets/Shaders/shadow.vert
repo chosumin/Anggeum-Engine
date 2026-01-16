@@ -4,12 +4,12 @@
 
 layout(location = 0) in vec3 inPosition;
 
-layout(binding = 1) buffer readonly TransformBuffer
+layout(set = 1, binding = 1) buffer readonly TransformBuffer
 {
     mat4 transforms[];
 } transformBuffer;
 
-layout(binding = 2) buffer readonly InstanceBuffer
+layout(set = 1, binding = 2) buffer readonly InstanceBuffer
 {
     uint IDs[];
 } instanceBuffer;

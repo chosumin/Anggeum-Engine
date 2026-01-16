@@ -122,13 +122,30 @@ void Core::CommandBuffer::BindDescriptorSets(
 	if (material.IsDirty())
 		material.UpdateDescriptorSets();
 
-    auto descriptorLayout = material.GetShader().GetPipelineLayout();
-    auto descriptorSet = material.GetDescriptorSet(currentFrame);
-
+    auto& shader = material.GetShader();
+    auto pipelineLayout = shader.GetPipelineLayout();
+    
+    // Get all descriptor set indices
+    auto setIndices = material.GetDescriptorSetIndices();
+    
+    if (setIndices.empty())
+        return;
+    
+    // Sort indices to ensure correct binding order
+    std::sort(setIndices.begin(), setIndices.end());
+    
+    // Get the cached descriptor sets array from Material
+    // Material will maintain this array until next binding
+    const auto& descriptorSets = material.GetDescriptorSetsForBinding(setIndices, currentFrame);
+    
+    // Bind all descriptor sets at once
+    // firstSet should be the lowest set index
+    uint32_t firstSet = setIndices.front();
+    
     vkCmdBindDescriptorSets(
         _commandBuffer, pipelineBindPoint,
-        descriptorLayout, 0, 1,
-        &descriptorSet, 0, nullptr);
+        pipelineLayout, firstSet, static_cast<uint32_t>(descriptorSets.size()),
+        descriptorSets.data(), 0, nullptr);
 }
 
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)

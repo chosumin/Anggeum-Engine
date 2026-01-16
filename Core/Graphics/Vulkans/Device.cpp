@@ -53,6 +53,7 @@ Core::Device::Device(Window& window)
     _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 
     _resourceCache = new ResourceCache(*this);
+    CreateGlobalDescriptorPool();
 }
 
 Core::Device::~Device()
@@ -68,6 +69,11 @@ Core::Device::~Device()
 
     vkDestroySurfaceKHR(_instance, _surface, nullptr);
     vkDestroyInstance(_instance, nullptr);
+
+    if (_globalDescriptorPool != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorPool(_device, _globalDescriptorPool, nullptr);
+    }
 }
 
 uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
@@ -497,4 +503,34 @@ Core::SwapChainSupportDetails Core::Device::QuerySwapChainSupport(VkPhysicalDevi
     }
 
     return details;
+}
+
+void Core::Device::CreateGlobalDescriptorPool()
+{
+    // Create global pool with generous size limits
+    std::array<VkDescriptorPoolSize, 3> poolSizes{};
+    
+    // Uniform Buffers
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = 1000;
+    
+    // Combined Image Samplers (Textures)
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 5000;
+    
+    // Storage Buffers
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount = 1000;
+    
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = 1000; // Maximum of 1000 descriptor sets
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    
+    if (vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_globalDescriptorPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create global descriptor pool!");
+    }
 }

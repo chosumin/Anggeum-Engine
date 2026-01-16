@@ -54,7 +54,7 @@ void Core::PreEnvironmentPass::Prepare()
 		
 		_sky = skybox->GetSubMeshes()[0];
 		auto material = skybox->GetMaterials()[0];
-		skyCubemap = material->GetTexture(1);
+		skyCubemap = material->GetTexture(0, 1);
 
 		auto pipelineState = *_pipelineState;
 
@@ -78,8 +78,8 @@ void Core::PreEnvironmentPass::Prepare()
 	_delta.Phi = (2.0f * float(PI)) / 180.0f;
 	_delta.Theta = (0.5f * float(PI)) / 64.0f;
 
-	_irradianceMaterial->SetBuffer(0, skyCubemap);
-	_prefilteredMaterial->SetBuffer(0, skyCubemap);
+	_irradianceMaterial->SetBuffer(0, 0, skyCubemap);
+	_prefilteredMaterial->SetBuffer(0, 0, skyCubemap);
 }
 
 void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)

@@ -70,7 +70,7 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compute
 	_rendererBatches->Draw(commandBuffer, currentFrame,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(currentFrame, 0, &_directionalLight);
+		material->SetBuffer(0, currentFrame, 0, &_directionalLight);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

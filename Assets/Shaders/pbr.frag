@@ -12,17 +12,17 @@ layout(location = 2) in vec2 uv;
 
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 3) uniform sampler2D basemap;
-layout(binding = 4) uniform sampler2D normalmap;
-layout(binding = 5) uniform sampler2D metallicRoughnessmap;
-layout(binding = 6) uniform sampler2D shadowmap;
+layout(set = 1, binding = 3) uniform sampler2D basemap;
+layout(set = 1, binding = 4) uniform sampler2D normalmap;
+layout(set = 1, binding = 5) uniform sampler2D metallicRoughnessmap;
+layout(set = 1, binding = 6) uniform sampler2D shadowmap;
 
-layout(binding = 7) uniform ShadowUniform
+layout(set = 1, binding = 7) uniform ShadowUniform
 {
 	mat4 projection;
 } shadow;
 
-layout(binding = 8) uniform PBR
+layout(set = 1, binding = 8) uniform PBR
 {
     vec4 albedo;
     float metallic;
@@ -35,20 +35,20 @@ layout(binding = 8) uniform PBR
 	int debugMode;
 } pbr;
 
-layout(binding = 9) uniform Lights 
+layout(set = 1, binding = 9) uniform Lights 
 {
 	Light lights[MAX_FORWARD_LIGHT_COUNT];
 	uint count;
 } lights;
 
-layout(binding = 10) buffer readonly TileLightVisiblities
+layout(set = 1, binding = 10) buffer readonly TileLightVisiblities
 {
     LightVisiblity lightVisiblities[];
 };
 
-layout(binding = 11) uniform samplerCube irradiancemap;
-layout(binding = 12) uniform samplerCube prefiltermap;
-layout(binding = 13) uniform sampler2D brdfLut;
+layout(set = 1, binding = 11) uniform samplerCube irradiancemap;
+layout(set = 1, binding = 12) uniform samplerCube prefiltermap;
+layout(set = 1, binding = 13) uniform sampler2D brdfLut;
 
 layout(std140, push_constant) uniform TileInfo
 {

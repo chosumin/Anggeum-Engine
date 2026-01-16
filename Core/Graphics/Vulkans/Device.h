@@ -73,6 +73,8 @@ namespace Core
 		}
 
 		ResourceCache& GetResourceCache() const { return *_resourceCache; }
+
+		VkDescriptorPool& GetGlobalDescriptorPool() { return _globalDescriptorPool; }
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -88,6 +90,7 @@ namespace Core
 		void CheckBindlessSupport(
 			VkPhysicalDeviceDescriptorIndexingFeatures& outIndexingFeatures);
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+		void CreateGlobalDescriptorPool();
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -119,6 +122,8 @@ namespace Core
 		CommandPool* _graphicsCommandPool;
 
 		MemoryAllocatorManager* _memoryAllocatorManager;
+
+		VkDescriptorPool _globalDescriptorPool;
 
 		const vector<const char*> _validationLayers = 
 		{
