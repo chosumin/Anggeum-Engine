@@ -163,6 +163,7 @@
     <ClCompile Include="Core\Graphics\Vulkans\StorageBuffer.cpp" />
     <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
     <ClCompile Include="Core\Graphics\RendererPasses\LightCullingPass.cpp" />
+    <ClCompile Include="Core\Utils\Log.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
