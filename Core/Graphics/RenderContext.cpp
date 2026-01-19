@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Graphics/RenderContext.h"
+#include "Graphics/RenderFrame.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/CommandPool.h"
@@ -8,20 +9,16 @@ namespace Core
 {
 	vector<function<void(SwapChain&)>> RenderContext::_resizeCallbacks;
 
-	void RenderContext::AddResizeCallback(
-		function<void(SwapChain&)> callback)
+	void RenderContext::AddResizeCallback(function<void(SwapChain&)> callback)
 	{
 		_resizeCallbacks.push_back(callback);
 	}
 
-	void Core::RenderContext::RemoveResizeCallback(
-		function<void(SwapChain&)> callback)
+	void RenderContext::RemoveResizeCallback(function<void(SwapChain&)> callback)
 	{
-		for (auto it = _resizeCallbacks.begin();
-			it != _resizeCallbacks.end(); ++it) {
-			bool isSame = is_same<
-				decltype(*it), decltype(callback)>::value;
-
+		for (auto it = _resizeCallbacks.begin(); it != _resizeCallbacks.end(); ++it)
+		{
+			bool isSame = is_same<decltype(*it), decltype(callback)>::value;
 			if (isSame)
 			{
 				_resizeCallbacks.erase(it);
@@ -31,18 +28,20 @@ namespace Core
 	}
 
 	RenderContext::RenderContext(Device& device)
-		:_device(device)
+		: _device(device)
 	{
 		_swapChain = new SwapChain(device);
 
 		auto queueFamilyIndices = device.GetQueueFamilyIndices();
 		
-		_commandPool = new CommandPool(
-			device, queueFamilyIndices.GraphicsFamily.value());
+		// Create command pools (owned by RenderContext)
+		_commandPool = new CommandPool(device, queueFamilyIndices.GraphicsFamily.value());
+		_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
 
-		_computeCommandPool = new CommandPool(
-			device, queueFamilyIndices.ComputeFamily.value());
-
+		// Create render frames
+		CreateRenderFrames();
+		
+		// Create sync objects
 		CreateSyncObjects();
 	}
 
@@ -50,18 +49,32 @@ namespace Core
 	{
 		auto device = _device.GetDevice();
 
-		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		// Clean up timeline semaphores
+		if (_graphicsSemaphore != VK_NULL_HANDLE)
+			vkDestroySemaphore(device, _graphicsSemaphore, nullptr);
+		
+		if (_computeSemaphore != VK_NULL_HANDLE)
+			vkDestroySemaphore(device, _computeSemaphore, nullptr);
+
+		// Clean up frames
+		_frames.clear();
+
+		// Clean up command pools
+		delete _commandPool;
+		delete _computeCommandPool;
+		
+		// Clean up swap chain
+		delete _swapChain;
+	}
+
+	void RenderContext::CreateRenderFrames()
+	{
+		_frames.reserve(MAX_FRAMES_IN_FLIGHT);
+		
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 		{
-			vkDestroySemaphore(device, _imageAvailableSemaphores[i], nullptr);
-			vkDestroySemaphore(device, _renderFinishedSemaphores[i], nullptr);
+			_frames.push_back(make_unique<RenderFrame>(_device));
 		}
-
-		vkDestroySemaphore(device, _graphicsSemaphore, nullptr);
-		vkDestroySemaphore(device, _computeSemaphore, nullptr);
-
-		delete(_swapChain);
-		delete(_commandPool);
-		delete(_computeCommandPool);
 	}
 
 	void RenderContext::Prepare(size_t threadCount)
@@ -77,25 +90,40 @@ namespace Core
 		}
 	}
 
-	vector<CommandBuffer> RenderContext::Begin()
+	void RenderContext::Begin()
 	{
+		// Acquire swap chain image and wait
 		AcquireSwapChainAndResetFence(*_swapChain);
 
+		auto& currentFrame = GetCurrentFrame();
+
+		// Allocate command buffers (from CommandPool)
 		auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		auto& computeBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		
+		// Set command buffers to RenderFrame
+		currentFrame.SetCommandBuffer(&commandBuffer);
+		currentFrame.SetComputeCommandBuffer(&computeBuffer);
+		
+		// Reset current frame (Descriptor pool, Command buffers)
+		currentFrame.Reset();
+
+		// Begin command buffers
 		commandBuffer.BeginCommandBuffer();
-
-		auto& computeBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 		computeBuffer.BeginCommandBuffer();
-
-		vector<CommandBuffer> buffers;
-		buffers.push_back(commandBuffer);
-		buffers.push_back(computeBuffer);
-
-		return buffers;
 	}
 
-	void RenderContext::Submit(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer)
+	void RenderContext::Submit()
 	{
+		auto& currentFrame = GetCurrentFrame();
+		auto& commandBuffer = currentFrame.GetCommandBuffer();
+		auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+		
+		// End command buffers
+		commandBuffer.EndCommandBuffer();
+		computeBuffer.EndCommandBuffer();
+
+		// Graphics queue submit
 		u32 waitSemaphoreCount = 1;
 
 		bool waitForComputeSemaphore = _lastComputeSemaphoreValue > 0;
@@ -108,7 +136,7 @@ namespace Core
 
 		VkSemaphore waitSemaphores[] = 
 		{
-			_imageAvailableSemaphores[_currentFrame],
+			currentFrame.GetImageAvailableSemaphore(),
 			_computeSemaphore,
 			_graphicsSemaphore 
 		};
@@ -122,7 +150,7 @@ namespace Core
 
 		VkSemaphore signalSemaphores[] =
 		{
-			_renderFinishedSemaphores[_currentFrame],
+			currentFrame.GetRenderFinishedSemaphore(),
 			_graphicsSemaphore
 		};
 
@@ -144,7 +172,6 @@ namespace Core
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
 		submitInfo.waitSemaphoreCount = waitSemaphoreCount;
 		submitInfo.pWaitSemaphores = waitSemaphores;
 		submitInfo.pWaitDstStageMask = waitStages;
@@ -152,19 +179,23 @@ namespace Core
 		submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
 		submitInfo.signalSemaphoreCount = 2;
 		submitInfo.pSignalSemaphores = signalSemaphores;
-
 		submitInfo.pNext = &semaphoreSubmitInfo;
 
 		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
 			throw runtime_error("failed to submit draw command buffer!");
 
-		SubmitComputeBuffer(computeBuffer);
+		// Compute queue submit
+		SubmitComputeBuffer();
 
+		// Present
 		EndFrame(signalSemaphores);
 	}
 
-	void RenderContext::SubmitComputeBuffer(CommandBuffer& computeBuffer)
+	void RenderContext::SubmitComputeBuffer()
 	{
+		auto& currentFrame = GetCurrentFrame();
+		auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+		
 		bool has_wait_semaphore = _lastComputeSemaphoreValue > 0;
 
 		VkSemaphore waitSemaphores[] = { _computeSemaphore };
@@ -212,36 +243,30 @@ namespace Core
 
 	void RenderContext::CreateSyncObjects()
 	{
-		_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-		_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-
-		VkSemaphoreCreateInfo semaphoreInfo{};
-		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
 		auto device = _device.GetDevice();
 
-		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-		{
-			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_imageAvailableSemaphores[i]) != VK_SUCCESS)
-				throw runtime_error("failed to create semaphores!");
-			
-			if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_renderFinishedSemaphores[i]) != VK_SUCCESS)
-				throw runtime_error("failed to create semaphores!");
-		}
-
+		// Create timeline semaphores
 		VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
 		semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
 		semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+		
+		VkSemaphoreCreateInfo semaphoreInfo{};
+		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 		semaphoreInfo.pNext = &semaphoreTypeInfo;
 
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_graphicsSemaphore);
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_computeSemaphore);
+		if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_graphicsSemaphore) != VK_SUCCESS ||
+		    vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_computeSemaphore) != VK_SUCCESS)
+		{
+			throw runtime_error("Failed to create timeline semaphores!");
+		}
 	}
 
 	void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	{
 		auto device = _device.GetDevice();
+		auto& currentFrame = GetCurrentFrame();
 
+		// Wait for GPU work completion (Timeline semaphores)
 		if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
 		{
 			u64 graphicsTimelineValue = FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1);
@@ -259,10 +284,12 @@ namespace Core
 			vkWaitSemaphores(device, &waitInfo, UINT64_MAX);
 		}
 
+		// Acquire swap chain image
 		auto swapChainHandle = swapChain.GetSwapChain();
 		VkResult result = vkAcquireNextImageKHR(
 			device, swapChainHandle, UINT64_MAX,
-			_imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &_imageIndex);
+			currentFrame.GetImageAvailableSemaphore(), 
+			VK_NULL_HANDLE, &_imageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
@@ -277,7 +304,6 @@ namespace Core
 	{
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
 		presentInfo.waitSemaphoreCount = 1;
 		presentInfo.pWaitSemaphores = semaphore;
 

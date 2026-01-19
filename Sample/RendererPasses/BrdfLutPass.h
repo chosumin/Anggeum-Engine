@@ -7,6 +7,8 @@ namespace Core
 	class Material;
 	class Texture;
 	class Pipeline;
+	class CommandBuffer;
+	
 	class BrdfLutPass : public RendererPass
 	{
 	public:
@@ -14,7 +16,7 @@ namespace Core
 		virtual ~BrdfLutPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
 	private:
 		Pipeline* _brdfPipeline;
 		Material* _brdfMaterial;
@@ -23,11 +25,13 @@ namespace Core
 	class BrdfLutJob : public Job
 	{
 	public:
-		BrdfLutJob(BrdfLutPass& pass);
+		BrdfLutJob(Device& device, BrdfLutPass& pass);
 		~BrdfLutJob();
 
 		void Execute() override;
+		
 	private:
 		BrdfLutPass& _pass;
+		RenderFrame _tempRenderFrame; // Temporary RenderFrame to hold command buffer
 	};
 }

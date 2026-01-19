@@ -20,7 +20,7 @@ namespace Core
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
 
 		void Cleanup();
 		void Resize(SwapChain& swapChain);

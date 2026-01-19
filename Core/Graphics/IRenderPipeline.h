@@ -1,18 +1,16 @@
 #pragma once
-#include <cstdint>
+#include "Graphics/RenderFrame.h"
 #include "Graphics/Vulkans/Texture.h"
 
 namespace Core
 {
-	class CommandBuffer;
-	class RenderPass;
 	class IRenderPipeline
 	{
 	public:
-		virtual ~IRenderPipeline() {}
+		virtual ~IRenderPipeline() = default;
+		
 		virtual void Prepare() = 0;
-		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,
-			uint32_t currentFrame, uint32_t imageIndex) = 0;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) = 0;
 		virtual Texture* GetColorRenderTarget() = 0;
 		virtual VkSampleCountFlagBits GetMSAASamples() const = 0;
 	};

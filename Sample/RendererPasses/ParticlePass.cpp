@@ -108,15 +108,17 @@ void Sample::ParticlePass::Prepare()
 	_computeMaterial->SetStorageBuffer(1, 4, _buffers[1]);
 }
 
-void Sample::ParticlePass::Draw(Core::CommandBuffer& commandBuffer, Core::CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
+	auto& commandBuffer = renderFrame.GetComputeCommandBuffer();
+
 	_deltaTime.deltaTime += 0.01f;
-	_computeMaterial->SetBuffer(0, currentFrame, 0, &_deltaTime.deltaTime);
+	_computeMaterial->SetBuffer(0, frameIndex, 0, &_deltaTime.deltaTime);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 
 	commandBuffer.BindDescriptorSets(
-		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, currentFrame);
+		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, frameIndex);
 
 	commandBuffer.Dispatch(PARTICLE_COUNT / 256, 1, 1);
 
@@ -128,8 +130,8 @@ void Sample::ParticlePass::Draw(Core::CommandBuffer& commandBuffer, Core::Comman
 	commandBuffer.BindPipeline(_graphicsPipeline.get());
 
 	vector<Core::Buffer*> vertexBuffers(2);
-	vertexBuffers[0] = _buffers[currentFrame * 3];
-	vertexBuffers[1] = _buffers[currentFrame * 3 + 2];
+	vertexBuffers[0] = _buffers[frameIndex * 3];
+	vertexBuffers[1] = _buffers[frameIndex * 3 + 2];
 
 	commandBuffer.BindVertexBuffers(vertexBuffers, 0);
 	commandBuffer.Draw(PARTICLE_COUNT, 1);

@@ -32,23 +32,25 @@ void Core::LightCullingPass::Prepare()
 	_computeMaterial->SetBuffer(1, 2, _depthPrepassRenderTarget);
 }
 
-void Core::LightCullingPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
 	UpdateLightBuffer();
+
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
 	commandBuffer.TransitionImageLayout(*_depthPrepassRenderTarget->GetImage().lock(),
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
-	_computeMaterial->SetBuffer(0, currentFrame, 0, &camera->Matrices);
+	_computeMaterial->SetBuffer(0, frameIndex, 0, &camera->Matrices);
 
-	_computeMaterial->SetBuffer(1, currentFrame, 3, &_lightBuffer);
+	_computeMaterial->SetBuffer(1, frameIndex, 3, &_lightBuffer);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 
 	commandBuffer.BindDescriptorSets(
-		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, currentFrame);
+		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, frameIndex);
 
 	_computeMaterial->SetPushConstants<TileInfo>(_tileInfo);
 	commandBuffer.PushConstants(*_computeMaterial, 0);

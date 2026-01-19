@@ -1,19 +1,34 @@
 #pragma once
+#include "Device.h"
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
 #include "StorageBuffer.h"
 
 namespace Core
 {
-	class IDescriptor;
+	// ============================================
+	// Descriptor Set Type
+	// ============================================
+	enum class DescriptorSetType : uint32_t
+	{
+		Global = 0,    // Per-frame: Camera, Lighting
+		Pass = 1,      // Per-pass: Shadow maps, Pass-specific data
+		Material = 2   // Per-material: Textures, Material properties
+	};
 
+	// ============================================
+	// Descriptor Set Layout
+	// ============================================
 	class DescriptorSetLayout
 	{
 	public:
 		DescriptorSetLayout(Device& device);
+		DescriptorSetLayout(Device& device, DescriptorSetType type);
 		~DescriptorSetLayout();
 
 		VkDescriptorSetLayout& GetDescriptorSetLayout() { return _descriptorSetLayout; }
+		DescriptorSetType GetType() const { return _type; }
+		uint32_t GetSetIndex() const { return static_cast<uint32_t>(_type); }
 
 		// Add binding methods
 		void AddUniformBufferBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
@@ -42,12 +57,41 @@ namespace Core
 
 	private:
 		Device& _device;
-		VkDescriptorSetLayout _descriptorSetLayout;
-		bool _isFinalized;
+		VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
+		DescriptorSetType _type = DescriptorSetType::Material;
+		bool _isFinalized = false;
 
 		vector<UniformBufferLayoutBinding> _uniformBufferBindings;
 		vector<TextureBufferLayoutBinding> _textureBufferBindings;
 		vector<StorageBufferLayoutBinding> _storageBufferBindings;
+	};
+
+	// ============================================
+	// Descriptor Pool
+	// ============================================
+	class DescriptorPool
+	{
+	public:
+		DescriptorPool(Device& device);
+		~DescriptorPool();
+		
+		// Pool 积己
+		void CreatePool(const vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets);
+		
+		// Pool 府悸 (葛电 descriptor sets 秦力)
+		void Reset();
+		
+		// Descriptor set 且寸
+		VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
+		vector<VkDescriptorSet> AllocateDescriptorSets(
+			const vector<VkDescriptorSetLayout>& layouts);
+		
+		VkDescriptorPool GetHandle() const { return _descriptorPool; }
+		
+	private:
+		Device& _device;
+		VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+		uint32_t _maxSets = 0;
 	};
 }
 

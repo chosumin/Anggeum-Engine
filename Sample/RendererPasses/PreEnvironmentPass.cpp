@@ -82,10 +82,12 @@ void Core::PreEnvironmentPass::Prepare()
 	_prefilteredMaterial->SetBuffer(0, 0, skyCubemap);
 }
 
-void Core::PreEnvironmentPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
-	DrawIrradiance(commandBuffer, currentFrame, imageIndex);
-	DrawPrefiltered(commandBuffer, currentFrame, imageIndex);
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+	
+	DrawIrradiance(commandBuffer, frameIndex, imageIndex);
+	DrawPrefiltered(commandBuffer, frameIndex, imageIndex);
 }
 
 void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
@@ -215,8 +217,10 @@ void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uin
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
-Core::PreEnvironmentJob::PreEnvironmentJob(PreEnvironmentPass& pass)
-	:Job(JobType::GRAPHICS_PRIMARY), _pass(pass)
+Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& pass)
+	: Job(JobType::GRAPHICS_PRIMARY)
+	, _pass(pass)
+	, _tempRenderFrame(device)
 {
 	_pass.Prepare();
 }
@@ -227,6 +231,9 @@ Core::PreEnvironmentJob::~PreEnvironmentJob()
 
 void Core::PreEnvironmentJob::Execute()
 {
-	_pass.Draw(*commandBuffer, *commandBuffer, 0, 0);
+	_tempRenderFrame.SetCommandBuffer(commandBuffer);
+
+	_pass.Draw(_tempRenderFrame, 0, 0);
+	
 	status = JobStatus::COMPLETE;
 }

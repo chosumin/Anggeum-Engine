@@ -35,8 +35,11 @@ void Core::DepthPrePass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 }
 
-void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
+	// Get command buffer from RenderFrame
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+	
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 
 	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
@@ -44,10 +47,10 @@ void Core::DepthPrePass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compu
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(commandBuffer, currentFrame,
+	_rendererBatches->Draw(commandBuffer, frameIndex,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
+		material->SetBuffer(0, frameIndex, 0, &camera->Matrices);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

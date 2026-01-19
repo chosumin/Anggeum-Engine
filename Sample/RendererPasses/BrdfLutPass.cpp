@@ -39,8 +39,10 @@ void Core::BrdfLutPass::Prepare()
 	_brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
 }
 
-void Core::BrdfLutPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::BrdfLutPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+
 	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
 
 	commandBuffer.BeginRenderPass(_renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex));
@@ -52,8 +54,10 @@ void Core::BrdfLutPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& comput
 	commandBuffer.EndRenderPass();
 }
 
-Core::BrdfLutJob::BrdfLutJob(BrdfLutPass& pass)
-	:Job(JobType::GRAPHICS_PRIMARY), _pass(pass)
+Core::BrdfLutJob::BrdfLutJob(Device& device, BrdfLutPass& pass)
+	: Job(JobType::GRAPHICS_PRIMARY)
+	, _pass(pass)
+	, _tempRenderFrame(device) // Initialize temp RenderFrame
 {
 	_pass.Prepare();
 }
@@ -64,6 +68,10 @@ Core::BrdfLutJob::~BrdfLutJob()
 
 void Core::BrdfLutJob::Execute()
 {
-	_pass.Draw(*commandBuffer, *commandBuffer, 0, 0);
+	_tempRenderFrame.SetCommandBuffer(commandBuffer);
+
+	// Execute draw with temporary frame
+	_pass.Draw(_tempRenderFrame, 0, 0);
+	
 	status = JobStatus::COMPLETE;
 }

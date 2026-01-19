@@ -19,6 +19,7 @@ namespace Core
 	class CommandBuffer;
 	class SwapChain;
 	class CommandPool;
+	class RenderFrame;
 	class RenderContext
 	{
 	public:
@@ -28,62 +29,48 @@ namespace Core
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
 		RenderContext(Device& device);
-
-		RenderContext(const RenderContext&) = delete;
-		RenderContext(RenderContext&&) = delete;
-
-		virtual ~RenderContext();
-
-		RenderContext& operator=(const RenderContext&) = delete;
-		RenderContext& operator=(RenderContext&&) = delete;
-
-		void Prepare(size_t threadCount = 1);
-
+		~RenderContext();
+		
+		void Prepare(size_t threadCount);
 		void RecreateSwapChain();
-
-		vector<CommandBuffer> Begin();
-
-		void Submit(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer);
-
+		
+		// Frame management
+		void Begin(); // Allocate and start command buffers
+		void Submit();
+		
+		// Get current frame
+		RenderFrame& GetCurrentFrame() { return *_frames[_currentFrame]; }
+		uint32_t GetCurrentFrameIndex() const { return _currentFrame; }
+		uint32_t GetImageIndex() const { return _imageIndex; }
+		
+		// Swap chain
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
-
-		uint32_t GetCurrentFrame() { return _currentFrame; }
-
-		uint32_t GetImageIndex() const { return _imageIndex; }
-		//RenderFrame& GetActiveFrame();
-		//uint32_t GetActiveFrameIndex();
-		//RenderFrame& GetLastRenderedFrame();
-
-		//VkSemaphore RequestSemaphore();
-		//VkSemaphore RequestSemaphoreWithOwnership();
-		//void ReleaseOwnedSemaphore(VkSemaphore semaphore);
-
-		//VkSemaphore ConsumeAcquiredSemaphore();
 	private:
+		void CreateRenderFrames();
 		void CreateSyncObjects();
-
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
+		void SubmitComputeBuffer();
 		void EndFrame(VkSemaphore* semaphore);
-		void SubmitComputeBuffer(CommandBuffer& computeBuffer);
-	private:
+		
 		Device& _device;
-
-		SwapChain* _swapChain;
-		//vector<unique_ptr<RenderFrame>> _frames;
-
-		CommandPool* _commandPool;
-		CommandPool* _computeCommandPool;
-
-		uint32_t _currentFrame;
-		uint32_t _imageIndex;
-		u64 _lastComputeSemaphoreValue;
-		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT - 1;
-
-		vector<VkSemaphore> _imageAvailableSemaphores;
-		vector<VkSemaphore> _renderFinishedSemaphores;
-
-		VkSemaphore _graphicsSemaphore;
-		VkSemaphore _computeSemaphore;
+		
+		// Swap chain
+		SwapChain* _swapChain = nullptr;
+		uint32_t _imageIndex = 0;
+		
+		// Command pools (owned by RenderContext)
+		CommandPool* _commandPool = nullptr;
+		CommandPool* _computeCommandPool = nullptr;
+		
+		// Per-frame resources
+		vector<unique_ptr<RenderFrame>> _frames; // MAX_FRAMES_IN_FLIGHT count
+		uint32_t _currentFrame = 0;
+		
+		// Timeline semaphores
+		VkSemaphore _graphicsSemaphore = VK_NULL_HANDLE;
+		VkSemaphore _computeSemaphore = VK_NULL_HANDLE;
+		u64 _lastComputeSemaphoreValue = 0;
+		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT;
 	};
 }

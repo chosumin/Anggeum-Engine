@@ -6,8 +6,8 @@
 namespace Core
 {
 	class Scene;
-	class Material;
 	class Texture;
+	class CommandBuffer;
 	class Pipeline;
 	class SubMesh;
 	class PreEnvironmentPass : public RendererPass
@@ -18,7 +18,7 @@ namespace Core
 		virtual ~PreEnvironmentPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
 	private:
 		void DrawIrradiance(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex);
 		void DrawPrefiltered(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex);
@@ -43,11 +43,13 @@ namespace Core
 	class PreEnvironmentJob : public Job
 	{
 	public:
-		PreEnvironmentJob(PreEnvironmentPass& pass);
+		PreEnvironmentJob(Device& device, PreEnvironmentPass& pass);
 		~PreEnvironmentJob();
-
+		
 		void Execute() override;
+		
 	private:
+		RenderFrame _tempRenderFrame; // Temporary RenderFrame to hold command buffer
 		PreEnvironmentPass& _pass;
 	};
 }

@@ -18,7 +18,7 @@ namespace Core
 		virtual ~LightCullingPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
 	private:
 		void UpdateLightBuffer();
 	private:

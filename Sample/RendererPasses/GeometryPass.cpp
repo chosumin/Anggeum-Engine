@@ -63,9 +63,10 @@ namespace Core
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 	}
 
-	void GeometryPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer,
-		uint32_t currentFrame, uint32_t imageIndex)
+	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 	{
+		auto& commandBuffer = renderFrame.GetCommandBuffer();
+
 		UpdateGUI();
 		UpdateLightBuffer();
 
@@ -81,13 +82,13 @@ namespace Core
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
-		_rendererBatches->Draw(commandBuffer, currentFrame, 
+		_rendererBatches->Draw(commandBuffer, frameIndex, 
 		[&](shared_ptr<Material> material) 
 		{
-			material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(0, frameIndex, 0, &camera->Matrices);
 			material->SetBuffer(1, 6, _shadowRenderTarget);
-			material->SetBuffer(1, currentFrame, 7, &_shadowBuffer->Projection);
-			material->SetBuffer(1, currentFrame, 9, &_lightBuffer);
+			material->SetBuffer(1, frameIndex, 7, &_shadowBuffer->Projection);
+			material->SetBuffer(1, frameIndex, 9, &_lightBuffer);
 
 			material->SetStorageBuffer(1, 10, _lightVisibilityBuffer);
 
@@ -95,7 +96,7 @@ namespace Core
 			material->SetBuffer(1, 12, _prefilteredCubemap);
 			material->SetBuffer(1, 13, _brdfLut);
 
-			material->SetBuffer(1, currentFrame);
+			material->SetBuffer(1, frameIndex);
 		},
 		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 		{
@@ -103,7 +104,7 @@ namespace Core
 			commandBuffer.PushConstants(*sharedMaterial, 0);
 		});
 
-		DrawSkybox(commandBuffer, currentFrame);
+		DrawSkybox(commandBuffer, frameIndex);
 
 		commandBuffer.EndRenderPass();
 	}
@@ -113,30 +114,28 @@ namespace Core
 	{
 		_timer.tick();
 
-		auto preEnvironmentPass = new PreEnvironmentPass(_device, _workerThreadManager, _scene, pregenerationSky, irradianceCubemap, prefilterCubemap);
-		auto preEnvironmentJob = new PreEnvironmentJob(*preEnvironmentPass);
+		// PreEnvironmentPass - command buffer allocated from worker thread
+		auto preEnvironmentPass = new PreEnvironmentPass(_device, _workerThreadManager, _scene, 
+			pregenerationSky, irradianceCubemap, prefilterCubemap);
+		auto preEnvironmentJob = new PreEnvironmentJob(_device, *preEnvironmentPass);
 		Enqueue(preEnvironmentJob);
 
-		auto& buffer = _device.BeginSingleTimeCommands();
 		auto brdf = new BrdfLutPass(_device, _workerThreadManager, _brdfLut.get());
-		auto brdfJob = new BrdfLutJob(*brdf);
-		brdfJob->commandBuffer = &buffer;
-		brdfJob->Execute();
-		buffer.EndCommandBuffer();
+		auto brdfJob = new BrdfLutJob(_device, *brdf);
+		Enqueue(brdfJob);
 
 		Wait();
 
 		const size_t commandSize = 2;
 		vector<VkCommandBuffer> commands(commandSize);
 		commands[0] = preEnvironmentJob->commandBuffer->GetHandle();
-		commands[1] = buffer.GetHandle();
+		commands[1] = brdfJob->commandBuffer->GetHandle();
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.commandBufferCount = commandSize;
 		submitInfo.pCommandBuffers = commands.data();
 
-		// Create fence to ensure that the command buffer has finished executing
 		VkFenceCreateInfo fence_info{};
 		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		fence_info.flags = 0;

@@ -54,8 +54,10 @@ void Core::ShadowPass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 }
 
-void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& computeBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+
 	UpdateGUI();
 
 	commandBuffer.TransitionImageLayout(*_shadowMap->GetImage().lock(),
@@ -67,10 +69,10 @@ void Core::ShadowPass::Draw(CommandBuffer& commandBuffer, CommandBuffer& compute
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(commandBuffer, currentFrame,
+	_rendererBatches->Draw(commandBuffer, frameIndex,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(0, currentFrame, 0, &_directionalLight);
+		material->SetBuffer(0, frameIndex, 0, &_directionalLight);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{
