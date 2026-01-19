@@ -62,6 +62,11 @@ Core::Device::~Device()
     delete(_memoryAllocatorManager);
     delete(_graphicsCommandPool);
 
+    if (_globalDescriptorPool != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorPool(_device, _globalDescriptorPool, nullptr);
+    }
+
     vkDestroyDevice(_device, nullptr);
 
     if (_enableValidationLayers)
@@ -69,11 +74,6 @@ Core::Device::~Device()
 
     vkDestroySurfaceKHR(_instance, _surface, nullptr);
     vkDestroyInstance(_instance, nullptr);
-
-    if (_globalDescriptorPool != VK_NULL_HANDLE)
-    {
-        vkDestroyDescriptorPool(_device, _globalDescriptorPool, nullptr);
-    }
 }
 
 uint32_t Core::Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
