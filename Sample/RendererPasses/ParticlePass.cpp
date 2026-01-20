@@ -96,16 +96,6 @@ void Sample::ParticlePass::Prepare()
 	{
 		delete(job);
 	}
-
-	_computeMaterial->SetStorageBuffer(0, 1, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(0, 2, _buffers[1]);
-	_computeMaterial->SetStorageBuffer(0, 3, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(0, 4, _buffers[4]);
-
-	_computeMaterial->SetStorageBuffer(1, 1, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(1, 2, _buffers[4]);
-	_computeMaterial->SetStorageBuffer(1, 3, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(1, 4, _buffers[1]);
 }
 
 void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
@@ -113,7 +103,17 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIn
 	auto& commandBuffer = renderFrame.GetComputeCommandBuffer();
 
 	_deltaTime.deltaTime += 0.01f;
-	_computeMaterial->SetBuffer(0, frameIndex, 0, &_deltaTime.deltaTime);
+	_computeMaterial->SetBuffer(renderFrame, 0, frameIndex, 0, &_deltaTime.deltaTime);
+
+	_computeMaterial->SetStorageBuffer(renderFrame, 0, 1, _buffers[0]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 0, 2, _buffers[1]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 0, 3, _buffers[3]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 0, 4, _buffers[4]);
+
+	_computeMaterial->SetStorageBuffer(renderFrame, 1, 1, _buffers[3]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 1, 2, _buffers[4]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 1, 3, _buffers[0]);
+	_computeMaterial->SetStorageBuffer(renderFrame, 1, 4, _buffers[1]);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 

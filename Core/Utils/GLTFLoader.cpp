@@ -304,7 +304,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path), textureName);
 
 	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
-	material->SetBuffer(0, 1, texture);
+	material->AddTexture(0, 1, texture);
 
 	vector<shared_ptr<Material>> materials = { material };
 	LoadMeshes(materials);
@@ -606,7 +606,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(1, 3, texture);
+				material->AddTexture(1, 3, texture);
 				
 				pbrBuffer->AlbedoTextureSet = 1;
 			}
@@ -619,7 +619,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(1, 5, texture);
+				material->AddTexture(1, 5, texture);
 				
 				pbrBuffer->RoughnessTextureSet = 1;
 				pbrBuffer->MetallicTextureSet = 1;
@@ -638,7 +638,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->SetBuffer(1, 4, texture);
+				material->AddTexture(1, 4, texture);
 			}
 			else if (additionalValue.first.find("emissiveTexture") != string::npos)
 			{

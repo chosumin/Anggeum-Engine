@@ -4,6 +4,10 @@ namespace Core
 {
 	class CommandBuffer;
 	class DescriptorPool;
+	class UniformBuffer;
+	class TextureBuffer;
+	class StorageBuffer;
+
 	class RenderFrame
 	{
 	public:
@@ -23,9 +27,18 @@ namespace Core
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
 		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
 		DescriptorPool& GetDescriptorPool() { return *_descriptorPool; }
+
+		// Per-frame buffer creation and management
+		UniformBuffer* CreateUniformBuffer(VkDeviceSize size);
+		TextureBuffer* CreateTextureBuffer();
+		StorageBuffer* CreateStorageBuffer();
+
+		// Cleanup all buffers
+		void CleanupBuffers();
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
+
 	private:
 		Device& _device;
 		
@@ -39,5 +52,10 @@ namespace Core
 		
 		// Per-frame descriptor pool (owned by RenderFrame)
 		unique_ptr<DescriptorPool> _descriptorPool;
+
+		// Per-frame buffers (owned by RenderFrame)
+		vector<UniformBuffer*> _uniformBuffers;
+		vector<TextureBuffer*> _textureBuffers;
+		vector<StorageBuffer*> _storageBuffers;
 	};
 }

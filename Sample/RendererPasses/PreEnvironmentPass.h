@@ -38,6 +38,7 @@ namespace Core
 		Pipeline* _prefilteredPipeline;
 		shared_ptr<Material> _prefilteredMaterial;
 		PrefilterEnv _prefilterEnv;
+		shared_ptr<Texture> _skyCubemap;
 	};
 
 	class PreEnvironmentJob : public Job

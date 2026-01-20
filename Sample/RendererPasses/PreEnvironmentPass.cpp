@@ -78,12 +78,15 @@ void Core::PreEnvironmentPass::Prepare()
 	_delta.Phi = (2.0f * float(PI)) / 180.0f;
 	_delta.Theta = (0.5f * float(PI)) / 64.0f;
 
-	_irradianceMaterial->SetBuffer(0, 0, skyCubemap);
-	_prefilteredMaterial->SetBuffer(0, 0, skyCubemap);
+	_skyCubemap = skyCubemap;
 }
 
 void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
 {
+	// Set textures through RenderFrame
+	_irradianceMaterial->SetBuffer(renderFrame, 0, 0, _skyCubemap);
+	_prefilteredMaterial->SetBuffer(renderFrame, 0, 0, _skyCubemap);
+
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 	
 	DrawIrradiance(commandBuffer, frameIndex, imageIndex);

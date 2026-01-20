@@ -4,6 +4,7 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/DescriptorPool.h"
+#include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 
 namespace Core
@@ -17,7 +18,6 @@ namespace Core
 		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
 
 		CreateDescriptorSets();
-		CreateBuffers();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
 		SetDefault(device.GetResourceCache().RequestDefaultTexture());
@@ -28,8 +28,10 @@ namespace Core
 	{
 		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
 
+		// Initialize per-frame cache
+		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
+
 		CreateDescriptorSets();
-		CreateBuffers();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
 		SetDefault(device.GetResourceCache().RequestDefaultTexture());
@@ -77,33 +79,10 @@ namespace Core
 
 	Core::Material::~Material()
 	{
-		for (auto& [setIndex, bindingMap] : _uniformBuffers)
-		{
-			for (auto& [binding, buffer] : bindingMap)
-			{
-				delete buffer;
-			}
-		}
+		// Buffers are now owned by RenderFrame, so we don't delete them here
 		_uniformBuffers.clear();
-
-		for (auto& [setIndex, bindingMap] : _textureBuffers)
-		{
-			for (auto& [binding, buffer] : bindingMap)
-			{
-				delete buffer;
-			}
-		}
 		_textureBuffers.clear();
-
-		for (auto& [setIndex, bindingMap] : _storageBuffers)
-		{
-			for (auto& [binding, buffer] : bindingMap)
-			{
-				delete buffer;
-			}
-		}
 		_storageBuffers.clear();
-
 		_buffers.clear();
 		_textures.clear();
 	}
@@ -113,57 +92,84 @@ namespace Core
 		return *_shader;
 	}
 
-	void Core::Material::SetBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data)
+	void Core::Material::SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data)
 	{
-		auto setIt = _uniformBuffers.find(setIndex);
-		if (setIt == _uniformBuffers.end())
-			return;
+		auto& bindingMap = _uniformBuffers[setIndex];
+		auto it = bindingMap.find(binding);
+		
+		if (it == bindingMap.end())
+		{
+			// Create uniform buffer through RenderFrame if not exists
+			auto& layouts = _shader->GetDescriptorSetLayouts();
+			auto layoutIt = layouts.find(setIndex);
+			if (layoutIt != layouts.end())
+			{
+				auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
+				for (auto& bindingInfo : uniformBindings)
+				{
+					if (bindingInfo.Binding == binding)
+					{
+						it = bindingMap.emplace(binding, frame.CreateUniformBuffer(bindingInfo.BufferSize)).first;
+						break;
+					}
+				}
+			}
+		}
 
-		auto bindingIt = setIt->second.find(binding);
-		if (bindingIt == setIt->second.end())
-			return;
-
-		bindingIt->second->SetBuffer(currentImage, data);
+		if (it != bindingMap.end())
+		{
+			it->second->SetBuffer(currentImage, data);
+		}
 	}
 
-	void Core::Material::SetBuffer(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture)
+	void Core::Material::SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture)
 	{
 		auto setIt = _textureBuffers.find(setIndex);
-		if (setIt == _textureBuffers.end())
-			return;
-
-		auto bindingIt = setIt->second.find(binding);
-		if (bindingIt == setIt->second.end())
-			return;
+		if (setIt == _textureBuffers.end() || setIt->second.find(binding) == setIt->second.end())
+		{
+			// Create texture buffer through RenderFrame if not exists
+			auto buffer = frame.CreateTextureBuffer();
+			_textureBuffers[setIndex][binding] = buffer;
+		}
 
 		_textures[setIndex][binding] = texture;
 	}
 
-	void Material::SetStorageBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer)
+	void Material::SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer)
 	{
 		auto setIt = _storageBuffers.find(setIndex);
-		if (setIt == _storageBuffers.end())
-			return;
+		if (setIt == _storageBuffers.end() || setIt->second.find(binding) == setIt->second.end())
+		{
+			// Create storage buffer through RenderFrame if not exists
+			auto storageBuffer = frame.CreateStorageBuffer();
+			_storageBuffers[setIndex][binding] = storageBuffer;
+		}
 
-		auto bindingIt = setIt->second.find(binding);
-		if (bindingIt == setIt->second.end())
-			return;
-
-		bindingIt->second->SetBuffer(currentImage, buffer);
+		auto bindingIt = _storageBuffers[setIndex].find(binding);
+		if (bindingIt != _storageBuffers[setIndex].end())
+		{
+			bindingIt->second->SetBuffer(currentImage, buffer);
+		}
 	}
 
-	void Material::SetStorageBuffer(uint32_t setIndex, uint32_t binding, Buffer* buffer)
+	void Material::SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, Buffer* buffer)
 	{
 		auto setIt = _storageBuffers.find(setIndex);
-		if (setIt == _storageBuffers.end())
-			return;
+		if (setIt == _storageBuffers.end() || setIt->second.find(binding) == setIt->second.end())
+		{
+			// Create storage buffer through RenderFrame if not exists
+			auto storageBuffer = frame.CreateStorageBuffer();
+			_storageBuffers[setIndex][binding] = storageBuffer;
+		}
 
-		auto bindingIt = setIt->second.find(binding);
-		if (bindingIt == setIt->second.end())
-			return;
-
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-			bindingIt->second->SetBuffer(i, buffer);
+		auto bindingIt = _storageBuffers[setIndex].find(binding);
+		if (bindingIt != _storageBuffers[setIndex].end())
+		{
+			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+			{
+				bindingIt->second->SetBuffer(i, buffer);
+			}
+		}
 	}
 
 	shared_ptr<Texture> Material::GetTexture(uint32_t setIndex, uint32_t binding)
@@ -308,49 +314,19 @@ namespace Core
 		}
 	}
 
-	void Material::CreateBuffers()
+	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
 	{
 		auto& layouts = _shader->GetDescriptorSetLayouts();
 		
 		// Iterate through all descriptor set layouts
 		for (auto& [setIndex, descriptorLayout] : layouts)
 		{
-			// Create uniform buffers
-			auto& uniformBindings = descriptorLayout->GetUniformBufferBindings();
-			for (auto& binding : uniformBindings)
-			{
-				auto buffer = new Core::UniformBuffer(_device, binding.BufferSize);
-				_uniformBuffers[setIndex][binding.Binding] = buffer;
-			}
-
-			// Create texture buffers
+			// Get texture bindings from the shader
 			auto& textureBindings = descriptorLayout->GetTextureBufferBindings();
 			for (auto& binding : textureBindings)
 			{
-				auto buffer = new Core::TextureBuffer();
-				_textureBuffers[setIndex][binding.Binding] = buffer;
-			}
-
-			// Create storage buffers
-			auto& storageBindings = descriptorLayout->GetStorageBufferBindings();
-			for (auto& binding : storageBindings)
-			{
-				auto buffer = new Core::StorageBuffer();
-				_storageBuffers[setIndex][binding.Binding] = buffer;
-			}
-		}
-	}
-
-	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
-	{
-		auto descriptor = defaultTexture->GetDescriptorImageInfo();
-
-		for (auto& [setIndex, bindingMap] : _textureBuffers)
-		{
-			for (auto& [binding, textureBuffer] : bindingMap)
-			{
-				textureBuffer->CopyDescriptorImageInfo(descriptor);
-				_textures[setIndex][binding] = defaultTexture;
+				// Set default texture for each texture binding
+				_textures[setIndex][binding.Binding] = defaultTexture;
 			}
 		}
 	}

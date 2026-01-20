@@ -82,21 +82,21 @@ namespace Core
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
-		_rendererBatches->Draw(commandBuffer, frameIndex, 
+		_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
 		[&](shared_ptr<Material> material) 
 		{
-			material->SetBuffer(0, frameIndex, 0, &camera->Matrices);
-			material->SetBuffer(1, 6, _shadowRenderTarget);
-			material->SetBuffer(1, frameIndex, 7, &_shadowBuffer->Projection);
-			material->SetBuffer(1, frameIndex, 9, &_lightBuffer);
+			material->SetBuffer(renderFrame, 0, frameIndex, 0, &camera->Matrices);
+			material->SetBuffer(renderFrame, 1, 6, _shadowRenderTarget);
+			material->SetBuffer(renderFrame, 1, frameIndex, 7, &_shadowBuffer->Projection);
+			material->SetBuffer(renderFrame, 1, frameIndex, 9, &_lightBuffer);
 
-			material->SetStorageBuffer(1, 10, _lightVisibilityBuffer);
+			material->SetStorageBuffer(renderFrame, 1, 10, _lightVisibilityBuffer);
 
-			material->SetBuffer(1, 11, _irradianceCubemap);
-			material->SetBuffer(1, 12, _prefilteredCubemap);
-			material->SetBuffer(1, 13, _brdfLut);
+			material->SetBuffer(renderFrame, 1, 11, _irradianceCubemap);
+			material->SetBuffer(renderFrame, 1, 12, _prefilteredCubemap);
+			material->SetBuffer(renderFrame, 1, 13, _brdfLut);
 
-			material->SetBuffer(1, frameIndex);
+			material->SetBuffer(renderFrame, 1, frameIndex);
 		},
 		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 		{
@@ -104,7 +104,7 @@ namespace Core
 			commandBuffer.PushConstants(*sharedMaterial, 0);
 		});
 
-		DrawSkybox(commandBuffer, frameIndex);
+		DrawSkybox(renderFrame, commandBuffer, frameIndex);
 
 		commandBuffer.EndRenderPass();
 	}
@@ -158,7 +158,7 @@ namespace Core
 		delete(preEnvironmentJob);
 	}
 
-	void GeometryPass::DrawSkybox(CommandBuffer& commandBuffer, uint32_t currentFrame)
+	void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame)
 	{
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
@@ -190,7 +190,8 @@ namespace Core
 				_skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
 			}
 
-			material->SetBuffer(0, currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(renderFrame, 0, currentFrame, 0, &camera->Matrices);
+			material->SetBuffer(renderFrame, 0, currentFrame);
 
 			commandBuffer.BindPipeline(_skyboxPipeline);
 

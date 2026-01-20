@@ -69,10 +69,10 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint3
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(commandBuffer, frameIndex,
+	_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(0, frameIndex, 0, &_directionalLight);
+		material->SetBuffer(renderFrame, 0, frameIndex, 0, &_directionalLight);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

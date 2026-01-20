@@ -47,10 +47,10 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uin
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(commandBuffer, frameIndex,
+	_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
 	[&](shared_ptr<Material> material)
 	{
-		material->SetBuffer(0, frameIndex, 0, &camera->Matrices);
+		material->SetBuffer(renderFrame, 0, frameIndex, 0, &camera->Matrices);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

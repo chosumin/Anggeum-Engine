@@ -28,8 +28,7 @@ Core::LightCullingPass::~LightCullingPass()
 
 void Core::LightCullingPass::Prepare()
 {
-	_computeMaterial->SetStorageBuffer(1, 1, _lightVisibilityBuffer);
-	_computeMaterial->SetBuffer(1, 2, _depthPrepassRenderTarget);
+	// Note: These will be set per-frame in Draw() method now
 }
 
 void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
@@ -43,9 +42,11 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
-	_computeMaterial->SetBuffer(0, frameIndex, 0, &camera->Matrices);
+	_computeMaterial->SetBuffer(renderFrame, 0, frameIndex, 0, &camera->Matrices);
 
-	_computeMaterial->SetBuffer(1, frameIndex, 3, &_lightBuffer);
+	_computeMaterial->SetStorageBuffer(renderFrame, 1, 1, _lightVisibilityBuffer);
+	_computeMaterial->SetBuffer(renderFrame, 1, 2, _depthPrepassRenderTarget);
+	_computeMaterial->SetBuffer(renderFrame, 1, frameIndex, 3, &_lightBuffer);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 

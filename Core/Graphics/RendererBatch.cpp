@@ -11,6 +11,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/RenderPass.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/RenderFrame.h"
 #include "TransferJob.h"
 using namespace Core;
 
@@ -72,7 +73,7 @@ void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material
 }
 
 
-void Core::RendererBatches::Draw(CommandBuffer& commandBuffer, uint32_t currentFrame, function<void(shared_ptr<Material>)> perMaterial, function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
+void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, function<void(shared_ptr<Material>)> perMaterial, function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
 {
 	for (auto&& shaderBatch : _shaderBatches)
 	{
@@ -89,8 +90,8 @@ void Core::RendererBatches::Draw(CommandBuffer& commandBuffer, uint32_t currentF
 		{
 			auto sharedMaterial = materialBatch.second.Material.lock();
 
-			sharedMaterial->SetStorageBuffer(1, 1, _transformBatch.TransformBuffer);
-			sharedMaterial->SetStorageBuffer(1, 2, _instanceBuffer);
+			sharedMaterial->SetStorageBuffer(renderFrame, 1, 1, _transformBatch.TransformBuffer);
+			sharedMaterial->SetStorageBuffer(renderFrame, 1, 2, _instanceBuffer);
 
 			commandBuffer.BindDescriptorSets(
 				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);

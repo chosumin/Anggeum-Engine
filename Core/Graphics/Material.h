@@ -9,6 +9,7 @@ namespace Core
 	class Device;
 	class Shader;
 	class Texture;
+	class RenderFrame;
 
 	enum class AlphaMode
 	{
@@ -54,20 +55,26 @@ namespace Core
 			_buffers[setIndex][binding] = data;
 		}
 
-		void SetBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data);
-		void SetBuffer(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture);
-		void SetStorageBuffer(uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer);
-		void SetStorageBuffer(uint32_t setIndex, uint32_t binding, Buffer* buffer);
-
-		void SetBuffer(uint32_t setIndex, uint32_t currentImage)
+		void AddTexture(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture)
 		{
-			auto setIt = _buffers.find(setIndex);
-			if (setIt == _buffers.end())
-				return;
-			
-			for (auto&& [binding, buffer] : setIt->second)
+			_textures[setIndex][binding] = texture;
+		}
+
+		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data);
+		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture);
+		void SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer);
+		void SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, Buffer* buffer);
+
+		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage)
+		{
+			for (auto&& [binding, buffer] : _buffers[setIndex])
 			{
-				SetBuffer(setIndex, currentImage, binding, buffer);
+				SetBuffer(frame, setIndex, currentImage, binding, buffer);
+			}
+
+			for (auto&& [binding, texture] : _textures[setIndex])
+			{
+				SetBuffer(frame, setIndex, binding, texture);
 			}
 		}
 
@@ -118,9 +125,9 @@ namespace Core
 		void ClearPushConstantsCache();
 
 		bool IsDirty() { return _isDirty; }
+
 	private:
 		void CreateDescriptorSets();
-		void CreateBuffers();
 		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:
 		Device& _device;
@@ -131,6 +138,7 @@ namespace Core
 		unordered_map<uint32_t, unordered_map<uint32_t, UniformBuffer*>> _uniformBuffers;
 		unordered_map<uint32_t, unordered_map<uint32_t, TextureBuffer*>> _textureBuffers;
 		unordered_map<uint32_t, unordered_map<uint32_t, StorageBuffer*>> _storageBuffers;
+
 	private:
 		bool _isDirty;
 
