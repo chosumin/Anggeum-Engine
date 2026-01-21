@@ -14,11 +14,6 @@ namespace Core
 	{
 		_shader = device.GetResourceCache().RequestShader(shaderName);
 
-		// Initialize per-frame cache
-		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
-
-		CreateDescriptorSets();
-
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
 		SetDefault(device.GetResourceCache().RequestDefaultTexture());
 	}
@@ -27,11 +22,6 @@ namespace Core
 		:_device(device), _isDirty(true), _name(materialName)
 	{
 		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
-
-		// Initialize per-frame cache
-		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
-
-		CreateDescriptorSets();
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
 		SetDefault(device.GetResourceCache().RequestDefaultTexture());
@@ -45,15 +35,12 @@ namespace Core
 		_textureBuffers(other._textureBuffers),
 		_isDirty(other._isDirty),
 		_name(other._name),
-		_descriptorSets(other._descriptorSets),
 		_isDoubledSided(other._isDoubledSided),
 		_alphaMode(other._alphaMode),
 		_isAlphaCutoff(other._isAlphaCutoff),
 		_buffers(other._buffers),
 		_textures(other._textures)
 	{
-		// Initialize per-frame cache
-		_cachedDescriptorSetsForBinding.resize(MAX_FRAMES_IN_FLIGHT);
 	}
 
 	Material& Material::operator=(const Material& other)
@@ -67,7 +54,6 @@ namespace Core
 		_textureBuffers = other._textureBuffers;
 		_isDirty = other._isDirty;
 		_name = other._name;
-		_descriptorSets = other._descriptorSets;
 		_isDoubledSided = other._isDoubledSided;
 		_alphaMode = other._alphaMode;
 		_isAlphaCutoff = other._isAlphaCutoff;
@@ -99,7 +85,6 @@ namespace Core
 		
 		if (it == bindingMap.end())
 		{
-			// Create uniform buffer through RenderFrame if not exists
 			auto& layouts = _shader->GetDescriptorSetLayouts();
 			auto layoutIt = layouts.find(setIndex);
 			if (layoutIt != layouts.end())
@@ -118,7 +103,7 @@ namespace Core
 
 		if (it != bindingMap.end())
 		{
-			it->second->SetBuffer(currentImage, data);
+			it->second->SetBuffer(data);
 		}
 	}
 
@@ -148,7 +133,7 @@ namespace Core
 		auto bindingIt = _storageBuffers[setIndex].find(binding);
 		if (bindingIt != _storageBuffers[setIndex].end())
 		{
-			bindingIt->second->SetBuffer(currentImage, buffer);
+			bindingIt->second->SetBuffer(buffer);
 		}
 	}
 
@@ -167,7 +152,7 @@ namespace Core
 		{
 			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 			{
-				bindingIt->second->SetBuffer(i, buffer);
+				bindingIt->second->SetBuffer(buffer);
 			}
 		}
 	}
@@ -186,71 +171,67 @@ namespace Core
 		return nullptr;
 	}
 
-	void Core::Material::UpdateDescriptorSets()
+	//TODO: fix the function to accept descriptor sets from outside.
+	void Core::Material::UpdateDescriptorSets(unordered_map<uint32_t, VkDescriptorSet> descriptorSets)
 	{
 		uint32_t size = static_cast<uint32_t>(
-			_uniformBuffers.size() + 
-			_textureBuffers.size() + 
+			_uniformBuffers.size() +
+			_textureBuffers.size() +
 			_storageBuffers.size());
 
 		// Collect all write operations first
 		vector<VkWriteDescriptorSet> allDescriptorWrites;
-		allDescriptorWrites.reserve(_descriptorSets.size() * MAX_FRAMES_IN_FLIGHT * size);
+		allDescriptorWrites.reserve(descriptorSets.size() * size);
 
-		for (auto& [setIndex, descriptorSetVector] : _descriptorSets)
+		for (auto& [setIndex, descriptorSet] : descriptorSets)
 		{
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+			// Process uniform buffers for this set
+			auto uniformSetIt = _uniformBuffers.find(setIndex);
+			if (uniformSetIt != _uniformBuffers.end())
 			{
-				auto descriptorSet = descriptorSetVector[i];
-
-				// Process uniform buffers for this set
-				auto uniformSetIt = _uniformBuffers.find(setIndex);
-				if (uniformSetIt != _uniformBuffers.end())
+				// uniform buffers
+				for (auto& [binding, buffer] : uniformSetIt->second)
 				{
-					for (auto& [binding, buffer] : uniformSetIt->second)
-					{
-						VkWriteDescriptorSet writeDescriptorSet =
-							buffer->CreateWriteDescriptorSet(i, binding);
+					VkWriteDescriptorSet writeDescriptorSet =
+						buffer->CreateWriteDescriptorSet(binding);
+					writeDescriptorSet.dstSet = descriptorSet;
+					allDescriptorWrites.push_back(writeDescriptorSet);
+				}
+			}
 
+			// Process texture buffers for this set
+			auto textureSetIt = _textures.find(setIndex);
+			auto textureBufferSetIt = _textureBuffers.find(setIndex);
+			if (textureSetIt != _textures.end() && textureBufferSetIt != _textureBuffers.end())
+			{
+				for (auto& [binding, texture] : textureSetIt->second)
+				{
+					auto bufferIt = textureBufferSetIt->second.find(binding);
+					if (bufferIt != textureBufferSetIt->second.end())
+					{
+						auto info = texture->GetDescriptorImageInfo();
+						bufferIt->second->CopyDescriptorImageInfo(info);
+
+						VkWriteDescriptorSet writeDescriptorSet =
+							bufferIt->second->CreateWriteDescriptorSet(binding);
+						
 						writeDescriptorSet.dstSet = descriptorSet;
 						allDescriptorWrites.push_back(writeDescriptorSet);
 					}
 				}
+			}
 
-				// Process texture buffers for this set
-				auto textureSetIt = _textures.find(setIndex);
-				auto textureBufferSetIt = _textureBuffers.find(setIndex);
-				if (textureSetIt != _textures.end() && textureBufferSetIt != _textureBuffers.end())
+			// Process storage buffers for this set
+			auto storageSetIt = _storageBuffers.find(setIndex);
+			if (storageSetIt != _storageBuffers.end())
+			{
+				for (auto& [binding, buffer] : storageSetIt->second)
 				{
-					for (auto& [binding, texture] : textureSetIt->second)
-					{
-						auto bufferIt = textureBufferSetIt->second.find(binding);
-						if (bufferIt != textureBufferSetIt->second.end())
-						{
-							auto info = texture->GetDescriptorImageInfo();
-							bufferIt->second->CopyDescriptorImageInfo(info);
+					VkWriteDescriptorSet writeDescriptorSet =
+						buffer->CreateWriteDescriptorSet(binding);
 
-							VkWriteDescriptorSet writeDescriptorSet =
-								bufferIt->second->CreateWriteDescriptorSet(i, binding);
-
-							writeDescriptorSet.dstSet = descriptorSet;
-							allDescriptorWrites.push_back(writeDescriptorSet);
-						}
-					}
-				}
-
-				// Process storage buffers for this set
-				auto storageSetIt = _storageBuffers.find(setIndex);
-				if (storageSetIt != _storageBuffers.end())
-				{
-					for (auto& [binding, buffer] : storageSetIt->second)
-					{
-						VkWriteDescriptorSet writeDescriptorSet =
-							buffer->CreateWriteDescriptorSet(i, binding);
-
-						writeDescriptorSet.dstSet = descriptorSet;
-						allDescriptorWrites.push_back(writeDescriptorSet);
-					}
+					writeDescriptorSet.dstSet = descriptorSet;
+					allDescriptorWrites.push_back(writeDescriptorSet);
 				}
 			}
 		}
@@ -275,43 +256,6 @@ namespace Core
 	void Material::ClearPushConstantsCache()
 	{
 		_pushConstants.clear();
-	}
-
-	void Material::CreateDescriptorSets()
-	{
-		// Get all descriptor set layouts from shader
-		auto& layouts = _shader->GetDescriptorSetLayouts();
-		
-		// Allocate descriptor sets for each set index
-		for (auto& [setIndex, descriptorLayout] : layouts)
-		{
-			VkDescriptorSetLayout vkLayout = descriptorLayout->GetDescriptorSetLayout();
-			vector<VkDescriptorSetLayout> perFrameLayouts(MAX_FRAMES_IN_FLIGHT, vkLayout);
-			
-			VkDescriptorSetAllocateInfo allocInfo{};
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = _device.GetGlobalDescriptorPool();
-			allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-			allocInfo.pSetLayouts = perFrameLayouts.data();
-
-			_descriptorSets[setIndex].resize(MAX_FRAMES_IN_FLIGHT);
-			
-			VkResult result = vkAllocateDescriptorSets(_device.GetDevice(),
-				&allocInfo, _descriptorSets[setIndex].data());
-
-			if (result != VK_SUCCESS)
-			{
-				if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
-				{
-					throw runtime_error("Global descriptor pool out of memory! Increase pool size.");
-				}
-				else if (result == VK_ERROR_FRAGMENTED_POOL)
-				{
-					throw runtime_error("Global descriptor pool fragmented!");
-				}
-				throw runtime_error("Failed to allocate descriptor sets for set index " + std::to_string(setIndex));
-			}
-		}
 	}
 
 	void Material::SetDefault(shared_ptr<Texture> defaultTexture)

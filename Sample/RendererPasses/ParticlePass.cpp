@@ -118,6 +118,7 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIn
 	commandBuffer.BindPipeline(_computePipeline.get());
 
 	commandBuffer.BindDescriptorSets(
+		renderFrame,
 		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, frameIndex);
 
 	commandBuffer.Dispatch(PARTICLE_COUNT / 256, 1, 1);

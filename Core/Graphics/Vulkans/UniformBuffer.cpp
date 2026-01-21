@@ -15,17 +15,16 @@ Core::UniformBuffer::~UniformBuffer()
 {
 }
 
-void Core::UniformBuffer::SetBuffer(uint32_t currentImage, void* data)
+void Core::UniformBuffer::SetBuffer(void* data)
 {
-	if (_uniformBuffersMapped.size() > 0 &&
-		_uniformBuffersMapped[currentImage] != nullptr)
-		memcpy(_uniformBuffersMapped[currentImage], data, _bufferInfo.range);
+	memcpy(_uniformBufferMapped, data, _buffer->GetSize());
 }
 
-VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)
+VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(uint32_t binding)
 {
-	_bufferInfo.buffer = _buffers[index]->GetBuffer();
+	_bufferInfo.buffer = _buffer->GetBuffer();
 	_bufferInfo.offset = 0;
+	_bufferInfo.range = _buffer->GetSize();
 
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -40,17 +39,11 @@ VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(size_t index,
 
 void Core::UniformBuffer::CreateUniformBuffer(VkDeviceSize bufferSize)
 {
-	_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-	_uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+	_buffer = make_unique<Buffer>(_device,
+		bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		MemoryType::UNIFORM);
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-	{
-		_buffers[i] = make_unique<Buffer>(_device,
-			bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			MemoryType::UNIFORM);
-
-		_buffers[i]->GetMappedPtr(&_uniformBuffersMapped[i]);
-	}
+	_buffer->GetMappedPtr(&_uniformBufferMapped);
 }
 
 Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize)

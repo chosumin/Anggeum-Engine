@@ -10,7 +10,7 @@ namespace Core
 
 		void CopyDescriptorImageInfo(VkDescriptorImageInfo info);
 		
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
+		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:
 		VkDescriptorImageInfo _imageInfo;
 	};

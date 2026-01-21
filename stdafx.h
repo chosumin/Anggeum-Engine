@@ -48,6 +48,7 @@ using namespace rapidjson;
 #include <limits>
 #include <array>
 #include <unordered_map>
+#include <unordered_set>
 #include <typeindex>
 #include <typeinfo>
 #include <assert.h>

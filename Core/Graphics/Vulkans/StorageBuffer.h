@@ -10,11 +10,11 @@ namespace Core
 		StorageBuffer();
 		~StorageBuffer();
 
-		void SetBuffer(uint32_t currentImage, Buffer* data);
+		void SetBuffer(Buffer* data);
 
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
+		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:
-		vector<Buffer*> _buffers;
+		Buffer* _buffer;
 		VkDescriptorBufferInfo _bufferInfo;
 	};
 

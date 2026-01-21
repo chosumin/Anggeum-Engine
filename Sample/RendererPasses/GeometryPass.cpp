@@ -196,6 +196,7 @@ namespace Core
 			commandBuffer.BindPipeline(_skyboxPipeline);
 
 			commandBuffer.BindDescriptorSets(
+				renderFrame,
 				_skyboxPipeline->GetPipelineBindPoint(), *material, currentFrame);
 
 			auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();

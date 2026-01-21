@@ -51,6 +51,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex,
 	commandBuffer.BindPipeline(_computePipeline.get());
 
 	commandBuffer.BindDescriptorSets(
+		renderFrame,
 		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, frameIndex);
 
 	_computeMaterial->SetPushConstants<TileInfo>(_tileInfo);

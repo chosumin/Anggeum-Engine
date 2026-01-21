@@ -7,6 +7,7 @@ namespace Core
 	class UniformBuffer;
 	class TextureBuffer;
 	class StorageBuffer;
+	class Material;
 
 	class RenderFrame
 	{
@@ -35,6 +36,15 @@ namespace Core
 
 		// Cleanup all buffers
 		void CleanupBuffers();
+
+		unordered_map<uint32_t, VkDescriptorSet>& GetOrCreateDescriptorSets(Material& material);
+
+		const vector<VkDescriptorSet>& GetDescriptorSetsForBinding(
+			Material& material, 
+			const vector<uint32_t>& setIndices);
+
+		bool IsDescriptorSetUpdated(const string& materialName) const;
+		void MarkDescriptorSetUpdated(const string& materialName);
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
@@ -57,5 +67,10 @@ namespace Core
 		vector<UniformBuffer*> _uniformBuffers;
 		vector<TextureBuffer*> _textureBuffers;
 		vector<StorageBuffer*> _storageBuffers;
+
+		unordered_map<string, unordered_map<uint32_t, VkDescriptorSet>> _descriptorSets;
+		unordered_map<string, vector<VkDescriptorSet>> _cachedDescriptorSets;
+
+		unordered_set<string> _updatedDescriptorSets;
 	};
 }

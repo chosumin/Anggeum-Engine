@@ -13,7 +13,7 @@ void Core::TextureBuffer::CopyDescriptorImageInfo(VkDescriptorImageInfo info)
 	_imageInfo.sampler = info.sampler;
 }
 
-VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)
+VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t binding)
 {
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

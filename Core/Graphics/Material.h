@@ -80,37 +80,7 @@ namespace Core
 
 		shared_ptr<Texture> GetTexture(uint32_t setIndex, uint32_t binding);
 
-		// Get the descriptor set indices that exist
-		vector<uint32_t> GetDescriptorSetIndices() const
-		{
-			vector<uint32_t> indices;
-			indices.reserve(_descriptorSets.size());
-			
-			for (const auto& [setIndex, _] : _descriptorSets)
-			{
-				indices.push_back(setIndex);
-			}
-			
-			return indices;
-		}
-
-		// Get descriptor sets ready for binding (cached per frame in material)
-		const vector<VkDescriptorSet>& GetDescriptorSetsForBinding(
-			const vector<uint32_t>& setIndices, uint32_t currentFrame)
-		{
-			auto& frameCache = _cachedDescriptorSetsForBinding[currentFrame];
-			frameCache.clear();
-			frameCache.reserve(setIndices.size());
-
-			for (auto setIndex : setIndices)
-			{
-				frameCache.push_back(_descriptorSets.at(setIndex)[currentFrame]);
-			}
-
-			return frameCache;
-		}
-
-		void UpdateDescriptorSets();
+		void UpdateDescriptorSets(unordered_map<uint32_t, VkDescriptorSet> descriptorSets);
 
 		template <typename T>
 		inline void SetPushConstants(const T& value)
@@ -127,7 +97,6 @@ namespace Core
 		bool IsDirty() { return _isDirty; }
 
 	private:
-		void CreateDescriptorSets();
 		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:
 		Device& _device;
@@ -143,12 +112,6 @@ namespace Core
 		bool _isDirty;
 
 		string _name;
-
-		// Map of set index to descriptor sets (per frame)
-		unordered_map<uint32_t, vector<VkDescriptorSet>> _descriptorSets;
-		
-		// Cached descriptor sets for binding (per frame, persists until next binding)
-		vector<vector<VkDescriptorSet>> _cachedDescriptorSetsForBinding;
 
 		bool _isDoubledSided;
 		AlphaMode _alphaMode = AlphaMode::Opaque;

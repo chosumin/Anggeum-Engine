@@ -74,11 +74,8 @@ namespace Core
 	public:
 		DescriptorPool(Device& device);
 		~DescriptorPool();
-		
-		// Pool 积己
+
 		void CreatePool(const vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets);
-		
-		// Pool 府悸 (葛电 descriptor sets 秦力)
 		void Reset();
 		
 		// Descriptor set 且寸

@@ -4,23 +4,23 @@
 #include "MemoryAllocator.h"
 
 Core::StorageBuffer::StorageBuffer()
+	: _buffer(nullptr)
 {
-	_buffers.resize(MAX_FRAMES_IN_FLIGHT);
 }
 
 Core::StorageBuffer::~StorageBuffer()
 {
 }
 
-void Core::StorageBuffer::SetBuffer(uint32_t currentImage, Buffer* data)
+void Core::StorageBuffer::SetBuffer(Buffer* data)
 {
-	_buffers[currentImage] = data;
+	_buffer = data;
 	_bufferInfo.range = data->GetSize();
 }
 
-VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(size_t index, uint32_t binding)
+VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(uint32_t binding)
 {
-	_bufferInfo.buffer = _buffers[index]->GetBuffer();
+	_bufferInfo.buffer = _buffer->GetBuffer();
 	_bufferInfo.offset = 0;
 
 	VkWriteDescriptorSet descriptorWrite{};

@@ -10,15 +10,15 @@ namespace Core
 		UniformBuffer(Device& device, VkDeviceSize bufferSize);
 		~UniformBuffer();
 
-		void SetBuffer(uint32_t currentImage, void* data);
+		void SetBuffer(void* data);
 
-		VkWriteDescriptorSet CreateWriteDescriptorSet(size_t index, uint32_t binding);
+		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:
 		void CreateUniformBuffer(VkDeviceSize bufferSize);
 	private:
 		Device& _device;
-		vector<void*> _uniformBuffersMapped;
-		vector<unique_ptr<Buffer>> _buffers;
+		void* _uniformBufferMapped;
+		unique_ptr<Buffer> _buffer;
 		VkDescriptorBufferInfo _bufferInfo;
 	};
 

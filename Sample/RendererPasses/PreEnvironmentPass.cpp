@@ -89,11 +89,11 @@ void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t frameInde
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 	
-	DrawIrradiance(commandBuffer, frameIndex, imageIndex);
-	DrawPrefiltered(commandBuffer, frameIndex, imageIndex);
+	DrawIrradiance(renderFrame, commandBuffer, frameIndex, imageIndex);
+	DrawPrefiltered(renderFrame, commandBuffer, frameIndex, imageIndex);
 }
 
-void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -127,6 +127,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint
 			commandBuffer.BindPipeline(_irradiancePipeline);
 
 			commandBuffer.BindDescriptorSets(
+				renderFrame,
 				_irradiancePipeline->GetPipelineBindPoint(), *_irradianceMaterial, currentFrame);
 
 			auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
@@ -156,7 +157,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(CommandBuffer& commandBuffer, uint
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
-void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
 {
 	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -190,8 +191,9 @@ void Core::PreEnvironmentPass::DrawPrefiltered(CommandBuffer& commandBuffer, uin
 
 			commandBuffer.BindPipeline(_prefilteredPipeline);
 
-			commandBuffer.BindDescriptorSets(_prefilteredPipeline->GetPipelineBindPoint(),
-				*_prefilteredMaterial, currentFrame);
+			commandBuffer.BindDescriptorSets(
+				renderFrame,
+				_prefilteredPipeline->GetPipelineBindPoint(), *_prefilteredMaterial, currentFrame);
 
 			auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
 

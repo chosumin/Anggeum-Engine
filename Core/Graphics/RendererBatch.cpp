@@ -73,20 +73,22 @@ void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material
 }
 
 
-void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, function<void(shared_ptr<Material>)> perMaterial, function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
+void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, 
+    function<void(shared_ptr<Material>)> perMaterial, 
+    function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
 {
-	for (auto&& shaderBatch : _shaderBatches)
-	{
-		for (auto&& material : shaderBatch.second.MaterialBatches)
-		{
-			auto sharedMat = material.second.Material.lock();
-			perMaterial(sharedMat);
-		}
+    for (auto&& shaderBatch : _shaderBatches)
+    {
+        for (auto&& material : shaderBatch.second.MaterialBatches)
+        {
+            auto sharedMat = material.second.Material.lock();
+            perMaterial(sharedMat);
+        }
 
-		commandBuffer.BindPipeline(shaderBatch.second.Pipeline);
+        commandBuffer.BindPipeline(shaderBatch.second.Pipeline);
 
-		//1. Material batch
-		for (auto&& materialBatch : shaderBatch.second.MaterialBatches)
+        //1. Material batch
+        for (auto&& materialBatch : shaderBatch.second.MaterialBatches)
 		{
 			auto sharedMaterial = materialBatch.second.Material.lock();
 
@@ -94,28 +96,27 @@ void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& comman
 			sharedMaterial->SetStorageBuffer(renderFrame, 1, 2, _instanceBuffer);
 
 			commandBuffer.BindDescriptorSets(
+				renderFrame,
 				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);
 
 			//2. SubMesh batch
-			for (auto&& subMeshBatch : materialBatch.second.SubMeshBatches)
-			{
-				auto subMesh = subMeshBatch.second.SubMesh.lock();
+            for (auto&& subMeshBatch : materialBatch.second.SubMeshBatches)
+            {
+                auto subMesh = subMeshBatch.second.SubMesh.lock();
 
-				perDraw(sharedMaterial, subMesh);
+                perDraw(sharedMaterial, subMesh);
 
-				auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
+                auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
 
-				commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
-
-				commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
-
-				commandBuffer.DrawIndexed(
-					subMesh->GetIndexCount(), 
-					subMeshBatch.second.Transforms.size(),
-					subMeshBatch.second.FirstInstance);
-			}
-		}
-	}
+                commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+                commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+                commandBuffer.DrawIndexed(
+                    subMesh->GetIndexCount(), 
+                    subMeshBatch.second.Transforms.size(),
+                    subMeshBatch.second.FirstInstance);
+            }
+        }
+    }
 }
 
 void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh)

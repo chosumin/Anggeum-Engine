@@ -11,6 +11,7 @@
 #include "Framebuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Material.h"
+#include "Graphics/RenderFrame.h"
 #include "Foundation/Job.h"
 
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
@@ -117,35 +118,44 @@ void Core::CommandBuffer::SetViewportAndScissor(VkExtent2D extent)
 }
 
 void Core::CommandBuffer::BindDescriptorSets(
-    VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame)
+    RenderFrame& renderFrame,
+    VkPipelineBindPoint pipelineBindPoint, 
+    Material& material, 
+    uint32_t currentFrame)
 {
-	if (material.IsDirty())
-		material.UpdateDescriptorSets();
+    auto& descriptorSets = renderFrame.GetOrCreateDescriptorSets(material);
 
-    auto& shader = material.GetShader();
-    auto pipelineLayout = shader.GetPipelineLayout();
+    // Update only if not already updated this frame
+    if (!renderFrame.IsDescriptorSetUpdated(material.GetName()))
+    {
+        material.UpdateDescriptorSets(descriptorSets);
+        renderFrame.MarkDescriptorSetUpdated(material.GetName());
+    }
     
-    // Get all descriptor set indices
-    auto setIndices = material.GetDescriptorSetIndices();
+    vector<uint32_t> setIndices;
+    setIndices.reserve(descriptorSets.size());
+    
+    for (const auto& [setIndex, _] : descriptorSets)
+    {
+        setIndices.push_back(setIndex);
+    }
     
     if (setIndices.empty())
         return;
     
-    // Sort indices to ensure correct binding order
     std::sort(setIndices.begin(), setIndices.end());
     
-    // Get the cached descriptor sets array from Material
-    // Material will maintain this array until next binding
-    const auto& descriptorSets = material.GetDescriptorSetsForBinding(setIndices, currentFrame);
-    
-    // Bind all descriptor sets at once
-    // firstSet should be the lowest set index
+    const auto& descriptorSetsArray = renderFrame.GetDescriptorSetsForBinding(material, setIndices);
+
+    auto& shader = material.GetShader();
+    auto pipelineLayout = shader.GetPipelineLayout();
+
     uint32_t firstSet = setIndices.front();
     
     vkCmdBindDescriptorSets(
         _commandBuffer, pipelineBindPoint,
-        pipelineLayout, firstSet, static_cast<uint32_t>(descriptorSets.size()),
-        descriptorSets.data(), 0, nullptr);
+        pipelineLayout, firstSet, static_cast<uint32_t>(descriptorSetsArray.size()),
+        descriptorSetsArray.data(), 0, nullptr);
 }
 
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
