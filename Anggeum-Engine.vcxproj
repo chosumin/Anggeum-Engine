@@ -120,6 +120,13 @@
     <PostBuildEvent>
       <Command>if not exist "$(OutDir)Assets" mklink /J "$(OutDir)Assets" "$(ProjectDir)Assets"</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>cd /d "$(ProjectDir)Assets\Shaders"
+for %%f in (*.vert *.frag *.comp) do (
+    echo Compiling %%f...
+    "$(VULKAN_SDK)\Bin\glslc.exe" %%f -g -o %%f.spv
+)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>

@@ -6,7 +6,7 @@ layout(location = 0) in vec3 pos;
 
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 1) uniform samplerCube envmap;
+layout(set = 1, binding = 1) uniform samplerCube envmap;
 
 void main()
 {

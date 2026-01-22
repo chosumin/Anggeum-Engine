@@ -11,14 +11,14 @@ layout(push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
-layout(set = 1, binding = 1) writeonly buffer TileLightVisiblities
+layout(set = 0, binding = 1) writeonly buffer TileLightVisiblities
 {
     LightVisiblity light_visiblities[];
 };
 
-layout(set = 1, binding = 2) uniform sampler2DMS depthBuffer;
+layout(set = 0, binding = 2) uniform sampler2DMS depthBuffer;
 
-layout(set = 1, binding = 3) uniform Lights
+layout(set = 0, binding = 3) uniform Lights
 {
 	Light lights[MAX_FORWARD_LIGHT_COUNT];
 	uint count;
