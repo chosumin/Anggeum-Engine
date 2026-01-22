@@ -63,7 +63,7 @@ namespace Core
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 	}
 
-	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		auto& commandBuffer = renderFrame.GetCommandBuffer();
 
@@ -82,21 +82,20 @@ namespace Core
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
-		_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
-		[&](shared_ptr<Material> material) 
+		_rendererBatches->Draw(renderFrame, commandBuffer,
+		[&](shared_ptr<Shader> shader) 
 		{
-			material->SetBuffer(renderFrame, 0, frameIndex, 0, &camera->Matrices);
-			material->SetBuffer(renderFrame, 1, 6, _shadowRenderTarget);
-			material->SetBuffer(renderFrame, 1, frameIndex, 7, &_shadowBuffer->Projection);
-			material->SetBuffer(renderFrame, 1, frameIndex, 9, &_lightBuffer);
+			renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
+			renderFrame.SetShaderTextureBuffer(*shader, 3, _shadowRenderTarget);
+			renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
+			renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
 
-			material->SetStorageBuffer(renderFrame, 1, 10, _lightVisibilityBuffer);
+			renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
 
-			material->SetBuffer(renderFrame, 1, 11, _irradianceCubemap);
-			material->SetBuffer(renderFrame, 1, 12, _prefilteredCubemap);
-			material->SetBuffer(renderFrame, 1, 13, _brdfLut);
+			renderFrame.SetShaderTextureBuffer(*shader, 7, _irradianceCubemap);
+			renderFrame.SetShaderTextureBuffer(*shader, 8, _prefilteredCubemap);
 
-			material->SetBuffer(renderFrame, 1, frameIndex);
+			renderFrame.SetShaderTextureBuffer(*shader, 9, _brdfLut);
 		},
 		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 		{
@@ -104,7 +103,7 @@ namespace Core
 			commandBuffer.PushConstants(*sharedMaterial, 0);
 		});
 
-		DrawSkybox(renderFrame, commandBuffer, frameIndex);
+		DrawSkybox(renderFrame, commandBuffer);
 
 		commandBuffer.EndRenderPass();
 	}
@@ -158,7 +157,7 @@ namespace Core
 		delete(preEnvironmentJob);
 	}
 
-	void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame)
+	void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 	{
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
@@ -190,14 +189,16 @@ namespace Core
 				_skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
 			}
 
-			material->SetBuffer(renderFrame, 0, currentFrame, 0, &camera->Matrices);
-			material->SetBuffer(renderFrame, 0, currentFrame);
+			renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
 
 			commandBuffer.BindPipeline(_skyboxPipeline);
 
 			commandBuffer.BindDescriptorSets(
 				renderFrame,
-				_skyboxPipeline->GetPipelineBindPoint(), *material, currentFrame);
+				_skyboxPipeline->GetPipelineBindPoint(), material->GetShader());
+			commandBuffer.BindDescriptorSets(
+				renderFrame,
+				_skyboxPipeline->GetPipelineBindPoint(), *material);
 
 			auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
 

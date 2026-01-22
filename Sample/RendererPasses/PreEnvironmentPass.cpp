@@ -54,7 +54,7 @@ void Core::PreEnvironmentPass::Prepare()
 		
 		_sky = skybox->GetSubMeshes()[0];
 		auto material = skybox->GetMaterials()[0];
-		skyCubemap = material->GetTexture(0, 1);
+		skyCubemap = material->GetTexture(1);
 
 		auto pipelineState = *_pipelineState;
 
@@ -81,19 +81,19 @@ void Core::PreEnvironmentPass::Prepare()
 	_skyCubemap = skyCubemap;
 }
 
-void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	// Set textures through RenderFrame
-	_irradianceMaterial->SetBuffer(renderFrame, 0, 0, _skyCubemap);
-	_prefilteredMaterial->SetBuffer(renderFrame, 0, 0, _skyCubemap);
+	renderFrame.SetShaderTextureBuffer(_irradianceMaterial->GetShader(), 0, _skyCubemap);
+	renderFrame.SetShaderTextureBuffer(_prefilteredMaterial->GetShader(), 0, _skyCubemap);
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 	
-	DrawIrradiance(renderFrame, commandBuffer, frameIndex, imageIndex);
-	DrawPrefiltered(renderFrame, commandBuffer, frameIndex, imageIndex);
+	DrawIrradiance(renderFrame, commandBuffer, imageIndex);
+	DrawPrefiltered(renderFrame, commandBuffer, imageIndex);
 }
 
-void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -128,7 +128,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
 			commandBuffer.BindDescriptorSets(
 				renderFrame,
-				_irradiancePipeline->GetPipelineBindPoint(), *_irradianceMaterial, currentFrame);
+				_irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader());
 
 			auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
 
@@ -157,7 +157,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
-void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
@@ -193,7 +193,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
 			commandBuffer.BindDescriptorSets(
 				renderFrame,
-				_prefilteredPipeline->GetPipelineBindPoint(), *_prefilteredMaterial, currentFrame);
+				_prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader());
 
 			auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
 
@@ -238,7 +238,7 @@ void Core::PreEnvironmentJob::Execute()
 {
 	_tempRenderFrame.SetCommandBuffer(commandBuffer);
 
-	_pass.Draw(_tempRenderFrame, 0, 0);
+	_pass.Draw(_tempRenderFrame, 0);
 	
 	status = JobStatus::COMPLETE;
 }

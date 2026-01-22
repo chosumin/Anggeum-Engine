@@ -37,50 +37,26 @@ namespace Core
 		Shader& GetShader() const;
 		weak_ptr<Shader> GetShaderPtr() const { return _shader; }
 
-		void* GetBuffer(uint32_t setIndex, uint32_t binding)
+		void* GetBuffer(uint32_t binding)
 		{
-			auto setIt = _buffers.find(setIndex);
+			auto setIt = _buffers.find(binding);
 			if (setIt == _buffers.end())
 				return nullptr;
-			
-			auto bindingIt = setIt->second.find(binding);
-			if (bindingIt == setIt->second.end())
-				return nullptr;
-			
-			return bindingIt->second;
+
+			return setIt->second;
 		}
 
-		void AddBuffer(uint32_t setIndex, uint32_t binding, void* data)
+		shared_ptr<Texture> GetTexture(uint32_t binding);
+
+		void AddBuffer(uint32_t binding, void* data)
 		{
-			_buffers[setIndex][binding] = data;
+			_buffers[binding] = data;
 		}
 
-		void AddTexture(uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture)
+		void AddTexture(uint32_t binding, shared_ptr<Texture> texture)
 		{
-			_textures[setIndex][binding] = texture;
+			_textures[binding] = texture;
 		}
-
-		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, void* data);
-		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, shared_ptr<Texture> texture);
-		void SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage, uint32_t binding, Buffer* buffer);
-		void SetStorageBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t binding, Buffer* buffer);
-
-		void SetBuffer(RenderFrame& frame, uint32_t setIndex, uint32_t currentImage)
-		{
-			for (auto&& [binding, buffer] : _buffers[setIndex])
-			{
-				SetBuffer(frame, setIndex, currentImage, binding, buffer);
-			}
-
-			for (auto&& [binding, texture] : _textures[setIndex])
-			{
-				SetBuffer(frame, setIndex, binding, texture);
-			}
-		}
-
-		shared_ptr<Texture> GetTexture(uint32_t setIndex, uint32_t binding);
-
-		void UpdateDescriptorSets(unordered_map<uint32_t, VkDescriptorSet> descriptorSets);
 
 		template <typename T>
 		inline void SetPushConstants(const T& value)
@@ -94,7 +70,8 @@ namespace Core
 		vector<uint8_t>* GetPushConstantsData();
 		void ClearPushConstantsCache();
 
-		bool IsDirty() { return _isDirty; }
+		const unordered_map<uint32_t, void*>& GetBuffersMap() const { return _buffers; }
+		const unordered_map<uint32_t, shared_ptr<Texture>>& GetTexturesMap() const { return _textures; }
 
 	private:
 		void SetDefault(shared_ptr<Texture> defaultTexture);
@@ -102,23 +79,16 @@ namespace Core
 		Device& _device;
 		shared_ptr<Shader> _shader;
 		vector<uint8_t> _pushConstants;
-		
-		// Nested map: setIndex -> (binding -> buffer)
-		unordered_map<uint32_t, unordered_map<uint32_t, UniformBuffer*>> _uniformBuffers;
-		unordered_map<uint32_t, unordered_map<uint32_t, TextureBuffer*>> _textureBuffers;
-		unordered_map<uint32_t, unordered_map<uint32_t, StorageBuffer*>> _storageBuffers;
 
 	private:
-		bool _isDirty;
-
 		string _name;
 
 		bool _isDoubledSided;
 		AlphaMode _alphaMode = AlphaMode::Opaque;
 		bool _isAlphaCutoff;
 
-		unordered_map<uint32_t, unordered_map<uint32_t, void*>> _buffers;
-		unordered_map<uint32_t, unordered_map<uint32_t, shared_ptr<Texture>>> _textures;
+		unordered_map<uint32_t, void*> _buffers;
+		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
 	};
 }
 

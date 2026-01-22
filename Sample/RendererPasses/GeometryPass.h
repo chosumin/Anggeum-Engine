@@ -23,7 +23,7 @@ namespace Core
 		virtual ~GeometryPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
 		//TODO : remove and replace it to the light component
 		void SetBuffer(ShadowUniform& shadowBuffer)
@@ -33,7 +33,7 @@ namespace Core
 	private:
 		void PreparePregenerationSkybox(Texture* pregenerationSky, 
 			Texture* irradianceCubemap, Texture* prefilterCubemap);
-		void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame);
+		void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 		void UpdateGUI();
 		void UpdateLightBuffer();
 	private:

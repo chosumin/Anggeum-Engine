@@ -91,11 +91,11 @@ void ForwardRenderPipeline::Prepare()
 	}
 }
 
-void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	for (auto&& rendererPass : _rendererPasses)
 	{
-		rendererPass->Draw(renderFrame, frameIndex, imageIndex);
+		rendererPass->Draw(renderFrame, imageIndex);
 	}
 }
 

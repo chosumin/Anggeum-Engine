@@ -54,7 +54,7 @@ void Core::ShadowPass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 }
 
-void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
@@ -69,10 +69,10 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint3
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
-	[&](shared_ptr<Material> material)
+	_rendererBatches->Draw(renderFrame, commandBuffer,
+	[&](shared_ptr<Shader> shader)
 	{
-		material->SetBuffer(renderFrame, 0, frameIndex, 0, &_directionalLight);
+		renderFrame.SetShaderUniformBuffer(*shader, 0, &_directionalLight);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

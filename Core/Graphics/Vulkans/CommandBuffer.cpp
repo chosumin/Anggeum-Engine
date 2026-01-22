@@ -120,42 +120,53 @@ void Core::CommandBuffer::SetViewportAndScissor(VkExtent2D extent)
 void Core::CommandBuffer::BindDescriptorSets(
     RenderFrame& renderFrame,
     VkPipelineBindPoint pipelineBindPoint, 
-    Material& material, 
-    uint32_t currentFrame)
+    Material& material)
 {
-    auto& descriptorSets = renderFrame.GetOrCreateDescriptorSets(material);
+    auto& resources = renderFrame.GetOrCreateMaterialResources(material.GetName());
 
     // Update only if not already updated this frame
-    if (!renderFrame.IsDescriptorSetUpdated(material.GetName()))
+    if (!resources.isDescriptorSetUpdated)
     {
-        material.UpdateDescriptorSets(descriptorSets);
-        renderFrame.MarkDescriptorSetUpdated(material.GetName());
+		renderFrame.SetMaterialBuffers(material);
+		renderFrame.AllocateDescriptorSets(material);
+		renderFrame.UpdateDescriptorSets(material);
+		resources.isDescriptorSetUpdated = true;
     }
     
-    vector<uint32_t> setIndices;
-    setIndices.reserve(descriptorSets.size());
-    
-    for (const auto& [setIndex, _] : descriptorSets)
+    if (resources.descriptorSet == VK_NULL_HANDLE)
     {
-        setIndices.push_back(setIndex);
-    }
-    
-    if (setIndices.empty())
+		//Nothing to bind
         return;
-    
-    std::sort(setIndices.begin(), setIndices.end());
-    
-    const auto& descriptorSetsArray = renderFrame.GetDescriptorSetsForBinding(material, setIndices);
+    }
 
     auto& shader = material.GetShader();
     auto pipelineLayout = shader.GetPipelineLayout();
 
-    uint32_t firstSet = setIndices.front();
-    
     vkCmdBindDescriptorSets(
         _commandBuffer, pipelineBindPoint,
-        pipelineLayout, firstSet, static_cast<uint32_t>(descriptorSetsArray.size()),
-        descriptorSetsArray.data(), 0, nullptr);
+        pipelineLayout, (uint)DescriptorSetType::Material, 1,
+        &resources.descriptorSet, 0, nullptr);
+}
+
+void Core::CommandBuffer::BindDescriptorSets(
+    RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader)
+{
+    auto& resources = renderFrame.GetOrCreateShaderResources(shader.GetHash());
+
+    // Update only if not already updated this frame
+    if (!resources.isDescriptorSetUpdated)
+    {
+        renderFrame.AllocateDescriptorSets(shader);
+		renderFrame.UpdateDescriptorSets(shader);
+        resources.isDescriptorSetUpdated = true;
+    }
+
+    auto pipelineLayout = shader.GetPipelineLayout();
+
+    vkCmdBindDescriptorSets(
+        _commandBuffer, pipelineBindPoint,
+        pipelineLayout, (uint)DescriptorSetType::Shader, 1,
+        &resources.descriptorSet, 0, nullptr);
 }
 
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)

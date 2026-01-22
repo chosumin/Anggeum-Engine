@@ -10,7 +10,7 @@ namespace Core
 		virtual ~IRenderPipeline() = default;
 		
 		virtual void Prepare() = 0;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) = 0;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 		virtual Texture* GetColorRenderTarget() = 0;
 		virtual VkSampleCountFlagBits GetMSAASamples() const = 0;
 	};

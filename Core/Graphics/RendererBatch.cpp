@@ -73,31 +73,32 @@ void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material
 }
 
 
-void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame, 
-    function<void(shared_ptr<Material>)> perMaterial, 
+void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+    function<void(shared_ptr<Shader>)> perShader, 
     function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
 {
     for (auto&& shaderBatch : _shaderBatches)
     {
-        for (auto&& material : shaderBatch.second.MaterialBatches)
-        {
-            auto sharedMat = material.second.Material.lock();
-            perMaterial(sharedMat);
-        }
-
         commandBuffer.BindPipeline(shaderBatch.second.Pipeline);
+
+		auto shader = shaderBatch.second.SharedShader.lock();
+		perShader(shader);
+
+		renderFrame.SetShaderStorageBuffer(*shader, 1, _transformBatch.TransformBuffer);
+		renderFrame.SetShaderStorageBuffer(*shader, 2, _instanceBuffer);
+
+		commandBuffer.BindDescriptorSets(
+			renderFrame,
+			VK_PIPELINE_BIND_POINT_GRAPHICS, *shader);
 
         //1. Material batch
         for (auto&& materialBatch : shaderBatch.second.MaterialBatches)
 		{
 			auto sharedMaterial = materialBatch.second.Material.lock();
 
-			sharedMaterial->SetStorageBuffer(renderFrame, 1, 1, _transformBatch.TransformBuffer);
-			sharedMaterial->SetStorageBuffer(renderFrame, 1, 2, _instanceBuffer);
-
 			commandBuffer.BindDescriptorSets(
 				renderFrame,
-				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial, currentFrame);
+				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial);
 
 			//2. SubMesh batch
             for (auto&& subMeshBatch : materialBatch.second.SubMeshBatches)

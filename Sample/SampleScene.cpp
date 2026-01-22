@@ -107,7 +107,7 @@ void SampleScene::Update()
 	{
 		auto mesh = GetComponents<Mesh>()[0];
 
-		auto pbr = (PBRBuffer*)mesh->GetMaterials()[0]->GetBuffer(1, 8);
+		auto pbr = (PBRBuffer*)mesh->GetMaterials()[0]->GetBuffer(1);
 
 		ImGui::SliderFloat4("Albedo", &pbr->Albedo[0], 0, 1);
 		ImGui::SliderFloat("Metallic", &pbr->Metallic, 0, 1);

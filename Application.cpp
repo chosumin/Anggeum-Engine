@@ -79,12 +79,11 @@ void Application::Draw()
 
 	_renderContext->Begin();
 
-	uint32_t frameIndex = _renderContext->GetCurrentFrameIndex();
 	uint32_t imageIndex = _renderContext->GetImageIndex();
 
-	_renderPipeline->Draw(_renderContext->GetCurrentFrame(), frameIndex, imageIndex);
+	_renderPipeline->Draw(_renderContext->GetCurrentFrame(), imageIndex);
 
-	_guiRenderPass->Draw(_renderContext->GetCurrentFrame(), frameIndex, imageIndex);
+	_guiRenderPass->Draw(_renderContext->GetCurrentFrame(), imageIndex);
 
 	_renderContext->Submit();
 }

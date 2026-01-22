@@ -16,7 +16,7 @@ namespace Core
 		virtual ~BrdfLutPass() override;
 
 		virtual void Prepare() override;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 	private:
 		Pipeline* _brdfPipeline;
 		Material* _brdfMaterial;

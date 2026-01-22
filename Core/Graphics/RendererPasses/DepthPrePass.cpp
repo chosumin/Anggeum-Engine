@@ -26,7 +26,7 @@ Core::DepthPrePass::~DepthPrePass()
 
 void Core::DepthPrePass::Prepare()
 {
-	_material = _device.GetResourceCache().RequestMaterial("depth prepass", "Shadow");
+	_material = _device.GetResourceCache().RequestMaterial("depth prepass", "Depth");
 
 	auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 	multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
@@ -35,7 +35,7 @@ void Core::DepthPrePass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 }
 
-void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	// Get command buffer from RenderFrame
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
@@ -47,10 +47,10 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t frameIndex, uin
 	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 	commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-	_rendererBatches->Draw(renderFrame, commandBuffer, frameIndex,
-	[&](shared_ptr<Material> material)
+	_rendererBatches->Draw(renderFrame, commandBuffer,
+	[&](shared_ptr<Shader> shader)
 	{
-		material->SetBuffer(renderFrame, 0, frameIndex, 0, &camera->Matrices);
+		renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
 	},
 	[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 	{

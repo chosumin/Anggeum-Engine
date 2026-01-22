@@ -74,7 +74,7 @@ void GUIRenderPass::Prepare()
 	ImGui_ImplVulkan_Init(&init_info);
 }
 
-void GUIRenderPass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void GUIRenderPass::Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 

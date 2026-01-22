@@ -11,9 +11,50 @@ namespace Core
 	// ============================================
 	enum class DescriptorSetType : uint32_t
 	{
-		Global = 0,    // Per-frame: Camera, Lighting
-		Pass = 1,      // Per-pass: Shadow maps, Pass-specific data
-		Material = 2   // Per-material: Textures, Material properties
+		Shader = 0,    // Per-shader: Lights, Shadows, IBL, Pass-specific data
+		Material = 1   // Per-material: Textures, Material properties
+	};
+
+	// ============================================
+	// Descriptor Set Resources
+	// ============================================
+	// 단일 descriptor set과 관련된 버퍼를 관리하는 기본 구조체
+	struct DescriptorSetResources
+	{
+		// Descriptor set
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		bool isDescriptorSetUpdated = false;
+
+		// Buffers: [binding] -> Buffer*
+		unordered_map<uint32_t, UniformBuffer*> uniformBuffers;
+		unordered_map<uint32_t, TextureBuffer*> textureBuffers;
+		unordered_map<uint32_t, StorageBuffer*> storageBuffers;
+
+		void CleanupBuffers()
+		{
+			// Cleanup uniform buffers
+			for (auto& [binding, buffer] : uniformBuffers)
+			{
+				delete buffer;
+			}
+			uniformBuffers.clear();
+			
+			// Cleanup texture buffers
+			for (auto& [binding, buffer] : textureBuffers)
+			{
+				delete buffer;
+			}
+			textureBuffers.clear();
+			
+			// Cleanup storage buffers
+			for (auto& [binding, buffer] : storageBuffers)
+			{
+				delete buffer;
+			}
+			storageBuffers.clear();
+			
+			descriptorSet = VK_NULL_HANDLE;
+		}
 	};
 
 	// ============================================

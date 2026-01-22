@@ -218,6 +218,11 @@ void Core::ResourceCache::GetShaderFiles(const uint32_t hash,
 		vert = "shaders/shadow.vert.spv";
 		frag = "shaders/shadow.frag.spv";
 		break;
+	case Utility::HashCode("Depth"):
+		pass = "Depth";
+		vert = "shaders/depth.vert.spv";
+		frag = "shaders/shadow.frag.spv";
+		break;
 	case Utility::HashCode("Skybox"):
 		pass = "Skybox";
 		vert = "shaders/skybox.vert.spv";

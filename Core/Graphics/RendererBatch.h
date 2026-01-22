@@ -49,8 +49,8 @@ namespace Core
 		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 
-		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t currentFrame,
-			function<void(shared_ptr<Material>)> perMaterial,
+		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
 	private:
 		//Add batch depending on the mesh's materials.

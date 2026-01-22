@@ -6,6 +6,7 @@ namespace Core
 	class SwapChain;
 	class Buffer;
 	class Material;
+	class Shader;
 	class CommandPool;
 	class Device;
 	class Image;
@@ -30,7 +31,8 @@ namespace Core
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
-		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Material& material, uint32_t currentFrame);
+		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Material& material);
+		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader);
 		void PushConstants(Material& material, uint32_t index = 0);
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);

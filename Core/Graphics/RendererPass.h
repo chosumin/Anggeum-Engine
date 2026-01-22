@@ -19,7 +19,7 @@ namespace Core
 		virtual ~RendererPass();
 
 		virtual void Prepare() = 0;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex) = 0;
+		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 	protected:
 		void CreateFrameBuffer(SwapChain& swapChain);
 		void CreateFrameBuffer(Image* image);

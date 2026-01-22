@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/TextureBuffer.h"
 #include "Graphics/Vulkans/StorageBuffer.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Material.h"
 
 namespace Core
@@ -33,87 +34,38 @@ namespace Core
 
 	void RenderFrame::Reset()
 	{
-		// Clean up buffers from previous frame
-		//CleanupBuffers();
-
 		// Reset descriptor pool
 		if (_descriptorPool)
 		{
 			_descriptorPool->Reset();
 		}
 		
-		// Clear descriptor sets and update tracking
-		_descriptorSets.clear();
-		_cachedDescriptorSets.clear();
-		_updatedDescriptorSets.clear();
-	}
-
-	UniformBuffer* RenderFrame::CreateUniformBuffer(VkDeviceSize size)
-	{
-		auto buffer = new UniformBuffer(_device, size);
-		_uniformBuffers.push_back(buffer);
-		return buffer;
-	}
-
-	TextureBuffer* RenderFrame::CreateTextureBuffer()
-	{
-		auto buffer = new TextureBuffer();
-		_textureBuffers.push_back(buffer);
-		return buffer;
-	}
-
-	StorageBuffer* RenderFrame::CreateStorageBuffer()
-	{
-		auto buffer = new StorageBuffer();
-		_storageBuffers.push_back(buffer);
-		return buffer;
-	}
-
-	void RenderFrame::CleanupBuffers()
-	{
-		// Delete all uniform buffers
-		for (auto buffer : _uniformBuffers)
+		// Clear shader resources (set index 0)
+		for (auto& [shaderHash, resources] : _shaderResources)
 		{
-			delete buffer;
+			resources.CleanupBuffers();
 		}
-		_uniformBuffers.clear();
-
-		// Delete all texture buffers
-		for (auto buffer : _textureBuffers)
-		{
-			delete buffer;
-		}
-		_textureBuffers.clear();
-
-		// Delete all storage buffers
-		for (auto buffer : _storageBuffers)
-		{
-			delete buffer;
-		}
-		_storageBuffers.clear();
-	}
-
-	unordered_map<uint32_t, VkDescriptorSet>& RenderFrame::GetOrCreateDescriptorSets(Material& material)
-	{
-		auto materialName = material.GetName();
+		_shaderResources.clear();
 		
-		// Check if descriptor sets already exist for this material
-		auto materialIt = _descriptorSets.find(materialName);
-		if (materialIt != _descriptorSets.end())
+		// Clear material resources (set index 1)
+		for (auto& [materialName, resources] : _materialResources)
 		{
-			return materialIt->second;
+			resources.CleanupBuffers();
 		}
-		
-		// Get all descriptor set layouts from material's shader
-		auto& shader = material.GetShader();
+		_materialResources.clear();
+	}
+
+	void RenderFrame::AllocateDescriptorSets(Shader& shader)
+	{
+		auto shaderHash = shader.GetType();
+		auto& resources = GetOrCreateShaderResources(shaderHash);
+
 		auto& layouts = shader.GetDescriptorSetLayouts();
 
-		// Allocate descriptor sets for each set index
-		auto& materialDescriptorSets = _descriptorSets[materialName];
-
-		for (auto& [setIndex, descriptorLayout] : layouts)
+		auto layoutIt = layouts.find((uint)DescriptorSetType::Shader);
+		if (layoutIt != layouts.end())
 		{
-			VkDescriptorSetLayout vkLayout = descriptorLayout->GetDescriptorSetLayout();
+			VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
 
 			VkDescriptorSetAllocateInfo allocInfo{};
 			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -121,8 +73,7 @@ namespace Core
 			allocInfo.descriptorSetCount = 1;
 			allocInfo.pSetLayouts = &vkLayout;
 
-			VkDescriptorSet descriptorSet;
-			VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &descriptorSet);
+			VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &resources.descriptorSet);
 
 			if (result != VK_SUCCESS)
 			{
@@ -134,13 +85,101 @@ namespace Core
 				{
 					throw runtime_error("Descriptor pool fragmented!");
 				}
-				throw runtime_error("Failed to allocate descriptor set for set index " + std::to_string(setIndex));
+				throw runtime_error("Failed to allocate descriptor set for shader: " + shader.GetHash());
 			}
-
-			materialDescriptorSets[setIndex] = descriptorSet;
 		}
+	}
 
-		return materialDescriptorSets;
+	void RenderFrame::AllocateDescriptorSets(Material& material)
+	{
+		auto materialName = material.GetName();
+		auto& resources = GetOrCreateMaterialResources(materialName);
+
+		auto& layouts = material.GetShader().GetDescriptorSetLayouts();
+
+		auto layoutIt = layouts.find((uint)DescriptorSetType::Material);
+		if (layoutIt != layouts.end())
+		{
+			VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
+
+			VkDescriptorSetAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = _descriptorPool->GetHandle();
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &vkLayout;
+
+			VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &resources.descriptorSet);
+
+			if (result != VK_SUCCESS)
+			{
+				if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
+				{
+					throw runtime_error("Descriptor pool out of memory! Increase pool size.");
+				}
+				else if (result == VK_ERROR_FRAGMENTED_POOL)
+				{
+					throw runtime_error("Descriptor pool fragmented!");
+				}
+				throw runtime_error("Failed to allocate descriptor set for material: " + material.GetName());
+			}
+		}
+	}
+
+	void RenderFrame::CleanupBuffers()
+	{
+		// Cleanup shader resources (set index 0)
+		for (auto& [shaderHash, resources] : _shaderResources)
+		{
+			resources.CleanupBuffers();
+		}
+		_shaderResources.clear();
+
+		// Cleanup material resources (set index 1)
+		for (auto& [materialName, resources] : _materialResources)
+		{
+			resources.CleanupBuffers();
+		}
+		_materialResources.clear();
+	}
+
+	// Per-shader resources access methods (set index 0)
+	DescriptorSetResources& RenderFrame::GetOrCreateShaderResources(size_t shaderHash)
+	{
+		auto it = _shaderResources.find(shaderHash);
+		if (it == _shaderResources.end())
+		{
+			// Create new shader resources
+			it = _shaderResources.emplace(shaderHash, DescriptorSetResources{}).first;
+		}
+		return it->second;
+	}
+
+	DescriptorSetResources* RenderFrame::GetShaderResources(size_t shaderHash)
+	{
+		auto it = _shaderResources.find(shaderHash);
+		if (it == _shaderResources.end())
+			return nullptr;
+		return &(it->second);
+	}
+
+	// Per-material resources access methods (set index 1)
+	DescriptorSetResources& RenderFrame::GetOrCreateMaterialResources(const string& materialName)
+	{
+		auto it = _materialResources.find(materialName);
+		if (it == _materialResources.end())
+		{
+			// Create new material resources
+			it = _materialResources.emplace(materialName, DescriptorSetResources{}).first;
+		}
+		return it->second;
+	}
+
+	DescriptorSetResources* RenderFrame::GetMaterialResources(const string& materialName)
+	{
+		auto it = _materialResources.find(materialName);
+		if (it == _materialResources.end())
+			return nullptr;
+		return &(it->second);
 	}
 
 	void RenderFrame::CreateSyncObjects()
@@ -171,36 +210,252 @@ namespace Core
 		_descriptorPool->CreatePool(poolSizes, maxSets);
 	}
 
-	const vector<VkDescriptorSet>& RenderFrame::GetDescriptorSetsForBinding(
-		Material& material,
-		const vector<uint32_t>& setIndices)
+	void RenderFrame::UpdateDescriptorSets(Shader& shader)
 	{
-		auto materialName = material.GetName();
-		auto& cache = _cachedDescriptorSets[materialName];
+		// Get material resources from RenderFrame
+		auto* resources = GetShaderResources(shader.GetHash());
+		if (!resources)
+			return;
 
-		cache.clear();
-		cache.reserve(setIndices.size());
+		auto& descriptorSet = resources->descriptorSet;
+		vector<VkWriteDescriptorSet> allDescriptorWrites;
 
-		auto& materialSets = _descriptorSets[materialName];
-		for (auto setIndex : setIndices)
+		// Process uniform buffers
+		for (auto& [binding, buffer] : resources->uniformBuffers)
 		{
-			auto it = materialSets.find(setIndex);
-			if (it != materialSets.end())
+			VkWriteDescriptorSet writeDescriptorSet =
+				buffer->CreateWriteDescriptorSet(binding);
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Process texture buffers - get textures from Material
+		for (auto& [binding, textureBuffer] : resources->textureBuffers)
+		{
+			VkWriteDescriptorSet writeDescriptorSet =
+				textureBuffer->CreateWriteDescriptorSet(binding);
+
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Process storage buffers
+		for (auto& [binding, buffer] : resources->storageBuffers)
+		{
+			VkWriteDescriptorSet writeDescriptorSet =
+				buffer->CreateWriteDescriptorSet(binding);
+
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Single batched update call
+		if (!allDescriptorWrites.empty())
+		{
+			vkUpdateDescriptorSets(
+				_device.GetDevice(),
+				static_cast<uint32_t>(allDescriptorWrites.size()),
+				allDescriptorWrites.data(), 0, nullptr);
+		}
+	}
+
+	void RenderFrame::UpdateDescriptorSets(Material& material)
+	{
+		// Get material resources from RenderFrame
+		auto* resources = GetMaterialResources(material.GetName());
+		if (!resources)
+			return;
+
+		auto& descriptorSet = resources->descriptorSet;
+		vector<VkWriteDescriptorSet> allDescriptorWrites;
+
+		// Process uniform buffers
+		for (auto& [binding, buffer] : resources->uniformBuffers)
+		{
+			VkWriteDescriptorSet writeDescriptorSet =
+				buffer->CreateWriteDescriptorSet(binding);
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Process texture buffers - get textures from Material
+		for (auto& [binding, textureBuffer] : resources->textureBuffers)
+		{
+			VkWriteDescriptorSet writeDescriptorSet =
+				textureBuffer->CreateWriteDescriptorSet(binding);
+
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Process storage buffers
+		for (auto& [binding, buffer] : resources->storageBuffers)
+		{
+			VkWriteDescriptorSet writeDescriptorSet =
+				buffer->CreateWriteDescriptorSet(binding);
+
+			writeDescriptorSet.dstSet = descriptorSet;
+			allDescriptorWrites.push_back(writeDescriptorSet);
+		}
+
+		// Single batched update call
+		if (!allDescriptorWrites.empty())
+		{
+			vkUpdateDescriptorSets(
+				_device.GetDevice(),
+				static_cast<uint32_t>(allDescriptorWrites.size()),
+				allDescriptorWrites.data(), 0, nullptr);
+		}
+	}
+	
+	// Per-shader buffer management methods (set index 0)
+	void RenderFrame::SetShaderUniformBuffer(Shader& shader, uint32_t binding, void* data)
+	{
+		auto& resources = GetOrCreateShaderResources(shader.GetHash());
+		
+		// Find or create uniform buffer
+		auto it = resources.uniformBuffers.find(binding);
+		if (it == resources.uniformBuffers.end())
+		{
+			auto& layouts = shader.GetDescriptorSetLayouts();
+			auto layoutIt = layouts.find(0); // Shader descriptor set (set index 0)
+			if (layoutIt != layouts.end())
 			{
-				cache.push_back(it->second);
+				auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
+				for (auto& bindingInfo : uniformBindings)
+				{
+					if (bindingInfo.Binding == binding)
+					{
+						auto buffer = new UniformBuffer(_device, bindingInfo.BufferSize);
+						resources.uniformBuffers[binding] = buffer;
+						it = resources.uniformBuffers.find(binding);
+						break;
+					}
+				}
 			}
 		}
 
-		return cache;
+		if (it != resources.uniformBuffers.end())
+		{
+			it->second->SetBuffer(data);
+		}
 	}
 
-	bool RenderFrame::IsDescriptorSetUpdated(const string& materialName) const
+	void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture)
 	{
-		return _updatedDescriptorSets.find(materialName) != _updatedDescriptorSets.end();
+		auto& resources = GetOrCreateShaderResources(shader.GetHash());
+		
+		// Get or create texture buffer
+		auto it = resources.textureBuffers.find(binding);
+		if (it == resources.textureBuffers.end())
+		{
+			auto buffer = new TextureBuffer();
+			auto info = texture->GetDescriptorImageInfo();
+			buffer->CopyDescriptorImageInfo(info);
+			resources.textureBuffers[binding] = buffer;
+		}
 	}
 
-	void RenderFrame::MarkDescriptorSetUpdated(const string& materialName)
+	void RenderFrame::SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer)
 	{
-		_updatedDescriptorSets.insert(materialName);
+		auto& resources = GetOrCreateShaderResources(shader.GetHash());
+		
+		// Get or create storage buffer
+		auto it = resources.storageBuffers.find(binding);
+		if (it == resources.storageBuffers.end())
+		{
+			auto storageBuffer = new StorageBuffer();
+			resources.storageBuffers[binding] = storageBuffer;
+			it = resources.storageBuffers.find(binding);
+		}
+		
+		if (it != resources.storageBuffers.end())
+		{
+			it->second->SetBuffer(buffer);
+		}
+	}
+
+	// Per-material buffer management methods (set index 1)
+	void RenderFrame::SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data)
+	{
+		auto& resources = GetOrCreateMaterialResources(material.GetName());
+		
+		// Find or create uniform buffer
+		auto it = resources.uniformBuffers.find(binding);
+		if (it == resources.uniformBuffers.end())
+		{
+			auto& layouts = material.GetShader().GetDescriptorSetLayouts();
+			auto layoutIt = layouts.find(1); // Material descriptor set (set index 1)
+			if (layoutIt != layouts.end())
+			{
+				auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
+				for (auto& bindingInfo : uniformBindings)
+				{
+					if (bindingInfo.Binding == binding)
+					{
+						auto buffer = new UniformBuffer(_device, bindingInfo.BufferSize);
+						resources.uniformBuffers[binding] = buffer;
+						it = resources.uniformBuffers.find(binding);
+						break;
+					}
+				}
+			}
+		}
+
+		if (it != resources.uniformBuffers.end())
+		{
+			it->second->SetBuffer(data);
+		}
+	}
+
+	void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture)
+	{
+		auto& resources = GetOrCreateMaterialResources(material.GetName());
+		
+		// Get or create texture buffer
+		auto it = resources.textureBuffers.find(binding);
+		if (it == resources.textureBuffers.end())
+		{
+			auto buffer = new TextureBuffer();
+			auto info = texture->GetDescriptorImageInfo();
+			buffer->CopyDescriptorImageInfo(info);
+			resources.textureBuffers[binding] = buffer;
+		}
+	}
+
+	void RenderFrame::SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer)
+	{
+		auto& resources = GetOrCreateMaterialResources(material.GetName());
+		
+		// Get or create storage buffer
+		auto it = resources.storageBuffers.find(binding);
+		if (it == resources.storageBuffers.end())
+		{
+			auto storageBuffer = new StorageBuffer();
+			resources.storageBuffers[binding] = storageBuffer;
+			it = resources.storageBuffers.find(binding);
+		}
+		
+		if (it != resources.storageBuffers.end())
+		{
+			it->second->SetBuffer(buffer);
+		}
+	}
+
+	void RenderFrame::SetMaterialBuffers(Material& material)
+	{
+		// Process uniform buffers from Material
+		auto& buffers = material.GetBuffersMap();
+		for (auto& [binding, data] : buffers)
+		{
+			SetMaterialUniformBuffer(material, binding, data);
+		}
+
+		// Process texture buffers from Material
+		auto& textures = material.GetTexturesMap();
+		for (auto& [binding, texture] : textures)
+		{
+			SetMaterialTextureBuffer(material, binding, texture);
+		}
 	}
 }

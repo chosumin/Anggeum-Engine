@@ -98,28 +98,23 @@ void Sample::ParticlePass::Prepare()
 	}
 }
 
-void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIndex, uint32_t imageIndex)
+void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto& commandBuffer = renderFrame.GetComputeCommandBuffer();
 
 	_deltaTime.deltaTime += 0.01f;
-	_computeMaterial->SetBuffer(renderFrame, 0, frameIndex, 0, &_deltaTime.deltaTime);
+	renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(), 0, &_deltaTime.deltaTime);
 
-	_computeMaterial->SetStorageBuffer(renderFrame, 0, 1, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 0, 2, _buffers[1]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 0, 3, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 0, 4, _buffers[4]);
-
-	_computeMaterial->SetStorageBuffer(renderFrame, 1, 1, _buffers[3]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 1, 2, _buffers[4]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 1, 3, _buffers[0]);
-	_computeMaterial->SetStorageBuffer(renderFrame, 1, 4, _buffers[1]);
+	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 1, _buffers[0]);
+	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 2, _buffers[1]);
+	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 3, _buffers[3]);
+	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 4, _buffers[4]);
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 
 	commandBuffer.BindDescriptorSets(
 		renderFrame,
-		_computePipeline->GetPipelineBindPoint(), *_computeMaterial, frameIndex);
+		_computePipeline->GetPipelineBindPoint(), _computeMaterial->GetShader());
 
 	commandBuffer.Dispatch(PARTICLE_COUNT / 256, 1, 1);
 
@@ -131,8 +126,8 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, uint32_t frameIn
 	commandBuffer.BindPipeline(_graphicsPipeline.get());
 
 	vector<Core::Buffer*> vertexBuffers(2);
-	vertexBuffers[0] = _buffers[frameIndex * 3];
-	vertexBuffers[1] = _buffers[frameIndex * 3 + 2];
+	vertexBuffers[0] = _buffers[0];
+	vertexBuffers[1] = _buffers[2];
 
 	commandBuffer.BindVertexBuffers(vertexBuffers, 0);
 	commandBuffer.Draw(PARTICLE_COUNT, 1);

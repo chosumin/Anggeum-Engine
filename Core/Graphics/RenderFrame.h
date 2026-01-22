@@ -1,13 +1,16 @@
 #pragma once
+#include "Vulkans/DescriptorPool.h"
 
 namespace Core
 {
 	class CommandBuffer;
-	class DescriptorPool;
 	class UniformBuffer;
 	class TextureBuffer;
 	class StorageBuffer;
 	class Material;
+	class Shader;
+	class Texture;
+	class Buffer;
 
 	class RenderFrame
 	{
@@ -22,33 +25,44 @@ namespace Core
 		void SetCommandBuffer(CommandBuffer* commandBuffer) { _commandBuffer = commandBuffer; }
 		void SetComputeCommandBuffer(CommandBuffer* computeBuffer) { _computeCommandBuffer = computeBuffer; }
 		
-		// Getters
+		void AllocateDescriptorSets(Shader& shader);
+		void AllocateDescriptorSets(Material& material);
+		
+		// Descriptor set updates
+		void UpdateDescriptorSets(Shader& shader);
+		void UpdateDescriptorSets(Material& material);
+
 		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
 		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }
+
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
 		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
-		DescriptorPool& GetDescriptorPool() { return *_descriptorPool; }
 
-		// Per-frame buffer creation and management
-		UniformBuffer* CreateUniformBuffer(VkDeviceSize size);
-		TextureBuffer* CreateTextureBuffer();
-		StorageBuffer* CreateStorageBuffer();
+		// Per-shader resources access (set index 0, hash-based)
+		DescriptorSetResources& GetOrCreateShaderResources(size_t shaderHash);
+		DescriptorSetResources* GetShaderResources(size_t shaderHash);
+
+		// Per-material resources access (set index 1, name-based)
+		DescriptorSetResources& GetOrCreateMaterialResources(const string& materialName);
+		DescriptorSetResources* GetMaterialResources(const string& materialName);
+
+		// Per-shader buffer management (set index 0)
+		void SetShaderUniformBuffer(Shader& shader, uint32_t binding, void* data);
+		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture);
+		void SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer);
+
+		void SetMaterialBuffers(Material& material);
 
 		// Cleanup all buffers
 		void CleanupBuffers();
-
-		unordered_map<uint32_t, VkDescriptorSet>& GetOrCreateDescriptorSets(Material& material);
-
-		const vector<VkDescriptorSet>& GetDescriptorSetsForBinding(
-			Material& material, 
-			const vector<uint32_t>& setIndices);
-
-		bool IsDescriptorSetUpdated(const string& materialName) const;
-		void MarkDescriptorSetUpdated(const string& materialName);
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
 
+		// Per-material buffer management (set index 1)
+		void SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data);
+		void SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture);
+		void SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer);
 	private:
 		Device& _device;
 		
@@ -63,14 +77,10 @@ namespace Core
 		// Per-frame descriptor pool (owned by RenderFrame)
 		unique_ptr<DescriptorPool> _descriptorPool;
 
-		// Per-frame buffers (owned by RenderFrame)
-		vector<UniformBuffer*> _uniformBuffers;
-		vector<TextureBuffer*> _textureBuffers;
-		vector<StorageBuffer*> _storageBuffers;
+		// Per-shader resources (set index = 0, hash-based)
+		unordered_map<size_t, DescriptorSetResources> _shaderResources;
 
-		unordered_map<string, unordered_map<uint32_t, VkDescriptorSet>> _descriptorSets;
-		unordered_map<string, vector<VkDescriptorSet>> _cachedDescriptorSets;
-
-		unordered_set<string> _updatedDescriptorSets;
+		// Per-material resources (set index = 1, name-based)
+		unordered_map<string, DescriptorSetResources> _materialResources;
 	};
 }
