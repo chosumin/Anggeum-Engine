@@ -3,21 +3,17 @@
 #include "Graphics/Vulkans/UniformBuffer.h"
 #include "Graphics/Vulkans/TextureBuffer.h"
 #include "Graphics/Vulkans/StorageBuffer.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 
 namespace Core
 {
-	class Device;
 	class Shader;
 	class Texture;
-	class RenderFrame;
 
 	enum class AlphaMode
 	{
-		/// Alpha value is ignored
 		Opaque,
-		/// Either full opaque or fully transparent
 		Mask,
-		/// Output is combined with the background
 		Blend
 	};
 
@@ -58,6 +54,43 @@ namespace Core
 			_textures[binding] = texture;
 		}
 
+		// Bindless texture methods (no binding index needed)
+		void AddBindlessTexture(TextureHandle handle)
+		{
+			_bindlessTextureHandles.push_back(handle);
+		}
+
+		void SetBindlessTexture(size_t index, TextureHandle handle)
+		{
+			if (index >= _bindlessTextureHandles.size())
+			{
+				_bindlessTextureHandles.resize(index + 1);
+			}
+			_bindlessTextureHandles[index] = handle;
+		}
+
+		TextureHandle GetBindlessTexture(size_t index) const
+		{
+			if (index >= _bindlessTextureHandles.size())
+				return TextureHandle{};
+			return _bindlessTextureHandles[index];
+		}
+
+		const vector<TextureHandle>& GetBindlessTexturesVector() const
+		{
+			return _bindlessTextureHandles;
+		}
+
+		size_t GetBindlessTextureCount() const
+		{
+			return _bindlessTextureHandles.size();
+		}
+
+		void ClearBindlessTextures()
+		{
+			_bindlessTextureHandles.clear();
+		}
+
 		template <typename T>
 		inline void SetPushConstants(const T& value)
 		{
@@ -87,8 +120,13 @@ namespace Core
 		AlphaMode _alphaMode = AlphaMode::Opaque;
 		bool _isAlphaCutoff;
 
+		// Traditional bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
 		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
+
+		// Bindless texture handles (Set 2, Binding 0)
+		// Just store handles in order, no binding index needed
+		vector<TextureHandle> _bindlessTextureHandles;
 	};
 }
 

@@ -4,6 +4,7 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/CommandPool.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 
 namespace Core
 {
@@ -31,6 +32,12 @@ namespace Core
 		: _device(device)
 	{
 		_swapChain = new SwapChain(device);
+
+		// Create bindless texture manager if supported
+		if (device.SupportsDescriptorIndexing())
+		{
+			_bindlessTextureManager = make_unique<BindlessTextureManager>(device, 4096);
+		}
 
 		auto queueFamilyIndices = device.GetQueueFamilyIndices();
 		
@@ -69,16 +76,22 @@ namespace Core
 
 	void RenderContext::CreateRenderFrames()
 	{
-		_frames.reserve(MAX_FRAMES_IN_FLIGHT);
-		
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+		_frames.resize(MAX_FRAMES_IN_FLIGHT);
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
-			_frames.push_back(make_unique<RenderFrame>(_device));
+			_frames[i] = make_unique<RenderFrame>(_device, _bindlessTextureManager.get());
 		}
 	}
 
 	void RenderContext::Prepare(size_t threadCount)
 	{
+		if (_bindlessTextureManager)
+		{
+			_bindlessTextureManager->Initialize();
+			cout << "Bindless texture system initialized with " 
+				<< _bindlessTextureManager->GetMaxTextures() << " slots" << endl;
+		}
 	}
 
 	void RenderContext::RecreateSwapChain()
@@ -111,6 +124,9 @@ namespace Core
 		// Begin command buffers
 		commandBuffer.BeginCommandBuffer();
 		computeBuffer.BeginCommandBuffer();
+
+		if (_bindlessTextureManager)
+			_bindlessTextureManager->UpdateDescriptorSet();
 	}
 
 	void RenderContext::Submit()

@@ -1,10 +1,8 @@
 #include "stdafx.h"
-#include "Graphics/Material.h"
+#include "Material.h"
 #include "Graphics/Vulkans/Shader.h"
-#include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/DescriptorPool.h"
-#include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 
 namespace Core
@@ -29,31 +27,30 @@ namespace Core
 
 	Material::Material(const Material& other)
 		: _device(other._device),
-		_shader(other._shader),
-		_pushConstants(other._pushConstants),
-		_name(other._name),
-		_isDoubledSided(other._isDoubledSided),
-		_alphaMode(other._alphaMode),
-		_isAlphaCutoff(other._isAlphaCutoff),
-		_buffers(other._buffers),
-		_textures(other._textures)
+		  _shader(other._shader),
+		  _name(other._name + "_copy"),
+		  _isDoubledSided(other._isDoubledSided),
+		  _alphaMode(other._alphaMode),
+		  _isAlphaCutoff(other._isAlphaCutoff),
+		  _buffers(other._buffers),
+		  _textures(other._textures),
+		  _bindlessTextureHandles(other._bindlessTextureHandles) // Copy bindless handles
 	{
 	}
 
 	Material& Material::operator=(const Material& other)
 	{
-		if (this == &other)
-			return *this;
-
-		_shader = other._shader;
-		_pushConstants = other._pushConstants;
-		_name = other._name;
-		_isDoubledSided = other._isDoubledSided;
-		_alphaMode = other._alphaMode;
-		_isAlphaCutoff = other._isAlphaCutoff;
-		_buffers = other._buffers;
-		_textures = other._textures;
-
+		if (this != &other)
+		{
+			_shader = other._shader;
+			_name = other._name;
+			_isDoubledSided = other._isDoubledSided;
+			_alphaMode = other._alphaMode;
+			_isAlphaCutoff = other._isAlphaCutoff;
+			_buffers = other._buffers;
+			_textures = other._textures;
+			_bindlessTextureHandles = other._bindlessTextureHandles; // Copy bindless handles
+		}
 		return *this;
 	}
 
@@ -107,5 +104,7 @@ namespace Core
 				_textures[binding.Binding] = defaultTexture;
 			}
 		}
+
+		//todo: set first texture of bindless as a default texture
 	}
 }

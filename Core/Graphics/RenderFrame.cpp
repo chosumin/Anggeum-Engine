@@ -7,12 +7,13 @@
 #include "Graphics/Vulkans/StorageBuffer.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Texture.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "Graphics/Material.h"
 
 namespace Core
 {
-	RenderFrame::RenderFrame(Device& device)
-		: _device(device)
+	RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager)
+		: _device(device), _bindlessTextureManager(bindlessManager)
 	{
 		CreateSyncObjects();
 		CreateDescriptorPool();

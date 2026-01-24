@@ -11,11 +11,12 @@ namespace Core
 	class Shader;
 	class Texture;
 	class Buffer;
+	class BindlessTextureManager;
 
 	class RenderFrame
 	{
 	public:
-		RenderFrame(Device& device);
+		RenderFrame(Device& device, BindlessTextureManager* bindlessManager = nullptr);
 		~RenderFrame();
 		
 		// Reset frame resources
@@ -53,6 +54,10 @@ namespace Core
 
 		void SetMaterialBuffers(Material& material);
 
+		// Bindless texture manager access
+		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
+		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
+
 		// Cleanup all buffers
 		void CleanupBuffers();
 	private:
@@ -82,5 +87,8 @@ namespace Core
 
 		// Per-material resources (set index = 1, name-based)
 		unordered_map<string, DescriptorSetResources> _materialResources;
+
+		// Reference to global bindless texture manager (not owned)
+		BindlessTextureManager* _bindlessTextureManager;
 	};
 }
