@@ -11,8 +11,9 @@ namespace Core
 	// ============================================
 	enum class DescriptorSetType : uint32_t
 	{
-		Shader = 0,    // Per-shader: Lights, Shadows, IBL, Pass-specific data
-		Material = 1   // Per-material: Textures, Material properties
+		Shader = 0,      // Per-shader: Lights, Shadows, IBL, Pass-specific data
+		Material = 1,    // Per-material: Textures, Material properties
+		Bindless = 2     // Global bindless texture array (optional)
 	};
 
 	// ============================================

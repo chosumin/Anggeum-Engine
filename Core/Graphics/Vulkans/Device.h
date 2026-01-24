@@ -74,7 +74,7 @@ namespace Core
 
 		ResourceCache& GetResourceCache() const { return *_resourceCache; }
 
-		VkDescriptorPool& GetGlobalDescriptorPool() { return _globalDescriptorPool; }
+		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -82,15 +82,13 @@ namespace Core
 		void SetupDebugMessenger();
 		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 		void PickPhysicalDevice();
-		int RateDeviceSuitability(VkPhysicalDevice device);
 		QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 		bool IsDeviceSuitable(VkPhysicalDevice device);
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
-		void CreateLogicalDevice(VkPhysicalDeviceDescriptorIndexingFeatures& indexingFeatures);
-		void CheckBindlessSupport(
-			VkPhysicalDeviceDescriptorIndexingFeatures& outIndexingFeatures);
+		void CreateLogicalDevice();
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
-		void CreateGlobalDescriptorPool();
+
+		void CheckDescriptorIndexingSupport(VkPhysicalDevice device);
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -114,8 +112,6 @@ namespace Core
 
 		ResourceCache* _resourceCache;
 
-		bool _bindlessSupport = false;
-
 		VkSurfaceKHR _surface;
 
 		QueueFamilyIndices _queueFamilyIndices;
@@ -123,7 +119,9 @@ namespace Core
 
 		MemoryAllocatorManager* _memoryAllocatorManager;
 
-		VkDescriptorPool _globalDescriptorPool;
+		// Descriptor indexing support
+		bool _supportsDescriptorIndexing = false;
+		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
 
 		const vector<const char*> _validationLayers = 
 		{
@@ -133,7 +131,8 @@ namespace Core
 		const vector<const char*> _deviceExtensions =
 		{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
+			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME // Added for bindless
 		};
 #ifdef NDEBUG
 		const bool _enableValidationLayers = false;

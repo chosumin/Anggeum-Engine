@@ -164,6 +164,7 @@
     <ClCompile Include="Sample\RendererPasses\ParticlePass.cpp" />
     <ClCompile Include="Core\Graphics\RendererPasses\LightCullingPass.cpp" />
     <ClCompile Include="Core\Utils\Log.cpp" />
+    <ClCompile Include="Core\Graphics\Vulkans\BindlessTextureManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -349,6 +350,7 @@
     <ClInclude Include="Core\Graphics\Vulkans\StorageBuffer.h" />
     <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
     <ClInclude Include="Core\Graphics\RendererPasses\LightCullingPass.h" />
+    <ClInclude Include="Core\Graphics\Vulkans\BindlessTextureManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">
