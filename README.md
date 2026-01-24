@@ -21,15 +21,24 @@ Features
 	- Uniform buffers
 	- Image buffers (also support dedicated memory)
 7. Multithreading
-	- Separated queues (Graphics, Compute, Tranfer, Present)
+	- Separated queues (Graphics, Compute, Transfer, Present)
 	- Loading images and buffers by using secondary command buffers and a single primary buffer
 	- Round-robin scheduling
 8. Resource cache
-9. Shader system
+9. Shader system with integrated descriptor management
 	- Runtime shader compile using shaderc
 	- Runtime shader reflection using SPIRV_Cross
+	- Automatic descriptor set layout generation from shader reflection
+	- Two-tier descriptor set architecture:
+		- Set 0 (Shader): Shared per-shader resources (camera, lights, shadows)
+		- Set 1 (Material): Per-material resources (textures, material properties)
+	- Per-frame descriptor pool with automatic reset
+	- Hash-based shader resource lookup for efficient binding
+	- Name-based material resource tracking
+	- Lazy descriptor set allocation and update on first bind
 10. Lighting
 	- Directional, Point, Spot
+	- Tiled forward rendering with light culling compute shader
 
 Third Parties
 - imgui
@@ -39,3 +48,5 @@ Third Parties
 - glm
 - glfw
 - ktx
+- shaderc
+- SPIRV-Cross
