@@ -24,19 +24,30 @@ Features
 	- Separated queues (Graphics, Compute, Transfer, Present)
 	- Loading images and buffers by using secondary command buffers and a single primary buffer
 	- Round-robin scheduling
+	- Timeline semaphores for frame synchronization
 8. Resource cache
 9. Shader system with integrated descriptor management
 	- Runtime shader compile using shaderc
 	- Runtime shader reflection using SPIRV_Cross
 	- Automatic descriptor set layout generation from shader reflection
-	- Two-tier descriptor set architecture:
-		- Set 0 (Shader): Shared per-shader resources (camera, lights, shadows)
+	- Three-tier descriptor set architecture:
+		- Set 0 (Shader): Shared per-shader resources (camera, lights, shadows, IBL)
 		- Set 1 (Material): Per-material resources (textures, material properties)
+		- Set 2 (Bindless): Global texture arrays (2D textures, cubemaps) - Optional
 	- Per-frame descriptor pool with automatic reset
 	- Hash-based shader resource lookup for efficient binding
 	- Name-based material resource tracking
 	- Lazy descriptor set allocation and update on first bind
-10. Lighting
+10. Bindless Texture System
+	- Graceful fallback to traditional descriptor bindings
+	- Support for up to 4096 textures per type (2D and Cubemap)
+	- Generation-based handle validation for safe texture lifetime management
+	- Automatic shader detection via SPIRV reflection
+	- Zero-cost abstraction when hardware doesn't support bindless
+	- Separate arrays for 2D textures and cubemaps
+	- Dynamic texture registration/unregistration
+	- Batch descriptor updates for efficiency
+11. Lighting
 	- Directional, Point, Spot
 	- Tiled forward rendering with light culling compute shader
 
