@@ -21,6 +21,7 @@ namespace Core
 	class Light;
 	class TransferContext;
 	class ResourceCache;
+	class RenderContext;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -45,6 +46,9 @@ namespace Core
 
 		void LoadScene(string path);
 		void LoadSkybox(string path);
+
+		void SetRenderContext(RenderContext* renderContext) { _renderContext = renderContext; }
+
 	private:
 		bool LoadFromFile(tinygltf::Model* model, const string& path);
 		void LoadAssets(const string& modelPath);
@@ -64,8 +68,9 @@ namespace Core
 	private:
 		Device& _device;
 		Scene& _scene;
-		ResourceCache& _resourceCache;
 		TransferContext& _transferContext;
+		ResourceCache& _resourceCache;
+		RenderContext* _renderContext = nullptr; // Added
 
 		string _modelPath;
 		tinygltf::Model* _model;

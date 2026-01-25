@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class RenderContext;
 	class IRenderPipeline
 	{
 	public:
@@ -13,6 +14,7 @@ namespace Core
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 		virtual Texture* GetColorRenderTarget() = 0;
 		virtual VkSampleCountFlagBits GetMSAASamples() const = 0;
+		virtual void RegisterGiTexturesToBindless(RenderContext& renderContext) = 0;
 	};
 }
 

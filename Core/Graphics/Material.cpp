@@ -13,7 +13,7 @@ namespace Core
 		_shader = device.GetResourceCache().RequestShader(shaderName);
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().RequestDefaultTexture());
+		SetDefault(device.GetResourceCache().GetDefaultTexture());
 	}
 
 	Material::Material(Device& device, string materialName, string vertPath, string fragPath)
@@ -22,7 +22,7 @@ namespace Core
 		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
 
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().RequestDefaultTexture());
+		SetDefault(device.GetResourceCache().GetDefaultTexture());
 	}
 
 	Material::Material(const Material& other)

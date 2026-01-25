@@ -2,6 +2,7 @@
 #include "Graphics/IRenderPipeline.h"
 #include "Graphics/BufferObjects.h"
 #include "Graphics/RendererBatch.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 
 namespace Core
 {
@@ -11,6 +12,7 @@ namespace Core
 	class WorkerThreadManager;
 	class TransferContext;
 	class Buffer;
+	class RenderContext;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
@@ -33,6 +35,8 @@ namespace Core
 		{ 
 			return _renderTargets[0].get(); 
 		}
+
+		void RegisterGiTexturesToBindless(RenderContext& renderContext);
 	private:
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
 
@@ -58,6 +62,8 @@ namespace Core
 		shared_ptr<Sampler> _sampler;
 
 		TransformBatch _transformBatch;
+
+		GI _giBuffer;
 	};
 }
 

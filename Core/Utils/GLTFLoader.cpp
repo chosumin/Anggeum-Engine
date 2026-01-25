@@ -5,6 +5,8 @@
 #include "Foundation/Entity.h"
 #include "Graphics/TransferJob.h"
 #include "Graphics/TransferContext.h"
+#include "Graphics/RenderContext.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Texture.h"
@@ -557,6 +559,16 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	size_t size = _model->materials.size();
 	
 	vector<shared_ptr<Core::Material>> materials(size);
+	
+	// Check bindless support
+	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
+	BindlessTextureManager* bindlessManager = nullptr;
+	
+	if (useBindless)
+	{
+		bindlessManager = _renderContext->GetBindlessTextureManager();
+		cout << "GLTFLoader: Using bindless textures for materials" << endl;
+	}
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -583,7 +595,6 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 		for (auto& value : gltfMaterial.values)
 		{
-
 			if (value.first.find("baseColorFactor") != string::npos)
 			{
 				const auto& colorFactor = value.second.ColorFactor();
@@ -600,26 +611,39 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-
-				/*if (NeedSRGB(value.first))
-					texture->GetImage()->SetSRGBFormat();*/
-
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->AddTexture(2, texture);
+				if (useBindless)
+				{
+					// Register to bindless manager
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					material->AddBindlessTexture(handle);
+					pbrBuffer->BasemapIndex = handle.index & 0x7FFFFFFF; // Store index without cubemap flag
+				}
+				else
+				{
+					// Traditional binding
+					material->AddTexture(2, texture);
+				}
 				
 				pbrBuffer->AlbedoTextureSet = 1;
 			}
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-
-				/*if (NeedSRGB(value.first))
-					texture->GetImage()->SetSRGBFormat();*/
-
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->AddTexture(4, texture);
+				if (useBindless)
+				{
+					// Register to bindless manager
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					material->AddBindlessTexture(handle);
+					pbrBuffer->MetallicRoughnessmapIndex = handle.index & 0x7FFFFFFF;
+				}
+				else
+				{
+					material->AddTexture(4, texture);
+				}
 				
 				pbrBuffer->RoughnessTextureSet = 1;
 				pbrBuffer->MetallicTextureSet = 1;
@@ -632,13 +656,19 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-
-				/*if (NeedSRGB(additionalValue.first))
-					texture->GetImage()->SetSRGBFormat();*/
-
 				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
-				material->AddTexture(3, texture);
+				if (useBindless)
+				{
+					// Register to bindless manager
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					material->AddBindlessTexture(handle);
+					pbrBuffer->NormalmapIndex = handle.index & 0x7FFFFFFF;
+				}
+				else
+				{
+					material->AddTexture(3, texture);
+				}
 			}
 			else if (additionalValue.first.find("emissiveTexture") != string::npos)
 			{

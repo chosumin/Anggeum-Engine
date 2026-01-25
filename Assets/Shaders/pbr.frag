@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : require
 
 // Source: https://learnopengl.com/PBR/Theory (Theory, Lighting and IBL sections)
 
@@ -12,24 +13,32 @@ layout(location = 2) in vec2 uv;
 
 layout(location = 0) out vec4 outColor;
 
+// Set 1: Material properties with texture indices
 layout(set = 1, binding = 1) uniform PBR
 {
     vec4 albedo;
     float metallic;
     float roughness;
     float ao;
+
 	int albedoTextureSet;
 	int metallicTextureSet;
 	int roughnessTextureSet;
 	int occlusionTextureSet;
 	int debugMode;
+
+	uint basemapIndex;           // Material texture 0
+	uint normalmapIndex;         // Material texture 1
+	uint metallicRoughnessmapIndex; // Material texture 2
 } pbr;
 
-layout(set = 1, binding = 2) uniform sampler2D basemap;
-layout(set = 1, binding = 3) uniform sampler2D normalmap;
-layout(set = 1, binding = 4) uniform sampler2D metallicRoughnessmap;
-
-layout(set = 0, binding = 3) uniform sampler2D shadowmap;
+layout(set = 0, binding = 3) uniform GI
+{
+	uint shadowmapIndex;
+	uint irradiancemapIndex;
+	uint prefiltermapIndex;
+	uint brdfLutIndex;
+} gi;
 
 layout(set = 0, binding = 4) uniform ShadowUniform
 {
@@ -47,9 +56,9 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
     LightVisiblity lightVisiblities[];
 };
 
-layout(set = 0, binding = 7) uniform samplerCube irradiancemap;
-layout(set = 0, binding = 8) uniform samplerCube prefiltermap;
-layout(set = 0, binding = 9) uniform sampler2D brdfLut;
+// Set 2: Bindless texture arrays
+layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
+layout(set = 2, binding = 1) uniform samplerCube bindlessTexturesCube[];
 
 layout(std140, push_constant) uniform TileInfo
 {
@@ -69,7 +78,8 @@ vec3 Normal()
 	vec3 B = normalize(cross(N, T));
 	mat3 TBN = mat3(T, B, N);
 
-	vec3 n = texture(normalmap, uv).rgb;
+	// Modified: Use bindless texture
+	vec3 n = texture(bindlessTextures2D[nonuniformEXT(pbr.normalmapIndex)], uv).rgb;
 
 	return normalize(TBN * (2.0 * n - 1.0));
 }
@@ -83,7 +93,7 @@ void main()
 
 	if (pbr.albedoTextureSet == 1)
 	{
-		albedo = SRGBtoLINEAR(texture(basemap, uv));
+		albedo = SRGBtoLINEAR(texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], uv));
 	}
 	else
 		albedo = pbr.albedo;
@@ -91,7 +101,7 @@ void main()
 	vec4 metallicRoughness = vec4(0.0);
 	if (pbr.metallicTextureSet == 1)
 	{
-		metallicRoughness = texture(metallicRoughnessmap, uv);
+		metallicRoughness = texture(bindlessTextures2D[nonuniformEXT(pbr.metallicRoughnessmapIndex)], uv);
 		metallic = metallicRoughness.b;
 	}
 	else
@@ -158,13 +168,15 @@ void main()
 	vec3 kD = 1.0 - kS;
 	kD *= 1.0 - metallic;
 
-	vec3 irradiance = SRGBtoLINEAR(texture(irradiancemap, N)).rgb;
+	vec3 irradiance = SRGBtoLINEAR(texture(bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)], N)).rgb;
 	vec3 diffuse = irradiance * albedo.rgb;
 	
 	// split-sum approximation to get the IBL specular part.
 	const float MAX_REFLECTION_LOD = 4.0;
-	vec3 prefilteredColor = SRGBtoLINEAR(textureLod(prefiltermap, R, roughness * MAX_REFLECTION_LOD)).rgb;
-	vec2 brdf = texture(brdfLut, vec2(max(dot(N, V), 0.0), roughness)).rg;
+
+	vec3 prefilteredColor = SRGBtoLINEAR(textureLod(bindlessTexturesCube[nonuniformEXT(gi.prefiltermapIndex)], R, roughness * MAX_REFLECTION_LOD)).rgb;
+
+	vec2 brdf = texture(bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)], vec2(max(dot(N, V), 0.0), roughness)).rg;
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
 
 	vec3 ambient = (kD * diffuse + specular) * ao;

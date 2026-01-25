@@ -9,6 +9,7 @@ namespace Core
 {
 	class IDescriptor;
 	class DescriptorSetLayout;
+	class BindlessTextureManager;
 	
 	class Shader
 	{
@@ -56,7 +57,23 @@ namespace Core
 			return _descriptorSetLayouts; 
 		}
 		
+		//// Get specific descriptor set layout
+		//DescriptorSetLayout* GetDescriptorSetLayout(DescriptorSetType type) const
+		//{
+		//	auto it = _descriptorSetLayouts.find(static_cast<uint32_t>(type));
+		//	return (it != _descriptorSetLayouts.end()) ? it->second : nullptr;
+		//}
+		
 		VkPipelineLayout GetPipelineLayout() { return _pipelineLayout; }
+		
+		// Added: Bindless texture support
+		void EnableBindlessTextures() { _usesBindlessTextures = true; }
+		bool UsesBindlessTextures() const { return _usesBindlessTextures; }
+		
+		void SetBindlessDescriptorSetLayout(VkDescriptorSetLayout layout)
+		{
+			_bindlessDescriptorSetLayout = layout;
+		}
 		
 	protected:
 		// Add binding with set index
@@ -93,9 +110,12 @@ namespace Core
 
 		VkPipelineLayout _pipelineLayout;
 		
-		// Manage descriptor set layout objects by set index
+		// Manage descriptor set layout objects by set index (Set 0, Set 1)
 		unordered_map<uint32_t, DescriptorSetLayout*> _descriptorSetLayouts;
 
 		vector<string> _vertexAttributeNames;
+
+		bool _usesBindlessTextures = false;
+		VkDescriptorSetLayout _bindlessDescriptorSetLayout = VK_NULL_HANDLE; // Not owned
 	};
 }

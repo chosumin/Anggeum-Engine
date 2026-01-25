@@ -22,11 +22,24 @@ struct alignas(16) PBRBuffer
 	float Metallic;
 	float Roughness;
 	float AO;
+
 	int AlbedoTextureSet;
 	int MetallicTextureSet;
 	int RoughnessTextureSet;
 	int OcclusionTextureSet;
 	int DebugMode;
+
+	uint BasemapIndex;
+	uint NormalmapIndex;
+	uint MetallicRoughnessmapIndex;
+};
+
+struct alignas(16) GI
+{
+	uint shadowmapIndex;
+	uint irradianceMapIndex;
+	uint prefilterMapIndex;
+	uint brdfLUTIndex;
 };
 
 struct alignas(16) LightInfo

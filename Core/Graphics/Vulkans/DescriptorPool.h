@@ -1,5 +1,4 @@
 #pragma once
-#include "Device.h"
 #include "UniformBuffer.h"
 #include "TextureBuffer.h"
 #include "StorageBuffer.h"

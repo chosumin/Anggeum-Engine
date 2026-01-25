@@ -57,6 +57,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain,
 		_renderTargets[0], _renderTargets[1], 
+		_giBuffer,
 		_renderTargets[2], _renderTargets[3], 
 		_renderTargets[4], _renderTargets[5],
 		_renderTargets[6],
@@ -351,4 +352,28 @@ void Core::ForwardRenderPipeline::CreateTransformBuffer(Scene& scene)
 
 	Core::VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_transformBatch.TransformBuffer, transforms, true);
 	Core::CommandBuffer::ImmediateSubmit(_device, job);
+}
+
+void Core::ForwardRenderPipeline::RegisterGiTexturesToBindless(RenderContext& renderContext)
+{
+	if (!renderContext.HasBindlessSupport())
+		return;
+
+	auto* bindlessManager = renderContext.GetBindlessTextureManager();
+
+	TextureHandle shadowmapHandle = bindlessManager->RegisterTexture(_renderTargets[2]);
+	TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[4]);
+	TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[5]);
+	TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(_renderTargets[6]);
+
+	_giBuffer.irradianceMapIndex = irradianceCubemapHandle.index;
+	_giBuffer.prefilterMapIndex = prefilteredCubemapHandle.index;
+	_giBuffer.brdfLUTIndex = brdfLutHandle.index;
+	_giBuffer.shadowmapIndex = shadowmapHandle.index;
+
+	cout << "GI textures registered to bindless:" << endl;
+	cout << "  Irradiance cubemap: index " << irradianceCubemapHandle.index << endl;
+	cout << "  Prefiltered cubemap: index " << prefilteredCubemapHandle.index << endl;
+	cout << "  BRDF LUT: index " << brdfLutHandle.index << endl;
+	cout << "  Shadowmap: index " << shadowmapHandle.index << endl;
 }

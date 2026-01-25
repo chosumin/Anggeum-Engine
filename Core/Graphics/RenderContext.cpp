@@ -84,7 +84,7 @@ namespace Core
 		}
 	}
 
-	void RenderContext::Prepare(size_t threadCount)
+	void RenderContext::Prepare()
 	{
 		if (_bindlessTextureManager)
 		{

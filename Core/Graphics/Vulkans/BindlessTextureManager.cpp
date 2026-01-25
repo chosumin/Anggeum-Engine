@@ -7,20 +7,22 @@ namespace Core
 	BindlessTextureManager::BindlessTextureManager(Device& device, uint32_t maxTextures)
 		: _device(device), _maxTextures(maxTextures)
 	{
-		_textureSlots.resize(maxTextures);
-		_freeSlots.reserve(maxTextures);
+		_texture2DSlots.resize(maxTextures);
+		_cubemapSlots.resize(maxTextures);
+		
+		_freeTexture2DSlots.reserve(maxTextures);
+		_freeCubemapSlots.reserve(maxTextures);
 		
 		// Initialize all slots as free
 		for (uint32_t i = 0; i < maxTextures; ++i)
 		{
-			_freeSlots.push_back(i);
+			_freeTexture2DSlots.push_back(i);
+			_freeCubemapSlots.push_back(i);
 		}
 	}
 
 	BindlessTextureManager::~BindlessTextureManager()
 	{
-		// Descriptor set is freed when pool is destroyed
-		
 		if (_descriptorPool != VK_NULL_HANDLE)
 		{
 			vkDestroyDescriptorPool(_device.GetDevice(), _descriptorPool, nullptr);
@@ -43,22 +45,29 @@ namespace Core
 	{
 		if (!texture)
 		{
-			throw std::runtime_error("Cannot register null texture to bindless manager");
+			throw runtime_error("Cannot register null texture to bindless manager");
 		}
 
-		uint32_t slotIndex = AllocateSlot();
+		// Detect if cubemap or 2D
+		bool isCubemap = texture->GetLayers() == 6;
 		
-		auto& slot = _textureSlots[slotIndex];
+		uint32_t slotIndex = AllocateSlot(isCubemap);
+		
+		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		slot.texture = texture;
 		slot.generation++;
 		slot.isActive = true;
 		
-		_activeTextureCount++;
-		_pendingUpdates.push_back(slotIndex);
+		if (isCubemap)
+			_activeCubemapCount++;
+		else
+			_activeTexture2DCount++;
+		
+		_pendingUpdates.push_back(slotIndex | (isCubemap ? 0x80000000 : 0)); // MSB indicates cubemap
 		_needsUpdate = true;
 
 		TextureHandle handle;
-		handle.index = slotIndex;
+		handle.index = slotIndex | (isCubemap ? 0x80000000 : 0); // MSB = cubemap flag
 		handle.generation = slot.generation;
 		
 		return handle;
@@ -66,32 +75,46 @@ namespace Core
 
 	void BindlessTextureManager::UnregisterTexture(TextureHandle handle)
 	{
-		if (!handle.IsValid() || handle.index >= _maxTextures)
+		if (!handle.IsValid())
 			return;
 
-		auto& slot = _textureSlots[handle.index];
+		bool isCubemap = (handle.index & 0x80000000) != 0;
+		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
 		
-		// Validate generation
+		if (slotIndex >= _maxTextures)
+			return;
+
+		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
+		
 		if (slot.generation != handle.generation || !slot.isActive)
 			return;
 
 		slot.texture.reset();
 		slot.isActive = false;
 		
-		FreeSlot(handle.index);
-		_activeTextureCount--;
+		FreeSlot(slotIndex, isCubemap);
 		
-		// Mark for update (set to null/default texture)
+		if (isCubemap)
+			_activeCubemapCount--;
+		else
+			_activeTexture2DCount--;
+		
 		_pendingUpdates.push_back(handle.index);
 		_needsUpdate = true;
 	}
 
 	void BindlessTextureManager::UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture)
 	{
-		if (!handle.IsValid() || handle.index >= _maxTextures || !texture)
+		if (!handle.IsValid() || !texture)
 			return;
 
-		auto& slot = _textureSlots[handle.index];
+		bool isCubemap = (handle.index & 0x80000000) != 0;
+		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
+		
+		if (slotIndex >= _maxTextures)
+			return;
+
+		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		
 		if (slot.generation != handle.generation || !slot.isActive)
 			return;
@@ -113,9 +136,12 @@ namespace Core
 		imageInfos.reserve(_pendingUpdates.size());
 		writes.reserve(_pendingUpdates.size());
 
-		for (uint32_t index : _pendingUpdates)
+		for (uint32_t packedIndex : _pendingUpdates)
 		{
-			auto& slot = _textureSlots[index];
+			bool isCubemap = (packedIndex & 0x80000000) != 0;
+			uint32_t slotIndex = packedIndex & 0x7FFFFFFF;
+			
+			auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 			
 			VkDescriptorImageInfo imageInfo{};
 			if (slot.isActive && slot.texture)
@@ -135,8 +161,8 @@ namespace Core
 			VkWriteDescriptorSet write{};
 			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			write.dstSet = _descriptorSet;
-			write.dstBinding = 0; // Bindless array binding
-			write.dstArrayElement = index;
+			write.dstBinding = isCubemap ? 1 : 0; // Binding 0 = 2D, Binding 1 = Cubemap
+			write.dstArrayElement = slotIndex;
 			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			write.descriptorCount = 1;
 			write.pImageInfo = &imageInfos.back();
@@ -153,10 +179,16 @@ namespace Core
 
 	shared_ptr<Texture> BindlessTextureManager::GetTexture(TextureHandle handle) const
 	{
-		if (!handle.IsValid() || handle.index >= _maxTextures)
+		if (!handle.IsValid())
 			return nullptr;
 
-		auto& slot = _textureSlots[handle.index];
+		bool isCubemap = (handle.index & 0x80000000) != 0;
+		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
+		
+		if (slotIndex >= _maxTextures)
+			return nullptr;
+
+		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		
 		if (slot.generation != handle.generation || !slot.isActive)
 			return nullptr;
@@ -166,64 +198,88 @@ namespace Core
 
 	void BindlessTextureManager::CreateDescriptorSetLayout()
 	{
-		VkDescriptorSetLayoutBinding binding{};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding.descriptorCount = _maxTextures;
-		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
-		binding.pImmutableSamplers = nullptr;
+		array<VkDescriptorSetLayoutBinding, 2> bindings{};
+		
+		// Binding 0: 2D texture array
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[0].descriptorCount = _maxTextures;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+		bindings[0].pImmutableSamplers = nullptr;
 
-		// Enable descriptor indexing features
-		VkDescriptorBindingFlags bindingFlags = 
+		// Binding 1: Cubemap texture array
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[1].descriptorCount = _maxTextures;
+		bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+		bindings[1].pImmutableSamplers = nullptr;
+
+		// Only apply VARIABLE_DESCRIPTOR_COUNT_BIT to the last binding
+		array<VkDescriptorBindingFlags, 2> bindingFlags = {
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+			// Removed VARIABLE_DESCRIPTOR_COUNT_BIT from binding 0
+			
 			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
 			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
-			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+			VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+			// VARIABLE_DESCRIPTOR_COUNT_BIT only on last binding (binding 1)
+		};
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
 		bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		bindingFlagsInfo.bindingCount = 1;
-		bindingFlagsInfo.pBindingFlags = &bindingFlags;
+		bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+		bindingFlagsInfo.pBindingFlags = bindingFlags.data();
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &binding;
+		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+		layoutInfo.pBindings = bindings.data();
 		layoutInfo.pNext = &bindingFlagsInfo;
 		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 
 		if (vkCreateDescriptorSetLayout(_device.GetDevice(), &layoutInfo, 
 			nullptr, &_descriptorSetLayout) != VK_SUCCESS)
 		{
-			throw std::runtime_error("Failed to create bindless descriptor set layout!");
+			throw runtime_error("Failed to create bindless descriptor set layout!");
 		}
 	}
 
 	void BindlessTextureManager::CreateDescriptorPool()
 	{
-		VkDescriptorPoolSize poolSize{};
-		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = _maxTextures;
+		array<VkDescriptorPoolSize, 2> poolSizes{};
+		
+		// 2D textures
+		poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSizes[0].descriptorCount = _maxTextures;
+		
+		// Cubemap textures
+		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSizes[1].descriptorCount = _maxTextures;
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = 1; // Single bindless set
+		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+		poolInfo.pPoolSizes = poolSizes.data();
+		poolInfo.maxSets = 1;
 		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
 		if (vkCreateDescriptorPool(_device.GetDevice(), &poolInfo, 
 			nullptr, &_descriptorPool) != VK_SUCCESS)
 		{
-			throw std::runtime_error("Failed to create bindless descriptor pool!");
+			throw runtime_error("Failed to create bindless descriptor pool!");
 		}
 	}
 
 	void BindlessTextureManager::AllocateDescriptorSet()
 	{
+		// Only specify variable count for the last binding (binding 1)
+		uint32_t variableCount = _maxTextures;
+		
 		VkDescriptorSetVariableDescriptorCountAllocateInfo countInfo{};
 		countInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
 		countInfo.descriptorSetCount = 1;
-		countInfo.pDescriptorCounts = &_maxTextures;
+		countInfo.pDescriptorCounts = &variableCount; // Only one count value
 
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -235,25 +291,28 @@ namespace Core
 		if (vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, 
 			&_descriptorSet) != VK_SUCCESS)
 		{
-			throw std::runtime_error("Failed to allocate bindless descriptor set!");
+			throw runtime_error("Failed to allocate bindless descriptor set!");
 		}
 	}
 
-	uint32_t BindlessTextureManager::AllocateSlot()
+	uint32_t BindlessTextureManager::AllocateSlot(bool isCubemap)
 	{
-		if (_freeSlots.empty())
+		auto& freeSlots = isCubemap ? _freeCubemapSlots : _freeTexture2DSlots;
+		
+		if (freeSlots.empty())
 		{
-			throw std::runtime_error("Bindless texture array is full! Maximum capacity: " + 
-				std::to_string(_maxTextures));
+			throw runtime_error("Bindless texture array is full! Maximum capacity: " + 
+				to_string(_maxTextures));
 		}
 
-		uint32_t slot = _freeSlots.back();
-		_freeSlots.pop_back();
+		uint32_t slot = freeSlots.back();
+		freeSlots.pop_back();
 		return slot;
 	}
 
-	void BindlessTextureManager::FreeSlot(uint32_t index)
+	void BindlessTextureManager::FreeSlot(uint32_t index, bool isCubemap)
 	{
-		_freeSlots.push_back(index);
+		auto& freeSlots = isCubemap ? _freeCubemapSlots : _freeTexture2DSlots;
+		freeSlots.push_back(index);
 	}
 }

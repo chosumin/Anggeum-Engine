@@ -33,7 +33,7 @@ namespace Core
 		RenderContext(Device& device);
 		~RenderContext();
 		
-		void Prepare(size_t threadCount);
+		void Prepare();
 		void RecreateSwapChain();
 		
 		// Frame management

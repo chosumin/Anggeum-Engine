@@ -2,6 +2,7 @@
 #include "SpirvUtility.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Vertex.h"
+#include "Graphics/Vulkans/DescriptorPool.h"
 #include "Utils/Utility.h"
 #include "shaderc/shaderc.hpp"
 #include "spirv_cross/spirv_cross.hpp"
@@ -167,6 +168,19 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
     {
         uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
         uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+
+        // Check if this is the bindless texture array (Set 2, Binding 0)
+        if (set == static_cast<uint32_t>(DescriptorSetType::Bindless))
+        {
+            // Check if it's an array
+            const auto& type = compiler.get_type(resource.type_id);
+            if (type.array.size() > 0)
+            {
+                cout << "Shader '" << shaderPath << "' uses bindless textures (Set "
+                    << set << ", Array size: " << type.array[0] << ")" << endl;
+                shader.EnableBindlessTextures();
+            }
+        }
 
         shader.AddTextureBufferLayoutBinding(set, binding, shaderStage);
     }

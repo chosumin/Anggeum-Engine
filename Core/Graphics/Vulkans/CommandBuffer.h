@@ -1,19 +1,20 @@
 #pragma once
+#include "CommandPool.h"
+
 
 namespace Core
 {
-	class Pipeline;
-	class SwapChain;
-	class Buffer;
-	class Material;
-	class Shader;
-	class CommandPool;
 	class Device;
-	class Image;
 	class RenderPass;
-	class Framebuffer;
-	class Job;
+	class Pipeline;
+	class Material;
 	class RenderFrame;
+	class Buffer;
+	class Shader;
+	class Image;
+	class Job;
+	class Framebuffer;
+
 	class CommandBuffer
 	{
 	public:
@@ -33,6 +34,7 @@ namespace Core
 		void SetViewportAndScissor(VkExtent2D extent);
 		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Material& material);
 		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader);
+
 		void PushConstants(Material& material, uint32_t index = 0);
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
@@ -57,6 +59,11 @@ namespace Core
 		static void ImmediateSubmit(Device& device, Job& job);
 		static void ImmediateSubmit(Device& device, std::vector<Job*>& jobs);
 	private:
+		void BindBindlessDescriptorSet(
+			RenderFrame& renderFrame,
+			VkPipelineBindPoint pipelineBindPoint,
+			VkPipelineLayout pipelineLayout);
+
 		void GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 	private:
 		Device& _device;
@@ -65,6 +72,8 @@ namespace Core
 
 		//hack : have to be managed in resource system or something
 		uint64_t _frame;
+
+		bool _bindlessDescriptorSetBound = false;
 	};
 }
 

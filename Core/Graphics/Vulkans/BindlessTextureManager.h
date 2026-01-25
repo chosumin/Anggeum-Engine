@@ -4,26 +4,16 @@
 
 namespace Core
 {
-	// Bindless texture handle (opaque type for safety)
+	// Texture handle with validation
 	struct TextureHandle
 	{
 		uint32_t index = UINT32_MAX;
-		uint32_t generation = 0; // For handle validation
+		uint32_t generation = 0;
 		
 		bool IsValid() const { return index != UINT32_MAX; }
-		
-		bool operator==(const TextureHandle& other) const 
-		{ 
-			return index == other.index && generation == other.generation; 
-		}
-		
-		bool operator!=(const TextureHandle& other) const 
-		{ 
-			return !(*this == other); 
-		}
 	};
 
-	// Texture slot in the bindless array
+	// Internal texture slot
 	struct TextureSlot
 	{
 		shared_ptr<Texture> texture;
@@ -37,16 +27,14 @@ namespace Core
 		BindlessTextureManager(Device& device, uint32_t maxTextures = 4096);
 		~BindlessTextureManager();
 
-		// Disable copy, enable move
 		BindlessTextureManager(const BindlessTextureManager&) = delete;
 		BindlessTextureManager& operator=(const BindlessTextureManager&) = delete;
 		BindlessTextureManager(BindlessTextureManager&&) = delete;
 		BindlessTextureManager& operator=(BindlessTextureManager&&) = delete;
 
-		// Initialize bindless descriptor set layout and pool
 		void Initialize();
 
-		// Texture registration
+		// Texture registration (auto-detects 2D vs Cubemap)
 		TextureHandle RegisterTexture(shared_ptr<Texture> texture);
 		void UnregisterTexture(TextureHandle handle);
 		void UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture);
@@ -56,42 +44,43 @@ namespace Core
 		VkDescriptorSet GetDescriptorSet() const { return _descriptorSet; }
 		VkDescriptorSetLayout GetDescriptorSetLayout() const { return _descriptorSetLayout; }
 		
-		// Get set index for bindless textures (always Set 2)
 		static constexpr uint32_t GetSetIndex() { return 2; }
 		
-		// Get texture by handle (for validation)
 		shared_ptr<Texture> GetTexture(TextureHandle handle) const;
 		
 		// Statistics
-		uint32_t GetActiveTextureCount() const { return _activeTextureCount; }
+		uint32_t GetActiveTextureCount() const { return _activeTexture2DCount + _activeCubemapCount; }
+		uint32_t GetActive2DTextureCount() const { return _activeTexture2DCount; }
+		uint32_t GetActiveCubemapCount() const { return _activeCubemapCount; }
 		uint32_t GetMaxTextures() const { return _maxTextures; }
 		float GetUsagePercentage() const 
 		{ 
-			return (_activeTextureCount * 100.0f) / _maxTextures; 
+			return (GetActiveTextureCount() * 100.0f) / (_maxTextures * 2); 
 		}
 		
 	private:
 		void CreateDescriptorSetLayout();
 		void CreateDescriptorPool();
 		void AllocateDescriptorSet();
-		uint32_t AllocateSlot();
-		void FreeSlot(uint32_t index);
+		uint32_t AllocateSlot(bool isCubemap);
+		void FreeSlot(uint32_t index, bool isCubemap);
 
 	private:
 		Device& _device;
 		uint32_t _maxTextures;
-		uint32_t _activeTextureCount = 0;
+		uint32_t _activeTexture2DCount = 0;
+		uint32_t _activeCubemapCount = 0;
 
-		// Global bindless descriptor resources (Set 2)
 		VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
 		VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSet _descriptorSet = VK_NULL_HANDLE;
 
-		// Texture storage
-		vector<TextureSlot> _textureSlots;
-		vector<uint32_t> _freeSlots; // Free slot indices for reuse
+		// Separate storage for 2D and Cubemap textures
+		vector<TextureSlot> _texture2DSlots;    // Binding 0
+		vector<TextureSlot> _cubemapSlots;      // Binding 1
+		vector<uint32_t> _freeTexture2DSlots;
+		vector<uint32_t> _freeCubemapSlots;
 		
-		// Pending updates
 		vector<uint32_t> _pendingUpdates;
 		bool _needsUpdate = false;
 	};

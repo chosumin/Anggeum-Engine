@@ -15,6 +15,7 @@ namespace Core
 		GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, SwapChain& swapChain, 
 			shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
+			GI& giBuffer,
 			shared_ptr<Texture> shadowRenderTarget, 
 			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
 			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
@@ -45,6 +46,8 @@ namespace Core
 		ShadowUniform* _shadowBuffer;
 		LightBuffer _lightBuffer;
 		Pipeline* _skyboxPipeline;
+
+		GI _giBuffer;
 
 		shared_ptr<Texture> _irradianceCubemap;
 		shared_ptr<Texture> _prefilteredCubemap;

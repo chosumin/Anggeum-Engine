@@ -81,42 +81,54 @@ Core::Shader::Shader(Device& device, const string pass, const string& computeFil
 
 void Core::Shader::CreatePipelineLayout()
 {
-	// Finalize all descriptor set layouts
+	vector<VkDescriptorSetLayout> layouts;
+
+	// Collect layouts in order (Set 0, Set 1, Set 2)
+	uint32_t maxSetIndex = 0;
 	for (auto& [setIndex, layout] : _descriptorSetLayouts)
 	{
 		layout->Finalize();
+
+		if (setIndex > maxSetIndex)
+			maxSetIndex = setIndex;
 	}
 
-	// Create VkDescriptorSetLayout array sorted by set index for pipeline layout
-	vector<VkDescriptorSetLayout> setLayoutsArray;
-	
-	if (!_descriptorSetLayouts.empty())
+	// Add bindless set index if used
+	if (_usesBindlessTextures)
 	{
-		uint32_t maxSet = 0;
-		for (auto& [setIndex, layout] : _descriptorSetLayouts)
-		{
-			maxSet = std::max(maxSet, setIndex);
-		}
-		
-		setLayoutsArray.resize(maxSet + 1, VK_NULL_HANDLE);
-		
-		for (auto& [setIndex, layout] : _descriptorSetLayouts)
-		{
-			setLayoutsArray[setIndex] = layout->GetDescriptorSetLayout();
-		}
+		uint32_t bindlessSetIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
+		if (bindlessSetIndex > maxSetIndex)
+			maxSetIndex = bindlessSetIndex;
+	}
+
+	// Resize to accommodate all sets (including gaps)
+	if (_descriptorSetLayouts.empty() == false)
+		layouts.resize(maxSetIndex + 1, VK_NULL_HANDLE);
+
+	// Fill in owned layouts (Set 0, Set 1)
+	for (auto& [setIndex, layout] : _descriptorSetLayouts)
+	{
+		layouts[setIndex] = layout->GetDescriptorSetLayout();
+	}
+
+	// Fill in bindless layout (Set 2, not owned)
+	if (_usesBindlessTextures && _bindlessDescriptorSetLayout != VK_NULL_HANDLE)
+	{
+		layouts[static_cast<uint32_t>(DescriptorSetType::Bindless)] = _bindlessDescriptorSetLayout;
 	}
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayoutsArray.size());
-	pipelineLayoutInfo.pSetLayouts = setLayoutsArray.empty() ? nullptr : setLayoutsArray.data();
-
-	pipelineLayoutInfo.pushConstantRangeCount =
-		static_cast<uint32_t>(_pushConstantRanges.size());
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(layouts.size());
+	pipelineLayoutInfo.pSetLayouts = layouts.data();
+	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(_pushConstantRanges.size());
 	pipelineLayoutInfo.pPushConstantRanges = _pushConstantRanges.data();
 
-	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
-		throw std::runtime_error("failed to create pipeline layout!");
+	if (vkCreatePipelineLayout(_device.GetDevice(), &pipelineLayoutInfo,
+		nullptr, &_pipelineLayout) != VK_SUCCESS)
+	{
+		throw runtime_error("Failed to create pipeline layout!");
+	}
 }
 
 // Move constructor

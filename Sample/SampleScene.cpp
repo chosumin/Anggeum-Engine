@@ -11,14 +11,20 @@
 #include "Components/Mesh.h"
 #include "Graphics/Material.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/RenderContext.h"
 using namespace Core;
 
-SampleScene::SampleScene(Core::Device& device, float width, float height, TransferContext* transferContext)
+SampleScene::SampleScene(Core::Device& device, float width, float height, TransferContext* transferContext, Core::RenderContext* renderContext)
 {
 	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, *transferContext);
 
-	string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
+	_gltfLoader->SetRenderContext(renderContext);
+
+	string path = "./Assets/Models/Sponza/glTF/Sponza.gltf";
 	_gltfLoader->LoadScene(path);
+
+	//string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
+	//_gltfLoader->LoadScene(path);
 
 	string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";
 	_gltfLoader->LoadSkybox(skyTexture);

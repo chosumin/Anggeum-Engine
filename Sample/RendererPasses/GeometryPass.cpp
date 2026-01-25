@@ -17,7 +17,8 @@ namespace Core
 {
 	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 		Scene& scene, SwapChain& swapChain,
-		shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
+		shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget,
+		GI& giBuffer,
 		shared_ptr<Texture> shadowRenderTarget, 
 		shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> irradianceCubemap,
 		shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
@@ -27,7 +28,8 @@ namespace Core
 		_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilterCubemap), 
 		_brdfLut(brdfLut), _shadowBuffer(nullptr), _lightBuffer(),
 		_skyboxPipeline(nullptr),
-		_lightVisibilityBuffer(lightVisibilityBuffer)
+		_lightVisibilityBuffer(lightVisibilityBuffer),
+		_giBuffer(giBuffer)
 	{
 		_renderPass->CreateColorAttachment(colorRenderTarget.get(),
 			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
@@ -86,16 +88,10 @@ namespace Core
 		[&](shared_ptr<Shader> shader) 
 		{
 			renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-			renderFrame.SetShaderTextureBuffer(*shader, 3, _shadowRenderTarget);
+			renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
 			renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
 			renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
-
 			renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
-
-			renderFrame.SetShaderTextureBuffer(*shader, 7, _irradianceCubemap);
-			renderFrame.SetShaderTextureBuffer(*shader, 8, _prefilteredCubemap);
-
-			renderFrame.SetShaderTextureBuffer(*shader, 9, _brdfLut);
 		},
 		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
 		{

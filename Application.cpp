@@ -4,6 +4,7 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/TransferContext.h"
+#include "Graphics/ResourceCache.h"
 #include "Sample/SampleScene.h"
 #include "Sample/ForwardRenderPipeline.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
@@ -23,16 +24,24 @@ Application::Application(const ApplicationOptions& options)
 
 bool Application::Prepare()
 {
+	_renderContext->Prepare();
+
+	// Initialize ResourceCache with RenderContext for bindless support
+	auto& resourceCache = _device->GetResourceCache();
+	resourceCache.Initialize(*_renderContext);
+
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
 
-	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext);
+	_scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext, _renderContext);
 
 	_transferContext->Wait();
 
 	_renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
 		*_scene, swapChain);
 	_renderPipeline->Prepare();
+
+	_renderPipeline->RegisterGiTexturesToBindless(*_renderContext);
 
 	_guiRenderPass = new GUIRenderPass(*_device, *_workerThreadManager, swapChain, _renderPipeline->GetColorRenderTarget());
 	_guiRenderPass->Prepare();
