@@ -70,7 +70,7 @@ namespace Core
 		Scene& _scene;
 		TransferContext& _transferContext;
 		ResourceCache& _resourceCache;
-		RenderContext* _renderContext = nullptr; // Added
+		RenderContext* _renderContext = nullptr;
 
 		string _modelPath;
 		tinygltf::Model* _model;

@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/MeshBufferManager.h"
 
 namespace Core
 {
@@ -24,6 +25,14 @@ namespace Core
 
 		Buffer** InsertBufferSpace(string name);
 		Buffer** InsertBufferSpace(VkIndexType indexType);
+
+		void SetAllocation(const MeshAllocation& allocation) 
+		{ 
+			_globalAllocation = allocation; 
+			_hasGlobalAllocation = true; 
+		}
+		const MeshAllocation& GetAllocation() const { return _globalAllocation; }
+		bool HasAllocation() const { return _hasGlobalAllocation; }
 	private:
 		Device& _device;
 
@@ -32,9 +41,13 @@ namespace Core
 		uint32_t _indexCount;
 		VkIndexType _indexType;
 
+		//Legacy Buffers
 		//Key: Attribute name, Value: Attribute value
 		unordered_map<string, Buffer*> _vertexBuffers;
-
 		Buffer* _indexBuffer;
+		
+		//Global Buffer Allocation Info
+		MeshAllocation _globalAllocation;
+		bool _hasGlobalAllocation = false;
 	};
 }

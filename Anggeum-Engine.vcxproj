@@ -163,6 +163,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\MeshBufferManager.cpp" />
     <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
     <ClCompile Include="Core\Graphics\ResourceCache.cpp" />
     <ClCompile Include="Core\Graphics\SpirvUtility.cpp" />
@@ -214,6 +215,14 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClCompile Include="Sample\RendererPasses\ShadowPass.cpp" />
     <ClCompile Include="Sample\SampleScene.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Semaphore.cpp" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_glfw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="ThirdParties\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -223,14 +232,6 @@ for %%f in (*.vert *.frag *.comp) do (
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="ThirdParties\imgui\imgui_impl_glfw.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="ThirdParties\imgui\imgui_impl_vulkan.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -259,6 +260,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
     <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />
     <ClInclude Include="Core\Graphics\ResourceCache.h" />
     <ClInclude Include="Core\Graphics\SpirvUtility.h" />
@@ -315,9 +317,13 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClInclude Include="Core\Graphics\Vulkans\Semaphore.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
-    <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_glfw.h">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.h">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClInclude Include="resource.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="stdafx.h" />

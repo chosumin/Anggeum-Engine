@@ -7,8 +7,6 @@
     <ClCompile Include="ThirdParties\imgui\imgui.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_demo.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_draw.cpp" />
-    <ClCompile Include="ThirdParties\imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="ThirdParties\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_tables.cpp" />
     <ClCompile Include="ThirdParties\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Core\Utils\Math.cpp">
@@ -165,6 +163,7 @@
     <ClCompile Include="Core\Graphics\RendererPasses\LightCullingPass.cpp" />
     <ClCompile Include="Core\Utils\Log.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\BindlessTextureManager.cpp" />
+    <ClCompile Include="Core\Graphics\MeshBufferManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -174,8 +173,6 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="ThirdParties\imgui\imconfig.h" />
     <ClInclude Include="ThirdParties\imgui\imgui.h" />
-    <ClInclude Include="ThirdParties\imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="ThirdParties\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="ThirdParties\imgui\imgui_internal.h" />
     <ClInclude Include="Core\Utils\Math.h">
       <Filter>Core\Utils</Filter>
@@ -351,6 +348,7 @@
     <ClInclude Include="Sample\RendererPasses\ParticlePass.h" />
     <ClInclude Include="Core\Graphics\RendererPasses\LightCullingPass.h" />
     <ClInclude Include="Core\Graphics\Vulkans\BindlessTextureManager.h" />
+    <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

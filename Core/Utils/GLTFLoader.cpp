@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "GLTFLoader.h"
 #include "Log.h"
 #include "Foundation/Scene.h"
@@ -15,6 +15,7 @@
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceCache.h"
+#include "Graphics/MeshBufferManager.h"
 #include "Components/Mesh.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
@@ -710,6 +711,9 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 
 	vector<unique_ptr<Core::Mesh>> meshes(size);
 
+	auto meshBufferManager = _renderContext->GetMeshBufferManager();
+	bool useGlobalBuffers = (meshBufferManager != nullptr);
+
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
@@ -742,65 +746,195 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 			auto subMesh = 
 				_resourceCache.RequestSubMesh(subMeshName);
 
-			//Already jobified
-			if (subMesh.use_count() > 1)
+			if (useGlobalBuffers)
 			{
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
-				continue;
-			}
-
-			size_t count = 0;
-			for (auto& attribute : primitive.attributes)
-			{
-				string name = attribute.first;
-
-				auto vertexData = GetAttributeData(_model, attribute.second);
-
-				auto& accessor = _model->accessors[attribute.second];
-				
-				count = accessor.count;
-
-				VkFormat format = GetAttributeFormat(_model, attribute.second);
-				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-				_transferContext.Enqueue(new VkBufferJob(
-					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-					subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
-			}
-
-			if (primitive.indices >= 0)
-			{
-				subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-				
-				auto indexData = GetAttributeData(_model, primitive.indices);
-				
-				VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-				VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-				switch (format)
+				//Already jobified
+				if (subMesh.use_count() > 1)
 				{
-				case VK_FORMAT_R8_UINT:
-					// Converts uint8 data into uint16 data, still represented by a uint8 vector
-					indexData = ConvertDataStride(indexData, 1, 2);
-					indexType = VK_INDEX_TYPE_UINT16;
-					break;
-				case VK_FORMAT_R16_UINT:
-					indexType = VK_INDEX_TYPE_UINT16;
-					break;
-				case VK_FORMAT_R32_UINT:
-					indexType = VK_INDEX_TYPE_UINT32;
-					break;
+					mesh->AddSubMesh(subMesh);
+					mesh->AddMaterial(materials[primitive.material]);
+					continue;
 				}
 
-				_transferContext.Enqueue(new VkBufferJob(
-					_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-					subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
-			}
+				vector<glm::vec3> positions;
+				vector<glm::vec3> normals;
+				vector<glm::vec2> uvs;
+				vector<uint32_t> indices;
 
-			mesh->AddSubMesh(subMesh);
-			mesh->AddMaterial(materials[primitive.material]);
+				if (primitive.attributes.find("POSITION") != primitive.attributes.end())
+				{
+					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("POSITION")];
+					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
+					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+
+					const float* data = reinterpret_cast<const float*>(
+						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+
+					positions.resize(accessor.count);
+					for (size_t j = 0; j < accessor.count; j++)
+					{
+						positions[j] = glm::vec3(data[j * 3 + 0], data[j * 3 + 1], data[j * 3 + 2]);
+					}
+				}
+
+				if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
+				{
+					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("NORMAL")];
+					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
+					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+
+					const float* data = reinterpret_cast<const float*>(
+						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+
+					normals.resize(accessor.count);
+					for (size_t j = 0; j < accessor.count; j++)
+					{
+						normals[j] = glm::vec3(data[j * 3 + 0], data[j * 3 + 1], data[j * 3 + 2]);
+					}
+				}
+				else
+				{
+					normals.resize(positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
+				}
+
+				if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
+				{
+					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("TEXCOORD_0")];
+					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
+					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+
+					const float* data = reinterpret_cast<const float*>(
+						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+
+					uvs.resize(accessor.count);
+					for (size_t j = 0; j < accessor.count; j++)
+					{
+						uvs[j] = glm::vec2(data[j * 2 + 0], data[j * 2 + 1]);
+					}
+				}
+				else
+				{
+					uvs.resize(positions.size(), glm::vec2(0.0f, 0.0f));
+				}
+
+				if (primitive.indices >= 0)
+				{
+					const tinygltf::Accessor& accessor = _model->accessors[primitive.indices];
+					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
+					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+
+					const void* data = &buffer.data[bufferView.byteOffset + accessor.byteOffset];
+
+					indices.resize(accessor.count);
+
+					switch (accessor.componentType)
+					{
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+					{
+						const uint16_t* buf = static_cast<const uint16_t*>(data);
+						for (size_t j = 0; j < accessor.count; j++)
+						{
+							indices[j] = buf[j];
+						}
+						break;
+					}
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+					{
+						const uint32_t* buf = static_cast<const uint32_t*>(data);
+						for (size_t j = 0; j < accessor.count; j++)
+						{
+							indices[j] = buf[j];
+						}
+						break;
+					}
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+					{
+						const uint8_t* buf = static_cast<const uint8_t*>(data);
+						for (size_t j = 0; j < accessor.count; j++)
+						{
+							indices[j] = buf[j];
+						}
+						break;
+					}
+					default:
+						throw runtime_error("Unsupported index component type");
+					}
+
+					subMesh->SetIndexCount(static_cast<uint32_t>(indices.size()));
+				}
+
+				MeshAllocation allocation = meshBufferManager->AllocateMesh(
+					positions, normals, uvs, indices
+				);
+
+				subMesh->SetAllocation(allocation);
+
+				mesh->AddSubMesh(subMesh);
+				mesh->AddMaterial(materials[primitive.material]);
+			}
+			else
+			{
+				//Fallback
+				//Already jobified
+				if (subMesh.use_count() > 1)
+				{
+					mesh->AddSubMesh(subMesh);
+					mesh->AddMaterial(materials[primitive.material]);
+					continue;
+				}
+
+				size_t count = 0;
+				for (auto& attribute : primitive.attributes)
+				{
+					string name = attribute.first;
+
+					auto vertexData = GetAttributeData(_model, attribute.second);
+
+					auto& accessor = _model->accessors[attribute.second];
+					
+					count = accessor.count;
+
+					VkFormat format = GetAttributeFormat(_model, attribute.second);
+					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+
+					_transferContext.Enqueue(new VkBufferJob(
+						_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+						subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
+				}
+
+				if (primitive.indices >= 0)
+				{
+					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
+					
+					auto indexData = GetAttributeData(_model, primitive.indices);
+					
+					VkFormat format = GetAttributeFormat(_model, primitive.indices);
+
+					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+
+					switch (format)
+					{
+					case VK_FORMAT_R8_UINT:
+						// Converts uint8 data into uint16 data, still represented by a uint8 vector
+						indexData = ConvertDataStride(indexData, 1, 2);
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R16_UINT:
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R32_UINT:
+						indexType = VK_INDEX_TYPE_UINT32;
+						break;
+					}
+
+					_transferContext.Enqueue(new VkBufferJob(
+						_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+						subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
+				}
+
+				mesh->AddSubMesh(subMesh);
+				mesh->AddMaterial(materials[primitive.material]);
+			}
 		}
 
 		_meshes.push_back(mesh.get());

@@ -28,9 +28,9 @@ using namespace glm;
 #include "ThirdParties/rapidjson/include/rapidjson/filereadstream.h"
 using namespace rapidjson;
 
-#include "ThirdParties/imgui/imgui.h"
-#include "ThirdParties/imgui/imgui_impl_vulkan.h"
-#include "ThirdParties/imgui/imgui_impl_glfw.h"
+#include <imgui.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <backends/imgui_impl_glfw.h>
 
 #include <chrono>
 #include <iostream>

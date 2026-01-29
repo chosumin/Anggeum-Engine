@@ -20,7 +20,9 @@ namespace Core
 	class SwapChain;
 	class CommandPool;
 	class RenderFrame;
-	class BindlessTextureManager; // Added
+	class BindlessTextureManager;
+	class MeshBufferManager;
+	class TransferContext;
 	
 	class RenderContext
 	{
@@ -37,7 +39,7 @@ namespace Core
 		void RecreateSwapChain();
 		
 		// Frame management
-		void Begin(); // Allocate and start command buffers
+		void Begin();
 		void Submit();
 		
 		// Get current frame
@@ -49,10 +51,11 @@ namespace Core
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
 
-		// Added: Bindless texture manager access
+		// Bindless texture manager
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager.get(); }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 
+		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
 	private:
 		void CreateRenderFrames();
 		void CreateSyncObjects();
@@ -67,12 +70,12 @@ namespace Core
 		SwapChain* _swapChain = nullptr;
 		uint32_t _imageIndex = 0;
 		
-		// Command pools (owned by RenderContext)
+		// Command pools
 		CommandPool* _commandPool = nullptr;
 		CommandPool* _computeCommandPool = nullptr;
 		
 		// Per-frame resources
-		vector<unique_ptr<RenderFrame>> _frames; // MAX_FRAMES_IN_FLIGHT count
+		vector<unique_ptr<RenderFrame>> _frames;
 		uint32_t _currentFrame = 0;
 		
 		// Timeline semaphores
@@ -81,7 +84,11 @@ namespace Core
 		u64 _lastComputeSemaphoreValue = 0;
 		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT;
 
-		// Global bindless texture manager
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
+		
+		bool _enableGpuDrivenRendering = false;
+
+		// Global mesh buffer manager
+		unique_ptr<MeshBufferManager> _meshBufferManager;
 	};
 }
