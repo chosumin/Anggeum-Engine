@@ -565,10 +565,17 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
 	BindlessTextureManager* bindlessManager = nullptr;
 	
+	MaterialManager* materialManager = nullptr;
+	
 	if (useBindless)
 	{
 		bindlessManager = _renderContext->GetBindlessTextureManager();
 		cout << "GLTFLoader: Using bindless textures for materials" << endl;
+	}
+	
+	if (_renderContext)
+	{
+		materialManager = _renderContext->GetMaterialManager();
 	}
 
 	for (size_t i = 0; i < size; ++i)
@@ -583,7 +590,10 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 		//Already bound
 		if (material.use_count() > 1)
+		{
+			materials[i] = material;
 			continue;
+		}
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
 		material->AddBuffer(1, pbrBuffer);
@@ -697,6 +707,12 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			{
 				/*material.emissiveFactor = glm::vec4(glm::make_vec3(gltfMaterial.additionalValues["emissiveFactor"].ColorFactor().data()), 1.0);*/
 			}
+		}
+
+		if (materialManager)
+		{
+			uint32_t materialIndex = materialManager->RegisterMaterial(material);
+			cout << "Material '" << matName << "' registered at index " << materialIndex << endl;
 		}
 
 		materials[i] = material;

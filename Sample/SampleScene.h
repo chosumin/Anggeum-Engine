@@ -17,5 +17,6 @@ public:
 	virtual void Update() override;
 private:
 	unique_ptr<Core::GLTFLoader> _gltfLoader;
+	Core::RenderContext* _renderContext;
 };
 

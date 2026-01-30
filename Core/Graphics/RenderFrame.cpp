@@ -9,6 +9,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "Graphics/Material.h"
+#include "Graphics/MaterialManager.h"
 
 namespace Core
 {
@@ -17,10 +18,17 @@ namespace Core
 	{
 		CreateSyncObjects();
 		CreateDescriptorPool();
+
+		_materialUniformBuffer = make_unique<UniformBuffer>(
+			_device,
+			MaterialManager::GetMaterialDataSize()
+		);
 	}
 
 	RenderFrame::~RenderFrame()
 	{
+		_materialUniformBuffer.reset();
+
 		CleanupBuffers();
 
 		if (_imageAvailableSemaphore != VK_NULL_HANDLE)
@@ -141,6 +149,16 @@ namespace Core
 			resources.CleanupBuffers();
 		}
 		_materialResources.clear();
+	}
+
+	void RenderFrame::UpdateMaterialBuffer(const MaterialManager& materialManager)
+	{
+		if (_materialUniformBuffer)
+		{
+			_materialUniformBuffer->Update(
+				const_cast<GPUMaterialData*>(materialManager.GetMaterialData())
+			);
+		}
 	}
 
 	// Per-shader resources access methods (set index 0)
@@ -338,7 +356,7 @@ namespace Core
 
 		if (it != resources.uniformBuffers.end())
 		{
-			it->second->SetBuffer(data);
+			it->second->Update(data);
 		}
 	}
 
@@ -405,7 +423,7 @@ namespace Core
 
 		if (it != resources.uniformBuffers.end())
 		{
-			it->second->SetBuffer(data);
+			it->second->Update(data);
 		}
 	}
 

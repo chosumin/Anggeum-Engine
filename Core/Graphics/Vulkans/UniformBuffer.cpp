@@ -15,9 +15,14 @@ Core::UniformBuffer::~UniformBuffer()
 {
 }
 
-void Core::UniformBuffer::SetBuffer(void* data)
+void Core::UniformBuffer::Update(void* data)
 {
 	memcpy(_uniformBufferMapped, data, _buffer->GetSize());
+}
+
+void Core::UniformBuffer::Update(void* data, VkDeviceSize offset, VkDeviceSize size)
+{
+	memcpy(static_cast<char*>(_uniformBufferMapped) + offset, data, size);
 }
 
 VkWriteDescriptorSet Core::UniformBuffer::CreateWriteDescriptorSet(uint32_t binding)

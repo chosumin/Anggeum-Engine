@@ -12,6 +12,7 @@ namespace Core
 	class Texture;
 	class Buffer;
 	class BindlessTextureManager;
+	class MaterialManager;
 
 	class RenderFrame
 	{
@@ -60,6 +61,9 @@ namespace Core
 
 		// Cleanup all buffers
 		void CleanupBuffers();
+
+		void UpdateMaterialBuffer(const MaterialManager& materialManager);
+		UniformBuffer* GetMaterialUniformBuffer() const { return _materialUniformBuffer.get(); }
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
@@ -90,5 +94,8 @@ namespace Core
 
 		// Reference to global bindless texture manager (not owned)
 		BindlessTextureManager* _bindlessTextureManager;
+
+		// GPU Driven Rendering material uniform buffer
+		unique_ptr<UniformBuffer> _materialUniformBuffer;
 	};
 }

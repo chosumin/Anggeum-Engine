@@ -10,7 +10,8 @@ namespace Core
 		UniformBuffer(Device& device, VkDeviceSize bufferSize);
 		~UniformBuffer();
 
-		void SetBuffer(void* data);
+		void Update(void* data);
+		void Update(void* data, VkDeviceSize offset, VkDeviceSize size);
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:

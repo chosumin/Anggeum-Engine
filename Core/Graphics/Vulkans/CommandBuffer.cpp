@@ -128,6 +128,7 @@ void Core::CommandBuffer::BindDescriptorSets(
     auto& shader = material.GetShader();
     auto pipelineLayout = shader.GetPipelineLayout();
 
+    // HACK: Move to RenderCotext::Begin?
 	if (shader.UsesBindlessTextures())
 		BindBindlessDescriptorSet(
 			renderFrame,
@@ -162,6 +163,7 @@ void Core::CommandBuffer::BindDescriptorSets(
 {
     auto pipelineLayout = shader.GetPipelineLayout();
 
+    // HACK: Move to RenderCotext::Begin?
 	if (shader.UsesBindlessTextures())
 		BindBindlessDescriptorSet(
 			renderFrame,

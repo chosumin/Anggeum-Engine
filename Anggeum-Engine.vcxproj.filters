@@ -164,6 +164,11 @@
     <ClCompile Include="Core\Utils\Log.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\BindlessTextureManager.cpp" />
     <ClCompile Include="Core\Graphics\MeshBufferManager.cpp" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_glfw.h" />
+    <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.h" />
+    <ClCompile Include="Core\Graphics\MaterialManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -349,6 +354,7 @@
     <ClInclude Include="Core\Graphics\RendererPasses\LightCullingPass.h" />
     <ClInclude Include="Core\Graphics\Vulkans\BindlessTextureManager.h" />
     <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
+    <ClInclude Include="Core\Graphics\MaterialManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

@@ -5,8 +5,6 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
-#include "Graphics/MeshBufferManager.h"
-
 using namespace Core;
 
 vector<function<void(SwapChain&)>> RenderContext::_resizeCallbacks;
@@ -41,8 +39,10 @@ RenderContext::RenderContext(Device& device)
 	}
 
 	if (_enableGpuDrivenRendering)
+	{
 		_meshBufferManager = make_unique<MeshBufferManager>(_device);
-
+		_materialManager = make_unique<MaterialManager>();
+	}
 	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 
 	// Create command pools (owned by RenderContext)
@@ -56,7 +56,8 @@ RenderContext::RenderContext(Device& device)
 RenderContext::~RenderContext()
 {
 	_meshBufferManager.reset();
-	
+	_materialManager.reset();
+
 	auto device = _device.GetDevice();
 
 	// Clean up timeline semaphores
@@ -130,6 +131,13 @@ void RenderContext::Begin()
 
 	if (_bindlessTextureManager)
 		_bindlessTextureManager->UpdateDescriptorSet();
+
+	if (_materialManager)
+	{
+		// Update material buffers if dirty
+		_materialManager->RefreshDirtyMaterials();
+		currentFrame.UpdateMaterialBuffer(*_materialManager);
+	}
 }
 
 void RenderContext::Submit()

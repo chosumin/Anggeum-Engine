@@ -42,6 +42,16 @@ namespace Core
 			return setIt->second;
 		}
 
+		template <typename T>
+		const T* GetBufferConst(uint32_t binding) const
+		{
+			auto setIt = _buffers.find(binding);
+			if (setIt == _buffers.end())
+				return nullptr;
+
+			return static_cast<const T*>(setIt->second);
+		}
+
 		shared_ptr<Texture> GetTexture(uint32_t binding);
 
 		void AddBuffer(uint32_t binding, void* data)
@@ -106,6 +116,10 @@ namespace Core
 		const unordered_map<uint32_t, void*>& GetBuffersMap() const { return _buffers; }
 		const unordered_map<uint32_t, shared_ptr<Texture>>& GetTexturesMap() const { return _textures; }
 
+		// GPU Driven Rendering material
+		void SetMaterialIndex(uint32_t index) { _materialIndex = index; }
+		uint32_t GetMaterialIndex() const { return _materialIndex; }
+		bool HasMaterialIndex() const { return _materialIndex != UINT32_MAX; }
 	private:
 		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:
@@ -120,13 +134,16 @@ namespace Core
 		AlphaMode _alphaMode = AlphaMode::Opaque;
 		bool _isAlphaCutoff;
 
-		// Traditional bound resources (Set 1)
+		// Legacy bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
 		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
 
 		// Bindless texture handles (Set 2, Binding 0)
 		// Just store handles in order, no binding index needed
 		vector<TextureHandle> _bindlessTextureHandles;
+
+		// GPU Driven Rendering material index
+		uint32_t _materialIndex = UINT32_MAX;
 	};
 }
 

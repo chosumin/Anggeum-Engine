@@ -79,3 +79,27 @@ struct TileInfo
 	ivec2 viewportSize;
 	ivec2 tileNums;
 };
+
+// For GPU Driven Rendering
+struct alignas(16) GPUMaterialData
+{
+	glm::vec4 albedo{ 1.0f, 1.0f, 1.0f, 1.0f };
+	float metallic = 0.0f;
+	float roughness = 0.5f;
+	float ao = 1.0f;
+	int flags = 1;  // bit 0: enabled
+
+	int albedoTextureSet = 0;
+	int metallicTextureSet = 0;
+	int roughnessTextureSet = 0;
+	int occlusionTextureSet = 0;
+
+	uint32_t basemapIndex = 0;
+	uint32_t normalmapIndex = 0;
+	uint32_t metallicRoughnessmapIndex = 0;
+	int debugMode = 0;
+
+	glm::vec3 padding;  // 16-byte alignment
+};
+
+static_assert(sizeof(GPUMaterialData) == 80, "GPUMaterialData must be 80 bytes");

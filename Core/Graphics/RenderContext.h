@@ -1,4 +1,6 @@
 #pragma once
+#include "MeshBufferManager.h"
+#include "MaterialManager.h"
 
 namespace Core
 {
@@ -21,7 +23,6 @@ namespace Core
 	class CommandPool;
 	class RenderFrame;
 	class BindlessTextureManager;
-	class MeshBufferManager;
 	class TransferContext;
 	
 	class RenderContext
@@ -56,6 +57,10 @@ namespace Core
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 
 		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
+		
+		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
+
+		bool IsGpuDrivenRenderingEnabled() const { return _enableGpuDrivenRendering; }
 	private:
 		void CreateRenderFrames();
 		void CreateSyncObjects();
@@ -90,5 +95,7 @@ namespace Core
 
 		// Global mesh buffer manager
 		unique_ptr<MeshBufferManager> _meshBufferManager;
+
+		unique_ptr<MaterialManager> _materialManager;
 	};
 }
