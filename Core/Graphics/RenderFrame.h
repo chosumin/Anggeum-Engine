@@ -1,5 +1,8 @@
 #pragma once
 #include "Vulkans/DescriptorPool.h"
+#include "MeshBufferManager.h"
+#include "MaterialManager.h"
+#include "IndirectDrawBuffer.h"
 
 namespace Core
 {
@@ -12,7 +15,7 @@ namespace Core
 	class Texture;
 	class Buffer;
 	class BindlessTextureManager;
-	class MaterialManager;
+	class IndirectDrawBuffer;
 
 	class RenderFrame
 	{
@@ -55,47 +58,44 @@ namespace Core
 
 		void SetMaterialBuffers(Material& material);
 
-		// Bindless texture manager access
+		void SetGPUDrivenRenderingBuffers(Shader& shader);
+
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 
-		// Cleanup all buffers
 		void CleanupBuffers();
 
-		void UpdateMaterialBuffer(const MaterialManager& materialManager);
-		UniformBuffer* GetMaterialUniformBuffer() const { return _materialUniformBuffer.get(); }
+		void SetMeshBufferManager(MeshBufferManager* meshBufferManager) { _meshBufferManager = meshBufferManager; }
+		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager; }
+
+		void SetMaterialManager(MaterialManager* materialManager) { _materialManager = materialManager; }
+		MaterialManager* GetMaterialManager() { return _materialManager; }
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
 
-		// Per-material buffer management (set index 1)
 		void SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data);
 		void SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture);
 		void SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer);
+
 	private:
 		Device& _device;
 		
-		// Command buffers (allocated by RenderContext, not owned)
 		CommandBuffer* _commandBuffer = nullptr;
 		CommandBuffer* _computeCommandBuffer = nullptr;
 		
-		// Synchronization objects (owned by RenderFrame)
 		VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
 		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
 		
-		// Per-frame descriptor pool (owned by RenderFrame)
 		unique_ptr<DescriptorPool> _descriptorPool;
 
-		// Per-shader resources (set index = 0, hash-based)
 		unordered_map<size_t, DescriptorSetResources> _shaderResources;
-
-		// Per-material resources (set index = 1, name-based)
 		unordered_map<string, DescriptorSetResources> _materialResources;
 
-		// Reference to global bindless texture manager (not owned)
 		BindlessTextureManager* _bindlessTextureManager;
 
-		// GPU Driven Rendering material uniform buffer
-		unique_ptr<UniformBuffer> _materialUniformBuffer;
+		// GPU Driven Rendering Buffers
+		MeshBufferManager* _meshBufferManager = nullptr;
+		MaterialManager* _materialManager = nullptr;
 	};
 }

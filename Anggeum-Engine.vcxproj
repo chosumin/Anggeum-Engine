@@ -163,6 +163,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClCompile Include="Core\Foundation\Scene.cpp" />
     <ClCompile Include="Core\Foundation\Window.cpp" />
     <ClCompile Include="Core\Foundation\WorkerThread.cpp" />
+    <ClCompile Include="Core\Graphics\IndirectDrawBuffer.cpp" />
     <ClCompile Include="Core\Graphics\MaterialManager.cpp" />
     <ClCompile Include="Core\Graphics\MeshBufferManager.cpp" />
     <ClCompile Include="Core\Graphics\RendererPasses\DepthPrePass.cpp" />
@@ -261,6 +262,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClInclude Include="Core\Foundation\AsyncLoadable.h" />
     <ClInclude Include="Core\Foundation\WorkerThread.h" />
     <ClInclude Include="Core\Graphics\BufferObjects.h" />
+    <ClInclude Include="Core\Graphics\IndirectDrawBuffer.h" />
     <ClInclude Include="Core\Graphics\MaterialManager.h" />
     <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
     <ClInclude Include="Core\Graphics\RendererPasses\DepthPrePass.h" />

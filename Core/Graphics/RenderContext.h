@@ -56,11 +56,10 @@ namespace Core
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager.get(); }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 
+		// Managers
 		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
-		
 		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
 
-		bool IsGpuDrivenRenderingEnabled() const { return _enableGpuDrivenRendering; }
 	private:
 		void CreateRenderFrames();
 		void CreateSyncObjects();
@@ -90,12 +89,9 @@ namespace Core
 		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
-		
-		bool _enableGpuDrivenRendering = false;
 
-		// Global mesh buffer manager
+		// GPU Driven Rendering managers
 		unique_ptr<MeshBufferManager> _meshBufferManager;
-
 		unique_ptr<MaterialManager> _materialManager;
 	};
 }

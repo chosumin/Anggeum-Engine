@@ -723,12 +723,16 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 {
-	size_t size = _model->meshes.size();
+	
+	bool useGpuDriven = _renderContext && _device.IsGpuDrivenRenderingEnabled();
+	MeshBufferManager* meshBufferManager = nullptr;
+	MaterialManager* materialManager = nullptr;
 
-	vector<unique_ptr<Core::Mesh>> meshes(size);
-
-	auto meshBufferManager = _renderContext->GetMeshBufferManager();
-	bool useGlobalBuffers = (meshBufferManager != nullptr);
+	if (useGpuDriven && _renderContext)
+	{
+		meshBufferManager = _renderContext->GetMeshBufferManager();
+		materialManager = _renderContext->GetMaterialManager();
+	}
 
 	for (auto& gltfMesh : _model->meshes)
 	{
@@ -762,11 +766,11 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 			auto subMesh = 
 				_resourceCache.RequestSubMesh(subMeshName);
 
-			if (useGlobalBuffers)
+			if (useGpuDriven && meshBufferManager)
 			{
-				//Already jobified
-				if (subMesh.use_count() > 1)
+				if (subMesh->HasAllocation())
 				{
+					// Already jobified
 					mesh->AddSubMesh(subMesh);
 					mesh->AddMaterial(materials[primitive.material]);
 					continue;
@@ -882,7 +886,6 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 				MeshAllocation allocation = meshBufferManager->AllocateMesh(
 					positions, normals, uvs, indices
 				);
-
 				subMesh->SetAllocation(allocation);
 
 				mesh->AddSubMesh(subMesh);
@@ -890,7 +893,7 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 			}
 			else
 			{
-				//Fallback
+				// Legacy
 				//Already jobified
 				if (subMesh.use_count() > 1)
 				{

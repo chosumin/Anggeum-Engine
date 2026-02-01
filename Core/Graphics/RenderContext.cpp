@@ -38,7 +38,7 @@ RenderContext::RenderContext(Device& device)
 		_bindlessTextureManager = make_unique<BindlessTextureManager>(device, 4096);
 	}
 
-	if (_enableGpuDrivenRendering)
+	if (_device.IsGpuDrivenRenderingEnabled())
 	{
 		_meshBufferManager = make_unique<MeshBufferManager>(_device);
 		_materialManager = make_unique<MaterialManager>();
@@ -85,6 +85,9 @@ void RenderContext::CreateRenderFrames()
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		_frames[i] = make_unique<RenderFrame>(_device, _bindlessTextureManager.get());
+
+		_frames[i]->SetMeshBufferManager(_meshBufferManager.get());
+		_frames[i]->SetMaterialManager(_materialManager.get());
 	}
 }
 
@@ -132,12 +135,8 @@ void RenderContext::Begin()
 	if (_bindlessTextureManager)
 		_bindlessTextureManager->UpdateDescriptorSet();
 
-	if (_materialManager)
-	{
-		// Update material buffers if dirty
+	if (_device.IsGpuDrivenRenderingEnabled())
 		_materialManager->RefreshDirtyMaterials();
-		currentFrame.UpdateMaterialBuffer(*_materialManager);
-	}
 }
 
 void RenderContext::Submit()

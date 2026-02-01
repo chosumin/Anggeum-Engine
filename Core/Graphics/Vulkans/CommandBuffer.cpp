@@ -541,3 +541,36 @@ void Core::CommandBuffer::BindBindlessDescriptorSet(
 
 	_bindlessDescriptorSetBound = true;
 }
+
+void Core::CommandBuffer::BindGlobalBuffers(MeshBufferManager& meshBufferManager)
+{
+	VkBuffer vertexBuffers[] = {
+		meshBufferManager.GetPositionBuffer(),
+		meshBufferManager.GetNormalBuffer(),
+		meshBufferManager.GetUVBuffer()
+	};
+	VkDeviceSize offsets[] = { 0, 0, 0 };
+
+	vkCmdBindVertexBuffers(_commandBuffer, 0, 3, vertexBuffers, offsets);
+
+	vkCmdBindIndexBuffer(
+		_commandBuffer,
+		meshBufferManager.GetIndexBuffer(),
+		0,
+		VK_INDEX_TYPE_UINT32
+	);
+}
+
+void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
+{
+	if (drawCount == 0)
+		return;
+
+	vkCmdDrawIndexedIndirect(
+		_commandBuffer,
+		indirectBuffer.GetBuffer(),
+		0,
+		drawCount,
+		stride
+	);
+}

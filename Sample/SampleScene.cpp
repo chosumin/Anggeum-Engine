@@ -15,7 +15,7 @@
 using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, float width, float height, TransferContext* transferContext, Core::RenderContext* renderContext)
-	:_renderContext(renderContext)
+	:_renderContext(renderContext), _device(device)
 {
 	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, *transferContext);
 
@@ -110,7 +110,7 @@ SampleScene::~SampleScene()
 
 void SampleScene::Update()
 {
-	if (_renderContext->IsGpuDrivenRenderingEnabled())
+	if (_device.IsGpuDrivenRenderingEnabled())
 	{
 		ImGui::Begin("GPU Driven Rendering Info");
 		{

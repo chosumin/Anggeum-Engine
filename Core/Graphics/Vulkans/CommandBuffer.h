@@ -14,6 +14,7 @@ namespace Core
 	class Image;
 	class Job;
 	class Framebuffer;
+	class MeshBufferManager;
 
 	class CommandBuffer
 	{
@@ -22,6 +23,8 @@ namespace Core
 		~CommandBuffer() = default;
 
 		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
+
+		void BindGlobalBuffers(MeshBufferManager& meshBufferManager);
 
 		void ResetCommandBuffer();
 		void BeginCommandBuffer(VkCommandBufferUsageFlags flags, 
@@ -39,9 +42,12 @@ namespace Core
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
+		
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstInstance = 0);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
+		void DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
+
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);
 		void CopyImage(Image& srcImage, Image& dstImage, 
 			uint32_t srcMipLevel, uint32_t srcLayer, 

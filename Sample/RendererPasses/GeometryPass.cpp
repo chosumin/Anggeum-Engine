@@ -63,6 +63,9 @@ namespace Core
 
 		auto meshes = _scene.GetComponents<Core::Mesh>();
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
+
+		if(_device.IsGpuDrivenRenderingEnabled())
+			_rendererBatches->PrepareIndirectCommands(_device);
 	}
 
 	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
@@ -84,20 +87,42 @@ namespace Core
 
 		PerspectiveCamera* camera = _scene.GetMainCamera();
 
-		_rendererBatches->Draw(renderFrame, commandBuffer,
-		[&](shared_ptr<Shader> shader) 
+		if (_device.IsGpuDrivenRenderingEnabled())
 		{
-			renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-			renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
-			renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
-			renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
-			renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
-		},
-		[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+			_rendererBatches->DrawIndirect(
+			renderFrame,
+			commandBuffer,
+			[&](shared_ptr<Shader> shader) 
+			{
+				renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
+				renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
+				renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
+				renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
+				renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
+			},
+			[&](shared_ptr<Material> sharedMaterial)
+			{
+				sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+				commandBuffer.PushConstants(*sharedMaterial, 0);
+			});
+		}
+		else
 		{
-			sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-			commandBuffer.PushConstants(*sharedMaterial, 0);
-		});
+			_rendererBatches->Draw(renderFrame, commandBuffer,
+			[&](shared_ptr<Shader> shader)
+			{
+				renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
+				renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
+				renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
+				renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
+				renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
+			},
+			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+			{
+				sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+				commandBuffer.PushConstants(*sharedMaterial, 0);
+			});
+		}
 
 		DrawSkybox(renderFrame, commandBuffer);
 

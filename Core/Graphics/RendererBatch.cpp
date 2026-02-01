@@ -22,7 +22,14 @@ Core::RendererBatches::RendererBatches(TransformBatch& transformBatch)
 
 Core::RendererBatches::~RendererBatches()
 {
-	delete(_instanceBuffer);
+	if (_materialIndexBuffer != VK_NULL_HANDLE)
+		delete(_materialIndexBuffer);
+
+	if (_indirectCommandBuffer != VK_NULL_HANDLE)
+		delete(_indirectCommandBuffer);
+
+	if (_instanceBuffer != VK_NULL_HANDLE)
+		delete(_instanceBuffer);
 
 	for (auto& batch : _shaderBatches)
 	{
@@ -54,6 +61,75 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 	}
 
 	CreateInstanceBuffer(device);
+}
+
+void Core::RendererBatches::PrepareIndirectCommands(Device& device)
+{
+	_indirectDrawBuffer.Clear();
+
+	uint32_t globalFirstInstance = 0;
+
+	for (auto& [shaderHash, shaderBatch] : _shaderBatches)
+	{
+		for (auto& [materialName, materialBatch] : shaderBatch.MaterialBatches)
+		{
+			auto material = materialBatch.Material.lock();
+			if (!material || !material->HasMaterialIndex())
+				continue;
+
+			uint32_t materialIndex = material->GetMaterialIndex();
+
+			for (auto& [subMeshName, subMeshBatch] : materialBatch.SubMeshBatches)
+			{
+				auto subMesh = subMeshBatch.SubMesh.lock();
+				if (!subMesh || !subMesh->HasAllocation())
+					continue;
+
+				const auto& allocation = subMesh->GetAllocation();
+				uint32_t instanceCount = static_cast<uint32_t>(subMeshBatch.Transforms.size());
+
+				_indirectDrawBuffer.AddDrawCommand(
+					allocation,
+					materialIndex,
+					instanceCount,
+					globalFirstInstance
+				);
+
+				globalFirstInstance += instanceCount;
+			}
+		}
+	}
+
+	// Indirect Command Buffer
+	_indirectCommandBuffer = new Core::Buffer(
+		device, 
+		MAX_DRAW_COMMANDS * IndirectDrawBuffer::GetDrawCommandSize(),
+		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+		MemoryType::DEVICE_LOCAL);
+
+	Core::VkBufferJob<DrawIndexedIndirectCommand> job(device,
+		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+		&_indirectCommandBuffer,
+		_indirectDrawBuffer.GetDrawCommands());
+
+	// Material Index SSBO
+	_materialIndexBuffer = new Core::Buffer(
+		device,
+		MAX_DRAW_COMMANDS * sizeof(uint32_t),
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		MemoryType::DEVICE_LOCAL
+	);
+	
+	Core::VkBufferJob<uint32_t> job2(device, 
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+		&_materialIndexBuffer, 
+		_indirectDrawBuffer.GetMaterialIndices(), true);
+
+	vector<Job*> jobs;
+	jobs.push_back(&job);
+	jobs.push_back(&job2);
+
+	Core::CommandBuffer::ImmediateSubmit(device, job);
 }
 
 void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes)
@@ -118,6 +194,51 @@ void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& comman
             }
         }
     }
+}
+
+void Core::RendererBatches::DrawIndirect(
+	RenderFrame& renderFrame,
+	CommandBuffer& commandBuffer,
+	function<void(shared_ptr<Shader>)> perShader,
+	function<void(shared_ptr<Material>)> perDraw)
+{
+	if (_indirectDrawBuffer.GetDrawCount() == 0)
+		return;
+
+	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
+
+	// Global vertex/index buffer
+	commandBuffer.BindGlobalBuffers(*meshBufferManager);
+
+	for (auto& [shaderHash, shaderBatch] : _shaderBatches)
+	{
+		auto shader = shaderBatch.SharedShader.lock();
+		if (!shader)
+			continue;
+
+		commandBuffer.BindPipeline(shaderBatch.Pipeline);
+
+		renderFrame.SetShaderStorageBuffer(*shader, 1, _transformBatch.TransformBuffer);
+		renderFrame.SetShaderStorageBuffer(*shader, 2, _instanceBuffer);
+
+		renderFrame.SetShaderUniformBuffer(*shader, 7, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+		renderFrame.SetShaderStorageBuffer(*shader, 8, _materialIndexBuffer);
+		
+		if (perShader)
+			perShader(shader);
+
+		commandBuffer.BindDescriptorSets(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, *shader);
+
+		auto material = shaderBatch.MaterialBatches.begin()->second.Material.lock();
+
+		perDraw(material);
+
+		commandBuffer.DrawIndexedIndirect(
+			*_indirectCommandBuffer,
+			_indirectDrawBuffer.GetDrawCount(),
+			static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+		);
+	}
 }
 
 void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh)

@@ -169,6 +169,7 @@
     <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_glfw.h" />
     <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.h" />
     <ClCompile Include="Core\Graphics\MaterialManager.cpp" />
+    <ClCompile Include="Core\Graphics\IndirectDrawBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -355,6 +356,7 @@
     <ClInclude Include="Core\Graphics\Vulkans\BindlessTextureManager.h" />
     <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
     <ClInclude Include="Core\Graphics\MaterialManager.h" />
+    <ClInclude Include="Core\Graphics\IndirectDrawBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">
