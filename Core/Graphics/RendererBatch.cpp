@@ -63,8 +63,10 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 	CreateInstanceBuffer(device);
 }
 
-void Core::RendererBatches::PrepareIndirectCommands(Device& device)
+void Core::RendererBatches::PrepareIndirectCommands(Device& device, bool needMaterialData)
 {
+	_needsMaterialIndexBuffer = needMaterialData;
+
 	_indirectDrawBuffer.Clear();
 
 	uint32_t globalFirstInstance = 0;
@@ -100,6 +102,8 @@ void Core::RendererBatches::PrepareIndirectCommands(Device& device)
 		}
 	}
 
+	vector<Job*> jobs;
+
 	// Indirect Command Buffer
 	_indirectCommandBuffer = new Core::Buffer(
 		device, 
@@ -111,6 +115,7 @@ void Core::RendererBatches::PrepareIndirectCommands(Device& device)
 		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
 		&_indirectCommandBuffer,
 		_indirectDrawBuffer.GetDrawCommands());
+	jobs.push_back(&job);
 
 	// Material Index SSBO
 	_materialIndexBuffer = new Core::Buffer(
@@ -119,17 +124,14 @@ void Core::RendererBatches::PrepareIndirectCommands(Device& device)
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		MemoryType::DEVICE_LOCAL
 	);
-	
-	Core::VkBufferJob<uint32_t> job2(device, 
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
-		&_materialIndexBuffer, 
-		_indirectDrawBuffer.GetMaterialIndices(), true);
 
-	vector<Job*> jobs;
-	jobs.push_back(&job);
+	Core::VkBufferJob<uint32_t> job2(device,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		&_materialIndexBuffer,
+		_indirectDrawBuffer.GetMaterialIndices(), true);
 	jobs.push_back(&job2);
 
-	Core::CommandBuffer::ImmediateSubmit(device, job);
+	Core::CommandBuffer::ImmediateSubmit(device, jobs);
 }
 
 void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes)
@@ -207,22 +209,26 @@ void Core::RendererBatches::DrawIndirect(
 
 	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
 
-	// Global vertex/index buffer
-	commandBuffer.BindGlobalBuffers(*meshBufferManager);
-
 	for (auto& [shaderHash, shaderBatch] : _shaderBatches)
 	{
 		auto shader = shaderBatch.SharedShader.lock();
 		if (!shader)
 			continue;
 
+		auto vertexAttibuteNames = shader->GetVertexAttirbuteNames();
+		commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
+		commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+
 		commandBuffer.BindPipeline(shaderBatch.Pipeline);
 
 		renderFrame.SetShaderStorageBuffer(*shader, 1, _transformBatch.TransformBuffer);
 		renderFrame.SetShaderStorageBuffer(*shader, 2, _instanceBuffer);
 
-		renderFrame.SetShaderUniformBuffer(*shader, 7, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-		renderFrame.SetShaderStorageBuffer(*shader, 8, _materialIndexBuffer);
+		if (_needsMaterialIndexBuffer)
+		{
+			renderFrame.SetShaderUniformBuffer(*shader, 7, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+			renderFrame.SetShaderStorageBuffer(*shader, 8, _materialIndexBuffer);
+		}
 		
 		if (perShader)
 			perShader(shader);

@@ -246,11 +246,11 @@ void Core::CommandBuffer::Dispatch(uint32_t x, uint32_t y, uint32_t z)
     vkCmdDispatch(_commandBuffer, x, y, z);
 }
 
-void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer)
+void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset)
 {
     VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0; // Optional
-    copyRegion.dstOffset = 0; // Optional
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = dstOffset;
     copyRegion.size = srcBuffer.GetSize();
 
     vkCmdCopyBuffer(_commandBuffer, srcBuffer.GetBuffer(), dstBuffer.GetBuffer(),
@@ -540,25 +540,6 @@ void Core::CommandBuffer::BindBindlessDescriptorSet(
 		0, nullptr);
 
 	_bindlessDescriptorSetBound = true;
-}
-
-void Core::CommandBuffer::BindGlobalBuffers(MeshBufferManager& meshBufferManager)
-{
-	VkBuffer vertexBuffers[] = {
-		meshBufferManager.GetPositionBuffer(),
-		meshBufferManager.GetNormalBuffer(),
-		meshBufferManager.GetUVBuffer()
-	};
-	VkDeviceSize offsets[] = { 0, 0, 0 };
-
-	vkCmdBindVertexBuffers(_commandBuffer, 0, 3, vertexBuffers, offsets);
-
-	vkCmdBindIndexBuffer(
-		_commandBuffer,
-		meshBufferManager.GetIndexBuffer(),
-		0,
-		VK_INDEX_TYPE_UINT32
-	);
 }
 
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)

@@ -32,7 +32,7 @@ namespace Core
 
 	private:
 		array<GPUMaterialData, MAX_MATERIALS> _materialData;
-		array<shared_ptr<Material>, MAX_MATERIALS> _materials;
+		array<weak_ptr<Material>, MAX_MATERIALS> _materials;
 
 		bitset<MAX_MATERIALS> _dirtyMaterials;
 		bool _anyDirty = false;

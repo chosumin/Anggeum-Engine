@@ -21,7 +21,7 @@ namespace Core
 		ResourceCache(Device& device);
 		~ResourceCache();
 
-		void Initialize(RenderContext& renderContext);
+		void Prepare(RenderContext& renderContext);
 
 		shared_ptr<Material> RequestMaterial(const string materialName, const string& shaderName);
 		shared_ptr<Shader> RequestShader(const string& shaderName);

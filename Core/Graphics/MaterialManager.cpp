@@ -15,13 +15,13 @@ MaterialManager::MaterialManager()
 void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 {
 	auto& material = _materials[materialIndex];
-	if (!material)
+	if (material.expired())
 		return;
 
 	GPUMaterialData& data = _materialData[materialIndex];
 	
 	//todo: cast out of this function if material is not PBR
-	auto pbrBuffer = material->GetBufferConst<PBRBuffer>(1);
+	auto pbrBuffer = material.lock()->GetBufferConst<PBRBuffer>(1);
 	if (pbrBuffer)
 	{
 		data.albedo = pbrBuffer->Albedo;

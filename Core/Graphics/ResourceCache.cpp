@@ -30,7 +30,7 @@ namespace Core
 		_defaultTexture = nullptr;
 	}
 
-	void ResourceCache::Initialize(RenderContext& renderContext)
+	void ResourceCache::Prepare(RenderContext& renderContext)
 	{
 		_renderContext = &renderContext;
 		
@@ -55,6 +55,12 @@ namespace Core
 		auto material =
 			make_shared<Core::Material>(_device, shaderName, materialName);
 		_materials[materialName] = material;
+
+		if (_device.IsGpuDrivenRenderingEnabled())
+		{
+			MaterialManager* materialManager = _renderContext->GetMaterialManager();
+			uint32_t materialIndex = materialManager->RegisterMaterial(material);
+		}
 
 		return material;
 	}
@@ -241,8 +247,8 @@ namespace Core
 		{
 		case Utility::HashCode("PBR"):
 			pass = "Geometry";
-			vert = "shaders/pbr.vert";
-			frag = "shaders/pbr.frag";
+			vert = "shaders/pbr.vert.spv";
+			frag = "shaders/pbr.frag.spv";
 			break;
 		case Utility::HashCode("Shadow"):
 			pass = "Shadow";

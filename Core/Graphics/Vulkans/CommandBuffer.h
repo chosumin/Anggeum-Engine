@@ -24,8 +24,6 @@ namespace Core
 
 		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
 
-		void BindGlobalBuffers(MeshBufferManager& meshBufferManager);
-
 		void ResetCommandBuffer();
 		void BeginCommandBuffer(VkCommandBufferUsageFlags flags, 
 			const RenderPass* renderPass, const Framebuffer* framebuffer, 
@@ -48,7 +46,7 @@ namespace Core
 		void DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
 
-		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);
+		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 		void CopyImage(Image& srcImage, Image& dstImage, 
 			uint32_t srcMipLevel, uint32_t srcLayer, 
 			uint32_t dstMipLevel, uint32_t dstLayer);

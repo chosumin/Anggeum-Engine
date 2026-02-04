@@ -67,7 +67,7 @@ private:
     }
 };
 
-vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath)
+vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath, bool gpuDrivenEnabled)
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
@@ -102,8 +102,16 @@ vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderS
         break;
     }
 
+	// FIXME: Needs shader permutation system.
+    string modifiedSource;
+    /*if (gpuDrivenEnabled)
+    {
+        modifiedSource = "#define GPU_DRIVEN_RENDERING 1\n";
+    }*/
+    modifiedSource += shaderCode;
+
     // Compile GLSL to SPIR-V binary
-    shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(shaderCode, kind, shaderPath.c_str(), options);
+    shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(modifiedSource, kind, shaderPath.c_str(), options);
 
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
         std::cerr << "Shader compilation error: " << result.GetErrorMessage() << std::endl;

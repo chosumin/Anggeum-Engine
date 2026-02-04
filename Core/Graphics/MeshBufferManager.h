@@ -22,20 +22,8 @@ namespace Core
 		MeshBufferManager(Device& device);
 		~MeshBufferManager();
 
-		MeshAllocation AllocateMesh(
-			const vector<glm::vec3>& positions,
-			const vector<glm::vec3>& normals,
-			const vector<glm::vec2>& uvs,
-			const vector<uint32_t>& indices);
-
 		void FreeMesh(uint32_t meshID);
 		void Defragment();
-
-		// Global buffers Á¢±Ù
-		VkBuffer GetPositionBuffer() const;
-		VkBuffer GetNormalBuffer() const;
-		VkBuffer GetUVBuffer() const;
-		VkBuffer GetIndexBuffer() const;
 
 		uint32_t GetTotalVertexCount() const { return _currentVertexOffset; }
 		uint32_t GetTotalIndexCount() const { return _currentIndexOffset; }
@@ -43,23 +31,35 @@ namespace Core
 
 		const MeshAllocation* GetAllocation(uint32_t meshID) const;
 
+		void Allocate(TransferContext& transferContext, const string& name, uint32_t stride, vector<uint8_t>&& data, string subMeshName);
+		void Allocate(TransferContext& transferContext, VkIndexType indexType, vector<uint8_t>&& indexData, string subMeshName);
+		MeshAllocation Build();
+
+		vector<Buffer*> GetVertexBuffers(vector<string> names) const;
+		Buffer& GetIndexBuffer() { return *_indexBuffer; }
+
+		VkIndexType GetIndexType() const { return _indexType; }
 	private:
 		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
-		void CopyBufferToGlobal(Buffer* stagingBuffer, Buffer* dstBuffer, VkDeviceSize offset, VkDeviceSize size);
-
+		Buffer* InsertBufferSpace(VkIndexType indexType);
 	private:
 		Device& _device;
 
-		shared_ptr<Buffer> _globalPositionBuffer;
-		shared_ptr<Buffer> _globalNormalBuffer;
-		shared_ptr<Buffer> _globalUVBuffer;
-		shared_ptr<Buffer> _globalIndexBuffer;
+		//Key: Attribute name, Value: Attribute value
+		unordered_map<string, Buffer*> _vertexBuffers;
+
+		VkIndexType _indexType;
+		Buffer* _indexBuffer;
 
 		// Allocation tracking
 		uint32_t _maxVertices = 10'000'000;
 		uint32_t _maxIndices = 30'000'000;
 		uint32_t _currentVertexOffset = 0;
 		uint32_t _currentIndexOffset = 0;
+
+		uint32_t _tempVertexOffset = 0;
+		uint32_t _tempIndexCount = 0;
+		vec4 _tempBoundingSphere;
 
 		unordered_map<uint32_t, MeshAllocation> _allocations;
 		vector<uint32_t> _freeList;

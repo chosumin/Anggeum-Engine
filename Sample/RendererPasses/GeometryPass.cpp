@@ -64,8 +64,8 @@ namespace Core
 		auto meshes = _scene.GetComponents<Core::Mesh>();
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 
-		if(_device.IsGpuDrivenRenderingEnabled())
-			_rendererBatches->PrepareIndirectCommands(_device);
+		if (_device.IsGpuDrivenRenderingEnabled())
+			_rendererBatches->PrepareIndirectCommands(_device, true);
 	}
 
 	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

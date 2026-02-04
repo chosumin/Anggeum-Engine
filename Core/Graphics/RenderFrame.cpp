@@ -458,8 +458,3 @@ void RenderFrame::SetMaterialBuffers(Material& material)
 		SetMaterialTextureBuffer(material, binding, texture);
 	}
 }
-
-void Core::RenderFrame::SetGPUDrivenRenderingBuffers(Shader& shader)
-{
-	SetShaderUniformBuffer(shader, 7, const_cast<GPUMaterialData*>(_materialManager->GetMaterialData()));
-}

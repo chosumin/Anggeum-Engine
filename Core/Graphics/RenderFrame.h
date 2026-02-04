@@ -58,8 +58,6 @@ namespace Core
 
 		void SetMaterialBuffers(Material& material);
 
-		void SetGPUDrivenRenderingBuffers(Shader& shader);
-
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 

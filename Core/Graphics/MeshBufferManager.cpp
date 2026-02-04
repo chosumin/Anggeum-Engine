@@ -9,41 +9,18 @@ using namespace Core;
 MeshBufferManager::MeshBufferManager(Device& device)
 	: _device(device)
 {
-	// Position buffer (vec3)
-	_globalPositionBuffer = make_shared<Buffer>(
-		_device,
-		_maxVertices * sizeof(glm::vec3),
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		MemoryType::DEVICE_LOCAL
-	);
-
-	// Normal buffer (vec3)
-	_globalNormalBuffer = make_shared<Buffer>(
-		_device,
-		_maxVertices * sizeof(glm::vec3),
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		MemoryType::DEVICE_LOCAL
-	);
-
-	// UV buffer (vec2)
-	_globalUVBuffer = make_shared<Buffer>(
-		_device,
-		_maxVertices * sizeof(glm::vec2),
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		MemoryType::DEVICE_LOCAL
-	);
-
-	// Index buffer (uint32)
-	_globalIndexBuffer = make_shared<Buffer>(
-		_device,
-		_maxIndices * sizeof(uint32_t),
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		MemoryType::DEVICE_LOCAL
-	);
 }
 
 MeshBufferManager::~MeshBufferManager()
 {
+	for (auto&& vertexBuffer : _vertexBuffers)
+	{
+		delete(vertexBuffer.second);
+	}
+	_vertexBuffers.clear();
+
+	if (_indexBuffer)
+		delete(_indexBuffer);
 }
 
 glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& positions)
@@ -51,7 +28,6 @@ glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& po
 	if (positions.empty())
 		return glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-	// AABB 계산
 	glm::vec3 min = positions[0];
 	glm::vec3 max = positions[0];
 
@@ -61,10 +37,8 @@ glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& po
 		max = glm::max(max, pos);
 	}
 
-	// Bounding sphere center (AABB 중심)
 	glm::vec3 center = (min + max) * 0.5f;
 
-	// Bounding sphere radius (가장 먼 정점까지의 거리)
 	float radius = 0.0f;
 	for (const auto& pos : positions)
 	{
@@ -73,115 +47,6 @@ glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& po
 	}
 
 	return glm::vec4(center, radius);
-}
-
-void MeshBufferManager::CopyBufferToGlobal(Buffer* stagingBuffer, Buffer* dstBuffer, VkDeviceSize offset, VkDeviceSize size)
-{
-	// TransferContext를 사용하여 비동기 복사
-	// TODO: Custom job for buffer copy with offset
-}
-
-MeshAllocation MeshBufferManager::AllocateMesh(
-	const vector<glm::vec3>& positions,
-	const vector<glm::vec3>& normals,
-	const vector<glm::vec2>& uvs,
-	const vector<uint32_t>& indices)
-{
-	if (positions.empty() || indices.empty())
-		throw runtime_error("Cannot allocate empty mesh");
-
-	if (_currentVertexOffset + positions.size() > _maxVertices)
-		throw runtime_error("Global vertex buffer overflow");
-
-	if (_currentIndexOffset + indices.size() > _maxIndices)
-		throw runtime_error("Global index buffer overflow");
-
-	MeshAllocation allocation;
-	allocation.vertexOffset = _currentVertexOffset;
-	allocation.vertexCount = static_cast<uint32_t>(positions.size());
-	allocation.indexOffset = _currentIndexOffset;
-	allocation.indexCount = static_cast<uint32_t>(indices.size());
-	allocation.meshID = _nextMeshID++;
-
-	// Calculate bounding sphere
-	glm::vec4 bounds = CalculateBoundingSphere(positions);
-	allocation.boundingSphereCenter = glm::vec3(bounds);
-	allocation.boundingSphereRadius = bounds.w;
-
-	// TODO: Implement offset-based buffer copy using TransferContext or CommandBuffer
-
-	{
-		VkDeviceSize positionSize = positions.size() * sizeof(glm::vec3);
-		
-		auto stagingBuffer = new Buffer(
-			_device,
-			positionSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE
-		);
-		stagingBuffer->CopyBuffer((void*)positions.data(), positionSize);
-		
-		// TODO: Copy to global buffer with offset
-		
-		delete stagingBuffer;
-	}
-
-	{
-		VkDeviceSize normalSize = normals.size() * sizeof(glm::vec3);
-		
-		auto stagingBuffer = new Buffer(
-			_device,
-			normalSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE
-		);
-		stagingBuffer->CopyBuffer((void*)normals.data(), normalSize);
-		
-		// TODO: Copy to global buffer with offset
-		
-		delete stagingBuffer;
-	}
-
-	{
-		VkDeviceSize uvSize = uvs.size() * sizeof(glm::vec2);
-		
-		auto stagingBuffer = new Buffer(
-			_device,
-			uvSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE
-		);
-		stagingBuffer->CopyBuffer((void*)uvs.data(), uvSize);
-		
-		// TODO: Copy to global buffer with offset
-		
-		delete stagingBuffer;
-	}
-
-	{
-		VkDeviceSize indexSize = indices.size() * sizeof(uint32_t);
-		
-		auto stagingBuffer = new Buffer(
-			_device,
-			indexSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE
-		);
-		stagingBuffer->CopyBuffer((void*)indices.data(), indexSize);
-		
-		// TODO: Copy to global buffer with offset
-		
-		delete stagingBuffer;
-	}
-
-	// Update offsets
-	_currentVertexOffset += allocation.vertexCount;
-	_currentIndexOffset += allocation.indexCount;
-
-	// Store allocation
-	_allocations[allocation.meshID] = allocation;
-
-	return allocation;
 }
 
 void MeshBufferManager::FreeMesh(uint32_t meshID)
@@ -198,29 +63,31 @@ void MeshBufferManager::FreeMesh(uint32_t meshID)
 void MeshBufferManager::Defragment()
 {
 	// TODO: Implement buffer defragmentation
-	// 1. Compact allocated ranges
-	// 2. Update all mesh offsets
-	// 3. Re-upload vertex/index data
 }
 
-VkBuffer MeshBufferManager::GetPositionBuffer() const
+Buffer* MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 {
-	return _globalPositionBuffer->GetBuffer();
-}
+	VkDeviceSize size = 0;
 
-VkBuffer MeshBufferManager::GetNormalBuffer() const
-{
-	return _globalNormalBuffer->GetBuffer();
-}
+	switch (indexType)
+	{
+		case VK_INDEX_TYPE_UINT16:
+			size = sizeof(uint16_t);
+			break;
+		case VK_INDEX_TYPE_UINT32:
+			size = sizeof(uint32_t);
+			break;
+		default:
+			throw runtime_error("Unsupported index type");
+	}
 
-VkBuffer MeshBufferManager::GetUVBuffer() const
-{
-	return _globalUVBuffer->GetBuffer();
-}
+	_indexBuffer = new Core::Buffer(_device,
+		_maxIndices * size,
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		MemoryType::DEVICE_LOCAL);
 
-VkBuffer MeshBufferManager::GetIndexBuffer() const
-{
-	return _globalIndexBuffer->GetBuffer();
+	_indexType = indexType;
+	return _indexBuffer;
 }
 
 const MeshAllocation* MeshBufferManager::GetAllocation(uint32_t meshID) const
@@ -229,4 +96,108 @@ const MeshAllocation* MeshBufferManager::GetAllocation(uint32_t meshID) const
 	if (it != _allocations.end())
 		return &it->second;
 	return nullptr;
+}
+
+void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const std::string& name, uint32_t stride, std::vector<uint8_t>&& data, string subMeshName)
+{
+	if (_vertexBuffers.find(name) == _vertexBuffers.end())
+	{
+		_vertexBuffers[name] = new Buffer(_device,
+			_maxVertices * stride,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			MemoryType::DEVICE_LOCAL
+		);
+	}
+
+	// If the data is position, calculate bounding sphere
+	if (name == "POSITION")
+	{
+		const glm::vec3* positions = reinterpret_cast<const glm::vec3*>(data.data());
+		size_t positionCount = data.size() / sizeof(glm::vec3);
+		vector<glm::vec3> positionVec(positions, positions + positionCount);
+		
+		_tempBoundingSphere = CalculateBoundingSphere(positionVec);
+	}
+
+	// Update _tempVertexOffset
+	uint32_t vertexCount = static_cast<uint32_t>(data.size() / stride);
+	_tempVertexOffset = vertexCount;
+
+	VkDeviceSize offset = _currentVertexOffset * stride;
+
+	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
+		_vertexBuffers[name], move(data), offset), subMeshName + name);
+}
+
+void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndexType indexType, std::vector<uint8_t>&& indexData, string subMeshName)
+{
+	if (_indexBuffer == nullptr)
+	{
+		InsertBufferSpace(indexType);
+	}
+
+	uint32_t indexStride = 0;
+	switch (indexType)
+	{
+		case VK_INDEX_TYPE_UINT16:
+			indexStride = sizeof(uint16_t);
+			break;
+		case VK_INDEX_TYPE_UINT32:
+			indexStride = sizeof(uint32_t);
+			break;
+		default:
+			throw runtime_error("Unsupported index type");
+	}
+
+	_indexType = indexType;
+
+	// Update _tempIndexCount
+	uint32_t indexCount = static_cast<uint32_t>(indexData.size() / indexStride);
+	_tempIndexCount = indexCount;
+
+	VkDeviceSize offset = _currentIndexOffset * indexStride;
+
+	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
+		_indexBuffer, move(indexData), offset), subMeshName);
+}
+
+MeshAllocation MeshBufferManager::Build()
+{
+	// Finalize allocations
+	MeshAllocation allocation;
+	allocation.vertexOffset = _currentVertexOffset;
+	allocation.vertexCount = _tempVertexOffset;
+	allocation.indexOffset = _currentIndexOffset;
+	allocation.indexCount = _tempIndexCount;
+	allocation.meshID = _nextMeshID++;
+	allocation.boundingSphereCenter = _tempBoundingSphere;
+	allocation.boundingSphereRadius = _tempBoundingSphere.w;
+
+	// Update offsets
+	_currentVertexOffset += allocation.vertexCount;
+	_currentIndexOffset += allocation.indexCount;
+
+	// Store allocation
+	_allocations[allocation.meshID] = allocation;
+
+	// Reset temp values
+	_tempVertexOffset = 0;
+	_tempBoundingSphere = vec4();
+
+	return allocation;
+}
+
+vector<Core::Buffer*> MeshBufferManager::GetVertexBuffers(vector<string> names) const
+{
+	vector<Core::Buffer*> buffers;
+
+	for (string name : names)
+	{
+		auto vertexBuffer = _vertexBuffers.find(name);
+		assert(vertexBuffer != _vertexBuffers.end());
+
+		buffers.push_back(vertexBuffer->second);
+	}
+
+	return buffers;
 }

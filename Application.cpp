@@ -28,7 +28,7 @@ bool Application::Prepare()
 
 	// Initialize ResourceCache with RenderContext for bindless support
 	auto& resourceCache = _device->GetResourceCache();
-	resourceCache.Initialize(*_renderContext);
+	resourceCache.Prepare(*_renderContext);
 
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();

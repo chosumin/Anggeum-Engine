@@ -310,7 +310,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	material->AddTexture(1, texture);
 
 	vector<shared_ptr<Material>> materials = { material };
-	LoadMeshes(materials);
+	LoadMeshes(materials, false);
 
 	LoadNodes();
 }
@@ -564,18 +564,11 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	// Check bindless support
 	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
 	BindlessTextureManager* bindlessManager = nullptr;
-	
-	MaterialManager* materialManager = nullptr;
-	
+
 	if (useBindless)
 	{
 		bindlessManager = _renderContext->GetBindlessTextureManager();
 		cout << "GLTFLoader: Using bindless textures for materials" << endl;
-	}
-	
-	if (_renderContext)
-	{
-		materialManager = _renderContext->GetMaterialManager();
 	}
 
 	for (size_t i = 0; i < size; ++i)
@@ -709,26 +702,19 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			}
 		}
 
-		if (materialManager)
-		{
-			uint32_t materialIndex = materialManager->RegisterMaterial(material);
-			cout << "Material '" << matName << "' registered at index " << materialIndex << endl;
-		}
-
 		materials[i] = material;
 	}
 
 	return materials;
 }
 
-void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
+void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
 {
-	
-	bool useGpuDriven = _renderContext && _device.IsGpuDrivenRenderingEnabled();
+	bool useGpuDriven = _device.IsGpuDrivenRenderingEnabled() && useGlobalBuffer;
 	MeshBufferManager* meshBufferManager = nullptr;
 	MaterialManager* materialManager = nullptr;
 
-	if (useGpuDriven && _renderContext)
+	if (useGpuDriven)
 	{
 		meshBufferManager = _renderContext->GetMeshBufferManager();
 		materialManager = _renderContext->GetMaterialManager();
@@ -766,7 +752,7 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 			auto subMesh = 
 				_resourceCache.RequestSubMesh(subMeshName);
 
-			if (useGpuDriven && meshBufferManager)
+			if (useGpuDriven)
 			{
 				if (subMesh->HasAllocation())
 				{
@@ -776,116 +762,54 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 					continue;
 				}
 
-				vector<glm::vec3> positions;
-				vector<glm::vec3> normals;
-				vector<glm::vec2> uvs;
-				vector<uint32_t> indices;
-
-				if (primitive.attributes.find("POSITION") != primitive.attributes.end())
+				size_t count = 0;
+				for (auto& attribute : primitive.attributes)
 				{
-					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("POSITION")];
-					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
-					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+					string name = attribute.first;
 
-					const float* data = reinterpret_cast<const float*>(
-						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+					auto vertexData = GetAttributeData(_model, attribute.second);
 
-					positions.resize(accessor.count);
-					for (size_t j = 0; j < accessor.count; j++)
-					{
-						positions[j] = glm::vec3(data[j * 3 + 0], data[j * 3 + 1], data[j * 3 + 2]);
-					}
-				}
+					auto& accessor = _model->accessors[attribute.second];
 
-				if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("NORMAL")];
-					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
-					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+					count = accessor.count;
 
-					const float* data = reinterpret_cast<const float*>(
-						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+					VkFormat format = GetAttributeFormat(_model, attribute.second);
+					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
 
-					normals.resize(accessor.count);
-					for (size_t j = 0; j < accessor.count; j++)
-					{
-						normals[j] = glm::vec3(data[j * 3 + 0], data[j * 3 + 1], data[j * 3 + 2]);
-					}
-				}
-				else
-				{
-					normals.resize(positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
-				}
-
-				if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor = _model->accessors[primitive.attributes.at("TEXCOORD_0")];
-					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
-					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
-
-					const float* data = reinterpret_cast<const float*>(
-						&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-
-					uvs.resize(accessor.count);
-					for (size_t j = 0; j < accessor.count; j++)
-					{
-						uvs[j] = glm::vec2(data[j * 2 + 0], data[j * 2 + 1]);
-					}
-				}
-				else
-				{
-					uvs.resize(positions.size(), glm::vec2(0.0f, 0.0f));
+					meshBufferManager->Allocate(_transferContext, name, stride, 
+						move(vertexData), subMeshName);
 				}
 
 				if (primitive.indices >= 0)
 				{
-					const tinygltf::Accessor& accessor = _model->accessors[primitive.indices];
-					const tinygltf::BufferView& bufferView = _model->bufferViews[accessor.bufferView];
-					const tinygltf::Buffer& buffer = _model->buffers[bufferView.buffer];
+					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
 
-					const void* data = &buffer.data[bufferView.byteOffset + accessor.byteOffset];
+					auto indexData = GetAttributeData(_model, primitive.indices);
 
-					indices.resize(accessor.count);
+					VkFormat format = GetAttributeFormat(_model, primitive.indices);
 
-					switch (accessor.componentType)
+					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+
+					switch (format)
 					{
-					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-					{
-						const uint16_t* buf = static_cast<const uint16_t*>(data);
-						for (size_t j = 0; j < accessor.count; j++)
-						{
-							indices[j] = buf[j];
-						}
+					case VK_FORMAT_R8_UINT:
+						// Converts uint8 data into uint16 data, still represented by a uint8 vector
+						indexData = ConvertDataStride(indexData, 1, 2);
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R16_UINT:
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R32_UINT:
+						indexType = VK_INDEX_TYPE_UINT32;
 						break;
 					}
-					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-					{
-						const uint32_t* buf = static_cast<const uint32_t*>(data);
-						for (size_t j = 0; j < accessor.count; j++)
-						{
-							indices[j] = buf[j];
-						}
-						break;
-					}
-					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
-					{
-						const uint8_t* buf = static_cast<const uint8_t*>(data);
-						for (size_t j = 0; j < accessor.count; j++)
-						{
-							indices[j] = buf[j];
-						}
-						break;
-					}
-					default:
-						throw runtime_error("Unsupported index component type");
-					}
 
-					subMesh->SetIndexCount(static_cast<uint32_t>(indices.size()));
+					meshBufferManager->Allocate(_transferContext, indexType, move(indexData), subMesh->GetName() + " index");
 				}
 
-				MeshAllocation allocation = meshBufferManager->AllocateMesh(
-					positions, normals, uvs, indices
-				);
+				MeshAllocation allocation = meshBufferManager->Build();
+
 				subMesh->SetAllocation(allocation);
 
 				mesh->AddSubMesh(subMesh);

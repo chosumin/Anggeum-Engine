@@ -435,6 +435,9 @@
     <None Include="Assets\Shaders\particle.vert" />
     <None Include="Assets\Shaders\particle.frag" />
     <None Include="Assets\Shaders\lightCulling.comp" />
+    <None Include="Assets\Shaders\depth.vert">
+      <Filter>Assets\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

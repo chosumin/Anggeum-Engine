@@ -1,4 +1,5 @@
 #version 450
+#extension GL_ARB_shader_draw_parameters : require
 
 #include "common.glsl"
 
@@ -9,6 +10,7 @@ layout(location = 2) in vec2 texCoord;
 layout(location = 0) out vec4 worldPos;
 layout(location = 1) out vec3 worldNormal;
 layout(location = 2) out vec2 uv;
+layout(location = 3) flat out uint outDrawID; 
 
 layout(set = 0, binding = 1) buffer readonly TransformBuffer
 {
@@ -22,6 +24,8 @@ layout(set = 0, binding = 2) buffer readonly InstanceBuffer
 
 void main() 
 {
+    outDrawID = gl_InstanceIndex;
+
     uint id = instanceBuffer.IDs[gl_InstanceIndex];
     mat4 world = transformBuffer.transforms[id];
 

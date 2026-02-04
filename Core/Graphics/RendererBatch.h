@@ -49,7 +49,7 @@ namespace Core
 
 		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
-		void PrepareIndirectCommands(Device& device);
+		void PrepareIndirectCommands(Device& device, bool needMaterialData);
 
 		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
@@ -73,6 +73,7 @@ namespace Core
 		IndirectDrawBuffer _indirectDrawBuffer;
 		Core::Buffer* _indirectCommandBuffer;
 		Core::Buffer* _materialIndexBuffer;
+		bool _needsMaterialIndexBuffer = false;
 
 		static constexpr uint32_t MAX_DRAW_COMMANDS = 10000;
 	};
