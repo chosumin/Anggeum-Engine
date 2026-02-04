@@ -93,11 +93,11 @@ struct alignas(16) GPUMaterialData
 	int metallicTextureSet = 0;
 	int roughnessTextureSet = 0;
 	int occlusionTextureSet = 0;
+	int debugMode = 0;
 
 	uint32_t basemapIndex = 0;
 	uint32_t normalmapIndex = 0;
 	uint32_t metallicRoughnessmapIndex = 0;
-	int debugMode = 0;
 
 	glm::vec3 padding;  // 16-byte alignment
 };
