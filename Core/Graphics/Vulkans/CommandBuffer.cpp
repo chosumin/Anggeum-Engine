@@ -555,3 +555,56 @@ void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t d
 		stride
 	);
 }
+
+void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data)
+{
+	vkCmdFillBuffer(_commandBuffer, buffer.GetBuffer(), offset, size, data);
+}
+
+void Core::CommandBuffer::Barrier(
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	VkAccessFlags srcAccessMask,
+	VkAccessFlags dstAccessMask)
+{
+	VkMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		1, &barrier,
+		0, nullptr,
+		0, nullptr);
+}
+
+void Core::CommandBuffer::BufferBarrier(
+	Buffer& buffer,
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	VkAccessFlags srcAccessMask,
+	VkAccessFlags dstAccessMask)
+{
+	VkBufferMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = buffer.GetBuffer();
+	barrier.offset = 0;
+	barrier.size = VK_WHOLE_SIZE;
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
+}

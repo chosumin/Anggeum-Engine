@@ -35,7 +35,6 @@ namespace Core
 		void PreparePregenerationSkybox(Texture* pregenerationSky, 
 			Texture* irradianceCubemap, Texture* prefilterCubemap);
 		void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-		void UpdateGUI();
 		void UpdateLightBuffer();
 	private:
 		Scene& _scene;

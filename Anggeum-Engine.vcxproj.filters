@@ -438,6 +438,7 @@
     <None Include="Assets\Shaders\depth.vert">
       <Filter>Assets\Shaders</Filter>
     </None>
+    <None Include="Assets\Shaders\gpuCulling.comp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

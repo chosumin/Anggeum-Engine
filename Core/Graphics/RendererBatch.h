@@ -1,5 +1,6 @@
 #pragma once
 #include "IndirectDrawBuffer.h"
+#include "BufferObjects.h"
 
 namespace Core
 {
@@ -44,12 +45,12 @@ namespace Core
 	class RendererBatches
 	{
 	public:
-		RendererBatches(TransformBatch& transformBatch);
+		RendererBatches(Device& device, TransformBatch& transformBatch);
 		~RendererBatches();
 
 		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
-		void PrepareIndirectCommands(Device& device, bool needMaterialData);
+		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData);
 
 		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
@@ -60,11 +61,13 @@ namespace Core
 			CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
+		void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera);
 	private:
-		//Add batch depending on the mesh's materials.
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
+		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 	private:
+		Device& _device;
 		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
 		TransformBatch& _transformBatch;
 		Core::Buffer* _instanceBuffer;
@@ -75,7 +78,13 @@ namespace Core
 		Core::Buffer* _materialIndexBuffer;
 		bool _needsMaterialIndexBuffer = false;
 
-		static constexpr uint32_t MAX_DRAW_COMMANDS = 10000;
+		// Buffers for GPU Culling
+		Core::Buffer* _objectDataBuffer = nullptr;
+		Core::Buffer* _visibleCountsBuffer = nullptr;
+		shared_ptr<Shader> _cullingShader;
+		unique_ptr<Pipeline> _cullingPipeline;
+
+		static constexpr uint32_t WORKGROUP_SIZE = 64;
 	};
 }
 

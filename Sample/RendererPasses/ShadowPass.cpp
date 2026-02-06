@@ -21,14 +21,14 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 		vec3(0.0f, 0.0f, 1.0f));
 
 	auto extent = swapChain.GetSwapChainExtent();
-	_directionalLight.Perspective = glm::perspective(
+	_directionalLight.Projection = glm::perspective(
 		radians(60.0f),
 		extent.width / (float)extent.height,
 		0.1f, 10.0f);
-	_directionalLight.Perspective[1][1] *= -1;
+	_directionalLight.Projection[1][1] *= -1;
 
 	//TODO : remove _shadowBuffer  
-	_shadowBuffer.Projection = _directionalLight.Perspective * _directionalLight.View;
+	_shadowBuffer.Projection = _directionalLight.Projection * _directionalLight.View;
 
 	_material = device.GetResourceCache().RequestMaterial("shadow material", "Shadow");
 
@@ -41,7 +41,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	rasterization.depthBiasEnable = VK_TRUE;
 	rasterization.depthBiasSlopeFactor = 1.5f;
 
-	_rendererBatches = make_unique<RendererBatches>(transformBatch);
+	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -54,7 +54,7 @@ void Core::ShadowPass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 
 	if (_device.IsGpuDrivenRenderingEnabled())
-		_rendererBatches->PrepareIndirectCommands(_device, false);
+		_rendererBatches->PrepareGPUDrivenRendering(_device, false);
 }
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

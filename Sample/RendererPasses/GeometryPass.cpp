@@ -45,7 +45,7 @@ namespace Core
 		_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
 		_tileInfo.tileNums = tileNums;
 
-		_rendererBatches = make_unique<RendererBatches>(transformBatch);
+		_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 	}
 
 	GeometryPass::~GeometryPass()
@@ -65,14 +65,21 @@ namespace Core
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 
 		if (_device.IsGpuDrivenRenderingEnabled())
-			_rendererBatches->PrepareIndirectCommands(_device, true);
+			_rendererBatches->PrepareGPUDrivenRendering(_device, true);
 	}
 
 	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		auto& commandBuffer = renderFrame.GetCommandBuffer();
 
-		UpdateGUI();
+		PerspectiveCamera* camera = _scene.GetMainCamera();
+
+		if (_device.IsGpuDrivenRenderingEnabled())
+		{
+			_rendererBatches->DispatchCulling(renderFrame, commandBuffer,
+				camera->Matrices);
+		}
+
 		UpdateLightBuffer();
 
 		commandBuffer.TransitionImageLayout(*_shadowRenderTarget->GetImage().lock(),
@@ -85,7 +92,6 @@ namespace Core
 			_renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
 		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-		PerspectiveCamera* camera = _scene.GetMainCamera();
 
 		if (_device.IsGpuDrivenRenderingEnabled())
 		{
@@ -229,10 +235,6 @@ namespace Core
 
 			commandBuffer.DrawIndexed(subMesh->GetIndexCount(), 1);
 		}
-	}
-
-	void GeometryPass::UpdateGUI()
-	{
 	}
 
 	void GeometryPass::UpdateLightBuffer()

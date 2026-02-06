@@ -334,6 +334,7 @@ for %%f in (*.vert *.frag *.comp) do (
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\depth.vert" />
+    <None Include="Assets\Shaders\gpuCulling.comp" />
     <None Include="Assets\Shaders\lightCulling.comp" />
     <None Include="Assets\Shaders\particle.frag" />
     <None Include="Assets\Shaders\particle.vert" />

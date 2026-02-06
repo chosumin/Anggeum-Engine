@@ -12,11 +12,15 @@
 #include "Graphics/Vulkans/RenderPass.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderFrame.h"
+#include "Graphics/ResourceCache.h"
 #include "TransferJob.h"
+
 using namespace Core;
 
-Core::RendererBatches::RendererBatches(TransformBatch& transformBatch)
-	:_transformBatch(transformBatch), _instanceBuffer(VK_NULL_HANDLE)
+Core::RendererBatches::RendererBatches(Device& device, TransformBatch& transformBatch)
+	: _device(device)
+	, _transformBatch(transformBatch)
+	, _instanceBuffer(VK_NULL_HANDLE)
 {
 }
 
@@ -30,6 +34,12 @@ Core::RendererBatches::~RendererBatches()
 
 	if (_instanceBuffer != VK_NULL_HANDLE)
 		delete(_instanceBuffer);
+
+	if (_objectDataBuffer != VK_NULL_HANDLE)
+		delete(_objectDataBuffer);
+
+	if (_visibleCountsBuffer != VK_NULL_HANDLE)
+		delete(_visibleCountsBuffer);
 
 	for (auto& batch : _shaderBatches)
 	{
@@ -63,13 +73,15 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 	CreateInstanceBuffer(device);
 }
 
-void Core::RendererBatches::PrepareIndirectCommands(Device& device, bool needMaterialData)
+void Core::RendererBatches::PrepareGPUDrivenRendering(Device& device, bool needMaterialData)
 {
 	_needsMaterialIndexBuffer = needMaterialData;
 
 	_indirectDrawBuffer.Clear();
-
 	uint32_t globalFirstInstance = 0;
+
+	vector<GPUObjectData> objectData;
+	objectData.reserve(_instanceCount);
 
 	for (auto& [shaderHash, shaderBatch] : _shaderBatches)
 	{
@@ -96,8 +108,19 @@ void Core::RendererBatches::PrepareIndirectCommands(Device& device, bool needMat
 					instanceCount,
 					globalFirstInstance
 				);
-
 				globalFirstInstance += instanceCount;
+
+				//Prepare object data for each instance
+				for (size_t i = 0; i < subMeshBatch.Transforms.size(); ++i)
+				{
+					GPUObjectData data{};
+					data.boundingSphere = glm::vec4(
+						allocation.boundingSphereCenter,
+						allocation.boundingSphereRadius);
+					data.transformIndex = subMeshBatch.Transforms[i];
+
+					objectData.push_back(data);
+				}
 			}
 		}
 	}
@@ -105,33 +128,35 @@ void Core::RendererBatches::PrepareIndirectCommands(Device& device, bool needMat
 	vector<Job*> jobs;
 
 	// Indirect Command Buffer
-	_indirectCommandBuffer = new Core::Buffer(
-		device, 
-		MAX_DRAW_COMMANDS * IndirectDrawBuffer::GetDrawCommandSize(),
-		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
-		MemoryType::DEVICE_LOCAL);
-
 	Core::VkBufferJob<DrawIndexedIndirectCommand> job(device,
-		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+		VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		&_indirectCommandBuffer,
-		_indirectDrawBuffer.GetDrawCommands());
+		_indirectDrawBuffer.GetDrawCommands(), 0);
 	jobs.push_back(&job);
 
 	// Material Index SSBO
-	_materialIndexBuffer = new Core::Buffer(
-		device,
-		MAX_DRAW_COMMANDS * sizeof(uint32_t),
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		MemoryType::DEVICE_LOCAL
-	);
-
 	Core::VkBufferJob<uint32_t> job2(device,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		&_materialIndexBuffer,
-		_indirectDrawBuffer.GetMaterialIndices(), true);
+		_indirectDrawBuffer.GetMaterialIndices(), 0);
 	jobs.push_back(&job2);
 
+	// Object Data SSBO
+	Core::VkBufferJob<GPUObjectData> job3(device,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		&_objectDataBuffer,
+		objectData, 0);
+	jobs.push_back(&job3);
+
 	Core::CommandBuffer::ImmediateSubmit(device, jobs);
+
+	_cullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCulling.comp");
+	_cullingPipeline = make_unique<Pipeline>(device, *_cullingShader);
+
+	_visibleCountsBuffer = new Core::Buffer(device,
+		sizeof(uint32_t),
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		MemoryType::DEVICE_LOCAL);
 }
 
 void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes)
@@ -319,4 +344,99 @@ void Core::RendererBatches::CreateInstanceBuffer(Device& device)
 
 	Core::VkBufferJob<uint> job(device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_instanceBuffer, instanceData, true);
 	Core::CommandBuffer::ImmediateSubmit(device, job);
+}
+
+void Core::RendererBatches::ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes)
+{
+	// Left
+	planes[0] = glm::vec4(
+		viewProj[0][3] + viewProj[0][0],
+		viewProj[1][3] + viewProj[1][0],
+		viewProj[2][3] + viewProj[2][0],
+		viewProj[3][3] + viewProj[3][0]);
+
+	// Right
+	planes[1] = glm::vec4(
+		viewProj[0][3] - viewProj[0][0],
+		viewProj[1][3] - viewProj[1][0],
+		viewProj[2][3] - viewProj[2][0],
+		viewProj[3][3] - viewProj[3][0]);
+
+	// Bottom
+	planes[2] = glm::vec4(
+		viewProj[0][3] + viewProj[0][1],
+		viewProj[1][3] + viewProj[1][1],
+		viewProj[2][3] + viewProj[2][1],
+		viewProj[3][3] + viewProj[3][1]);
+
+	// Top
+	planes[3] = glm::vec4(
+		viewProj[0][3] - viewProj[0][1],
+		viewProj[1][3] - viewProj[1][1],
+		viewProj[2][3] - viewProj[2][1],
+		viewProj[3][3] - viewProj[3][1]);
+
+	// Near
+	planes[4] = glm::vec4(
+		viewProj[0][3] + viewProj[0][2],
+		viewProj[1][3] + viewProj[1][2],
+		viewProj[2][3] + viewProj[2][2],
+		viewProj[3][3] + viewProj[3][2]);
+
+	// Far
+	planes[5] = glm::vec4(
+		viewProj[0][3] - viewProj[0][2],
+		viewProj[1][3] - viewProj[1][2],
+		viewProj[2][3] - viewProj[2][2],
+		viewProj[3][3] - viewProj[3][2]);
+
+	// Normalize planes
+	for (int i = 0; i < 6; ++i)
+	{
+		float length = glm::length(glm::vec3(planes[i]));
+		planes[i] /= length;
+	}
+}
+
+void Core::RendererBatches::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera)
+{
+	GPUCullData cullData{};
+	cullData.drawCount = _instanceCount;
+
+	glm::mat4 viewProj = camera.Projection * camera.View;
+	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
+
+	//Reset visible counts to 0
+	commandBuffer.FillBuffer(*_visibleCountsBuffer, 0, sizeof(uint32_t), 0);
+
+	commandBuffer.BufferBarrier(
+		*_visibleCountsBuffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_TRANSFER_WRITE_BIT,
+		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+
+	commandBuffer.BindPipeline(_cullingPipeline.get());
+
+	renderFrame.SetShaderUniformBuffer(*_cullingShader, 0, &cullData);
+	renderFrame.SetShaderStorageBuffer(*_cullingShader, 1, _objectDataBuffer);
+	renderFrame.SetShaderStorageBuffer(*_cullingShader, 2, _transformBatch.TransformBuffer);
+	renderFrame.SetShaderStorageBuffer(*_cullingShader, 3, _instanceBuffer);
+	renderFrame.SetShaderStorageBuffer(*_cullingShader, 4, _indirectCommandBuffer);
+	renderFrame.SetShaderStorageBuffer(*_cullingShader, 5, _visibleCountsBuffer);
+
+	commandBuffer.BindDescriptorSets(
+		renderFrame,
+		_cullingPipeline->GetPipelineBindPoint(),
+		*_cullingShader);
+
+	uint32_t groupCount = (_instanceCount + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+	commandBuffer.Dispatch(groupCount, 1, 1);
+
+	//Barrier for instance buffer and indirect draw buffer
+	commandBuffer.Barrier(
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
 }

@@ -46,6 +46,21 @@ namespace Core
 		void DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
 
+		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
+
+		void Barrier(
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask,
+			VkAccessFlags srcAccessMask,
+			VkAccessFlags dstAccessMask);
+
+		void BufferBarrier(
+			Buffer& buffer,
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask,
+			VkAccessFlags srcAccessMask,
+			VkAccessFlags dstAccessMask);
+
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 		void CopyImage(Image& srcImage, Image& dstImage, 
 			uint32_t srcMipLevel, uint32_t srcLayer, 
@@ -80,4 +95,3 @@ namespace Core
 		bool _bindlessDescriptorSetBound = false;
 	};
 }
-

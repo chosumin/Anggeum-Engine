@@ -7,7 +7,7 @@
 struct alignas(16) CameraBuffer
 {
 	mat4 View;
-	mat4 Perspective;
+	mat4 Projection;
 	vec3 Position;
 };
 
@@ -103,3 +103,15 @@ struct alignas(16) GPUMaterialData
 };
 
 static_assert(sizeof(GPUMaterialData) == 80, "GPUMaterialData must be 80 bytes");
+
+struct alignas(16) GPUObjectData
+{
+	glm::vec4 boundingSphere;  // xyz: center, w: radius
+	uint32_t transformIndex;
+};
+
+struct alignas(16) GPUCullData
+{
+	glm::vec4 frustumPlanes[6];
+	uint32_t drawCount;
+};

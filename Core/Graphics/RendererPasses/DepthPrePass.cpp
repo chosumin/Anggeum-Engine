@@ -17,7 +17,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 
 	CreateFrameBuffer(swapChain);
 
-	_rendererBatches = make_unique<RendererBatches>(transformBatch);
+	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 }
 
 Core::DepthPrePass::~DepthPrePass()
@@ -35,7 +35,7 @@ void Core::DepthPrePass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 
 	if (_device.IsGpuDrivenRenderingEnabled())
-		_rendererBatches->PrepareIndirectCommands(_device, false);
+		_rendererBatches->PrepareGPUDrivenRendering(_device, false);
 }
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

@@ -68,7 +68,7 @@ float Core::PerspectiveCamera::GetFieldOfView()
 
 mat4 Core::PerspectiveCamera::GetProjection()
 {
-	return Matrices.Perspective;
+	return Matrices.Projection;
 }
 
 mat4 Core::PerspectiveCamera::GetView()
@@ -88,13 +88,13 @@ void Core::PerspectiveCamera::SetPreRotation(const glm::mat4& pre_rotation)
 
 void Core::PerspectiveCamera::SetPerspective()
 {
-	Matrices.Perspective = perspective(
+	Matrices.Projection = perspective(
 		_fov,
 		_aspectRatio,
 		_nearPlane, _farPlane);
 
 	//Flip Y in clipspace.
-	Matrices.Perspective[1][1] *= -1;
+	Matrices.Projection[1][1] *= -1;
 }
 
 void Core::PerspectiveCamera::UpdateFrame(float deltaTime)
