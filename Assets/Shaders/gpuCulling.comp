@@ -20,9 +20,14 @@ struct ObjectData
 
 layout(set = 0, binding = 0) uniform CullData
 {
+    mat4 view;
+    mat4 proj;
     vec4 frustumPlanes[6];
+    vec2 screenSize;
     uint drawCount;
-    uint padding[3];
+    uint hiZMipLevels;
+    uint enableOcclusionCulling;
+    uint padding[2];
 } cullData;
 
 layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer
@@ -50,6 +55,8 @@ layout(set = 0, binding = 5) buffer DrawCount
     uint drawCount;
 };
 
+layout(set = 0, binding = 6) uniform sampler2D hiZBuffer;
+
 bool IsVisibleFrustum(vec3 center, float radius)
 {
     for (int i = 0; i < 6; ++i)
@@ -61,6 +68,45 @@ bool IsVisibleFrustum(vec3 center, float radius)
         }
     }
     return true;
+}
+
+bool IsOccluded(vec3 worldCenter, float worldRadius)
+{
+    // Transform to clip space
+    vec4 clipCenter = cullData.proj * cullData.view * vec4(worldCenter, 1.0);
+    
+    // Behind camera - let frustum culling handle it
+    if (clipCenter.w <= 0.0)
+        return false;
+    
+    // NDC coordinates
+    vec3 ndc = clipCenter.xyz / clipCenter.w;
+    
+    // Screen UV [0, 1]
+    vec2 screenUV = ndc.xy * 0.5 + 0.5;
+    
+    // Outside screen - let frustum culling handle it
+    if (any(lessThan(screenUV, vec2(0.0))) || any(greaterThan(screenUV, vec2(1.0))))
+        return false;
+    
+    // Calculate screen space radius
+    float projRadius = worldRadius * cullData.proj[1][1] / clipCenter.w;
+    float screenPixelRadius = projRadius * cullData.screenSize.y * 0.5;
+    
+    // Select appropriate mip level based on screen size
+    int mipLevel = int(ceil(log2(max(screenPixelRadius * 2.0, 1.0))));
+    mipLevel = clamp(mipLevel, 0, int(cullData.hiZMipLevels) - 1);
+    
+    // Sample Hi-Z buffer
+    float occluderDepth = textureLod(hiZBuffer, screenUV, float(mipLevel)).r;
+    
+    // Object's nearest depth (front of sphere)
+    float objectNearZ = clipCenter.z - worldRadius;
+    float objectNearDepth = objectNearZ / clipCenter.w;
+    objectNearDepth = objectNearDepth * 0.5 + 0.5;  // Convert to [0, 1]
+    
+    // Object is occluded if its nearest point is behind the occluder
+    return objectNearDepth > occluderDepth;
 }
 
 void main()
@@ -91,6 +137,10 @@ void main()
 
     // Frustum culling
     visible = IsVisibleFrustum(worldCenter, worldRadius);
+
+    // Occlusion culling (only if passed frustum test)
+    if (cullData.enableOcclusionCulling == 1 && visible)
+        visible = !IsOccluded(worldCenter, worldRadius);
 
     if (visible)
     {

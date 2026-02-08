@@ -194,7 +194,6 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClCompile Include="Core\Graphics\Vulkans\StorageBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\SwapChain.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Texture.cpp" />
-    <ClCompile Include="Core\Graphics\Vulkans\TextureBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\UniformBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Vulkans\Vertex.cpp" />
     <ClCompile Include="Core\Utils\FileSystem.cpp" />
@@ -284,7 +283,6 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClInclude Include="Core\Graphics\Vulkans\DescriptorPool.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Device.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Framebuffer.h" />
-    <ClInclude Include="Core\Graphics\Vulkans\IDescriptor.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Image.h" />
     <ClInclude Include="Core\Graphics\Vulkans\MemoryAllocator.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Pipeline.h" />
@@ -295,7 +293,6 @@ for %%f in (*.vert *.frag *.comp) do (
     <ClInclude Include="Core\Graphics\Vulkans\StorageBuffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\SwapChain.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Texture.h" />
-    <ClInclude Include="Core\Graphics\Vulkans\TextureBuffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\UniformBuffer.h" />
     <ClInclude Include="Core\Graphics\Vulkans\Vertex.h" />
     <ClInclude Include="Core\Utils\FileSystem.h" />
@@ -334,7 +331,9 @@ for %%f in (*.vert *.frag *.comp) do (
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\depth.vert" />
+    <None Include="Assets\Shaders\depthResolve.comp" />
     <None Include="Assets\Shaders\gpuCulling.comp" />
+    <None Include="Assets\Shaders\hiZGenerate.comp" />
     <None Include="Assets\Shaders\lightCulling.comp" />
     <None Include="Assets\Shaders\particle.frag" />
     <None Include="Assets\Shaders\particle.vert" />

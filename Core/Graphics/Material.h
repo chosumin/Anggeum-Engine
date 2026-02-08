@@ -1,8 +1,5 @@
 #pragma once
 #include "Graphics/Vulkans/Buffer.h"
-#include "Graphics/Vulkans/UniformBuffer.h"
-#include "Graphics/Vulkans/TextureBuffer.h"
-#include "Graphics/Vulkans/StorageBuffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
 
 namespace Core

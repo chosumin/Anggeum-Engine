@@ -200,6 +200,30 @@ namespace Core
 		return texture;
 	}
 
+	shared_ptr<Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo)
+	{
+		lock_guard<mutex> guard(_textureMutex);
+
+		string newName = textureName;
+		if (newName.empty())
+			newName = imageCreateInfo.filePath;
+
+		auto it = _textures.find(newName);
+		if (it != _textures.end())
+		{
+			if (auto shared = it->second.lock())
+				return shared;
+		}
+
+		auto image = RequestImage(imageCreateInfo);
+
+		auto texture =
+			make_shared<Core::Texture>(newName, image, nullptr);
+		_textures[newName] = texture;
+
+		return texture;
+	}
+
 	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const shared_ptr<Core::Image> image, const shared_ptr<Core::Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);

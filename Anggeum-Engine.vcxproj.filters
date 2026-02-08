@@ -114,9 +114,6 @@
     <ClCompile Include="Core\Graphics\Vulkans\UniformBuffer.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Graphics\Vulkans\TextureBuffer.cpp">
-      <Filter>Core\Graphics\Vulkans</Filter>
-    </ClCompile>
     <ClCompile Include="Core\Graphics\Vulkans\Texture.cpp">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClCompile>
@@ -249,9 +246,6 @@
     <ClInclude Include="Core\Graphics\Vulkans\Framebuffer.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Graphics\Vulkans\IDescriptor.h">
-      <Filter>Core\Graphics\Vulkans</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\Image.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
@@ -301,9 +295,6 @@
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\UniformBuffer.h">
-      <Filter>Core\Graphics\Vulkans</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\Vulkans\TextureBuffer.h">
       <Filter>Core\Graphics\Vulkans</Filter>
     </ClInclude>
     <ClInclude Include="Core\Graphics\Vulkans\Texture.h">
@@ -439,6 +430,12 @@
       <Filter>Assets\Shaders</Filter>
     </None>
     <None Include="Assets\Shaders\gpuCulling.comp" />
+    <None Include="Assets\Shaders\hiZGenerate.comp">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Assets\Shaders\depthResolve.comp">
+      <Filter>Assets\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">

@@ -46,15 +46,7 @@ namespace Core
 		_tileInfo.tileNums = tileNums;
 
 		_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
-	}
 
-	GeometryPass::~GeometryPass()
-	{
-		delete(_skyboxPipeline);
-	}
-
-	void GeometryPass::Prepare()
-	{
 		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
 		multiSampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
 
@@ -65,7 +57,16 @@ namespace Core
 		_rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 
 		if (_device.IsGpuDrivenRenderingEnabled())
-			_rendererBatches->PrepareGPUDrivenRendering(_device, true);
+			_rendererBatches->PrepareGPUDrivenRendering(_device, true, depthRenderTarget);
+	}
+
+	GeometryPass::~GeometryPass()
+	{
+		delete(_skyboxPipeline);
+	}
+
+	void GeometryPass::Prepare()
+	{
 	}
 
 	void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

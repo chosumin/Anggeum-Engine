@@ -38,20 +38,3 @@ Core::StorageBufferLayoutBinding::StorageBufferLayoutBinding(uint32_t binding, V
 	:Binding(binding), Stage(stage)
 {
 }
-
-VkDescriptorSetLayoutBinding Core::StorageBufferLayoutBinding::CreateDescriptorSetLayoutBinding()
-{
-	VkDescriptorSetLayoutBinding layoutBinding{};
-	layoutBinding.binding = Binding;
-	layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	layoutBinding.descriptorCount = 1;
-	layoutBinding.stageFlags = Stage;
-	layoutBinding.pImmutableSamplers = nullptr;
-
-	return layoutBinding;
-}
-
-VkDescriptorType Core::StorageBufferLayoutBinding::GetDescriptorType()
-{
-	return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-}

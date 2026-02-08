@@ -7,9 +7,6 @@
 namespace Core
 {
 	class CommandBuffer;
-	class UniformBuffer;
-	class TextureBuffer;
-	class StorageBuffer;
 	class Material;
 	class Shader;
 	class Texture;
@@ -32,10 +29,12 @@ namespace Core
 		
 		void AllocateDescriptorSets(Shader& shader);
 		void AllocateDescriptorSets(Material& material);
+		void AllocateDescriptorSetsWithKey(Shader& shader, size_t key);
 		
 		// Descriptor set updates
 		void UpdateDescriptorSets(Shader& shader);
 		void UpdateDescriptorSets(Material& material);
+		void UpdateDescriptorSetsWithKey(Shader& shader, size_t key);
 
 		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
 		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }
@@ -53,7 +52,7 @@ namespace Core
 
 		// Per-shader buffer management (set index 0)
 		void SetShaderUniformBuffer(Shader& shader, uint32_t binding, void* data);
-		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture);
+		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel = 0);
 		void SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer);
 
 		void SetMaterialBuffers(Material& material);
@@ -73,7 +72,7 @@ namespace Core
 		void CreateDescriptorPool();
 
 		void SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data);
-		void SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture);
+		void SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel);
 		void SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer);
 
 	private:

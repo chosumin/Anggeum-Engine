@@ -278,10 +278,11 @@ void Core::Shader::AddUniformBufferLayoutBinding(uint32_t set, uint32_t binding,
 	layout->AddUniformBufferBinding(binding, stage, size);
 }
 
-void Core::Shader::AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)
+void Core::Shader::AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage,
+	VkDescriptorType descriptorType)
 {
 	auto* layout = GetOrCreateDescriptorSetLayout(set);
-	layout->AddTextureBufferBinding(binding, stage);
+	layout->AddTextureBufferBinding(binding, stage, descriptorType);
 }
 
 void Core::Shader::AddStorageBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)

@@ -202,7 +202,13 @@ void RenderFrame::CreateDescriptorPool()
 	vector<VkDescriptorPoolSize> poolSizes = {
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 200 },
+		//{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		//{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		//{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		//{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		//{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000
 	};
 	
 	// Create pool with sufficient descriptor sets
@@ -212,7 +218,6 @@ void RenderFrame::CreateDescriptorPool()
 
 void RenderFrame::UpdateDescriptorSets(Shader& shader)
 {
-	// Get material resources from RenderFrame
 	auto* resources = GetShaderResources(shader.GetHash());
 	if (!resources)
 		return;
@@ -220,6 +225,10 @@ void RenderFrame::UpdateDescriptorSets(Shader& shader)
 	auto& descriptorSet = resources->descriptorSet;
 	vector<VkWriteDescriptorSet> allDescriptorWrites;
 
+	// Get shader layout for descriptor type info
+	auto& layouts = shader.GetDescriptorSetLayouts();
+	auto layoutIt = layouts.find(static_cast<uint32_t>(DescriptorSetType::Shader));
+	
 	// Process uniform buffers
 	for (auto& [binding, buffer] : resources->uniformBuffers)
 	{
@@ -229,11 +238,28 @@ void RenderFrame::UpdateDescriptorSets(Shader& shader)
 		allDescriptorWrites.push_back(writeDescriptorSet);
 	}
 
-	// Process texture buffers - get textures from Material
-	for (auto& [binding, textureBuffer] : resources->textureBuffers)
+	// Process texture buffers - use layout info for descriptor type
+	for (auto& [binding, texture] : resources->textureBuffers)
 	{
+		VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		
+		// Find descriptor type from shader layout
+		if (layoutIt != layouts.end())
+		{
+			auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
+			for (const auto& bindingInfo : textureBindings)
+			{
+				if (bindingInfo.Binding == binding)
+				{
+					descriptorType = bindingInfo.DescriptorType;
+					break;
+				}
+			}
+		}
+
 		VkWriteDescriptorSet writeDescriptorSet =
-			textureBuffer->CreateWriteDescriptorSet(binding);
+			texture.CreateWriteDescriptorSet(
+				binding, descriptorType);
 
 		writeDescriptorSet.dstSet = descriptorSet;
 		allDescriptorWrites.push_back(writeDescriptorSet);
@@ -249,7 +275,6 @@ void RenderFrame::UpdateDescriptorSets(Shader& shader)
 		allDescriptorWrites.push_back(writeDescriptorSet);
 	}
 
-	// Single batched update call
 	if (!allDescriptorWrites.empty())
 	{
 		vkUpdateDescriptorSets(
@@ -261,13 +286,16 @@ void RenderFrame::UpdateDescriptorSets(Shader& shader)
 
 void RenderFrame::UpdateDescriptorSets(Material& material)
 {
-	// Get material resources from RenderFrame
 	auto* resources = GetMaterialResources(material.GetName());
 	if (!resources)
 		return;
 
 	auto& descriptorSet = resources->descriptorSet;
 	vector<VkWriteDescriptorSet> allDescriptorWrites;
+
+	// Get material layout for descriptor type info
+	auto& layouts = material.GetShader().GetDescriptorSetLayouts();
+	auto layoutIt = layouts.find(static_cast<uint32_t>(DescriptorSetType::Material));
 
 	// Process uniform buffers
 	for (auto& [binding, buffer] : resources->uniformBuffers)
@@ -278,11 +306,27 @@ void RenderFrame::UpdateDescriptorSets(Material& material)
 		allDescriptorWrites.push_back(writeDescriptorSet);
 	}
 
-	// Process texture buffers - get textures from Material
-	for (auto& [binding, textureBuffer] : resources->textureBuffers)
+	// Process texture buffers - use layout info for descriptor type
+	for (auto& [binding, texture] : resources->textureBuffers)
 	{
+		VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		
+		// Find descriptor type from shader layout
+		if (layoutIt != layouts.end())
+		{
+			auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
+			for (const auto& bindingInfo : textureBindings)
+			{
+				if (bindingInfo.Binding == binding)
+				{
+					descriptorType = bindingInfo.DescriptorType;
+					break;
+				}
+			}
+		}
+
 		VkWriteDescriptorSet writeDescriptorSet =
-			textureBuffer->CreateWriteDescriptorSet(binding);
+			texture.CreateWriteDescriptorSet(binding, descriptorType);
 
 		writeDescriptorSet.dstSet = descriptorSet;
 		allDescriptorWrites.push_back(writeDescriptorSet);
@@ -298,7 +342,6 @@ void RenderFrame::UpdateDescriptorSets(Material& material)
 		allDescriptorWrites.push_back(writeDescriptorSet);
 	}
 
-	// Single batched update call
 	if (!allDescriptorWrites.empty())
 	{
 		vkUpdateDescriptorSets(
@@ -341,7 +384,7 @@ void RenderFrame::SetShaderUniformBuffer(Shader& shader, uint32_t binding, void*
 	}
 }
 
-void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture)
+void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel)
 {
 	auto& resources = GetOrCreateShaderResources(shader.GetHash());
 	
@@ -349,10 +392,11 @@ void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, share
 	auto it = resources.textureBuffers.find(binding);
 	if (it == resources.textureBuffers.end())
 	{
-		auto buffer = new TextureBuffer();
-		auto info = texture->GetDescriptorImageInfo();
-		buffer->CopyDescriptorImageInfo(info);
-		resources.textureBuffers[binding] = buffer;
+		TextureBuffer texBuffer{};
+		texBuffer.texture = texture;
+		texBuffer.mipLevel = mipLevel;
+
+		resources.textureBuffers[binding] = texBuffer;
 	}
 }
 
@@ -408,7 +452,7 @@ void RenderFrame::SetMaterialUniformBuffer(Material& material, uint32_t binding,
 	}
 }
 
-void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture)
+void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel)
 {
 	auto& resources = GetOrCreateMaterialResources(material.GetName());
 	
@@ -416,10 +460,11 @@ void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding,
 	auto it = resources.textureBuffers.find(binding);
 	if (it == resources.textureBuffers.end())
 	{
-		auto buffer = new TextureBuffer();
-		auto info = texture->GetDescriptorImageInfo();
-		buffer->CopyDescriptorImageInfo(info);
-		resources.textureBuffers[binding] = buffer;
+		TextureBuffer texBuffer{};
+		texBuffer.texture = texture;
+		texBuffer.mipLevel = mipLevel;
+
+		resources.textureBuffers[binding] = texBuffer;
 	}
 }
 
@@ -455,6 +500,73 @@ void RenderFrame::SetMaterialBuffers(Material& material)
 	auto& textures = material.GetTexturesMap();
 	for (auto& [binding, texture] : textures)
 	{
-		SetMaterialTextureBuffer(material, binding, texture);
+		SetMaterialTextureBuffer(material, binding, texture, 0);
 	}
+}
+
+void RenderFrame::AllocateDescriptorSetsWithKey(Shader& shader, size_t key)
+{
+    auto& resources = GetOrCreateShaderResources(key);
+
+    auto& layouts = shader.GetDescriptorSetLayouts();
+    auto layoutIt = layouts.find((uint)DescriptorSetType::Shader);
+    if (layoutIt != layouts.end())
+    {
+        VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
+
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = _descriptorPool->GetHandle();
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &vkLayout;
+
+        VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &resources.descriptorSet);
+        if (result != VK_SUCCESS)
+            throw runtime_error("Failed to allocate descriptor set");
+    }
+}
+
+void RenderFrame::UpdateDescriptorSetsWithKey(Shader& shader, size_t key)
+{
+    auto* resources = GetShaderResources(key);
+    if (!resources)
+        return;
+
+    auto& descriptorSet = resources->descriptorSet;
+    vector<VkWriteDescriptorSet> allDescriptorWrites;
+
+    auto& layouts = shader.GetDescriptorSetLayouts();
+    auto layoutIt = layouts.find(static_cast<uint32_t>(DescriptorSetType::Shader));
+
+    for (auto& [binding, texture] : resources->textureBuffers)
+    {
+        VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        
+        if (layoutIt != layouts.end())
+        {
+            auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
+            for (const auto& bindingInfo : textureBindings)
+            {
+                if (bindingInfo.Binding == binding)
+                {
+                    descriptorType = bindingInfo.DescriptorType;
+                    break;
+                }
+            }
+        }
+
+        VkWriteDescriptorSet writeDescriptorSet =
+            texture.CreateWriteDescriptorSet(binding, descriptorType);
+
+        writeDescriptorSet.dstSet = descriptorSet;
+        allDescriptorWrites.push_back(writeDescriptorSet);
+    }
+
+    if (!allDescriptorWrites.empty())
+    {
+        vkUpdateDescriptorSets(
+            _device.GetDevice(),
+            static_cast<uint32_t>(allDescriptorWrites.size()),
+            allDescriptorWrites.data(), 0, nullptr);
+    }
 }

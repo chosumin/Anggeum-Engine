@@ -11,17 +11,6 @@ Core::Texture::~Texture()
 {
 }
 
-VkDescriptorImageInfo Core::Texture::GetDescriptorImageInfo()
-{
-	VkDescriptorImageInfo imageInfo{};
-
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = _image->GetImageView();
-	imageInfo.sampler = _sampler->GetSampler();
-
-	return imageInfo;
-}
-
 uint32_t Core::Texture::GetMipLevels() const
 {
 	return _image->_mipLevels;

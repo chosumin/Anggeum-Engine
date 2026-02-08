@@ -55,20 +55,3 @@ Core::UniformBufferLayoutBinding::UniformBufferLayoutBinding(uint32_t binding, V
 	:Binding(binding), Stage(stage), BufferSize(bufferSize)
 {
 }
-
-VkDescriptorSetLayoutBinding Core::UniformBufferLayoutBinding::CreateDescriptorSetLayoutBinding()
-{
-	VkDescriptorSetLayoutBinding uboLayoutBinding{};
-	uboLayoutBinding.binding = Binding;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-	uboLayoutBinding.stageFlags = Stage;
-	uboLayoutBinding.pImmutableSamplers = nullptr;
-
-	return uboLayoutBinding;
-}
-
-VkDescriptorType Core::UniformBufferLayoutBinding::GetDescriptorType()
-{
-	return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-}

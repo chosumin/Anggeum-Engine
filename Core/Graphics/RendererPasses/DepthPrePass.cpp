@@ -9,23 +9,16 @@
 #include "Graphics/Material.h"
 #include "Graphics/ResourceCache.h"
 
-Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch)
+Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain, shared_ptr<Texture> depthRenderTarget, TransformBatch& transformBatch)
 	:RendererPass(device, workerThreadManager), _scene(scene)
 {
-	_renderPass->CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+	_renderPass->CreateDepthAttachment(depthRenderTarget.get(), VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
 
 	CreateFrameBuffer(swapChain);
 
 	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
-}
 
-Core::DepthPrePass::~DepthPrePass()
-{
-}
-
-void Core::DepthPrePass::Prepare()
-{
 	_material = _device.GetResourceCache().RequestMaterial("depth prepass", "Depth");
 
 	auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
@@ -35,7 +28,15 @@ void Core::DepthPrePass::Prepare()
 	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
 
 	if (_device.IsGpuDrivenRenderingEnabled())
-		_rendererBatches->PrepareGPUDrivenRendering(_device, false);
+		_rendererBatches->PrepareGPUDrivenRendering(_device, false, depthRenderTarget);
+}
+
+Core::DepthPrePass::~DepthPrePass()
+{
+}
+
+void Core::DepthPrePass::Prepare()
+{
 }
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

@@ -43,11 +43,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	CreateTransformBuffer(scene);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1].get(), _transformBatch);
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1], _transformBatch);
 	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, swapChain, _renderTargets[2].get(), _transformBatch);
+		device, workerThreadManager, scene, swapChain, _renderTargets[2], _transformBatch);
 	AddRendererPass(shadowPass);
 
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, 

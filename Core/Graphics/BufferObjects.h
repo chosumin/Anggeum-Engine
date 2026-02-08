@@ -112,6 +112,11 @@ struct alignas(16) GPUObjectData
 
 struct alignas(16) GPUCullData
 {
+	glm::mat4 view;
+	glm::mat4 proj;
 	glm::vec4 frustumPlanes[6];
+	glm::vec2 screenSize;
 	uint32_t drawCount;
+	uint32_t hiZMipLevels;
+	uint32_t enableOcclusionCulling;
 };

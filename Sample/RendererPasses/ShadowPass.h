@@ -12,7 +12,7 @@ namespace Core
 	{
 	public:
 		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch);
+			Scene& scene, SwapChain& swapChain, shared_ptr<Texture> depthRenderTarget, TransformBatch& transformBatch);
 		virtual ~ShadowPass() override;
 
 		virtual void Prepare() override;

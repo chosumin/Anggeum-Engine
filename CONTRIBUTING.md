@@ -8,7 +8,8 @@
 ### Include 규칙
 - `Device.h`는 `stdafx.h`에 포함되어 있으므로 각 파일에서 별도로 include하지 않습니다.
 - 모든 `.cpp` 파일의 include는 항상 `"stdafx.h"`로 시작합니다.
-
+- C++ 표준 라이브러리(std library)는 `stdafx.h`에 정의되어 있으므로 개별 파일에서 include하지 않습니다.
+- 
 ```cpp
 // ? 올바른 예시
 #include "stdafx.h"
@@ -19,6 +20,8 @@
 #include "DepthPrePass.h"
 #include "stdafx.h"  // stdafx.h가 첫 번째가 아님
 ```
+### 주석 작성
+- 주석은 항상 영어로 작성한다.
 
 ### 코드 언어 및 표준
 - C++17 표준 사용
@@ -29,10 +32,18 @@
 ### 1. 코드 위치 변경 금지 (Code Relocation Prohibition)
 **명시적으로 요청하지 않는 한 코드를 다른 클래스나 위치로 절대 옮기지 않습니다.**
 
+### 2. glsl 파일 생성 위치
+- ./Assets/Shaders/
+
 #### ? 금지 사항
 ```cpp
 // RendererBatch::Draw() 내부의 코드를
 // GeometryPass, ShadowPass 등 다른 Pass 클래스로 임의 이동
+```
+
+```h
+// #include "stdafx.h" 선언 금지
+// using namespace Core; 선언 금지
 ```
 
 #### ? 허용 사항
@@ -102,14 +113,3 @@ void SomeFunction()
 - [ ] `stdafx.h`가 첫 번째 include인가?
 - [ ] 변경 부분만 명확히 표시했는가?
 - [ ] 불필요한 리팩토링을 하지 않았는가?
-
-## 위반 시 발생하는 문제
-
-1. **디버깅 시간 증가**: 예상치 못한 위치의 코드로 인한 혼란
-2. **버그 발생**: 코드 의존성 파악 실패로 인한 에러
-3. **개발 속도 저하**: 원복 및 재수정에 소요되는 시간
-4. **팀 협업 방해**: 일관성 없는 코드 구조
-
-## 질문이나 제안
-
-프로젝트 구조나 규칙에 대한 질문이 있다면 이슈를 생성하거나 관리자에게 문의하세요.

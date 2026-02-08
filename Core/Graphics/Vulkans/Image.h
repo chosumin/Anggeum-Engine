@@ -35,7 +35,7 @@ namespace Core
 
 		VkFormat GetFormat() { return _format; }
 		VkImage& GetImage() { return _image; }
-		VkImageView& GetImageView() { return _imageView; }
+		VkImageView& GetOrCreateImageView(uint mipLevel);
 		const VkExtent3D& GetExtent() { return _extent; }
 		void SetSRGBFormat();
 
@@ -55,13 +55,16 @@ namespace Core
 		void CreateImage(VkImageTiling tiling, 
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
-		void CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType, VkImageAspectFlags aspectFlags);
+		VkImageView CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType, VkImageAspectFlags aspectFlags, uint32_t baseMipLevel);
 	private:
 		Device& _device;
 
 		VkFormat _format;
 		VkImage _image;
+
 		VkImageView _imageView;
+		vector<VkImageView> _mipImageViews;
+
 		VkExtent3D _extent;
 		uint32_t _layer;
 		uint32_t _mipLevels;

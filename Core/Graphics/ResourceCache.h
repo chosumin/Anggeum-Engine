@@ -28,8 +28,11 @@ namespace Core
 		shared_ptr<Shader> RequestShader(const string& vertPath, const string& fragPath);
 		shared_ptr<Image> RequestImage(const ImageCreateInfo imageCreateInfo);
 		shared_ptr<Sampler> RequestSampler(const SamplerCreateInfo info);
-		shared_ptr<Texture> RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo,
+		shared_ptr<Texture> RequestTexture(const string& textureName, 
+			const ImageCreateInfo imageCreateInfo,
 			const SamplerCreateInfo samplerCreateInfo);
+		shared_ptr<Texture> RequestTexture(const string& textureName,
+			const ImageCreateInfo imageCreateInfo);
 		shared_ptr<Texture> RequestTexture(const string& textureName, const shared_ptr<Image> image,
 			const shared_ptr<Sampler> sampler);
 		shared_ptr<SubMesh> RequestSubMesh(const string& name);

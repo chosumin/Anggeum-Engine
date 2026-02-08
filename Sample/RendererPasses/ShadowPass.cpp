@@ -12,8 +12,8 @@
 using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager, 
-	Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch)
-	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget)
+	Scene& scene, SwapChain& swapChain, shared_ptr<Texture> depthRenderTarget, TransformBatch& transformBatch)
+	: RendererPass(device, workerThreadManager), _scene(scene), _shadowMap(depthRenderTarget.get())
 {
 	_directionalLight.View = lookAt(
 		vec3(-2.0f, 2.0f, 2.0f),
@@ -32,7 +32,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 
 	_material = device.GetResourceCache().RequestMaterial("shadow material", "Shadow");
 
-	_renderPass->CreateDepthAttachment(depthRenderTarget, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+	_renderPass->CreateDepthAttachment(depthRenderTarget.get(), VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
 
 	CreateFrameBuffer(swapChain);
@@ -42,6 +42,12 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	rasterization.depthBiasSlopeFactor = 1.5f;
 
 	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
+
+	auto meshes = _scene.GetComponents<Core::Mesh>();
+	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
+
+	if (_device.IsGpuDrivenRenderingEnabled())
+		_rendererBatches->PrepareGPUDrivenRendering(_device, false, depthRenderTarget);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -50,11 +56,6 @@ Core::ShadowPass::~ShadowPass()
 
 void Core::ShadowPass::Prepare()
 {
-	auto meshes = _scene.GetComponents<Core::Mesh>();
-	_rendererBatches->PrepareSingleBatch(_device, _material, *_renderPass, *_pipelineState, meshes);
-
-	if (_device.IsGpuDrivenRenderingEnabled())
-		_rendererBatches->PrepareGPUDrivenRendering(_device, false);
 }
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
