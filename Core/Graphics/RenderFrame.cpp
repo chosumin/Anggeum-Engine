@@ -384,20 +384,17 @@ void RenderFrame::SetShaderUniformBuffer(Shader& shader, uint32_t binding, void*
 	}
 }
 
-void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel)
+void RenderFrame::SetShaderTextureBuffer(Shader& shader, uint32_t binding, 
+	shared_ptr<Texture> texture, uint mipLevel, VkImageLayout imageLayout)
 {
-	auto& resources = GetOrCreateShaderResources(shader.GetHash());
-	
-	// Get or create texture buffer
-	auto it = resources.textureBuffers.find(binding);
-	if (it == resources.textureBuffers.end())
-	{
-		TextureBuffer texBuffer{};
-		texBuffer.texture = texture;
-		texBuffer.mipLevel = mipLevel;
+    auto& resources = GetOrCreateShaderResources(shader.GetHash());
+    
+    TextureBuffer texBuffer{};
+    texBuffer.texture = texture;
+    texBuffer.mipLevel = mipLevel;
+    texBuffer.imageLayout = imageLayout;
 
-		resources.textureBuffers[binding] = texBuffer;
-	}
+    resources.textureBuffers[binding] = texBuffer;
 }
 
 void RenderFrame::SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer)
@@ -452,7 +449,8 @@ void RenderFrame::SetMaterialUniformBuffer(Material& material, uint32_t binding,
 	}
 }
 
-void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel)
+void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding, 
+	shared_ptr<Texture> texture, uint mipLevel, VkImageLayout imageLayout)
 {
 	auto& resources = GetOrCreateMaterialResources(material.GetName());
 	
@@ -463,6 +461,7 @@ void RenderFrame::SetMaterialTextureBuffer(Material& material, uint32_t binding,
 		TextureBuffer texBuffer{};
 		texBuffer.texture = texture;
 		texBuffer.mipLevel = mipLevel;
+		texBuffer.imageLayout = imageLayout;
 
 		resources.textureBuffers[binding] = texBuffer;
 	}

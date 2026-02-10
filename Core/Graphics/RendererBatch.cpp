@@ -453,23 +453,25 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
     auto& hiZTextureImage = *_hiZTexture->GetImage().lock();
     auto& depthBufferImage = *_previousDepthBuffer->GetImage().lock();
 
-	// Depth buffer: DEPTH_ATTACHMENT ¡æ SHADER_READ_ONLY
-	commandBuffer.TransitionImageLayout(
-		depthBufferImage,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    // Depth buffer: DEPTH_ATTACHMENT > SHADER_READ_ONLY
+    commandBuffer.TransitionImageLayout(
+        depthBufferImage,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	// Hi-Z texture: UNDEFINED ¡æ GENERAL
-	commandBuffer.TransitionImageLayout(
-		hiZTextureImage,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_GENERAL);
+    // Hi-Z texture: UNDEFINED > GENERAL
+    commandBuffer.TransitionImageLayout(
+        hiZTextureImage,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL);
 
-	// Step 1: Resolve MSAA Depth ¡æ Hi-Z Mip 0
+    // Step 1: Resolve MSAA Depth > Hi-Z Mip 0
     commandBuffer.BindPipeline(_depthResolvePipeline.get());
 
-    renderFrame.SetShaderTextureBuffer(*_depthResolveShader, 0, _previousDepthBuffer);
-    renderFrame.SetShaderTextureBuffer(*_depthResolveShader, 1, _hiZTexture, 0);
+    renderFrame.SetShaderTextureBuffer(*_depthResolveShader, 0, _previousDepthBuffer, 0, 
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    renderFrame.SetShaderTextureBuffer(*_depthResolveShader, 1, _hiZTexture, 0, 
+        VK_IMAGE_LAYOUT_GENERAL);
 
     struct DepthResolvePushConstants {
         int32_t outputWidth;
@@ -490,6 +492,10 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
     uint32_t groupY = (_screenExtent.height + 7) / 8;
     commandBuffer.Dispatch(groupX, groupY, 1);
 
+	commandBuffer.TransitionImageLayout(hiZTextureImage,
+		VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_GENERAL);
+
     // Step 2: Generate Hi-Z mip chain
     if (_hiZMipLevels > 1)
     {
@@ -503,25 +509,26 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
             mipWidth = std::max(1u, mipWidth / 2);
             mipHeight = std::max(1u, mipHeight / 2);
 
-			size_t uniqueKey = _hiZGenerateShader->GetHash() + mip;
-			auto& resources = renderFrame.GetOrCreateShaderResources(uniqueKey);
+            size_t uniqueKey = (_hiZGenerateShader->GetHash() << 8) | mip;
+            auto& resources = renderFrame.GetOrCreateShaderResources(uniqueKey);
 
-			TextureBuffer srcTex{};
-			srcTex.texture = _hiZTexture;
-			srcTex.mipLevel = mip - 1;
-			srcTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-			resources.textureBuffers[0] = srcTex;
+			//HACK HACK! Needs a new descriptor set system to avoid this kind of manual setup
+            TextureBuffer srcTex{};
+            srcTex.texture = _hiZTexture;
+            srcTex.mipLevel = mip - 1;
+            srcTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            resources.textureBuffers[0] = srcTex;
 
-			TextureBuffer dstTex{};
-			dstTex.texture = _hiZTexture;
-			dstTex.mipLevel = mip;
-			dstTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-			resources.textureBuffers[1] = dstTex;
+            TextureBuffer dstTex{};
+            dstTex.texture = _hiZTexture;
+            dstTex.mipLevel = mip;
+            dstTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            resources.textureBuffers[1] = dstTex;
 
-			renderFrame.AllocateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
-			renderFrame.UpdateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
-			commandBuffer.BindDescriptorSetsWithKey(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
-				*_hiZGenerateShader, uniqueKey);
+            renderFrame.AllocateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
+            renderFrame.UpdateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
+            commandBuffer.BindDescriptorSetsWithKey(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
+                *_hiZGenerateShader, uniqueKey);
 
             struct HiZPushConstants {
                 int32_t outputWidth;
@@ -536,16 +543,16 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
         }
     }
 
-    // Hi-Z: GENERAL ¡æ SHADER_READ_ONLY
+    // Hi-Z: GENERAL > SHADER_READ_ONLY
     commandBuffer.TransitionImageLayout(
         hiZTextureImage,
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	// Depth buffer: SHADER_READ_ONLY ¡æ DEPTH_ATTACHMENT
-	commandBuffer.TransitionImageLayout(depthBufferImage,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    // Depth buffer: SHADER_READ_ONLY > DEPTH_ATTACHMENT
+    commandBuffer.TransitionImageLayout(depthBufferImage,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void Core::RendererBatches::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera)

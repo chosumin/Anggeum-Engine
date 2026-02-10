@@ -52,7 +52,9 @@ namespace Core
 
 		// Per-shader buffer management (set index 0)
 		void SetShaderUniformBuffer(Shader& shader, uint32_t binding, void* data);
-		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel = 0);
+		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, 
+			shared_ptr<Texture> texture, uint mipLevel = 0, 
+			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		void SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer);
 
 		void SetMaterialBuffers(Material& material);
@@ -72,7 +74,9 @@ namespace Core
 		void CreateDescriptorPool();
 
 		void SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data);
-		void SetMaterialTextureBuffer(Material& material, uint32_t binding, shared_ptr<Texture> texture, uint mipLevel);
+		void SetMaterialTextureBuffer(Material& material, uint32_t binding, 
+			shared_ptr<Texture> texture, uint mipLevel,
+			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		void SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer);
 
 	private:

@@ -20,13 +20,12 @@ void main()
     ivec2 srcPos = pos * 2;
     
     // Sample 2x2 block and take maximum (furthest) depth
-    float maxDepth = texture(inputDepth, (vec2(srcPos) + vec2(0.5)) / pushConstants.outputSize).x;
-//    float d0 = texelFetch(inputDepth, srcPos + ivec2(0, 0), 0).r;
-//    float d1 = texelFetch(inputDepth, srcPos + ivec2(1, 0), 0).r;
-//    float d2 = texelFetch(inputDepth, srcPos + ivec2(0, 1), 0).r;
-//    float d3 = texelFetch(inputDepth, srcPos + ivec2(1, 1), 0).r;
-//    
-//    float maxDepth = max(max(d0, d1), max(d2, d3));
+    float d0 = texelFetch(inputDepth, srcPos + ivec2(0, 0), 0).r;
+    float d1 = texelFetch(inputDepth, srcPos + ivec2(1, 0), 0).r;
+    float d2 = texelFetch(inputDepth, srcPos + ivec2(0, 1), 0).r;
+    float d3 = texelFetch(inputDepth, srcPos + ivec2(1, 1), 0).r;
+    
+    float maxDepth = max(max(d0, d1), max(d2, d3));
     
     imageStore(outputDepth, pos, vec4(maxDepth, 0.0, 0.0, 0.0));
 }

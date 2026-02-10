@@ -55,32 +55,7 @@ namespace Core
 		VkDescriptorImageInfo imageInfo{};
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding,
-			VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-		{
-			imageInfo.imageLayout = imageLayout;
-			imageInfo.imageView = texture->GetImage().lock()->GetOrCreateImageView(mipLevel);
-
-			if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-			{
-				auto sampler = texture->GetSampler();
-				if (sampler != nullptr)
-					imageInfo.sampler = sampler->GetSampler();
-			}
-			else
-			{
-				imageInfo.sampler = VK_NULL_HANDLE;
-			}
-
-			VkWriteDescriptorSet descriptorWrite{};
-			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrite.dstBinding = binding;
-			descriptorWrite.dstArrayElement = 0;
-			descriptorWrite.descriptorType = descriptorType;
-			descriptorWrite.descriptorCount = 1;
-			descriptorWrite.pImageInfo = &imageInfo;
-
-			return descriptorWrite;
-		}
+			VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	};
 
 	struct TextureBufferLayoutBinding
