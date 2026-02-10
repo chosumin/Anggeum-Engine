@@ -6,7 +6,6 @@ Graphics API
 Features
 1. Renderer batching
 	- Ordered by Shader > Material > Mesh
-	- Instanced rendering by using SSBO
 2. Separate vertex buffer per attribute for vertex attribute optimization.
 3. GLTF scene loading.
 4. PBR rendering (Cook-Torrance BRDF)
@@ -19,7 +18,7 @@ Features
 	- Vertex and Index buffers
 	- Staging buffers
 	- Uniform buffers
-	- Image buffers (also support dedicated memory)
+	- Device local buffers (Storage, Image, and Dedicated memory)
 7. Multithreading
 	- Separated queues (Graphics, Compute, Transfer, Present)
 	- Loading images and buffers by using secondary command buffers and a single primary buffer
@@ -50,6 +49,12 @@ Features
 11. Lighting
 	- Directional, Point, Spot
 	- Tiled forward rendering with light culling compute shader
+12. GPU-Driven Rendering
+	- Support indirect drawing
+	- Unified Mesh Buffer Manager for vertex/index buffer management
+	- GPU Frustum Culling via compute shader
+	- Hi-Z Occlusion Culling with hierarchical depth buffer
+	- Per-mip ImageView for Hi-Z mip chain generation
 
 Third Parties
 - imgui
