@@ -197,7 +197,8 @@ namespace Core
 		submitInfo.pSignalSemaphores = signalSemaphores;
 		submitInfo.pNext = &semaphoreSubmitInfo;
 
-		if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+		auto result = vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		if (result != VK_SUCCESS)
 			throw runtime_error("failed to submit draw command buffer!");
 
 		// Compute queue submit

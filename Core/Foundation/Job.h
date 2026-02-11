@@ -34,7 +34,7 @@ namespace Core
 		Job* first = nullptr;
 		Job* last = nullptr;
 
-		size_t length;
+		size_t length = 0;
 		void Add(const Job* job);
 		Job* Pop();
 		Job* GetNext();

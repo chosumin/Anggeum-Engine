@@ -6,7 +6,7 @@
 
 Core::Pipeline::Pipeline(Device& device,
 	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
-	:_device(device)
+	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
 	auto vertexInputState =

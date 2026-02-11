@@ -22,15 +22,16 @@
 #include <glm/gtx/euler_angles.hpp>
 using namespace glm;
 
-#include "ThirdParties/rapidjson/include/rapidjson/document.h"
-#include "ThirdParties/rapidjson/include/rapidjson/writer.h"
-#include "ThirdParties/rapidjson/include/rapidjson/stringbuffer.h"
-#include "ThirdParties/rapidjson/include/rapidjson/filereadstream.h"
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/filereadstream.h"
 using namespace rapidjson;
 
-#include "ThirdParties/imgui/imgui.h"
-#include "ThirdParties/imgui/imgui_impl_vulkan.h"
-#include "ThirdParties/imgui/imgui_impl_glfw.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_glfw.h"
 
 #include <chrono>
 #include <iostream>
