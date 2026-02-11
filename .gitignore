@@ -1,4 +1,65 @@
-x64/
-*.hint
+# Build folders
+build/
+out/
+cmake-build-*/
+bin/
+lib/
+
+# Visual Studio
 .vs/
-VulkanSDK/
+*.user
+*.suo
+*.db
+*.opendb
+*.db-shm
+*.db-wal
+*.ipch
+
+# Visual Studio Code
+.vscode/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CMakeSettings.json
+*.cmake
+
+# Compiled files
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.iobj
+*.ipdb
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Debug/Release specific
+[Dd]ebug/
+[Rr]elease/
+[Rr]el[Ww]ith[Dd]eb[Ii]nfo/
+[Mm]in[Ss]ize[Rr]el/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/

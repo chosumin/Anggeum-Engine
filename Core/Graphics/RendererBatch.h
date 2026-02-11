@@ -60,7 +60,7 @@ namespace Core
 		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
 		TransformBatch& _transformBatch;
 		Core::Buffer* _instanceBuffer;
-		uint _instanceCount;
+		uint _instanceCount = 0;
 	};
 }
 
