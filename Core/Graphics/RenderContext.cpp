@@ -117,6 +117,10 @@ void RenderContext::Begin()
 
 	auto& currentFrame = GetCurrentFrame();
 
+	uint32_t prevIndex = (_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
+	_previousFrameDepth = _frameDepthBuffers[prevIndex];
+	currentFrame.SetPreviousDepthBuffer(_previousFrameDepth);
+
 	// Allocate command buffers (from CommandPool)
 	auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	auto& computeBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
@@ -142,6 +146,13 @@ void RenderContext::Begin()
 void RenderContext::Submit()
 {
 	auto& currentFrame = GetCurrentFrame();
+
+	auto currentDepth = currentFrame.GetRenderTarget("MainDepth");
+	if (currentDepth)
+	{
+		_frameDepthBuffers[_currentFrame] = currentDepth;
+	}
+
 	auto& commandBuffer = currentFrame.GetCommandBuffer();
 	auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
 

@@ -26,8 +26,6 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	_msaaSamples = GetMaxUsableSampleCount();
 
-	_sampler = device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
-
 	auto extent = swapChain.GetSwapChainExtent();
 
 	_renderTargets.push_back(CreateColorRenderTarget(extent, swapChain.GetImageFormat(), false));
@@ -94,10 +92,17 @@ void ForwardRenderPipeline::Prepare()
 
 void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+	auto& frameResources = renderFrame.GetFrameResources();
+	
+	auto prevDepth = _renderContext->GetPreviousFrameDepth(imageIndex);
+	frameResources.previousDepthTarget = prevDepth;
+	
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		rendererPass->Draw(renderFrame, imageIndex);
 	}
+	
+	_renderContext->UpdateFrameDepth(imageIndex, frameResources.depthTarget);
 }
 
 void Core::ForwardRenderPipeline::Cleanup()

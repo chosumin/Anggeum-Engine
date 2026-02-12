@@ -56,14 +56,24 @@ namespace Core
 	private:
 		Device& _device;
 		vector<RendererPass*> _rendererPasses;
-		vector<shared_ptr<Texture>> _renderTargets;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 		Buffer* _lightBuffer;
-		shared_ptr<Sampler> _sampler;
 
 		TransformBatch _transformBatch;
 
 		GI _giBuffer;
+
+		// Render target 이름 상수
+		static constexpr const char* RT_MAIN_COLOR = "MainColor";
+		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
+		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
+		static constexpr const char* RT_OFFSCREEN = "Offscreen";
+		static constexpr const char* RT_IRRADIANCE = "Irradiance";
+		static constexpr const char* RT_PREFILTERED = "Prefiltered";
+		static constexpr const char* RT_BRDF_LUT = "BrdfLut";
+
+		// _renderTargets 제거, RenderFrame에서 관리
+		void InitializeRenderTargets(RenderContext& renderContext, VkExtent2D extent, VkFormat swapChainFormat);
 	};
 }
 

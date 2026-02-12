@@ -60,6 +60,7 @@ namespace Core
 		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
 		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
 
+		shared_ptr<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 	private:
 		void CreateRenderFrames();
 		void CreateSyncObjects();
@@ -93,5 +94,9 @@ namespace Core
 		// GPU Driven Rendering managers
 		unique_ptr<MeshBufferManager> _meshBufferManager;
 		unique_ptr<MaterialManager> _materialManager;
+
+		// Double/Triple buffered depth for Hi-Z
+		array<shared_ptr<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
+		shared_ptr<Texture> _previousFrameDepth;
 	};
 }
