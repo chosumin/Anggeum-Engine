@@ -28,11 +28,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	auto extent = swapChain.GetSwapChainExtent();
 
-	_renderTargets.push_back(CreateColorRenderTarget(extent, swapChain.GetImageFormat(), false));
+	/*_renderTargets.push_back(CreateColorRenderTarget(extent, swapChain.GetImageFormat(), false));
 	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, _msaaSamples));
-	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));
+	_renderTargets.push_back(CreateDepthRenderTarget(extent, true, VK_SAMPLE_COUNT_1_BIT));*/
 
-	CreatePreSkyTextures();
+	//CreatePreSkyTextures();
 
 	ivec2 tileNums = ivec2(
 		(extent.width - 1) / TILE_SIZE + 1,
@@ -41,27 +41,19 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	CreateTransformBuffer(scene);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _renderTargets[1], _transformBatch);
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, _transformBatch);
 	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, swapChain, _renderTargets[2], _transformBatch);
+		device, workerThreadManager, scene, swapChain, _transformBatch);
 	AddRendererPass(shadowPass);
 
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, 
-		_renderTargets[1], _lightBuffer);
+	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
 	AddRendererPass(lightCullingPass);
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain,
-		_renderTargets[0], _renderTargets[1], 
-		_giBuffer,
-		_renderTargets[2], _renderTargets[3], 
-		_renderTargets[4], _renderTargets[5],
-		_renderTargets[6],
-		_lightBuffer, tileNums,
-		_transformBatch);
-
+		_giBuffer, _lightBuffer, tileNums, _transformBatch);
 	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
 }
@@ -92,22 +84,14 @@ void ForwardRenderPipeline::Prepare()
 
 void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto& frameResources = renderFrame.GetFrameResources();
-	
-	auto prevDepth = _renderContext->GetPreviousFrameDepth(imageIndex);
-	frameResources.previousDepthTarget = prevDepth;
-	
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		rendererPass->Draw(renderFrame, imageIndex);
 	}
-	
-	_renderContext->UpdateFrameDepth(imageIndex, frameResources.depthTarget);
 }
 
 void Core::ForwardRenderPipeline::Cleanup()
 {
-	_renderTargets.clear();
 }
 
 void Core::ForwardRenderPipeline::Resize(SwapChain& swapChain)
@@ -150,175 +134,175 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 	return VK_SAMPLE_COUNT_1_BIT;
 }
 
-shared_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
-{
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { extent.width, extent.height, 1 };
-	imageInfo.format = format;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = _msaaSamples;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = usageFlags;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
-	shared_ptr<Image> image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-	shared_ptr<Texture> renderTarget = make_shared<Texture>("render target", image, _sampler);
-	return renderTarget;
-}
+//shared_ptr<Texture> Core::ForwardRenderPipeline::CreateRenderTarget(VkExtent2D extent, VkFormat format, VkImageLayout layout, VkImageUsageFlags usageFlags)
+//{
+//	VkImageCreateInfo imageInfo{};
+//	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//	imageInfo.extent = { extent.width, extent.height, 1 };
+//	imageInfo.format = format;
+//	imageInfo.mipLevels = 1;
+//	imageInfo.arrayLayers = 1;
+//	imageInfo.samples = _msaaSamples;
+//	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//	imageInfo.usage = usageFlags;
+//	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//	
+//	shared_ptr<Image> image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+//	shared_ptr<Texture> renderTarget = make_shared<Texture>("render target", image, _sampler);
+//	return renderTarget;
+//}
+//
+//shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage)
+//{
+//	auto depthFormat = _device.FindSupportedFormat(
+//		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+//		VK_IMAGE_TILING_OPTIMAL,
+//		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+//
+//	VkImageUsageFlags flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+//	if (isUsedAsSource)
+//		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+//	if (isStorageImage)
+//		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
+//
+//	VkImageCreateInfo imageInfo{};
+//	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//	imageInfo.extent = { extent.width, extent.height, 1 };
+//	imageInfo.format = depthFormat;
+//	imageInfo.mipLevels = 1;
+//	imageInfo.arrayLayers = 1;
+//	imageInfo.samples = sampleCount;
+//	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//	imageInfo.usage = flags;
+//	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
+//
+//	shared_ptr<Texture> renderTarget = make_shared<Texture>("depth target", image, _sampler);
+//	return renderTarget;
+//}
+//
+//shared_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage)
+//{
+//	VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+//	if (isUsedAsSource)
+//		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+//	if (isStorageImage)
+//		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
+//
+//	//VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
+//	VkImageCreateInfo imageInfo{};
+//	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//	imageInfo.extent = { extent.width, extent.height, 1 };
+//	imageInfo.format = format;
+//	imageInfo.mipLevels = 1;
+//	imageInfo.arrayLayers = 1;
+//	imageInfo.samples = _msaaSamples;
+//	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//	imageInfo.usage = flags;
+//	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+//
+//	shared_ptr<Texture> renderTarget = make_shared<Texture>("color target", image, _sampler);
+//
+//	return renderTarget;
+//}
 
-shared_ptr<Texture> Core::ForwardRenderPipeline::CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage)
-{
-	auto depthFormat = _device.FindSupportedFormat(
-		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-
-	VkImageUsageFlags flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	if (isUsedAsSource)
-		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-	if (isStorageImage)
-		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
-
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { extent.width, extent.height, 1 };
-	imageInfo.format = depthFormat;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = sampleCount;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = flags;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-	shared_ptr<Texture> renderTarget = make_shared<Texture>("depth target", image, _sampler);
-	return renderTarget;
-}
-
-shared_ptr<Texture> Core::ForwardRenderPipeline::CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage)
-{
-	VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	if (isUsedAsSource)
-		flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-	if (isStorageImage)
-		flags |= VK_IMAGE_USAGE_STORAGE_BIT;
-
-	//VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : gpu virtual address and not physical memory pages.
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { extent.width, extent.height, 1 };
-	imageInfo.format = format;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = _msaaSamples;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = flags;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	shared_ptr<Texture> renderTarget = make_shared<Texture>("color target", image, _sampler);
-
-	return renderTarget;
-}
-
-void Core::ForwardRenderPipeline::CreatePreSkyTextures()
-{
-	uint32_t size = 128;
-	const uint32_t numMips = static_cast<uint32_t>(floor(std::log2(size))) + 1;
-	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	
-	{
-		//Offscreen texture to blit to the cubemap
-		VkImageCreateInfo imageInfo{};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = format;
-		imageInfo.extent = { size , size , 1 };
-		imageInfo.mipLevels = 1;
-		imageInfo.arrayLayers = 1;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-		shared_ptr<Texture> offscreen = make_shared<Texture>("offscreen", image, _sampler);
-		_renderTargets.push_back(offscreen);
-	}
-
-	{
-		//Irradiance cubemap
-		VkImageCreateInfo imageInfo{};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = format;
-		imageInfo.extent = { size , size , 1 };
-		imageInfo.mipLevels = numMips;
-		imageInfo.arrayLayers = 6;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-		auto image = make_shared<Image>(_device, imageInfo,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_VIEW_TYPE_CUBE);
-
-		shared_ptr<Texture> cubemap = make_shared<Texture>("irradiance", image, _sampler);
-		_renderTargets.push_back(cubemap);
-	}
-
-	{
-		//Prefiltered cubemap
-		VkImageCreateInfo imageInfo{};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = format;
-		imageInfo.extent = { size , size , 1 };
-		imageInfo.mipLevels = numMips;
-		imageInfo.arrayLayers = 6;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-		auto image = make_shared<Image>(_device, imageInfo,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_VIEW_TYPE_CUBE);
-
-		shared_ptr<Texture> cubemap = make_shared<Texture>("prefiltered", image, _sampler);
-		_renderTargets.push_back(cubemap);
-	}
-
-	{
-		//BRDF LUT
-		VkFormat format = VK_FORMAT_R16G16_SFLOAT;
-		uint32_t size = 512;
-
-		VkImageCreateInfo imageInfo{};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.format = format;
-		imageInfo.extent = { size , size , 1 };
-		imageInfo.mipLevels = 1;
-		imageInfo.arrayLayers = 1;
-		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-
-		shared_ptr<Texture> bdrf = make_shared<Texture>("brdflut", image, _sampler);
-		_renderTargets.push_back(bdrf);
-	}
-}
+//void Core::ForwardRenderPipeline::CreatePreSkyTextures()
+//{
+//	uint32_t size = 128;
+//	const uint32_t numMips = static_cast<uint32_t>(floor(std::log2(size))) + 1;
+//	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
+//	
+//	{
+//		//Offscreen texture to blit to the cubemap
+//		VkImageCreateInfo imageInfo{};
+//		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//		imageInfo.format = format;
+//		imageInfo.extent = { size , size , 1 };
+//		imageInfo.mipLevels = 1;
+//		imageInfo.arrayLayers = 1;
+//		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+//		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+//		shared_ptr<Texture> offscreen = make_shared<Texture>("offscreen", image, _sampler);
+//		_renderTargets.push_back(offscreen);
+//	}
+//
+//	{
+//		//Irradiance cubemap
+//		VkImageCreateInfo imageInfo{};
+//		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//		imageInfo.format = format;
+//		imageInfo.extent = { size , size , 1 };
+//		imageInfo.mipLevels = numMips;
+//		imageInfo.arrayLayers = 6;
+//		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+//		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+//
+//		auto image = make_shared<Image>(_device, imageInfo,
+//			VK_IMAGE_ASPECT_COLOR_BIT,
+//			VK_IMAGE_VIEW_TYPE_CUBE);
+//
+//		shared_ptr<Texture> cubemap = make_shared<Texture>("irradiance", image, _sampler);
+//		_renderTargets.push_back(cubemap);
+//	}
+//
+//	{
+//		//Prefiltered cubemap
+//		VkImageCreateInfo imageInfo{};
+//		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//		imageInfo.format = format;
+//		imageInfo.extent = { size , size , 1 };
+//		imageInfo.mipLevels = numMips;
+//		imageInfo.arrayLayers = 6;
+//		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//		imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+//		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+//
+//		auto image = make_shared<Image>(_device, imageInfo,
+//			VK_IMAGE_ASPECT_COLOR_BIT,
+//			VK_IMAGE_VIEW_TYPE_CUBE);
+//
+//		shared_ptr<Texture> cubemap = make_shared<Texture>("prefiltered", image, _sampler);
+//		_renderTargets.push_back(cubemap);
+//	}
+//
+//	{
+//		//BRDF LUT
+//		VkFormat format = VK_FORMAT_R16G16_SFLOAT;
+//		uint32_t size = 512;
+//
+//		VkImageCreateInfo imageInfo{};
+//		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+//		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+//		imageInfo.format = format;
+//		imageInfo.extent = { size , size , 1 };
+//		imageInfo.mipLevels = 1;
+//		imageInfo.arrayLayers = 1;
+//		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+//		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+//
+//		auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+//
+//		shared_ptr<Texture> bdrf = make_shared<Texture>("brdflut", image, _sampler);
+//		_renderTargets.push_back(bdrf);
+//	}
+//}
 
 void Core::ForwardRenderPipeline::CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums)
 {
@@ -359,26 +343,26 @@ void Core::ForwardRenderPipeline::CreateTransformBuffer(Scene& scene)
 	Core::CommandBuffer::ImmediateSubmit(_device, job);
 }
 
-void Core::ForwardRenderPipeline::RegisterGiTexturesToBindless(RenderContext& renderContext)
-{
-	if (!renderContext.HasBindlessSupport())
-		return;
-
-	auto* bindlessManager = renderContext.GetBindlessTextureManager();
-
-	TextureHandle shadowmapHandle = bindlessManager->RegisterTexture(_renderTargets[2]);
-	TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[4]);
-	TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[5]);
-	TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(_renderTargets[6]);
-
-	_giBuffer.irradianceMapIndex = irradianceCubemapHandle.index;
-	_giBuffer.prefilterMapIndex = prefilteredCubemapHandle.index;
-	_giBuffer.brdfLUTIndex = brdfLutHandle.index;
-	_giBuffer.shadowmapIndex = shadowmapHandle.index;
-
-	cout << "GI textures registered to bindless:" << endl;
-	cout << "  Irradiance cubemap: index " << irradianceCubemapHandle.index << endl;
-	cout << "  Prefiltered cubemap: index " << prefilteredCubemapHandle.index << endl;
-	cout << "  BRDF LUT: index " << brdfLutHandle.index << endl;
-	cout << "  Shadowmap: index " << shadowmapHandle.index << endl;
-}
+//void Core::ForwardRenderPipeline::RegisterGiTexturesToBindless(RenderContext& renderContext)
+//{
+//	if (!renderContext.HasBindlessSupport())
+//		return;
+//
+//	auto* bindlessManager = renderContext.GetBindlessTextureManager();
+//
+//	TextureHandle shadowmapHandle = bindlessManager->RegisterTexture(_renderTargets[2]);
+//	TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[4]);
+//	TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(_renderTargets[5]);
+//	TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(_renderTargets[6]);
+//
+//	_giBuffer.irradianceMapIndex = irradianceCubemapHandle.index;
+//	_giBuffer.prefilterMapIndex = prefilteredCubemapHandle.index;
+//	_giBuffer.brdfLUTIndex = brdfLutHandle.index;
+//	_giBuffer.shadowmapIndex = shadowmapHandle.index;
+//
+//	cout << "GI textures registered to bindless:" << endl;
+//	cout << "  Irradiance cubemap: index " << irradianceCubemapHandle.index << endl;
+//	cout << "  Prefiltered cubemap: index " << prefilteredCubemapHandle.index << endl;
+//	cout << "  BRDF LUT: index " << brdfLutHandle.index << endl;
+//	cout << "  Shadowmap: index " << shadowmapHandle.index << endl;
+//}

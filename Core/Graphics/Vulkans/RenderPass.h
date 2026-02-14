@@ -24,7 +24,7 @@ namespace Core
 		VkRenderPass GetHandle() const { return _renderPass; }
 
 		VkRenderPassBeginInfo CreateRenderPassBeginInfo(
-			Framebuffer& framebuffer, uint32_t imageIndex);
+			Framebuffer& framebuffer);
 		vector<VkImageView> GetAttachments(VkImageView swapChainImageView) const;
 
 		void CreateAttachment(Texture* renderTarget,

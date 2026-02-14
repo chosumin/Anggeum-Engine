@@ -13,6 +13,20 @@ namespace Core
 	class Buffer;
 	class BindlessTextureManager;
 	class IndirectDrawBuffer;
+	class RenderPass;
+	class Framebuffer;
+
+	struct RenderTargetDesc
+	{
+		VkExtent2D extent;
+		VkFormat format = VK_FORMAT_UNDEFINED; // For depth targets, this can be left as VK_FORMAT_UNDEFINED to auto-select a suitable depth format
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		bool isCubemap = false;
+		uint32_t mipLevels = 1;
+		uint32_t arrayLayers = 1;
+	};
 
 	class RenderFrame
 	{
@@ -70,12 +84,17 @@ namespace Core
 		void SetMaterialManager(MaterialManager* materialManager) { _materialManager = materialManager; }
 		MaterialManager* GetMaterialManager() { return _materialManager; }
 
-		shared_ptr<Texture> CreateRenderTarget(const string& name, 
-			VkExtent2D extent, VkFormat format, VkImageUsageFlags usage,
-			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
-			VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
+		// On-Demand createion
+		shared_ptr<Texture> GetOrCreateRenderTarget(const string& name, 
+			const RenderTargetDesc& desc);
 
-		shared_ptr<Texture> CreateDepthRenderTarget(const string& name,
+		shared_ptr<Texture> GetRenderTarget(const string& name) const;
+
+		// Explicit creation (for cases where you want to control the timing of resource creation)
+		shared_ptr<Texture> CreateRenderTarget(const string& name,
+			const RenderTargetDesc& desc);
+
+		/*shared_ptr<Texture> CreateDepthRenderTarget(const string& name,
 			VkExtent2D extent, bool isUsedAsSource = true,
 			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
 
@@ -84,17 +103,20 @@ namespace Core
 			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
 
 		shared_ptr<Texture> CreateCubemapRenderTarget(const string& name,
-			uint32_t size, VkFormat format, uint32_t mipLevels = 1);
+			uint32_t size, VkFormat format, uint32_t mipLevels = 1);*/
 
-		shared_ptr<Texture> GetRenderTarget(const string& name) const;
-		bool HasRenderTarget(const string& name) const;
-		void RemoveRenderTarget(const string& name);
+		//bool HasRenderTarget(const string& name) const;
+		//void RemoveRenderTarget(const string& name);
 
 		void SetPreviousDepthBuffer(shared_ptr<Texture> depth);
 		shared_ptr<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
 		// For debugging purposes
 		const unordered_map<string, shared_ptr<Texture>>& GetAllRenderTargets() const { return _renderTargets; }
+
+		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
+			const vector<string>& attachmentNames);
+		Framebuffer* GetFramebuffer(const string& name) const;
 
 	private:
 		void CreateSyncObjects();
@@ -130,5 +152,7 @@ namespace Core
 		shared_ptr<Texture> _previousDepthBuffer;
 
 		shared_ptr<Sampler> _defaultSampler;
+
+		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
 	};
 }

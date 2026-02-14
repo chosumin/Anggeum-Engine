@@ -1,59 +1,69 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/BufferObjects.h"
-#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/RendererBatch.h"
 
 namespace Core
 {
-	class Scene;
-	class SwapChain;
-	class Pipeline;
-	class GeometryPass : public RendererPass
-	{
-	public:
-		GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, 
-			shared_ptr<Texture> colorRenderTarget, shared_ptr<Texture> depthRenderTarget, 
-			GI& giBuffer,
-			shared_ptr<Texture> shadowRenderTarget, 
-			shared_ptr<Texture> pregenerationSky, shared_ptr<Texture> environmentCubemap,
-			shared_ptr<Texture> prefilterCubemap, shared_ptr<Texture> brdfLut,
-			Buffer* lightVisibilityBuffer, ivec2 tileNums,
-			TransformBatch& transformBatch);
-		virtual ~GeometryPass() override;
+    class Scene;
+    class SwapChain;
+    class Buffer;
+    class RenderContext;
 
-		virtual void Prepare() override;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+    class GeometryPass : public RendererPass
+    {
+    public:
+        // Render target 이름 상수
+        static constexpr const char* RT_MAIN_COLOR = "MainColor";
+        static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
+        static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
+        static constexpr const char* RT_IRRADIANCE = "Irradiance";
+        static constexpr const char* RT_PREFILTERED = "Prefiltered";
+        static constexpr const char* RT_BRDF_LUT = "BrdfLut";
+        static constexpr const char* RT_OFFSCREEN = "Offscreen";
 
-		//TODO : remove and replace it to the light component
-		void SetBuffer(ShadowUniform& shadowBuffer)
-		{
-			_shadowBuffer = &shadowBuffer;
-		}
-	private:
-		void PreparePregenerationSkybox(Texture* pregenerationSky, 
-			Texture* irradianceCubemap, Texture* prefilterCubemap);
-		void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-		void UpdateLightBuffer();
-	private:
-		Scene& _scene;
+        GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
+            Scene& scene, SwapChain& swapChain,
+            VkSampleCountFlagBits msaaSamples,
+            Buffer* lightVisibilityBuffer, ivec2 tileNums,
+            TransformBatch& transformBatch);
+        ~GeometryPass();
 
-		unique_ptr<RendererBatches> _rendererBatches;
+        void Prepare() override;
+        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-		shared_ptr<Texture> _shadowRenderTarget;
-		ShadowUniform* _shadowBuffer;
-		LightBuffer _lightBuffer;
-		Pipeline* _skyboxPipeline;
+        void SetBuffer(ShadowUniform* shadowBuffer) { _shadowBuffer = shadowBuffer; }
+    private:
+        void RegisterGiTexturesToBindless(RenderFrame& renderContext);
 
-		GI _giBuffer;
+        void EnsureRenderTargets(RenderFrame& renderFrame);
+        void EnsureIBLResources(RenderFrame& renderFrame);
+        void EnsureRenderPass(RenderFrame& renderFrame);
 
-		shared_ptr<Texture> _irradianceCubemap;
-		shared_ptr<Texture> _prefilteredCubemap;
-		shared_ptr<Texture> _brdfLut;
+        void PreparePregenerationSkybox(RenderFrame& renderFrame);
+        void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+        void UpdateLightBuffer();
 
-		Core::Buffer* _lightVisibilityBuffer;
-		TileInfo _tileInfo;
-	};
+    private:
+        Scene& _scene;
+        VkSampleCountFlagBits _msaaSamples;
+        VkFormat _swapChainFormat;
+
+        unique_ptr<RendererBatches> _rendererBatches;
+        Pipeline* _skyboxPipeline = nullptr;
+
+        GI _giBuffer;
+        ShadowUniform* _shadowBuffer = nullptr;
+        LightBuffer _lightBuffer;
+        Buffer* _lightVisibilityBuffer;
+        TileInfo _tileInfo;
+
+        bool _initialized = false;
+        bool _iblGenerated = false;
+
+        shared_ptr<Texture> _offscreenTexture;
+        shared_ptr<Texture> _irradianceCubemap;
+        shared_ptr<Texture> _prefilteredCubemap;
+        shared_ptr<Texture> _brdfLut;
+    };
 }
 

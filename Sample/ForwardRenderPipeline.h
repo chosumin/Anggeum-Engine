@@ -31,12 +31,6 @@ namespace Core
 		{ 
 			return _msaaSamples; 
 		}
-		virtual Texture* GetColorRenderTarget() override 
-		{ 
-			return _renderTargets[0].get(); 
-		}
-
-		void RegisterGiTexturesToBindless(RenderContext& renderContext);
 	private:
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
 
@@ -45,12 +39,12 @@ namespace Core
 			_rendererPasses.push_back(renderPass);
 		}
 
-		shared_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
+		/*shared_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
 			VkImageLayout layout, VkImageUsageFlags usageFlags);
 		shared_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage = false);
-		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);
+		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);*/
+		//void CreatePreSkyTextures();
 
-		void CreatePreSkyTextures();
 		void CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums);
 		void CreateTransformBuffer(Scene& scene);
 	private:
@@ -62,18 +56,6 @@ namespace Core
 		TransformBatch _transformBatch;
 
 		GI _giBuffer;
-
-		// Render target 이름 상수
-		static constexpr const char* RT_MAIN_COLOR = "MainColor";
-		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
-		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
-		static constexpr const char* RT_OFFSCREEN = "Offscreen";
-		static constexpr const char* RT_IRRADIANCE = "Irradiance";
-		static constexpr const char* RT_PREFILTERED = "Prefiltered";
-		static constexpr const char* RT_BRDF_LUT = "BrdfLut";
-
-		// _renderTargets 제거, RenderFrame에서 관리
-		void InitializeRenderTargets(RenderContext& renderContext, VkExtent2D extent, VkFormat swapChainFormat);
 	};
 }
 

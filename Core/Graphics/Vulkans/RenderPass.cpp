@@ -20,9 +20,9 @@ namespace Core
 	}
 
     VkRenderPassBeginInfo RenderPass::CreateRenderPassBeginInfo(
-        Framebuffer& framebuffer, uint32_t imageIndex)
+        Framebuffer& framebuffer)
     {
-        auto framebufferHandle = framebuffer.GetHandle(imageIndex);
+        auto framebufferHandle = framebuffer.GetHandle();
         VkExtent2D swapChainExtent = framebuffer.GetExtent();
 
         VkRenderPassBeginInfo renderPassInfo{};
