@@ -7,7 +7,8 @@ namespace Core
 	struct Attachment
 	{
 	public:
-		Texture* RenderTarget;
+		VkFormat Format;
+		VkSampleCountFlagBits Samples;
 		VkAttachmentLoadOp LoadOp;
 		VkAttachmentStoreOp StoreOp;
 		VkImageLayout FinalLayout;
@@ -25,12 +26,19 @@ namespace Core
 
 		VkRenderPassBeginInfo CreateRenderPassBeginInfo(
 			Framebuffer& framebuffer);
-		vector<VkImageView> GetAttachments(VkImageView swapChainImageView) const;
 
 		void CreateAttachment(Texture* renderTarget,
 			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
 		void CreateDepthAttachment(Texture* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp);
-		void CreateColorAttachment(Texture* renderTarget, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		void CreateDepthAttachment(VkFormat format, VkSampleCountFlagBits samples,
+			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp,
+			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		void CreateColorAttachment(Texture* renderTarget, 
+			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, 
+			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		void CreateColorAttachment(VkFormat format, VkSampleCountFlagBits samples,
+			VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp,
+			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		void CreateColorResolveAttachment();
 		void CreateRenderPass();
 	private:

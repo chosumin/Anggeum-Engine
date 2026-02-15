@@ -11,223 +11,225 @@
 #include "Graphics/Material.h"
 #include "Graphics/ResourceCache.h"
 #include "Utils/Utility.h"
+
 using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
 Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, 
-	WorkerThreadManager& workerThreadManager, Scene& scene,
-	Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
-	:RendererPass(device, workerThreadManager), _scene(scene), _colorRenderTarget(offscreen),
-	_irradianceCubemap(irradianceCubemap), _prefilteredCubemap(prefilteredCubemap),
-	_irradianceMaterial(device.GetResourceCache().RequestMaterial("irradiance", "Irradiance")),
-	_prefilteredMaterial(device.GetResourceCache().RequestMaterial("prefiltered", "Prefiltered"))
+    WorkerThreadManager& workerThreadManager, Scene& scene,
+    Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
+    : RendererPass(device, workerThreadManager)
+    , _scene(scene)
+    , _colorRenderTarget(offscreen)
+    , _irradianceCubemap(irradianceCubemap)
+    , _prefilteredCubemap(prefilteredCubemap)
+    , _irradianceMaterial(device.GetResourceCache().RequestMaterial("irradiance", "Irradiance"))
+    , _prefilteredMaterial(device.GetResourceCache().RequestMaterial("prefiltered", "Prefiltered"))
 {
-	_renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-	_renderPass->CreateRenderPass();
+    _renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+    _renderPass->CreateRenderPass();
 
-	CreateFrameBuffer(offscreen->GetImage().lock().get());
+    _framebuffer = make_unique<Framebuffer>(_device, *_renderPass, vector<Texture*>{ offscreen });
 }
 
 Core::PreEnvironmentPass::~PreEnvironmentPass()
 {
-	delete(_irradiancePipeline);
-	delete(_prefilteredPipeline);
+    delete(_irradiancePipeline);
+    delete(_prefilteredPipeline);
 }
 
 void Core::PreEnvironmentPass::Prepare()
 {
-	auto meshes = _scene.GetComponents<Core::Mesh>();
+    auto meshes = _scene.GetComponents<Core::Mesh>();
 
-	auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
-	{
-		auto material = mesh->GetMaterials()[0];
-		auto& shader = material->GetShader();
-		return shader.GetPass() == "Skybox";
-	});
+    auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
+    {
+        auto material = mesh->GetMaterials()[0];
+        auto& shader = material->GetShader();
+        return shader.GetPass() == "Skybox";
+    });
 
-	shared_ptr<Texture> skyCubemap;
+    shared_ptr<Texture> skyCubemap;
 
-	if (it != meshes.end())
-	{
-		auto skybox = *it;
-		
-		_sky = skybox->GetSubMeshes()[0];
-		auto material = skybox->GetMaterials()[0];
-		skyCubemap = material->GetTexture(1);
+    if (it != meshes.end())
+    {
+        auto skybox = *it;
+        
+        _sky = skybox->GetSubMeshes()[0];
+        auto material = skybox->GetMaterials()[0];
+        skyCubemap = material->GetTexture(1);
 
-		auto pipelineState = *_pipelineState;
+        auto pipelineState = *_pipelineState;
 
-		auto& depthInfo = pipelineState.GetDepthStencilStateCreateInfo();
-		depthInfo.depthWriteEnable = VK_FALSE;
-		depthInfo.depthTestEnable = VK_FALSE;
+        auto& depthInfo = pipelineState.GetDepthStencilStateCreateInfo();
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthTestEnable = VK_FALSE;
 
-		_irradiancePipeline = new Pipeline(_device, *_renderPass, _irradianceMaterial->GetShader(), pipelineState);
-		_prefilteredPipeline = new Pipeline(_device, *_renderPass, _prefilteredMaterial->GetShader(), pipelineState);
-	}
+        _irradiancePipeline = new Pipeline(_device, *_renderPass, _irradianceMaterial->GetShader(), pipelineState);
+        _prefilteredPipeline = new Pipeline(_device, *_renderPass, _prefilteredMaterial->GetShader(), pipelineState);
+    }
 
-	_mvpMatrices = {
-		glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-		glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-		glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-		glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-		glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-		glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-	};
+    _mvpMatrices = {
+        glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+        glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+        glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+        glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
+        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+    };
 
-	_delta.Phi = (2.0f * float(PI)) / 180.0f;
-	_delta.Theta = (0.5f * float(PI)) / 64.0f;
+    _delta.Phi = (2.0f * float(PI)) / 180.0f;
+    _delta.Theta = (0.5f * float(PI)) / 64.0f;
 
-	_skyCubemap = skyCubemap;
+    _skyCubemap = skyCubemap;
 }
 
 void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	// Set textures through RenderFrame
-	renderFrame.SetShaderTextureBuffer(_irradianceMaterial->GetShader(), 0, _skyCubemap);
-	renderFrame.SetShaderTextureBuffer(_prefilteredMaterial->GetShader(), 0, _skyCubemap);
+    // Set textures through RenderFrame
+    renderFrame.SetShaderTextureBuffer(_irradianceMaterial->GetShader(), 0, _skyCubemap);
+    renderFrame.SetShaderTextureBuffer(_prefilteredMaterial->GetShader(), 0, _skyCubemap);
 
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
-	
-	DrawIrradiance(renderFrame, commandBuffer, imageIndex);
-	DrawPrefiltered(renderFrame, commandBuffer, imageIndex);
+    auto& commandBuffer = renderFrame.GetCommandBuffer();
+    
+    DrawIrradiance(renderFrame, commandBuffer);
+    DrawPrefiltered(renderFrame, commandBuffer);
 }
 
-void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
-	uint32_t layers = _irradianceCubemap->GetLayers();
+    uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
+    uint32_t layers = _irradianceCubemap->GetLayers();
 
-	auto extent = _framebuffer->GetExtent();
+    auto extent = _colorRenderTarget->GetExtent();
+    VkExtent2D extent2D = { extent.width, extent.height };
 
-	for (uint32_t m = 0; m < mipLevels; ++m)
-	{
-		for (uint32_t layer = 0; layer < layers; ++layer)
-		{
-			VkExtent2D mipExtent;
-			mipExtent.width = static_cast<uint32_t>(extent.width * pow(0.5f, m));
-			mipExtent.height = static_cast<uint32_t>(extent.height * pow(0.5f, m));
+    for (uint32_t m = 0; m < mipLevels; ++m)
+    {
+        for (uint32_t layer = 0; layer < layers; ++layer)
+        {
+            VkExtent2D mipExtent;
+            mipExtent.width = static_cast<uint32_t>(extent2D.width * pow(0.5f, m));
+            mipExtent.height = static_cast<uint32_t>(extent2D.height * pow(0.5f, m));
 
-			commandBuffer.SetViewportAndScissor(mipExtent);
+            commandBuffer.SetViewportAndScissor(mipExtent);
 
-			auto beginInfo = 
-				_renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
-			commandBuffer.BeginRenderPass(beginInfo);
+            auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
+            commandBuffer.BeginRenderPass(beginInfo);
 
-			_irradianceMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
-			commandBuffer.PushConstants(*_irradianceMaterial, 0);
+            _irradianceMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
+            commandBuffer.PushConstants(*_irradianceMaterial, 0);
 
-			_irradianceMaterial->SetPushConstants<IrradianceDelta>(_delta);
-			commandBuffer.PushConstants(*_irradianceMaterial, 1);
+            _irradianceMaterial->SetPushConstants<IrradianceDelta>(_delta);
+            commandBuffer.PushConstants(*_irradianceMaterial, 1);
 
-			commandBuffer.BindPipeline(_irradiancePipeline);
+            commandBuffer.BindPipeline(_irradiancePipeline);
 
-			commandBuffer.BindDescriptorSets(
-				renderFrame,
-				_irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader());
+            commandBuffer.BindDescriptorSets(
+                renderFrame,
+                _irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader());
 
-			auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
+            auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
 
-			commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
+            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
+            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
-			commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.EndRenderPass();
 
-			commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
+            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-			commandBuffer.EndRenderPass();
+            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
+                *_irradianceCubemap->GetImage().lock(), 0, 0, m, layer);
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+    }
 
-			commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), *_irradianceCubemap->GetImage().lock(), 0, 0, m, layer);
-
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		}
-	}
-
-	commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
-void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	uint32_t mipLevels = _prefilteredCubemap->GetMipLevels();
-	uint32_t layers = _prefilteredCubemap->GetLayers();
+    uint32_t mipLevels = _prefilteredCubemap->GetMipLevels();
+    uint32_t layers = _prefilteredCubemap->GetLayers();
 
-	auto extent = _framebuffer->GetExtent();
+    auto extent = _colorRenderTarget->GetExtent();
+    VkExtent2D extent2D = { extent.width, extent.height };
 
-	for (uint32_t m = 0; m < mipLevels; ++m)
-	{
-		for (uint32_t layer = 0; layer < layers; ++layer)
-		{
-			VkExtent2D mipExtent;
-			mipExtent.width = static_cast<uint32_t>(extent.width * pow(0.5f, m));
-			mipExtent.height = static_cast<uint32_t>(extent.height * pow(0.5f, m));
+    for (uint32_t m = 0; m < mipLevels; ++m)
+    {
+        for (uint32_t layer = 0; layer < layers; ++layer)
+        {
+            VkExtent2D mipExtent;
+            mipExtent.width = static_cast<uint32_t>(extent2D.width * pow(0.5f, m));
+            mipExtent.height = static_cast<uint32_t>(extent2D.height * pow(0.5f, m));
 
-			commandBuffer.SetViewportAndScissor(mipExtent);
+            commandBuffer.SetViewportAndScissor(mipExtent);
 
-			auto beginInfo =
-				_renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
-			commandBuffer.BeginRenderPass(beginInfo);
+            auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
+            commandBuffer.BeginRenderPass(beginInfo);
 
-			_prefilteredMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
-			commandBuffer.PushConstants(*_prefilteredMaterial, 0);
+            _prefilteredMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
+            commandBuffer.PushConstants(*_prefilteredMaterial, 0);
 
-			_prefilterEnv.Roughness = (float)m / (float)(mipLevels - 1);
-			_prefilteredMaterial->SetPushConstants<PrefilterEnv>(_prefilterEnv);
-			commandBuffer.PushConstants(*_prefilteredMaterial, 1);
+            _prefilterEnv.Roughness = (float)m / (float)(mipLevels - 1);
+            _prefilteredMaterial->SetPushConstants<PrefilterEnv>(_prefilterEnv);
+            commandBuffer.PushConstants(*_prefilteredMaterial, 1);
 
-			commandBuffer.BindPipeline(_prefilteredPipeline);
+            commandBuffer.BindPipeline(_prefilteredPipeline);
 
-			commandBuffer.BindDescriptorSets(
-				renderFrame,
-				_prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader());
+            commandBuffer.BindDescriptorSets(
+                renderFrame,
+                _prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader());
 
-			auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
+            auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
 
-			commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
+            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
+            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
-			commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.EndRenderPass();
 
-			commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
+            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-			commandBuffer.EndRenderPass();
+            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
+                *_prefilteredCubemap->GetImage().lock(), 0, 0, m, layer);
 
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+    }
 
-			commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), *_prefilteredCubemap->GetImage().lock(), 0, 0, m, layer);
-
-			commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		}
-	}
-
-	commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& pass)
-	: Job(JobType::GRAPHICS_PRIMARY)
-	, _pass(pass)
-	, _tempRenderFrame(device)
+    : Job(JobType::GRAPHICS_PRIMARY)
+    , _pass(pass)
+    , _tempRenderFrame(device)
 {
-	_pass.Prepare();
+    _pass.Prepare();
 }
 
 Core::PreEnvironmentJob::~PreEnvironmentJob()
@@ -236,9 +238,9 @@ Core::PreEnvironmentJob::~PreEnvironmentJob()
 
 void Core::PreEnvironmentJob::Execute()
 {
-	_tempRenderFrame.SetCommandBuffer(commandBuffer);
+    _tempRenderFrame.SetCommandBuffer(commandBuffer);
 
-	_pass.Draw(_tempRenderFrame, 0);
-	
-	status = JobStatus::COMPLETE;
+    _pass.Draw(_tempRenderFrame, 0);
+    
+    status = JobStatus::COMPLETE;
 }

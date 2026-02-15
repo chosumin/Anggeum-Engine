@@ -24,7 +24,8 @@ namespace Core
 	class RenderFrame;
 	class BindlessTextureManager;
 	class TransferContext;
-	
+	class Texture;
+
 	class RenderContext
 	{
 	public:
@@ -95,7 +96,7 @@ namespace Core
 		unique_ptr<MeshBufferManager> _meshBufferManager;
 		unique_ptr<MaterialManager> _materialManager;
 
-		// Double/Triple buffered depth for Hi-Z
+		// Double/Triple buffered depth
 		array<shared_ptr<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
 		shared_ptr<Texture> _previousFrameDepth;
 	};

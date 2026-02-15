@@ -94,20 +94,6 @@ namespace Core
 		shared_ptr<Texture> CreateRenderTarget(const string& name,
 			const RenderTargetDesc& desc);
 
-		/*shared_ptr<Texture> CreateDepthRenderTarget(const string& name,
-			VkExtent2D extent, bool isUsedAsSource = true,
-			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
-
-		shared_ptr<Texture> CreateColorRenderTarget(const string& name,
-			VkExtent2D extent, VkFormat format, bool isUsedAsSource = false,
-			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
-
-		shared_ptr<Texture> CreateCubemapRenderTarget(const string& name,
-			uint32_t size, VkFormat format, uint32_t mipLevels = 1);*/
-
-		//bool HasRenderTarget(const string& name) const;
-		//void RemoveRenderTarget(const string& name);
-
 		void SetPreviousDepthBuffer(shared_ptr<Texture> depth);
 		shared_ptr<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
@@ -117,6 +103,8 @@ namespace Core
 		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
 			const vector<string>& attachmentNames);
 		Framebuffer* GetFramebuffer(const string& name) const;
+
+		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);
 
 	private:
 		void CreateSyncObjects();

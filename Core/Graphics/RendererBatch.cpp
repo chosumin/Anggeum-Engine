@@ -59,15 +59,14 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 		auto materials = mesh->GetMaterials();
 		for (size_t i = 0; i < materials.size(); ++i)
 		{
-			auto& shader = materials[i]->GetShader();
+			// Skip materials that don't have the "Geometry" pass
+			if (materials[i]->GetShader().GetPass() != "Geometry")
+				continue;
 
-			if (shader.GetPass() == "Geometry")
-			{
-				auto& material = materials[i];
-				auto& subMesh = mesh->GetSubMeshes()[i];
+			auto& material = materials[i];
+			auto& subMesh = mesh->GetSubMeshes()[i];
 
-				AddBatch(device, renderPass, pipelineState, entityId, material, subMesh);
-			}
+			AddBatch(device, renderPass, pipelineState, entityId, material, subMesh);
 		}
 	}
 
@@ -75,7 +74,7 @@ void Core::RendererBatches::Prepare(Device& device, RenderPass& renderPass, Pipe
 }
 
 void Core::RendererBatches::PrepareGPUDrivenRendering(Device& device, bool needMaterialData, 
-	shared_ptr<Texture> depthBuffer)
+	VkExtent2D extents)
 {
 	_needsMaterialIndexBuffer = needMaterialData;
 
@@ -152,7 +151,7 @@ void Core::RendererBatches::PrepareGPUDrivenRendering(Device& device, bool needM
 
 	Core::CommandBuffer::ImmediateSubmit(device, jobs);
 
-	PrepareHiZResources(device, depthBuffer);
+	PrepareHiZResources(device, extents);
 	PrepareCullingResources(device);
 }
 
@@ -259,8 +258,8 @@ void Core::RendererBatches::DrawIndirect(
 
 		if (_needsMaterialIndexBuffer)
 		{
-			renderFrame.SetShaderUniformBuffer(*shader, 7, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-			renderFrame.SetShaderStorageBuffer(*shader, 8, _materialIndexBuffer);
+			renderFrame.SetShaderUniformBuffer(*shader, 8, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+			renderFrame.SetShaderStorageBuffer(*shader, 9, _materialIndexBuffer);
 		}
 		
 		if (perShader)
@@ -289,7 +288,7 @@ void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, Pip
 	auto batch = _shaderBatches.find(key);
 	if (batch == _shaderBatches.end())
 	{
-		//Add new shader batch
+		// Add new shader batch
 		ShaderBatch shaderBatch;
 
 		shaderBatch.Pipeline = new Core::Pipeline(device, renderPass, *shaderPtr.get(), pipelineState);
@@ -303,7 +302,7 @@ void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, Pip
 	auto matPtr = materialBatches.find(materialName);
 	if (matPtr == materialBatches.end())
 	{
-		//Add new material batch
+		// Add new material batch
 		MaterialBatch materialBatch;
 		materialBatch.Material = material;
 
@@ -406,13 +405,9 @@ void Core::RendererBatches::ExtractFrustumPlanes(const glm::mat4& viewProj, glm:
 	}
 }
 
-void Core::RendererBatches::PrepareHiZResources(Device& device, shared_ptr<Texture> depthBuffer)
+void Core::RendererBatches::PrepareHiZResources(Device& device, VkExtent2D extents)
 {
-    if (depthBuffer == nullptr)
-        return;
-
-    _previousDepthBuffer = depthBuffer;
-    _screenExtent = _previousDepthBuffer->GetExtent();
+    _screenExtent = extents;
 
     // Calculate mip levels
     uint32_t maxDim = std::max(_screenExtent.width, _screenExtent.height);
@@ -447,9 +442,6 @@ void Core::RendererBatches::PrepareHiZResources(Device& device, shared_ptr<Textu
 
 void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-    if (!_previousDepthBuffer || !_hiZTexture)
-        return;
-
     auto& hiZTextureImage = *_hiZTexture->GetImage().lock();
     auto& depthBufferImage = *_previousDepthBuffer->GetImage().lock();
 
@@ -557,21 +549,31 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
 
 void Core::RendererBatches::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera)
 {
-	// Generate Hi-Z buffer from previous frame's depth
-	if (_previousDepthBuffer)
-	{
-		GenerateHiZBuffer(renderFrame, commandBuffer);
-	}
+    if (!_hiZInitialized)
+    {
+		// First frame: only initialize Hi-Z buffer without culling
+        auto& hiZImage = *_hiZTexture->GetImage().lock();
+        
+        commandBuffer.TransitionImageLayout(hiZImage,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        
+        _hiZInitialized = true;
+    }
+    else
+    {
+        GenerateHiZBuffer(renderFrame, commandBuffer);
+    }
 
-	GPUCullData cullData{};
-	cullData.view = camera.View;
-	cullData.proj = camera.Projection;
-	cullData.screenSize = glm::vec2(_screenExtent.width, _screenExtent.height);
-	cullData.drawCount = _instanceCount;
-	cullData.hiZMipLevels = _hiZMipLevels;
-	cullData.enableOcclusionCulling = _previousDepthBuffer ? 1 : 0;
+    GPUCullData cullData{};
+    cullData.view = camera.View;
+    cullData.proj = camera.Projection;
+    cullData.screenSize = glm::vec2(_screenExtent.width, _screenExtent.height);
+    cullData.drawCount = _instanceCount;
+    cullData.hiZMipLevels = _hiZMipLevels;
+    cullData.enableOcclusionCulling = _hiZInitialized ? 1 : 0;  // 첫 프레임은 0
 
-	glm::mat4 viewProj = camera.Projection * camera.View;
+    glm::mat4 viewProj = camera.Projection * camera.View;
 	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
 	// Reset visible counts to 0

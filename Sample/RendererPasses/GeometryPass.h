@@ -12,7 +12,6 @@ namespace Core
     class GeometryPass : public RendererPass
     {
     public:
-        // Render target 이름 상수
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
         static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
         static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
@@ -22,7 +21,7 @@ namespace Core
         static constexpr const char* RT_OFFSCREEN = "Offscreen";
 
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
-            Scene& scene, SwapChain& swapChain,
+            Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
             VkSampleCountFlagBits msaaSamples,
             Buffer* lightVisibilityBuffer, ivec2 tileNums,
             TransformBatch& transformBatch);
@@ -37,7 +36,6 @@ namespace Core
 
         void EnsureRenderTargets(RenderFrame& renderFrame);
         void EnsureIBLResources(RenderFrame& renderFrame);
-        void EnsureRenderPass(RenderFrame& renderFrame);
 
         void PreparePregenerationSkybox(RenderFrame& renderFrame);
         void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
@@ -57,7 +55,6 @@ namespace Core
         Buffer* _lightVisibilityBuffer;
         TileInfo _tileInfo;
 
-        bool _initialized = false;
         bool _iblGenerated = false;
 
         shared_ptr<Texture> _offscreenTexture;

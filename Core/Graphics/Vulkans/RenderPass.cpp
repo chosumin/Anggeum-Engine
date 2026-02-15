@@ -64,38 +64,12 @@ namespace Core
         return renderPassInfo;
     }
 
-    vector<VkImageView> RenderPass::GetAttachments(VkImageView swapChainImageView) const
-    {
-        vector<VkImageView> attachments;
-
-        if (_color != nullptr)
-        {
-            attachments.push_back(_color->RenderTarget->GetImageView());
-        }
-
-        if (_colorResolve != nullptr)
-        {
-            attachments.push_back(swapChainImageView);
-        }
-
-        if (_depth != nullptr)
-        {
-            attachments.push_back(_depth->RenderTarget->GetImageView());
-        }
-
-        for (auto& renderTarget : _inputAttachments)
-        {
-            attachments.push_back(renderTarget->RenderTarget->GetImageView());
-        }
-
-        return attachments;
-    }
-
     void RenderPass::CreateAttachment(Texture* renderTarget,
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
     {
         auto attachment = make_unique<Attachment>();
-        attachment->RenderTarget = renderTarget;
+		attachment->Format = renderTarget->GetFormat();
+		attachment->Samples = renderTarget->GetSampleCount();
         attachment->LoadOp = loadOp;
         attachment->StoreOp = storeOp;
 
@@ -106,7 +80,17 @@ namespace Core
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp)
 	{
         _depth = make_unique<Attachment>();
-        _depth->RenderTarget = renderTarget;
+        _depth->Format = renderTarget->GetFormat();
+        _depth->Samples = renderTarget->GetSampleCount();
+        _depth->LoadOp = loadOp;
+        _depth->StoreOp = storeOp;
+    }
+
+    void RenderPass::CreateDepthAttachment(VkFormat format, VkSampleCountFlagBits samples, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout)
+    {
+        _depth = make_unique<Attachment>();
+        _depth->Format = format;
+        _depth->Samples = samples;
         _depth->LoadOp = loadOp;
         _depth->StoreOp = storeOp;
     }
@@ -115,10 +99,21 @@ namespace Core
         VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout)
     {
         _color = make_unique<Attachment>();
-        _color->RenderTarget = renderTarget;
+        _color->Format = renderTarget->GetFormat();
+        _color->Samples = renderTarget->GetSampleCount();
         _color->LoadOp = loadOp;
         _color->StoreOp = storeOp;
 		_color->FinalLayout = finalLayout;
+    }
+
+    void RenderPass::CreateColorAttachment(VkFormat format, VkSampleCountFlagBits samples, VkAttachmentLoadOp loadOp, VkAttachmentStoreOp storeOp, VkImageLayout finalLayout)
+    {
+        _color = make_unique<Attachment>();
+        _color->Format = format;
+        _color->Samples = samples;
+        _color->LoadOp = loadOp;
+        _color->StoreOp = storeOp;
+        _color->FinalLayout = finalLayout;
     }
 
     void RenderPass::CreateColorResolveAttachment()
@@ -138,8 +133,8 @@ namespace Core
         if (_color != nullptr)
         {
             VkAttachmentDescription colorAttachment{};
-            colorAttachment.format = _color->RenderTarget->GetFormat();
-            colorAttachment.samples = _color->RenderTarget->GetSampleCount();
+            colorAttachment.format = _color->Format;
+            colorAttachment.samples = _color->Samples;
             colorAttachment.loadOp = _color->LoadOp;
             colorAttachment.storeOp = _color->StoreOp;
             colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -170,7 +165,7 @@ namespace Core
 		if (_colorResolve != nullptr)
 		{
 			VkAttachmentDescription colorAttachmentResolve{};
-			colorAttachmentResolve.format = _color->RenderTarget->GetFormat();
+			colorAttachmentResolve.format = _color->Format;
 			colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
 			colorAttachmentResolve.loadOp = _colorResolve->LoadOp;
 			colorAttachmentResolve.storeOp = _colorResolve->StoreOp;
@@ -191,8 +186,8 @@ namespace Core
         if (_depth != nullptr)
         {
             VkAttachmentDescription depthAttachment{};
-            depthAttachment.format = _depth->RenderTarget->GetFormat();
-            depthAttachment.samples = _depth->RenderTarget->GetSampleCount();
+            depthAttachment.format = _depth->Format;
+            depthAttachment.samples = _depth->Samples;
             depthAttachment.loadOp = _depth->LoadOp;
             depthAttachment.storeOp = _depth->StoreOp;
             depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -224,7 +219,7 @@ namespace Core
 		for (size_t i = 0; i < _inputAttachments.size(); ++i)
 		{
 			VkAttachmentDescription inputAttachment{};
-			inputAttachment.format = _inputAttachments[i]->RenderTarget->GetFormat();
+			inputAttachment.format = _inputAttachments[i]->Format;
 			inputAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 			inputAttachment.loadOp = _inputAttachments[i]->LoadOp;
 			inputAttachment.storeOp = _inputAttachments[i]->StoreOp;

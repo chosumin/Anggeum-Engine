@@ -9,11 +9,9 @@
 #include "Foundation/Scene.h"
 
 Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums, 
-	shared_ptr<Texture> depthPrepassRenderTarget,
 	Buffer* lightVisibilityBuffer)
 	:RendererPass(device, workerThreadManager), _scene(scene),
-	_lightVisibilityBuffer(lightVisibilityBuffer),
-	_depthPrepassRenderTarget(depthPrepassRenderTarget)
+	_lightVisibilityBuffer(lightVisibilityBuffer)
 {
 	_computeMaterial = device.GetResourceCache().RequestMaterial("lightCulling", "shaders/lightCulling.comp");
 	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial->GetShader());
@@ -33,11 +31,13 @@ void Core::LightCullingPass::Prepare()
 
 void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+	auto depthTarget = renderFrame.GetRenderTarget("MainDepth");
+
 	UpdateLightBuffer();
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
-	commandBuffer.TransitionImageLayout(*_depthPrepassRenderTarget->GetImage().lock(),
+	commandBuffer.TransitionImageLayout(*depthTarget->GetImage().lock(),
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -48,7 +48,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(),
 		1, _lightVisibilityBuffer);
 	renderFrame.SetShaderTextureBuffer(_computeMaterial->GetShader(),
-		2, _depthPrepassRenderTarget);
+		2, depthTarget);
 	renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(),
 		3, &_lightBuffer);
 
@@ -63,7 +63,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	commandBuffer.Dispatch(_tileInfo.tileNums.x, _tileInfo.tileNums.y, 1);
 
-	commandBuffer.TransitionImageLayout(*_depthPrepassRenderTarget->GetImage().lock(),
+	commandBuffer.TransitionImageLayout(*depthTarget->GetImage().lock(),
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }

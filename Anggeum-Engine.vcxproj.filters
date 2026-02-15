@@ -167,7 +167,6 @@
     <ClCompile Include="ThirdParties\imgui\backends\imgui_impl_vulkan.h" />
     <ClCompile Include="Core\Graphics\MaterialManager.cpp" />
     <ClCompile Include="Core\Graphics\IndirectDrawBuffer.cpp" />
-    <ClCompile Include="Core\Graphics\FrameResources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -349,7 +348,6 @@
     <ClInclude Include="Core\Graphics\MeshBufferManager.h" />
     <ClInclude Include="Core\Graphics\MaterialManager.h" />
     <ClInclude Include="Core\Graphics\IndirectDrawBuffer.h" />
-    <ClInclude Include="Core\Graphics\FrameResources.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\brdf_lut.frag">

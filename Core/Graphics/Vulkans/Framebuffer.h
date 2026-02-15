@@ -12,6 +12,7 @@ namespace Core
 	{
 	public:
 		Framebuffer(Device& device, RenderPass& renderPass, const vector<Texture*>& attachments);
+		Framebuffer(Device& device, RenderPass& renderPass, const vector<VkImageView>& imageViews, VkExtent2D extent);
 		~Framebuffer();
 
 		VkFramebuffer GetHandle() const { return _framebuffer; }

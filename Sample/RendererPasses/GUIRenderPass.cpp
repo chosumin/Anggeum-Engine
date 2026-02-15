@@ -3,112 +3,128 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-GUIRenderPass::GUIRenderPass(Core::Device& device, 
-	Core::WorkerThreadManager& workerThreadManager, 
-	Core::SwapChain& swapChain,
-	Core::Texture* colorRenderTarget)
-	:RendererPass(device, workerThreadManager)
-{
-	_renderPass->CreateColorAttachment(colorRenderTarget,
-		VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-	_renderPass->CreateColorResolveAttachment();
-	_renderPass->CreateRenderPass();
+using namespace Core;
 
-	CreateFrameBuffer(swapChain);
+Core::GUIRenderPass::GUIRenderPass(Device& device, WorkerThreadManager& workerThreadManager,
+    SwapChain& swapChain, VkSampleCountFlagBits msaaSamples)
+    : RendererPass(device, workerThreadManager)
+    , _swapChain(swapChain)
+    , _msaaSamples(msaaSamples)
+    , _swapChainFormat(swapChain.GetImageFormat())
+{
+    _extent = swapChain.GetSwapChainExtent();
+
+    _renderPass->CreateColorAttachment(_swapChainFormat, _msaaSamples,
+        VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    _renderPass->CreateColorResolveAttachment();
+
+    _renderPass->CreateRenderPass();
+
+    VkDescriptorPoolSize pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 1000;
+    pool_info.poolSizeCount = static_cast<uint32_t>(size(pool_sizes));
+    pool_info.pPoolSizes = pool_sizes;
+
+    vkCreateDescriptorPool(_device.GetDevice(), &pool_info, nullptr, &_pool);
+
+    //this initializes the core structures of imgui
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    ImGui_ImplGlfw_InitForVulkan(Core::Window::Instance().GetWindow(), true);
+
+    //this initializes imgui for Vulkan
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = _device.GetInstance();
+    init_info.PhysicalDevice = _device.GetPhysicalDevice();
+    init_info.Device = _device.GetDevice();
+    init_info.Queue = _device.GetGraphicsQueue();
+    init_info.DescriptorPool = _pool;
+    init_info.MinImageCount = 3;
+    init_info.ImageCount = 3;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_8_BIT;
+    init_info.RenderPass = _renderPass->GetHandle();
+    ImGui_ImplVulkan_Init(&init_info);
 }
 
-GUIRenderPass::~GUIRenderPass()
+Core::GUIRenderPass::~GUIRenderPass()
 {
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
-	vkDestroyDescriptorPool(_device.GetDevice(), _pool, nullptr);
+    vkDestroyDescriptorPool(_device.GetDevice(), _pool, nullptr);
 }
 
-void GUIRenderPass::Prepare()
+void Core::GUIRenderPass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
-	VkDescriptorPoolSize pool_sizes[] =
-	{
-		{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-	};
+    RenderTargetDesc colorDesc{};
+    colorDesc.extent = _extent;
+    colorDesc.format = _swapChainFormat;
+    colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+    colorDesc.samples = _msaaSamples;
+    colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 
-	VkDescriptorPoolCreateInfo pool_info = {};
-	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = static_cast<uint32_t>(size(pool_sizes));
-	pool_info.pPoolSizes = pool_sizes;
-
-	vkCreateDescriptorPool(_device.GetDevice(), &pool_info, nullptr, &_pool);
-
-	//this initializes the core structures of imgui
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-	ImGui_ImplGlfw_InitForVulkan(Core::Window::Instance().GetWindow(), true);
-
-	//this initializes imgui for Vulkan
-	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = _device.GetInstance();
-	init_info.PhysicalDevice = _device.GetPhysicalDevice();
-	init_info.Device = _device.GetDevice();
-	init_info.Queue = _device.GetGraphicsQueue();
-	init_info.DescriptorPool = _pool;
-	init_info.MinImageCount = 3;
-	init_info.ImageCount = 3;
-	init_info.MSAASamples = VK_SAMPLE_COUNT_8_BIT;
-	init_info.RenderPass = _renderPass->GetHandle();
-	ImGui_ImplVulkan_Init(&init_info);
+    renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
-void GUIRenderPass::Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::GUIRenderPass::Prepare()
 {
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
-
-	commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
-
-	auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer, imageIndex);
-	commandBuffer.BeginRenderPass(renderPassBeginInfo);
-
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-		commandBuffer.GetHandle());
-
-	commandBuffer.EndRenderPass();
 }
 
-void GUIRenderPass::Update()
+void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-	//ImGui::ShowDemoWindow();
+    EnsureRenderTargets(renderFrame);
 
-	UpdateFrame();
-}
+    auto colorTarget = renderFrame.GetRenderTarget(RT_MAIN_COLOR);
 
-void GUIRenderPass::UpdateFrame()
-{
-	static float f = 0.0f;
-	static int counter = 0;
+	// Create framebuffer using swapchain image view as resolve attachment for each frame
+	// This framebuffer is referencing different swapchain image for each frame, so we create it per frame
+    string framebufferName = "GUIRenderPass_" + to_string(imageIndex);
 
-	ImGui::Begin("Status");
+    auto* framebuffer = renderFrame.GetFramebuffer(framebufferName);
+    if (!framebuffer)
+    {
+        vector<VkImageView> imageViews = {
+            colorTarget->GetImageView(),
+            _swapChain.GetImageView(imageIndex)  // Resolve target
+        };
 
-	ImGuiIO& io = ImGui::GetIO();
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        auto fb = make_unique<Framebuffer>(_device, *_renderPass, imageViews, _extent);
+        framebuffer = fb.get();
+        renderFrame.RegisterFramebuffer(framebufferName, std::move(fb));
+    }
 
-	ImGui::End();
+    auto& commandBuffer = renderFrame.GetCommandBuffer();
+
+    commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+
+    auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+    commandBuffer.BeginRenderPass(renderPassBeginInfo);
+
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer.GetHandle());
+
+    commandBuffer.EndRenderPass();
 }

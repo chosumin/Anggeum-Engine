@@ -36,6 +36,26 @@ Core::Framebuffer::Framebuffer(Device& device, RenderPass& renderPass, const vec
 	}
 }
 
+Core::Framebuffer::Framebuffer(Device& device, RenderPass& renderPass, 
+    const vector<VkImageView>& imageViews, VkExtent2D extent)
+    : _device(device)
+    , _extent(extent)
+{
+    VkFramebufferCreateInfo framebufferInfo{};
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = renderPass.GetHandle();
+    framebufferInfo.attachmentCount = static_cast<uint32_t>(imageViews.size());
+    framebufferInfo.pAttachments = imageViews.data();
+    framebufferInfo.width = extent.width;
+    framebufferInfo.height = extent.height;
+    framebufferInfo.layers = 1;
+
+    if (vkCreateFramebuffer(_device.GetDevice(), &framebufferInfo, nullptr, &_framebuffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create framebuffer!");
+    }
+}
+
 Core::Framebuffer::~Framebuffer()
 {
 	if (_framebuffer != VK_NULL_HANDLE)

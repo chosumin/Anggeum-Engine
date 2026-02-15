@@ -21,7 +21,6 @@ layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 3) uniform GI
 {
-	uint shadowmapIndex;
 	uint irradiancemapIndex;
 	uint prefiltermapIndex;
 	uint brdfLutIndex;
@@ -42,6 +41,8 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
 {
     LightVisiblity lightVisiblities[];
 };
+
+layout(set = 0, binding = 7) uniform sampler2D shadowMap;
 
 #ifdef GPU_DRIVEN_RENDERING
 struct PBR
@@ -65,12 +66,12 @@ struct PBR
 	vec3 padding;
 };
 
-layout(set = 0, binding = 7) uniform PBRBuffer
+layout(set = 0, binding = 8) uniform PBRBuffer
 {
     PBR materials[256];
 } pbrBuffer;
 
-layout(set = 0, binding = 8) readonly buffer MaterialIndexBuffer {
+layout(set = 0, binding = 9) readonly buffer MaterialIndexBuffer {
     uint materialIndices[];
 } materialIndices;
 #else

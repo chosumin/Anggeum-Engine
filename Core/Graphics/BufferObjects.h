@@ -36,7 +36,6 @@ struct alignas(16) PBRBuffer
 
 struct alignas(16) GI
 {
-	uint shadowmapIndex;
 	uint irradianceMapIndex;
 	uint prefilterMapIndex;
 	uint brdfLUTIndex;

@@ -51,8 +51,8 @@ namespace Core
 
 		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
-		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData, 
-			shared_ptr<Texture> depthBuffer = nullptr);
+		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
+			VkExtent2D extents);
 
 		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
@@ -64,6 +64,8 @@ namespace Core
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
 		void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera);
+
+		void SetPreviousDepthBuffer(shared_ptr<Texture> depthBuffer) { _previousDepthBuffer = depthBuffer; }
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
@@ -72,7 +74,7 @@ namespace Core
 		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
 		// Hi-Z Occlusion Culling
-		void PrepareHiZResources(Device& device, shared_ptr<Texture> depthBuffer);
+		void PrepareHiZResources(Device& device, VkExtent2D extents);
 		void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 	private:
 		Device& _device;
@@ -98,10 +100,12 @@ namespace Core
 		unique_ptr<Pipeline> _hiZPipeline;
 		shared_ptr<Texture> _previousDepthBuffer = nullptr;
 		uint32_t _hiZMipLevels = 0;
-		VkExtent3D _screenExtent = {};
+		VkExtent2D _screenExtent = {};
 
 		shared_ptr<Shader> _depthResolveShader = nullptr;
 		unique_ptr<Pipeline> _depthResolvePipeline;
+
+		bool _hiZInitialized = false;
 	};
 }
 

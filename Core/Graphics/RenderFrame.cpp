@@ -580,104 +580,10 @@ shared_ptr<Texture> Core::RenderFrame::GetRenderTarget(const string& name) const
     return nullptr;
 }
 
-//bool Core::RenderFrame::HasRenderTarget(const string& name) const
-//{
-//    return _renderTargets.find(name) != _renderTargets.end();
-//}
-//
-//void Core::RenderFrame::RemoveRenderTarget(const string& name)
-//{
-//    _renderTargets.erase(name);
-//}
-
 void Core::RenderFrame::SetPreviousDepthBuffer(shared_ptr<Texture> depth)
 {
     _previousDepthBuffer = depth;
 }
-
-//shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
-//    VkExtent2D extent, VkFormat format, VkImageUsageFlags usage,
-//    VkSampleCountFlagBits samples, VkImageAspectFlags aspect)
-//{
-//    if (HasRenderTarget(name))
-//        return GetRenderTarget(name);
-//
-//    VkImageCreateInfo imageInfo{};
-//    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-//    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-//    imageInfo.extent = { extent.width, extent.height, 1 };
-//    imageInfo.format = format;
-//    imageInfo.mipLevels = 1;
-//    imageInfo.arrayLayers = 1;
-//    imageInfo.samples = samples;
-//    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-//    imageInfo.usage = usage;
-//    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-//
-//    auto image = make_shared<Image>(_device, imageInfo, aspect);
-//    auto texture = make_shared<Texture>(name, image, _defaultSampler);
-//
-//    _renderTargets[name] = texture;
-//    return texture;
-//}
-
-//shared_ptr<Texture> Core::RenderFrame::CreateDepthRenderTarget(const string& name,
-//    VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits samples)
-//{
-//    if (HasRenderTarget(name))
-//        return GetRenderTarget(name);
-//
-//    auto depthFormat = _device.FindSupportedFormat(
-//        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-//        VK_IMAGE_TILING_OPTIMAL,
-//        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
-//
-//    VkImageUsageFlags usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-//    if (isUsedAsSource)
-//        usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-//
-//    return CreateRenderTarget(name, extent, depthFormat, usage, samples, VK_IMAGE_ASPECT_DEPTH_BIT);
-//}
-//
-//shared_ptr<Texture> Core::RenderFrame::CreateColorRenderTarget(const string& name,
-//    VkExtent2D extent, VkFormat format, bool isUsedAsSource, VkSampleCountFlagBits samples)
-//{
-//    if (HasRenderTarget(name))
-//        return GetRenderTarget(name);
-//
-//    VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-//    if (!isUsedAsSource)
-//        usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-//    else
-//        usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-//
-//    return CreateRenderTarget(name, extent, format, usage, samples, VK_IMAGE_ASPECT_COLOR_BIT);
-//}
-//
-//shared_ptr<Texture> Core::RenderFrame::CreateCubemapRenderTarget(const string& name,
-//    uint32_t size, VkFormat format, uint32_t mipLevels)
-//{
-//    if (HasRenderTarget(name))
-//        return GetRenderTarget(name);
-//
-//    VkImageCreateInfo imageInfo{};
-//    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-//    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-//    imageInfo.format = format;
-//    imageInfo.extent = { size, size, 1 };
-//    imageInfo.mipLevels = mipLevels;
-//    imageInfo.arrayLayers = 6;
-//    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-//    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-//    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-//    imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-//
-//    auto image = make_shared<Image>(_device, imageInfo, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_CUBE);
-//    auto texture = make_shared<Texture>(name, image, _defaultSampler);
-//
-//    _renderTargets[name] = texture;
-//    return texture;
-//}
 
 shared_ptr<Texture> Core::RenderFrame::GetOrCreateRenderTarget(const string& name,
     const RenderTargetDesc& desc)
@@ -767,4 +673,9 @@ Framebuffer* Core::RenderFrame::GetFramebuffer(const string& name) const
     if (it != _framebuffers.end())
         return it->second.get();
     return nullptr;
+}
+
+void Core::RenderFrame::RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer)
+{
+    _framebuffers[name] = std::move(framebuffer);
 }

@@ -53,7 +53,7 @@ void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, co
 		inheritanceInfo.renderPass = renderPass != nullptr ?
 			renderPass->GetHandle() : VK_NULL_HANDLE;
 		inheritanceInfo.framebuffer = framebuffer != nullptr ?
-			framebuffer->GetHandle(imageIndex) : VK_NULL_HANDLE;
+			framebuffer->GetHandle() : VK_NULL_HANDLE;
 		inheritanceInfo.subpass = subpassIndex;
 
 		beginInfo.pInheritanceInfo = &inheritanceInfo;

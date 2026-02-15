@@ -4,24 +4,34 @@
 
 namespace Core
 {
-	class Scene;
-	class SwapChain;
-	class Material;
-	class DepthPrePass : public RendererPass
-	{
-	public:
-		DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, shared_ptr<Texture> depthRenderTarget, TransformBatch& transformBatch);
-		virtual ~DepthPrePass() override;
+    class Scene;
+    class SwapChain;
+    class Material;
 
-		void Prepare() override;
-		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
-	private:
-		Scene& _scene;
+    class DepthPrePass : public RendererPass
+    {
+    public:
+        static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 
-		unique_ptr<RendererBatches> _rendererBatches;
+        DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
+            Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
+            VkSampleCountFlagBits msaaSamples, TransformBatch& transformBatch);
+        ~DepthPrePass();
 
-		shared_ptr<Material> _material;
-	};
+        void Prepare() override;
+        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+
+    private:
+        void EnsureRenderTargets(RenderFrame& renderFrame);
+
+    private:
+        Scene& _scene;
+        VkExtent2D _extent;
+        VkSampleCountFlagBits _msaaSamples;
+
+        unique_ptr<RendererBatches> _rendererBatches;
+
+		shared_ptr<Material> _depthMaterial;
+    };
 }
 

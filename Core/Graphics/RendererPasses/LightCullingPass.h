@@ -13,7 +13,6 @@ namespace Core
 	public:
 		LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums,
-			shared_ptr<Texture> depthPrepassRenderTarget,
 			Buffer* lightVisibilityBuffer);
 		virtual ~LightCullingPass() override;
 
@@ -25,7 +24,6 @@ namespace Core
 		Scene& _scene;
 
 		Core::Buffer* _lightVisibilityBuffer;
-		shared_ptr<Texture> _depthPrepassRenderTarget;
 		
 		LightBuffer _lightBuffer;
 		TileInfo _tileInfo;

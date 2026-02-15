@@ -39,12 +39,6 @@ namespace Core
 			_rendererPasses.push_back(renderPass);
 		}
 
-		/*shared_ptr<Texture> CreateRenderTarget(VkExtent2D extent, VkFormat format,
-			VkImageLayout layout, VkImageUsageFlags usageFlags);
-		shared_ptr<Texture> CreateDepthRenderTarget(VkExtent2D extent, bool isUsedAsSource, VkSampleCountFlagBits sampleCount, bool isStorageImage = false);
-		shared_ptr<Texture> CreateColorRenderTarget(VkExtent2D extent, VkFormat format, bool isUsedAsSource, bool isStorageImage = false);*/
-		//void CreatePreSkyTextures();
-
 		void CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums);
 		void CreateTransformBuffer(Scene& scene);
 	private:
@@ -54,8 +48,6 @@ namespace Core
 		Buffer* _lightBuffer;
 
 		TransformBatch _transformBatch;
-
-		GI _giBuffer;
 	};
 }
 

@@ -18,7 +18,7 @@
 namespace Core
 {
     GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
-        Scene& scene, SwapChain& swapChain,
+        Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
         VkSampleCountFlagBits msaaSamples,
         Buffer* lightVisibilityBuffer, ivec2 tileNums,
         TransformBatch& transformBatch)
@@ -32,13 +32,27 @@ namespace Core
         _tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
         _tileInfo.tileNums = tileNums;
 
-        _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
-
         auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
         multiSampling.rasterizationSamples = msaaSamples;
 
         auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
         depthStencil.depthWriteEnable = VK_FALSE;
+
+        _renderPass->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
+            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+        _renderPass->CreateDepthAttachment(depthFormat, _msaaSamples,
+            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+        _renderPass->CreateRenderPass();
+
+        _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
+
+        auto meshes = _scene.GetComponents<Core::Mesh>();
+        _rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
+
+        if (_device.IsGpuDrivenRenderingEnabled())
+        {
+            _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtents);
+        }
     }
 
     GeometryPass::~GeometryPass()
@@ -121,31 +135,6 @@ namespace Core
         _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
-    void GeometryPass::EnsureRenderPass(RenderFrame& renderFrame)
-    {
-        if (_initialized)
-            return;
-
-        auto colorTarget = renderFrame.GetRenderTarget(RT_MAIN_COLOR);
-        auto depthTarget = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
-
-        _renderPass->CreateColorAttachment(colorTarget.get(),
-            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-        _renderPass->CreateDepthAttachment(depthTarget.get(),
-            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_DONT_CARE);
-        _renderPass->CreateRenderPass();
-
-        auto meshes = _scene.GetComponents<Core::Mesh>();
-        _rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
-
-        if (_device.IsGpuDrivenRenderingEnabled())
-        {
-            _rendererBatches->PrepareGPUDrivenRendering(_device, true, depthTarget);
-        }
-
-        _initialized = true;
-    }
-
     void GeometryPass::Prepare()
     {
     }
@@ -155,7 +144,6 @@ namespace Core
         // Lazy initialization
         EnsureRenderTargets(renderFrame);
         EnsureIBLResources(renderFrame);
-        EnsureRenderPass(renderFrame);
 
         if (!_iblGenerated)
         {
@@ -180,6 +168,9 @@ namespace Core
 
         if (_device.IsGpuDrivenRenderingEnabled())
         {
+			auto previousDepth = renderFrame.GetPreviousDepthBuffer();
+			_rendererBatches->SetPreviousDepthBuffer(previousDepth);
+
             _rendererBatches->DispatchCulling(renderFrame, commandBuffer, camera->Matrices);
         }
 
