@@ -333,6 +333,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <None Include="Assets\Shaders\depth.vert" />
     <None Include="Assets\Shaders\depthResolve.comp" />
     <None Include="Assets\Shaders\gpuCulling.comp" />
+    <None Include="Assets\Shaders\gpuCullingPass2.comp" />
     <None Include="Assets\Shaders\hiZGenerate.comp" />
     <None Include="Assets\Shaders\lightCulling.comp" />
     <None Include="Assets\Shaders\particle.frag" />
@@ -354,6 +355,7 @@ for %%f in (*.vert *.frag *.comp) do (
     <None Include="Assets\Shaders\pbr.vert.spv" />
     <None Include="Assets\Shaders\prefilter.frag" />
     <None Include="Assets\Shaders\prefilter.frag.spv" />
+    <None Include="Assets\Shaders\resetDrawCommands.comp" />
     <None Include="Assets\Shaders\shadow.frag" />
     <None Include="Assets\Shaders\shadow.frag.spv" />
     <None Include="Assets\Shaders\shadow.vert" />

@@ -38,11 +38,20 @@ namespace Core
         auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
         depthStencil.depthWriteEnable = VK_FALSE;
 
+        // Pass 1: color CLEAR, depth LOAD
         _renderPass->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
             VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
         _renderPass->CreateDepthAttachment(depthFormat, _msaaSamples,
             VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
         _renderPass->CreateRenderPass();
+
+        // Pass 2: color LOAD, depth LOAD (preserves Pass 1 results)
+        _renderPassPass2 = new RenderPass(_device);
+        _renderPassPass2->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
+            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+        _renderPassPass2->CreateDepthAttachment(depthFormat, _msaaSamples,
+            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+        _renderPassPass2->CreateRenderPass();
 
         _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 
@@ -58,6 +67,7 @@ namespace Core
     GeometryPass::~GeometryPass()
     {
         delete(_skyboxPipeline);
+        delete(_renderPassPass2);
     }
 
     void GeometryPass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -149,7 +159,6 @@ namespace Core
         {
             PreparePregenerationSkybox(renderFrame);
             RegisterGiTexturesToBindless(renderFrame);
-
             _iblGenerated = true;
         }
 
@@ -163,16 +172,7 @@ namespace Core
 
         auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
-
         auto shadowTarget = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
-
-        if (_device.IsGpuDrivenRenderingEnabled())
-        {
-			auto previousDepth = renderFrame.GetPreviousDepthBuffer();
-			_rendererBatches->SetPreviousDepthBuffer(previousDepth);
-
-            _rendererBatches->DispatchCulling(renderFrame, commandBuffer, camera->Matrices);
-        }
 
         UpdateLightBuffer();
 
@@ -185,52 +185,52 @@ namespace Core
 
         commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-        auto renderPassBeginInfo = 
-            _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-        commandBuffer.BeginRenderPass(renderPassBeginInfo);
+        auto perShader = [&](shared_ptr<Shader> shader)
+        {
+            renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
+            renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
+            renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
+            renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
+            renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
+            renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
+        };
+
+        auto perDraw = [&](shared_ptr<Material> sharedMaterial)
+        {
+            sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+            commandBuffer.PushConstants(*sharedMaterial, 0);
+        };
 
         if (_device.IsGpuDrivenRenderingEnabled())
         {
-            _rendererBatches->DrawIndirect(
-            renderFrame,
-            commandBuffer,
-            [&](shared_ptr<Shader> shader) 
-            {
-                renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-                renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
-                renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
-                renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
-                renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
-                renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
-            },
-            [&](shared_ptr<Material> sharedMaterial)
-            {
-                sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-                commandBuffer.PushConstants(*sharedMaterial, 0);
-            });
+            auto previousDepth = renderFrame.GetPreviousDepthBuffer();
+            auto depthTarget = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
+
+            _rendererBatches->GpuDrivenDraw(
+                renderFrame, commandBuffer,
+                previousDepth, depthTarget,
+                camera->Matrices,
+                *_renderPass, *_renderPassPass2,
+                *framebuffer,
+                perShader, perDraw,
+                [&]() { DrawSkybox(renderFrame, commandBuffer); });
         }
         else
         {
-            _rendererBatches->Draw(renderFrame, commandBuffer,
-            [&](shared_ptr<Shader> shader)
-            {
-                renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-                renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
-                renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
-                renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
-                renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
-                renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
-            },
-            [&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
-            {
-                sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-                commandBuffer.PushConstants(*sharedMaterial, 0);
-            });
+            auto renderPassBeginInfo =
+                _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+            commandBuffer.BeginRenderPass(renderPassBeginInfo);
+
+            _rendererBatches->Draw(renderFrame, commandBuffer, perShader,
+                [&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
+                {
+                    sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
+                    commandBuffer.PushConstants(*sharedMaterial, 0);
+                });
+
+            DrawSkybox(renderFrame, commandBuffer);
+            commandBuffer.EndRenderPass();
         }
-
-        DrawSkybox(renderFrame, commandBuffer);
-
-        commandBuffer.EndRenderPass();
     }
 
     void GeometryPass::PreparePregenerationSkybox(RenderFrame& renderFrame)

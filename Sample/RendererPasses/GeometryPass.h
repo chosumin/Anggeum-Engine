@@ -61,6 +61,9 @@ namespace Core
         shared_ptr<Texture> _irradianceCubemap;
         shared_ptr<Texture> _prefilteredCubemap;
         shared_ptr<Texture> _brdfLut;
+
+        // Pass 2 RenderPass (color LOAD, depth LOAD)
+        RenderPass* _renderPassPass2 = nullptr;
     };
 }
 

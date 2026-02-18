@@ -107,6 +107,7 @@ struct alignas(16) GPUObjectData
 {
 	glm::vec4 boundingSphere;  // xyz: center, w: radius
 	uint32_t transformIndex;
+	uint32_t drawCommandIndex;
 };
 
 struct alignas(16) GPUCullData

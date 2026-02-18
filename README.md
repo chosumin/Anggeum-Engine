@@ -53,7 +53,7 @@ Features
 	- Support indirect drawing
 	- Unified Mesh Buffer Manager for vertex/index buffer management
 	- GPU Frustum Culling via compute shader
-	- Hi-Z Occlusion Culling with hierarchical depth buffer
+	- Two-Pass Occlusion Culling with hierarchical depth buffer
 	- Per-mip ImageView for Hi-Z mip chain generation
 
 Third Parties

@@ -16,6 +16,7 @@ namespace Core
 	class CommandBuffer;
 	class RenderFrame;
 	class Buffer;
+	class Framebuffer;
 
 	struct TransformBatch
 	{
@@ -54,18 +55,22 @@ namespace Core
 		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
 			VkExtent2D extents);
 
+		void GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			shared_ptr<Texture> prevDepth, shared_ptr<Texture> curDepth,
+			CameraBuffer& camera,
+			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
+			Framebuffer& framebuffer,
+			function<void(shared_ptr<Shader>)> perShader,
+			function<void(shared_ptr<Material>)> perDraw,
+			function<void()> postDraw);
 		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
-
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
-		void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer, const CameraBuffer& camera);
-
-		void SetPreviousDepthBuffer(shared_ptr<Texture> depthBuffer) { _previousDepthBuffer = depthBuffer; }
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
@@ -73,9 +78,22 @@ namespace Core
 		void PrepareCullingResources(Core::Device& device);
 		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
-		// Hi-Z Occlusion Culling
+		// 2-Pass Occlusion Culling
+		void DrawIndirect(
+			RenderFrame& renderFrame,
+			CommandBuffer& commandBuffer,
+			Core::Buffer& indirectCommandBuffer,
+			function<void(shared_ptr<Shader>)> perShader,
+			function<void(shared_ptr<Material>)> perDraw);
+
 		void PrepareHiZResources(Device& device, VkExtent2D extents);
-		void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+		void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth);
+
+		void ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+		void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			const CameraBuffer& camera, shared_ptr<Texture> depth,
+			Core::Buffer* indirectCommandBuffer,
+			shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline);
 	private:
 		Device& _device;
 		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
@@ -90,7 +108,6 @@ namespace Core
 
 		// Buffers for GPU Culling
 		Core::Buffer* _objectDataBuffer = nullptr;
-		Core::Buffer* _visibleCountsBuffer = nullptr;
 		shared_ptr<Shader> _cullingShader;
 		unique_ptr<Pipeline> _cullingPipeline;
 
@@ -98,7 +115,6 @@ namespace Core
 		shared_ptr<Texture> _hiZTexture;
 		shared_ptr<Shader> _hiZGenerateShader = nullptr;
 		unique_ptr<Pipeline> _hiZPipeline;
-		shared_ptr<Texture> _previousDepthBuffer = nullptr;
 		uint32_t _hiZMipLevels = 0;
 		VkExtent2D _screenExtent = {};
 
@@ -106,6 +122,17 @@ namespace Core
 		unique_ptr<Pipeline> _depthResolvePipeline;
 
 		bool _hiZInitialized = false;
+
+		// 2-Pass Resources
+		Core::Buffer* _rejectedIndicesBuffer = nullptr;
+		Core::Buffer* _rejectedCountBuffer = nullptr;
+		Core::Buffer* _pass2IndirectCommandBuffer = nullptr;
+
+		shared_ptr<Shader> _pass2CullingShader;
+		unique_ptr<Pipeline> _pass2CullingPipeline;
+
+		shared_ptr<Shader> _resetDrawCommandsShader;
+		unique_ptr<Pipeline> _resetDrawCommandsPipeline;
 	};
 }
 

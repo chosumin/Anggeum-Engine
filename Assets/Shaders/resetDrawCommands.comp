@@ -1,0 +1,39 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct DrawIndexedIndirectCommand
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+};
+
+layout(push_constant) uniform PushConstants
+{
+    uint drawCommandCount;
+} pc;
+
+layout(set = 0, binding = 0) buffer Pass1DrawCommands { DrawIndexedIndirectCommand pass1Commands[]; };
+layout(set = 0, binding = 1) buffer Pass2DrawCommands { DrawIndexedIndirectCommand pass2Commands[]; };
+layout(set = 0, binding = 2) buffer RejectedCountBuffer { uint rejectedCount; };
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+
+    // Reset rejected count (only once)
+    if (index == 0)
+    {
+        rejectedCount = 0;
+    }
+
+    // Reset instanceCount for both pass buffers
+    if (index < pc.drawCommandCount)
+    {
+        pass1Commands[index].instanceCount = 0;
+        pass2Commands[index].instanceCount = 0;
+    }
+}

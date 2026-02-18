@@ -44,19 +44,6 @@ layout(set = 0, binding = 5) uniform sampler2D hiZBuffer;
 layout(set = 0, binding = 10) buffer RejectedIndicesBuffer { uint rejectedIndices[]; };
 layout(set = 0, binding = 11) buffer RejectedCountBuffer { uint rejectedCount; };
 
-bool IsVisibleFrustum(vec3 center, float radius)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        float distance = dot(cullData.frustumPlanes[i].xyz, center) + cullData.frustumPlanes[i].w;
-        if (distance < -radius)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool IsOccluded(vec3 worldCenter, float worldRadius)
 {
     // Transform to clip space
@@ -96,13 +83,27 @@ bool IsOccluded(vec3 worldCenter, float worldRadius)
     return objectNearDepth > occluderDepth;
 }
 
+bool IsVisibleFrustum(vec3 center, float radius)
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        float distance = dot(cullData.frustumPlanes[i].xyz, center) + cullData.frustumPlanes[i].w;
+        if (distance < -radius)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void main()
 {
     uint index = gl_GlobalInvocationID.x;
-    if (index >= cullData.drawCount)
+    if (index >= rejectedCount)
         return;
 
-    ObjectData obj = objects[index];
+    uint objectIndex = rejectedIndices[index];
+    ObjectData obj = objects[objectIndex];
     uint cmdIndex = obj.drawCommandIndex;
 
     // Get world transform matrix
@@ -120,24 +121,12 @@ void main()
     float maxScale = max(max(scale.x, scale.y), scale.z);
     float worldRadius = obj.boundingSphere.w * maxScale;
 
-    bool visible = true;
+    if (!IsVisibleFrustum(worldCenter, worldRadius))
+        return;
+    if (IsOccluded(worldCenter, worldRadius))
+        return;
 
-    // Frustum culling
-    visible = IsVisibleFrustum(worldCenter, worldRadius);
-
-    // Occlusion culling (only if passed frustum test)
-    if (cullData.enableOcclusionCulling == 1 && visible)
-        visible = !IsOccluded(worldCenter, worldRadius);
-
-    if (visible)
-    {
-        // Add it to Pass1 draw command
-        uint localIdx = atomicAdd(commands[cmdIndex].instanceCount, 1);
-        IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
-    }
-    else
-    {
-        uint rejIdx = atomicAdd(rejectedCount, 1);
-        rejectedIndices[rejIdx] = index;
-    }
+    // Add it to Pass2 draw command
+    uint localIdx = atomicAdd(commands[cmdIndex].instanceCount, 1);
+    IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
 }
