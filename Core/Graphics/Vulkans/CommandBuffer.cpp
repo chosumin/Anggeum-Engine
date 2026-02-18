@@ -53,7 +53,7 @@ void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, co
 		inheritanceInfo.renderPass = renderPass != nullptr ?
 			renderPass->GetHandle() : VK_NULL_HANDLE;
 		inheritanceInfo.framebuffer = framebuffer != nullptr ?
-			framebuffer->GetHandle(imageIndex) : VK_NULL_HANDLE;
+			framebuffer->GetHandle() : VK_NULL_HANDLE;
 		inheritanceInfo.subpass = subpassIndex;
 		inheritanceInfo.occlusionQueryEnable = VK_FALSE;
 		inheritanceInfo.queryFlags = 0;
@@ -131,6 +131,7 @@ void Core::CommandBuffer::BindDescriptorSets(
     auto& shader = material.GetShader();
     auto pipelineLayout = shader.GetPipelineLayout();
 
+    // HACK: Move to RenderCotext::Begin?
 	if (shader.UsesBindlessTextures())
 		BindBindlessDescriptorSet(
 			renderFrame,
@@ -165,6 +166,7 @@ void Core::CommandBuffer::BindDescriptorSets(
 {
     auto pipelineLayout = shader.GetPipelineLayout();
 
+    // HACK: Move to RenderCotext::Begin?
 	if (shader.UsesBindlessTextures())
 		BindBindlessDescriptorSet(
 			renderFrame,
@@ -203,6 +205,19 @@ void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
 		pushConstants->data());
 
 	material.ClearPushConstantsCache();
+}
+
+void Core::CommandBuffer::PushConstants(Shader& shader, uint index, const void* data)
+{
+	auto& pushConstantRanges = shader.GetPushConstantRanges();
+
+    vkCmdPushConstants(
+        _commandBuffer,
+        shader.GetPipelineLayout(),
+        pushConstantRanges[index].stageFlags,
+        pushConstantRanges[index].offset,
+        pushConstantRanges[index].size,
+        data);
 }
 
 void Core::CommandBuffer::BindVertexBuffers(Buffer& buffer, uint32_t binding)
@@ -247,11 +262,11 @@ void Core::CommandBuffer::Dispatch(uint32_t x, uint32_t y, uint32_t z)
     vkCmdDispatch(_commandBuffer, x, y, z);
 }
 
-void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer)
+void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset)
 {
     VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0; // Optional
-    copyRegion.dstOffset = 0; // Optional
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = dstOffset;
     copyRegion.size = srcBuffer.GetSize();
 
     vkCmdCopyBuffer(_commandBuffer, srcBuffer.GetBuffer(), dstBuffer.GetBuffer(),
@@ -341,8 +356,8 @@ void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldL
     VkPipelineStageFlags destinationStage;
 
     //tranfer writes that don't need to wait on anything.
-	GetAccessAndStageFlags(oldLayout, barrier.srcAccessMask, sourceStage);
-	GetAccessAndStageFlags(newLayout, barrier.dstAccessMask, destinationStage);
+	GetAccessAndStageMask(oldLayout, barrier.srcAccessMask, sourceStage);
+	GetAccessAndStageMask(newLayout, barrier.dstAccessMask, destinationStage);
 
     vkCmdPipelineBarrier(
         _commandBuffer,
@@ -387,8 +402,7 @@ void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        //DST에서 SRC로 레이아웃 변경.
-        //Tranfer를 기다린 후 Tranfer에서 실행 >> 이전 Tranfer 스테이지의 커맨드를 모두 수행한 후 이 루프를 실행 함. 
+        //Source image layout switches to source read.
         vkCmdPipelineBarrier(_commandBuffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
             0, nullptr,
@@ -416,13 +430,12 @@ void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
             image.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1, &blit, VK_FILTER_LINEAR);
 
-        //i - 1을 쉐이더용 레이아웃으로 변경.
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        //This transition waits on the current blit command to finish.
+        //Source image switches back to shader read only.
         vkCmdPipelineBarrier(_commandBuffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
             0, nullptr,
@@ -487,7 +500,7 @@ void Core::CommandBuffer::ImmediateSubmit(Device& device, vector<Job*>& jobs)
     device.EndSingleTimeCommands(commandBuffer);
 }
 
-void Core::CommandBuffer::GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags)
+void Core::CommandBuffer::GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags)
 {
     switch (inImageLayout)
     {
@@ -501,7 +514,7 @@ void Core::CommandBuffer::GetAccessAndStageFlags(const VkImageLayout& inImageLay
         break;
     case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 		outAccessFlags = VK_ACCESS_SHADER_READ_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		outPipelineStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         break;
     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 		outAccessFlags = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -514,6 +527,10 @@ void Core::CommandBuffer::GetAccessAndStageFlags(const VkImageLayout& inImageLay
     case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
 		outAccessFlags = VK_ACCESS_TRANSFER_READ_BIT;
 		outPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		break;
+	case VK_IMAGE_LAYOUT_GENERAL:
+		outAccessFlags = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		outPipelineStageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		break;
     default:
         throw invalid_argument("unsupported layout transition!");
@@ -541,4 +558,89 @@ void Core::CommandBuffer::BindBindlessDescriptorSet(
 		0, nullptr);
 
 	_bindlessDescriptorSetBound = true;
+}
+
+void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
+{
+	if (drawCount == 0)
+		return;
+
+	vkCmdDrawIndexedIndirect(
+		_commandBuffer,
+		indirectBuffer.GetBuffer(),
+		0,
+		drawCount,
+		stride
+	);
+}
+
+void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data)
+{
+	vkCmdFillBuffer(_commandBuffer, buffer.GetBuffer(), offset, size, data);
+}
+
+void Core::CommandBuffer::Barrier(
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	VkAccessFlags srcAccessMask,
+	VkAccessFlags dstAccessMask)
+{
+	VkMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		1, &barrier,
+		0, nullptr,
+		0, nullptr);
+}
+
+void Core::CommandBuffer::BufferBarrier(
+	Buffer& buffer,
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	VkAccessFlags srcAccessMask,
+	VkAccessFlags dstAccessMask)
+{
+	VkBufferMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = buffer.GetBuffer();
+	barrier.offset = 0;
+	barrier.size = VK_WHOLE_SIZE;
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
+}
+
+void Core::CommandBuffer::BindDescriptorSetsWithKey(
+    RenderFrame& renderFrame, 
+    VkPipelineBindPoint pipelineBindPoint, 
+    Shader& shader,
+    size_t key)
+{
+    auto pipelineLayout = shader.GetPipelineLayout();
+    auto* resources = renderFrame.GetShaderResources(key);
+    
+    if (!resources || resources->descriptorSet == VK_NULL_HANDLE)
+        return;
+
+    vkCmdBindDescriptorSets(
+        _commandBuffer, pipelineBindPoint,
+        pipelineLayout, (uint)DescriptorSetType::Shader, 1,
+        &resources->descriptorSet, 0, nullptr);
 }

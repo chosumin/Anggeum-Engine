@@ -14,6 +14,7 @@ namespace Core
 	class Image;
 	class Job;
 	class Framebuffer;
+	class MeshBufferManager;
 
 	class CommandBuffer
 	{
@@ -32,17 +33,42 @@ namespace Core
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
+		
 		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Material& material);
 		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader);
-
+		void BindDescriptorSetsWithKey(
+			RenderFrame& renderFrame,
+			VkPipelineBindPoint pipelineBindPoint,
+			Shader& shader,
+			size_t key);
 		void PushConstants(Material& material, uint32_t index = 0);
+		void PushConstants(Shader& shader, uint index, const void* data);
+
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
 		void BindIndexBuffer(Buffer& buffer, VkIndexType indexType);
+		
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstInstance = 0);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
+		void DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
-		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer);
+
+		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
+
+		void Barrier(
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask,
+			VkAccessFlags srcAccessMask,
+			VkAccessFlags dstAccessMask);
+
+		void BufferBarrier(
+			Buffer& buffer,
+			VkPipelineStageFlags srcStageMask,
+			VkPipelineStageFlags dstStageMask,
+			VkAccessFlags srcAccessMask,
+			VkAccessFlags dstAccessMask);
+
+		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 		void CopyImage(Image& srcImage, Image& dstImage, 
 			uint32_t srcMipLevel, uint32_t srcLayer, 
 			uint32_t dstMipLevel, uint32_t dstLayer);
@@ -64,7 +90,7 @@ namespace Core
 			VkPipelineBindPoint pipelineBindPoint,
 			VkPipelineLayout pipelineLayout);
 
-		void GetAccessAndStageFlags(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
+		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
@@ -76,4 +102,3 @@ namespace Core
 		bool _bindlessDescriptorSetBound = false;
 	};
 }
-

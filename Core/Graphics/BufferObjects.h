@@ -7,7 +7,7 @@
 struct alignas(16) CameraBuffer
 {
 	mat4 View;
-	mat4 Perspective;
+	mat4 Projection;
 	vec3 Position;
 };
 
@@ -36,7 +36,6 @@ struct alignas(16) PBRBuffer
 
 struct alignas(16) GI
 {
-	uint shadowmapIndex;
 	uint irradianceMapIndex;
 	uint prefilterMapIndex;
 	uint brdfLUTIndex;
@@ -78,4 +77,46 @@ struct TileInfo
 {
 	ivec2 viewportSize;
 	ivec2 tileNums;
+};
+
+// For GPU Driven Rendering
+struct alignas(16) GPUMaterialData
+{
+	glm::vec4 albedo{ 1.0f, 1.0f, 1.0f, 1.0f };
+	float metallic = 0.0f;
+	float roughness = 0.5f;
+	float ao = 1.0f;
+	int flags = 1;  // bit 0: enabled
+
+	int albedoTextureSet = 0;
+	int metallicTextureSet = 0;
+	int roughnessTextureSet = 0;
+	int occlusionTextureSet = 0;
+	int debugMode = 0;
+
+	uint32_t basemapIndex = 0;
+	uint32_t normalmapIndex = 0;
+	uint32_t metallicRoughnessmapIndex = 0;
+
+	glm::vec3 padding;  // 16-byte alignment
+};
+
+static_assert(sizeof(GPUMaterialData) == 80, "GPUMaterialData must be 80 bytes");
+
+struct alignas(16) GPUObjectData
+{
+	glm::vec4 boundingSphere;  // xyz: center, w: radius
+	uint32_t transformIndex;
+	uint32_t drawCommandIndex;
+};
+
+struct alignas(16) GPUCullData
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::vec4 frustumPlanes[6];
+	glm::vec2 screenSize;
+	uint32_t drawCount;
+	uint32_t hiZMipLevels;
+	uint32_t enableOcclusionCulling;
 };

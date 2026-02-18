@@ -1,5 +1,4 @@
 #pragma once
-#include "IDescriptor.h"
 
 namespace Core
 {
@@ -18,13 +17,10 @@ namespace Core
 		VkDescriptorBufferInfo _bufferInfo;
 	};
 
-	struct StorageBufferLayoutBinding : public IDescriptor
+	struct StorageBufferLayoutBinding
 	{
 	public:
 		StorageBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage);
-
-		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
-		VkDescriptorType GetDescriptorType();
 
 		uint32_t Binding;
 		VkShaderStageFlags Stage;

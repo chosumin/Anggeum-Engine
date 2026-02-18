@@ -21,15 +21,11 @@ namespace Core
 		virtual void Prepare() = 0;
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 	protected:
-		void CreateFrameBuffer(SwapChain& swapChain);
-		void CreateFrameBuffer(Image* image);
-
 		void Enqueue(Job* job);
 		void Wait();
 	protected:
 		Device& _device;
 		RenderPass* _renderPass;
-		Framebuffer* _framebuffer;
 		PipelineState* _pipelineState;
 
 		vector<Job*> _pendingJobs;

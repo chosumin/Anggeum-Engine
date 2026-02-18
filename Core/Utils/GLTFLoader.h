@@ -60,7 +60,7 @@ namespace Core
 			vector<shared_ptr<Core::Sampler>>& samplers,
 			vector<shared_ptr<Core::Image>>& images);
 		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
-		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials);
+		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();
@@ -70,7 +70,7 @@ namespace Core
 		Scene& _scene;
 		TransferContext& _transferContext;
 		ResourceCache& _resourceCache;
-		RenderContext* _renderContext = nullptr; // Added
+		RenderContext* _renderContext = nullptr;
 
 		string _modelPath;
 		tinygltf::Model* _model;

@@ -1,13 +1,9 @@
 #pragma once
-#include "UniformBuffer.h"
-#include "TextureBuffer.h"
-#include "StorageBuffer.h"
 #include "Graphics/Vulkans/Vertex.h"
 #include "Graphics/BufferObjects.h"
 
 namespace Core
 {
-	class IDescriptor;
 	class DescriptorSetLayout;
 	class BindlessTextureManager;
 	
@@ -78,7 +74,8 @@ namespace Core
 	protected:
 		// Add binding with set index
 		void AddUniformBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
-		void AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage);
+		void AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage,
+			VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		void AddStorageBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage);
 		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size);
 		

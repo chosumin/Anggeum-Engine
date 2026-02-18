@@ -1,97 +1,65 @@
 #include "stdafx.h"
 #include "Framebuffer.h"
 #include "RenderPass.h"
-#include "SwapChain.h"
-#include "Graphics/RenderContext.h"
+#include "Texture.h"
 #include "Image.h"
 
-Core::Framebuffer::Framebuffer(Device& device, SwapChain& swapChain, RenderPass& renderPass)
-	:_device{device}, _renderPass(renderPass), _isSwapChainFramebuffer(true)
+Core::Framebuffer::Framebuffer(Device& device, RenderPass& renderPass, const vector<Texture*>& attachments)
+	: _device(device)
 {
-    _extent = swapChain.GetSwapChainExtent();
-    CreateFramebuffers(swapChain);
+	if (attachments.empty())
+		throw std::runtime_error("Framebuffer requires at least one attachment!");
 
-    auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
-    Core::RenderContext::AddResizeCallback(a);
+	auto firstExtent = attachments[0]->GetExtent();
+	_extent = { firstExtent.width, firstExtent.height };
+
+	vector<VkImageView> imageViews;
+	imageViews.reserve(attachments.size());
+
+	for (auto* attachment : attachments)
+	{
+		imageViews.push_back(attachment->GetImageView());
+	}
+
+	VkFramebufferCreateInfo framebufferInfo{};
+	framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	framebufferInfo.renderPass = renderPass.GetHandle();
+	framebufferInfo.attachmentCount = static_cast<uint32_t>(imageViews.size());
+	framebufferInfo.pAttachments = imageViews.data();
+	framebufferInfo.width = _extent.width;
+	framebufferInfo.height = _extent.height;
+	framebufferInfo.layers = 1;
+
+	if (vkCreateFramebuffer(_device.GetDevice(), &framebufferInfo, nullptr, &_framebuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to create framebuffer!");
+	}
 }
 
-Core::Framebuffer::Framebuffer(Device& device, RenderPass& renderPass, Image& image)
-    :_device{ device }, _renderPass(renderPass), _isSwapChainFramebuffer(false)
+Core::Framebuffer::Framebuffer(Device& device, RenderPass& renderPass, 
+    const vector<VkImageView>& imageViews, VkExtent2D extent)
+    : _device(device)
+    , _extent(extent)
 {
-    auto extent = image.GetExtent();
-	_extent = { extent.width, extent.height };
+    VkFramebufferCreateInfo framebufferInfo{};
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = renderPass.GetHandle();
+    framebufferInfo.attachmentCount = static_cast<uint32_t>(imageViews.size());
+    framebufferInfo.pAttachments = imageViews.data();
+    framebufferInfo.width = extent.width;
+    framebufferInfo.height = extent.height;
+    framebufferInfo.layers = 1;
 
-    _framebuffers.resize(1);
-
-    for (size_t i = 0; i < _framebuffers.size(); i++)
+    if (vkCreateFramebuffer(_device.GetDevice(), &framebufferInfo, nullptr, &_framebuffer) != VK_SUCCESS)
     {
-        auto attachments =
-            _renderPass.GetAttachments(VkImageView{});
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _renderPass.GetHandle();
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = _extent.width;
-        framebufferInfo.height = _extent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(_device.GetDevice(), &framebufferInfo, nullptr, &_framebuffers[i]) !=
-            VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create framebuffer!");
-        }
+        throw std::runtime_error("failed to create framebuffer!");
     }
 }
 
 Core::Framebuffer::~Framebuffer()
 {
-    Cleanup();
-
-	if (_isSwapChainFramebuffer)
+	if (_framebuffer != VK_NULL_HANDLE)
 	{
-		auto a = std::bind(&Framebuffer::Resize, this, std::placeholders::_1);
-		Core::RenderContext::RemoveResizeCallback(a);
+		vkDestroyFramebuffer(_device.GetDevice(), _framebuffer, nullptr);
 	}
-}
-
-void Core::Framebuffer::Cleanup()
-{
-    for (auto framebuffer : _framebuffers)
-        vkDestroyFramebuffer(_device.GetDevice(), framebuffer, nullptr);
-}
-
-void Core::Framebuffer::Resize(SwapChain& swapChain)
-{
-    Cleanup();
-
-    _extent = swapChain.GetSwapChainExtent();
-    CreateFramebuffers(swapChain);
-}
-
-void Core::Framebuffer::CreateFramebuffers(SwapChain& swapChain)
-{
-    _framebuffers.resize(swapChain.GetSwapChainCount());
-
-    for (size_t i = 0; i < _framebuffers.size(); i++)
-    {
-        auto attachments = 
-            _renderPass.GetAttachments(swapChain.GetImageView(i));
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = _renderPass.GetHandle();
-        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        framebufferInfo.pAttachments = attachments.data();
-        framebufferInfo.width = _extent.width;
-        framebufferInfo.height = _extent.height;
-        framebufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(_device.GetDevice(), &framebufferInfo, nullptr, &_framebuffers[i]) !=
-            VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create framebuffer!");
-        }
-    }
 }

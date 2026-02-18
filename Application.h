@@ -20,8 +20,6 @@ struct ApplicationOptions
 	Core::Window* window{ nullptr };
 };
 
-class GUIRenderPass;
-
 class Application
 {
 public:
@@ -44,5 +42,4 @@ private:
 	Core::Scene* _scene;
 	Core::TransferContext* _transferContext;
 	Core::WorkerThreadManager* _workerThreadManager;
-	GUIRenderPass* _guiRenderPass;
 };

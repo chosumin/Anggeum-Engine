@@ -1,4 +1,6 @@
 #pragma once
+#include "MeshBufferManager.h"
+#include "MaterialManager.h"
 
 namespace Core
 {
@@ -20,8 +22,10 @@ namespace Core
 	class SwapChain;
 	class CommandPool;
 	class RenderFrame;
-	class BindlessTextureManager; // Added
-	
+	class BindlessTextureManager;
+	class TransferContext;
+	class Texture;
+
 	class RenderContext
 	{
 	public:
@@ -37,7 +41,7 @@ namespace Core
 		void RecreateSwapChain();
 		
 		// Frame management
-		void Begin(); // Allocate and start command buffers
+		void Begin();
 		void Submit();
 		
 		// Get current frame
@@ -49,10 +53,15 @@ namespace Core
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
 
-		// Added: Bindless texture manager access
+		// Bindless texture manager
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager.get(); }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 
+		// Managers
+		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
+		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
+
+		shared_ptr<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 	private:
 		void CreateRenderFrames();
 		void CreateSyncObjects();
@@ -67,12 +76,12 @@ namespace Core
 		SwapChain* _swapChain = nullptr;
 		uint32_t _imageIndex = 0;
 		
-		// Command pools (owned by RenderContext)
+		// Command pools
 		CommandPool* _commandPool = nullptr;
 		CommandPool* _computeCommandPool = nullptr;
 		
 		// Per-frame resources
-		vector<unique_ptr<RenderFrame>> _frames; // MAX_FRAMES_IN_FLIGHT count
+		vector<unique_ptr<RenderFrame>> _frames;
 		uint32_t _currentFrame = 0;
 		
 		// Timeline semaphores
@@ -81,7 +90,14 @@ namespace Core
 		u64 _lastComputeSemaphoreValue = 0;
 		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT;
 
-		// Global bindless texture manager
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
+
+		// GPU Driven Rendering managers
+		unique_ptr<MeshBufferManager> _meshBufferManager;
+		unique_ptr<MaterialManager> _materialManager;
+
+		// Double/Triple buffered depth
+		array<shared_ptr<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
+		shared_ptr<Texture> _previousFrameDepth;
 	};
 }

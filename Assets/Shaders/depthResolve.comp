@@ -1,0 +1,34 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// MSAA depth buffer (8 samples)
+layout(set = 0, binding = 0) uniform sampler2DMS depthBuffer;
+
+// Hi-Z mip 0 output
+layout(set = 0, binding = 1, r32f) uniform writeonly image2D hiZMip0;
+
+layout(push_constant) uniform PushConstants
+{
+    ivec2 outputSize;
+    int sampleCount;
+    int padding;
+} pc;
+
+void main()
+{
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    
+    if (pos.x >= pc.outputSize.x || pos.y >= pc.outputSize.y)
+        return;
+    
+    // MSAA resolve: MAX depth (가장 먼 값 = Occlusion Culling에 보수적)
+    float maxDepth = 0.0;
+    for (int i = 0; i < pc.sampleCount; ++i)
+    {
+        float depth = texelFetch(depthBuffer, pos, i).r;
+        maxDepth = max(maxDepth, depth);
+    }
+    
+    imageStore(hiZMip0, pos, vec4(maxDepth));
+}

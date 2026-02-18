@@ -1,5 +1,4 @@
 #pragma once
-#include "IDescriptor.h"
 
 namespace Core
 {
@@ -10,7 +9,8 @@ namespace Core
 		UniformBuffer(Device& device, VkDeviceSize bufferSize);
 		~UniformBuffer();
 
-		void SetBuffer(void* data);
+		void Update(void* data);
+		void Update(void* data, VkDeviceSize offset, VkDeviceSize size);
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:
@@ -22,14 +22,11 @@ namespace Core
 		VkDescriptorBufferInfo _bufferInfo;
 	};
 
-	struct UniformBufferLayoutBinding : public IDescriptor
+	struct UniformBufferLayoutBinding
 	{
 	public:
 		UniformBufferLayoutBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize bufferSize);
 
-		VkDescriptorSetLayoutBinding CreateDescriptorSetLayoutBinding();
-		VkDescriptorType GetDescriptorType();
-	
 		uint32_t Binding;
 		VkShaderStageFlags Stage;
 		VkDeviceSize BufferSize;

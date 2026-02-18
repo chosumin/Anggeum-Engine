@@ -1,56 +1,62 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
-#include "Foundation/Job.h"
 
 namespace Core
 {
-	class Scene;
-	class Texture;
-	class CommandBuffer;
-	class Pipeline;
-	class SubMesh;
-	class PreEnvironmentPass : public RendererPass
-	{
-	public:
-		PreEnvironmentPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, 
-			Texture* renderTarget, Texture* irradianceCubemap, Texture* prefilteredCubemap);
-		virtual ~PreEnvironmentPass() override;
+    class Scene;
+    class Pipeline;
+    class Material;
+    class SubMesh;
+    class Texture;
 
-		virtual void Prepare() override;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
-	private:
-		void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex);
-		void DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex);
-	private:
-		Scene& _scene;
-		
-		Texture* _colorRenderTarget;
-		shared_ptr<SubMesh> _sky;
-		vector<mat4> _mvpMatrices;
+    class PreEnvironmentPass : public RendererPass
+    {
+    public:
+        PreEnvironmentPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene,
+            Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap);
+        ~PreEnvironmentPass();
 
-		Texture* _irradianceCubemap;
-		Pipeline* _irradiancePipeline;
-		shared_ptr<Material> _irradianceMaterial;
-		IrradianceDelta _delta;
+        void Prepare() override;
+        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-		Texture* _prefilteredCubemap;
-		Pipeline* _prefilteredPipeline;
-		shared_ptr<Material> _prefilteredMaterial;
-		PrefilterEnv _prefilterEnv;
-		shared_ptr<Texture> _skyCubemap;
-	};
+    private:
+        void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+        void DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 
-	class PreEnvironmentJob : public Job
-	{
-	public:
-		PreEnvironmentJob(Device& device, PreEnvironmentPass& pass);
-		~PreEnvironmentJob();
-		
-		void Execute() override;
-		
-	private:
-		RenderFrame _tempRenderFrame; // Temporary RenderFrame to hold command buffer
-		PreEnvironmentPass& _pass;
-	};
+    private:
+        Scene& _scene;
+
+        Texture* _colorRenderTarget;
+        Texture* _irradianceCubemap;
+        Texture* _prefilteredCubemap;
+
+        shared_ptr<Material> _irradianceMaterial;
+        shared_ptr<Material> _prefilteredMaterial;
+
+        Pipeline* _irradiancePipeline = nullptr;
+        Pipeline* _prefilteredPipeline = nullptr;
+
+        shared_ptr<SubMesh> _sky;
+        shared_ptr<Texture> _skyCubemap;
+
+        vector<mat4> _mvpMatrices;
+        IrradianceDelta _delta;
+        PrefilterEnv _prefilterEnv;
+
+        unique_ptr<Framebuffer> _framebuffer;
+    };
+
+    class PreEnvironmentJob : public Job
+    {
+    public:
+        PreEnvironmentJob(Device& device, PreEnvironmentPass& pass);
+        ~PreEnvironmentJob();
+
+        void Execute() override;
+
+    private:
+        PreEnvironmentPass& _pass;
+        RenderFrame _tempRenderFrame;
+    };
 }

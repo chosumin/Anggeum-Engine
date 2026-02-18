@@ -28,7 +28,7 @@ bool Application::Prepare()
 
 	// Initialize ResourceCache with RenderContext for bindless support
 	auto& resourceCache = _device->GetResourceCache();
-	resourceCache.Initialize(*_renderContext);
+	resourceCache.Prepare(*_renderContext);
 
 	auto swapChainExtent = _renderContext->GetSurfaceExtent();
 	auto& swapChain = _renderContext->GetSwapChain();
@@ -41,18 +41,11 @@ bool Application::Prepare()
 		*_scene, swapChain);
 	_renderPipeline->Prepare();
 
-	_renderPipeline->RegisterGiTexturesToBindless(*_renderContext);
-
-	_guiRenderPass = new GUIRenderPass(*_device, *_workerThreadManager, swapChain, _renderPipeline->GetColorRenderTarget());
-	_guiRenderPass->Prepare();
-
 	return true;
 }
 
 Application::~Application()
 {
-	delete(_guiRenderPass);
-
 	delete(_renderPipeline);
 	delete(_scene);
 
@@ -66,7 +59,19 @@ Application::~Application()
 
 void Application::Update()
 {
-	_guiRenderPass->Update();
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	static float f = 0.0f;
+	static int counter = 0;
+
+	ImGui::Begin("Status");
+
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
+	ImGui::End();
 
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
 
@@ -77,8 +82,6 @@ void Application::Update()
 	}
 
 	_scene->Update();
-
-	//todo : update stats
 }
 
 void Application::Draw()
@@ -91,8 +94,6 @@ void Application::Draw()
 	uint32_t imageIndex = _renderContext->GetImageIndex();
 
 	_renderPipeline->Draw(_renderContext->GetCurrentFrame(), imageIndex);
-
-	_guiRenderPass->Draw(_renderContext->GetCurrentFrame(), imageIndex);
 
 	_renderContext->Submit();
 }

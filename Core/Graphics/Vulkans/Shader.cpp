@@ -20,7 +20,7 @@ Core::Shader::Shader(Device& device, const string pass,
 	{
 		vertShaderCode = FileSystem::Read32("Assets/" + vertFilePath);
 		const char* vert = reinterpret_cast<const char*>(vertShaderCode.data());
-		vertShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath);
+		vertShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath, _device.IsGpuDrivenRenderingEnabled());
 	}
 	else
 	{
@@ -33,7 +33,7 @@ Core::Shader::Shader(Device& device, const string pass,
 	{
 		fragShaderCode = FileSystem::Read32("Assets/" + fragFilePath);
 		const char* frag = reinterpret_cast<const char*>(fragShaderCode.data());
-		fragShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath);
+		fragShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath, _device.IsGpuDrivenRenderingEnabled());
 	}
 	else
 	{
@@ -62,7 +62,8 @@ Core::Shader::Shader(Device& device, const string pass, const string& computeFil
 	{
 		computeShaderCode = FileSystem::Read32("Assets/" + computeFilePath);
 		const char* compute = reinterpret_cast<const char*>(computeShaderCode.data());
-		computeShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, compute, computeFilePath);
+		computeShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, compute, computeFilePath,
+			_device.IsGpuDrivenRenderingEnabled());
 	}
 	else
 	{
@@ -109,6 +110,18 @@ void Core::Shader::CreatePipelineLayout()
 	for (auto& [setIndex, layout] : _descriptorSetLayouts)
 	{
 		layouts[setIndex] = layout->GetDescriptorSetLayout();
+	}
+
+	for (uint32_t i = 0; i < maxSetIndex; ++i)
+	{
+		if (layouts[i] == VK_NULL_HANDLE && i != static_cast<uint32_t>(DescriptorSetType::Bindless))
+		{
+			// Create empty descriptor set layout if any null layout found
+			auto* emptyLayout = new DescriptorSetLayout(_device);
+			emptyLayout->Finalize();
+			_descriptorSetLayouts[i] = emptyLayout;
+			layouts[i] = emptyLayout->GetDescriptorSetLayout();
+		}
 	}
 
 	// Fill in bindless layout (Set 2, not owned)
@@ -265,10 +278,11 @@ void Core::Shader::AddUniformBufferLayoutBinding(uint32_t set, uint32_t binding,
 	layout->AddUniformBufferBinding(binding, stage, size);
 }
 
-void Core::Shader::AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)
+void Core::Shader::AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage,
+	VkDescriptorType descriptorType)
 {
 	auto* layout = GetOrCreateDescriptorSetLayout(set);
-	layout->AddTextureBufferBinding(binding, stage);
+	layout->AddTextureBufferBinding(binding, stage, descriptorType);
 }
 
 void Core::Shader::AddStorageBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage)

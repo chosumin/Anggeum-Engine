@@ -27,7 +27,7 @@ Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
 Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
     VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
 	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
-    _layer(imageInfo.arrayLayers)
+	_layer(imageInfo.arrayLayers), _viewType(imageViewType)
 {
 	CreateImage(
 		VK_IMAGE_TILING_OPTIMAL,
@@ -37,7 +37,9 @@ Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo,
 
 	BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	CreateImageView(_mipLevels, imageViewType, aspectFlags);
+    _imageView = CreateImageView(_mipLevels,
+        imageViewType, 
+        aspectFlags, 0);
 }
 
 Core::Image::~Image()
@@ -47,11 +49,37 @@ Core::Image::~Image()
 	if (_imageView != VK_NULL_HANDLE)
 		vkDestroyImageView(device, _imageView, nullptr);
 
+    for(auto& mipView : _mipImageViews)
+    {
+        if (mipView != VK_NULL_HANDLE)
+            vkDestroyImageView(device, mipView, nullptr);
+	}
+
 	if (_image != VK_NULL_HANDLE)
 		vkDestroyImage(device, _image, nullptr);
 
 	if (_allocation != nullptr)
 		_allocator->Deallocate(*_allocation);
+}
+
+VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
+{
+	if (mipLevel == 0)
+		return _imageView;
+
+    if (_mipImageViews.size() == 0)
+        _mipImageViews.resize(_mipLevels - 1);
+
+    if (_mipImageViews[mipLevel - 1] != VK_NULL_HANDLE)
+        return _mipImageViews[mipLevel - 1];
+
+    auto imageView = CreateImageView(1,
+        _viewType,
+        GetAspectFlags(),
+        mipLevel);
+	_mipImageViews[mipLevel - 1] = imageView;
+
+	return _mipImageViews[mipLevel - 1];
 }
 
 void Core::Image::SetSRGBFormat()
@@ -285,24 +313,28 @@ void Core::Image::BindImageMemory(VkMemoryPropertyFlags properties)
     _allocator->BindImageMemory(*this, *_allocation);
 }
 
-void Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType,
-    VkImageAspectFlags aspectFlags)
+VkImageView Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType,
+    VkImageAspectFlags aspectFlags, uint32_t baseMipLevel)
 {
+	VkImageView imageView;
+
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = _image;
     viewInfo.viewType = imageViewType;
     viewInfo.format = _format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.baseMipLevel = baseMipLevel;
     viewInfo.subresourceRange.levelCount = mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = _layer;
 
-    if (vkCreateImageView(_device.GetDevice(), &viewInfo, nullptr, &_imageView) != VK_SUCCESS)
+    if (vkCreateImageView(_device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
     {
         throw runtime_error("failed to create texture image view!");
     }
+
+    return imageView;
 }
 
 void Core::Image::Load(vector<uint8_t>& outImageData)
@@ -322,5 +354,5 @@ void Core::Image::Load(vector<uint8_t>& outImageData)
 
     BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    CreateImageView(_mipLevels, _viewType, VK_IMAGE_ASPECT_COLOR_BIT);
+    _imageView = CreateImageView(_mipLevels, _viewType, VK_IMAGE_ASPECT_COLOR_BIT, 0);
 }

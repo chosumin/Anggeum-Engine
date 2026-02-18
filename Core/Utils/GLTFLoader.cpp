@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "GLTFLoader.h"
 #include "Log.h"
 #include "Foundation/Scene.h"
@@ -15,6 +15,7 @@
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceCache.h"
+#include "Graphics/MeshBufferManager.h"
 #include "Components/Mesh.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
@@ -309,7 +310,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	material->AddTexture(1, texture);
 
 	vector<shared_ptr<Material>> materials = { material };
-	LoadMeshes(materials);
+	LoadMeshes(materials, false);
 
 	LoadNodes();
 }
@@ -563,7 +564,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	// Check bindless support
 	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
 	BindlessTextureManager* bindlessManager = nullptr;
-	
+
 	if (useBindless)
 	{
 		bindlessManager = _renderContext->GetBindlessTextureManager();
@@ -582,7 +583,10 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 		//Already bound
 		if (material.use_count() > 1)
+		{
+			materials[i] = material;
 			continue;
+		}
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
 		material->AddBuffer(1, pbrBuffer);
@@ -704,11 +708,17 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	return materials;
 }
 
-void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
+void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
 {
-	size_t size = _model->meshes.size();
+	bool useGpuDriven = _device.IsGpuDrivenRenderingEnabled() && useGlobalBuffer;
+	MeshBufferManager* meshBufferManager = nullptr;
+	MaterialManager* materialManager = nullptr;
 
-	vector<unique_ptr<Core::Mesh>> meshes(size);
+	if (useGpuDriven)
+	{
+		meshBufferManager = _renderContext->GetMeshBufferManager();
+		materialManager = _renderContext->GetMaterialManager();
+	}
 
 	for (auto& gltfMesh : _model->meshes)
 	{
@@ -742,65 +752,132 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials)
 			auto subMesh = 
 				_resourceCache.RequestSubMesh(subMeshName);
 
-			//Already jobified
-			if (subMesh.use_count() > 1)
+			if (useGpuDriven)
 			{
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
-				continue;
-			}
-
-			size_t count = 0;
-			for (auto& attribute : primitive.attributes)
-			{
-				string name = attribute.first;
-
-				auto vertexData = GetAttributeData(_model, attribute.second);
-
-				auto& accessor = _model->accessors[attribute.second];
-				
-				count = accessor.count;
-
-				VkFormat format = GetAttributeFormat(_model, attribute.second);
-				uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-				_transferContext.Enqueue(new VkBufferJob(
-					_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-					subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
-			}
-
-			if (primitive.indices >= 0)
-			{
-				subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-				
-				auto indexData = GetAttributeData(_model, primitive.indices);
-				
-				VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-				VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-				switch (format)
+				if (subMesh->HasAllocation())
 				{
-				case VK_FORMAT_R8_UINT:
-					// Converts uint8 data into uint16 data, still represented by a uint8 vector
-					indexData = ConvertDataStride(indexData, 1, 2);
-					indexType = VK_INDEX_TYPE_UINT16;
-					break;
-				case VK_FORMAT_R16_UINT:
-					indexType = VK_INDEX_TYPE_UINT16;
-					break;
-				case VK_FORMAT_R32_UINT:
-					indexType = VK_INDEX_TYPE_UINT32;
-					break;
+					// Already jobified
+					mesh->AddSubMesh(subMesh);
+					mesh->AddMaterial(materials[primitive.material]);
+					continue;
 				}
 
-				_transferContext.Enqueue(new VkBufferJob(
-					_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-					subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
-			}
+				size_t count = 0;
+				for (auto& attribute : primitive.attributes)
+				{
+					string name = attribute.first;
 
-			mesh->AddSubMesh(subMesh);
-			mesh->AddMaterial(materials[primitive.material]);
+					auto vertexData = GetAttributeData(_model, attribute.second);
+
+					auto& accessor = _model->accessors[attribute.second];
+
+					count = accessor.count;
+
+					VkFormat format = GetAttributeFormat(_model, attribute.second);
+					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+
+					meshBufferManager->Allocate(_transferContext, name, stride, 
+						move(vertexData), subMeshName);
+				}
+
+				if (primitive.indices >= 0)
+				{
+					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
+
+					auto indexData = GetAttributeData(_model, primitive.indices);
+
+					VkFormat format = GetAttributeFormat(_model, primitive.indices);
+
+					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+
+					switch (format)
+					{
+					case VK_FORMAT_R8_UINT:
+						// Converts uint8 data into uint16 data, still represented by a uint8 vector
+						indexData = ConvertDataStride(indexData, 1, 2);
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R16_UINT:
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R32_UINT:
+						indexType = VK_INDEX_TYPE_UINT32;
+						break;
+					}
+
+					meshBufferManager->Allocate(_transferContext, indexType, move(indexData), subMesh->GetName() + " index");
+				}
+
+				MeshAllocation allocation = meshBufferManager->Build();
+
+				subMesh->SetAllocation(allocation);
+
+				mesh->AddSubMesh(subMesh);
+				mesh->AddMaterial(materials[primitive.material]);
+			}
+			else
+			{
+				// Legacy
+				//Already jobified
+				if (subMesh.use_count() > 1)
+				{
+					mesh->AddSubMesh(subMesh);
+					mesh->AddMaterial(materials[primitive.material]);
+					continue;
+				}
+
+				size_t count = 0;
+				for (auto& attribute : primitive.attributes)
+				{
+					string name = attribute.first;
+
+					auto vertexData = GetAttributeData(_model, attribute.second);
+
+					auto& accessor = _model->accessors[attribute.second];
+					
+					count = accessor.count;
+
+					VkFormat format = GetAttributeFormat(_model, attribute.second);
+					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+
+					_transferContext.Enqueue(new VkBufferJob(
+						_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+						subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
+				}
+
+				if (primitive.indices >= 0)
+				{
+					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
+					
+					auto indexData = GetAttributeData(_model, primitive.indices);
+					
+					VkFormat format = GetAttributeFormat(_model, primitive.indices);
+
+					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+
+					switch (format)
+					{
+					case VK_FORMAT_R8_UINT:
+						// Converts uint8 data into uint16 data, still represented by a uint8 vector
+						indexData = ConvertDataStride(indexData, 1, 2);
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R16_UINT:
+						indexType = VK_INDEX_TYPE_UINT16;
+						break;
+					case VK_FORMAT_R32_UINT:
+						indexType = VK_INDEX_TYPE_UINT32;
+						break;
+					}
+
+					_transferContext.Enqueue(new VkBufferJob(
+						_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+						subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
+				}
+
+				mesh->AddSubMesh(subMesh);
+				mesh->AddMaterial(materials[primitive.material]);
+			}
 		}
 
 		_meshes.push_back(mesh.get());

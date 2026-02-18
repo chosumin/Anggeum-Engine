@@ -75,6 +75,9 @@ namespace Core
 		ResourceCache& GetResourceCache() const { return *_resourceCache; }
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
+
+		void SetEnableGpuDrivenRendering(bool enable) { _enableGpuDrivenRendering = enable; }
+		bool IsGpuDrivenRenderingEnabled() { return _enableGpuDrivenRendering; }
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -122,6 +125,8 @@ namespace Core
 		// Descriptor indexing support
 		bool _supportsDescriptorIndexing = false;
 		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
+
+		bool _enableGpuDrivenRendering = false;
 
 		const vector<const char*> _validationLayers = 
 		{

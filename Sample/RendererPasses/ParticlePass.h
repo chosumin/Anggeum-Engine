@@ -29,15 +29,23 @@ namespace Sample
 	class ParticlePass : public Core::RendererPass
 	{
 	public:
+		static constexpr const char* RT_MAIN_COLOR = "MainColor";
+
 		ParticlePass(Core::Device& device, Core::WorkerThreadManager& workerThreadManager,
-			Core::Scene& scene, Core::SwapChain& swapChain,
-			shared_ptr<Core::Texture> colorRenderTarget);
+			Core::Scene& scene, VkExtent2D extent, VkFormat swapChainFormat,
+			VkSampleCountFlagBits msaaSamples);
 		virtual ~ParticlePass() override;
 
 		virtual void Prepare() override;
 		virtual void Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex) override;
 	private:
+		void EnsureRenderTargets(Core::RenderFrame& renderFrame);
+	private:
 		Core::Scene& _scene;
+
+		VkExtent2D _extent;
+		VkFormat _swapChainFormat;
+		VkSampleCountFlagBits _msaaSamples;
 
 		vector<Core::Buffer*> _buffers;
 
@@ -46,6 +54,8 @@ namespace Sample
 		unique_ptr<Core::Pipeline> _computePipeline;
 		shared_ptr<Core::Material> _graphicsMaterial;
 		unique_ptr<Core::Pipeline> _graphicsPipeline;
+
+		bool _initialized = false;
 	};
 }
 

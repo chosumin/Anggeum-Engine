@@ -1,19 +1,30 @@
 #pragma once
-#include "Core/Graphics/RendererPass.h"
+#include "Graphics/RendererPass.h"
 
-class GUIRenderPass : public Core::RendererPass
+namespace Core
 {
-public:
-	GUIRenderPass(Core::Device& device, Core::WorkerThreadManager& workerThreadManager, Core::SwapChain& swapChain, Core::Texture* colorRenderTarget);
-	virtual ~GUIRenderPass() override;
+    class SwapChain;
 
-	virtual void Prepare() override;
-	virtual void Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex) override;
+    class GUIRenderPass : public RendererPass
+    {
+    public:
+        static constexpr const char* RT_MAIN_COLOR = "MainColor";
 
-	void Update();
-private:
-	void UpdateFrame();
-private:
-	VkDescriptorPool _pool;
-};
+        GUIRenderPass(Device& device, WorkerThreadManager& workerThreadManager, 
+            SwapChain& swapChain, VkSampleCountFlagBits msaaSamples);
+        ~GUIRenderPass();
+
+        void Prepare() override;
+        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+    private:
+        void EnsureRenderTargets(RenderFrame& renderFrame);
+    private:
+        SwapChain& _swapChain;
+        VkExtent2D _extent;
+        VkFormat _swapChainFormat;
+        VkSampleCountFlagBits _msaaSamples;
+
+        VkDescriptorPool _pool;
+    };
+}
 

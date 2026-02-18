@@ -16,7 +16,8 @@ namespace Core
 	// Internal texture slot
 	struct TextureSlot
 	{
-		shared_ptr<Texture> texture;
+		//shared_ptr<Texture> texture;
+		TextureBuffer textureBuffer;
 		uint32_t generation = 0;
 		bool isActive = false;
 	};
@@ -45,9 +46,7 @@ namespace Core
 		VkDescriptorSetLayout GetDescriptorSetLayout() const { return _descriptorSetLayout; }
 		
 		static constexpr uint32_t GetSetIndex() { return 2; }
-		
-		shared_ptr<Texture> GetTexture(TextureHandle handle) const;
-		
+
 		// Statistics
 		uint32_t GetActiveTextureCount() const { return _activeTexture2DCount + _activeCubemapCount; }
 		uint32_t GetActive2DTextureCount() const { return _activeTexture2DCount; }

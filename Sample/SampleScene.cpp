@@ -15,6 +15,7 @@
 using namespace Core;
 
 SampleScene::SampleScene(Core::Device& device, float width, float height, TransferContext* transferContext, Core::RenderContext* renderContext)
+	:_renderContext(renderContext), _device(device)
 {
 	_gltfLoader = make_unique<Core::GLTFLoader>(device, *this, *transferContext);
 
@@ -109,25 +110,36 @@ SampleScene::~SampleScene()
 
 void SampleScene::Update()
 {
-	ImGui::Begin("Mesh");
+	if (_device.IsGpuDrivenRenderingEnabled())
 	{
-		auto mesh = GetComponents<Mesh>()[0];
+		ImGui::Begin("GPU Driven Rendering Info");
+		{
+			auto materialManager = _renderContext->GetMaterialManager();
+			ImGui::Text("Material Uniform Array Status:");
+			ImGui::Separator();
 
-		auto pbr = (PBRBuffer*)mesh->GetMaterials()[0]->GetBuffer(1);
+			uint32_t materialCount = materialManager->GetMaterialCount();
+			ImGui::Text("Registered Materials: %u / %u",
+				materialCount,
+				MaterialManager::MAX_MATERIALS);
 
-		ImGui::SliderFloat4("Albedo", &pbr->Albedo[0], 0, 1);
-		ImGui::SliderFloat("Metallic", &pbr->Metallic, 0, 1);
-		ImGui::SliderFloat("Roughness", &pbr->Roughness, 0, 1);
-		ImGui::SliderFloat("AO", &pbr->AO, 0, 1);
-		ImGui::SliderInt("Debug", &pbr->DebugMode, 0, 3);
+			float usage = (float)materialCount / (float)MaterialManager::MAX_MATERIALS * 100.0f;
+			ImGui::ProgressBar(usage / 100.0f, ImVec2(0.0f, 0.0f));
+			ImGui::SameLine();
+			ImGui::Text("Usage: %.1f%%", usage);
 
-		auto& transform = mesh->GetEntity().GetTransform();
-		auto translation = transform.GetTranslation();
-		ImGui::InputFloat3("Position", &translation[0]);
+			ImGui::Separator();
+			ImGui::Text("Uniform Buffer Size: %zu KB",
+				sizeof(GPUMaterialData) * MaterialManager::MAX_MATERIALS / 1024);
 
-		transform.SetTranslation(translation);
+			auto meshBufferManager = _renderContext->GetMeshBufferManager();
+			ImGui::Text("MeshBufferManager initialized:");
+			ImGui::Text("  Total Vertices: %u", meshBufferManager->GetTotalVertexCount());
+			ImGui::Text("  Total Indices: %u", meshBufferManager->GetTotalIndexCount());
+			ImGui::Text("  Allocated Meshes: %u", meshBufferManager->GetAllocatedMeshCount());
+		}
+		ImGui::End();
 	}
-	ImGui::End();
 
 	ImGui::Begin("Main Camera");
 	{

@@ -1,39 +1,45 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/BufferObjects.h"
 #include "Graphics/RendererBatch.h"
+#include "Graphics/BufferObjects.h"
 
 namespace Core
 {
-	class Scene;
-	class SwapChain;
-	class Material;
-	class ShadowPass : public RendererPass
-	{
-	public:
-		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, SwapChain& swapChain, Texture* depthRenderTarget, TransformBatch& transformBatch);
-		virtual ~ShadowPass() override;
+    class Scene;
+    class SwapChain;
+    class Material;
 
-		virtual void Prepare() override;
-		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+    class ShadowPass : public RendererPass
+    {
+    public:
+        static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
-		ShadowUniform& GetShadowBuffer()
-		{
-			return _shadowBuffer;
-		}
-	private:
-		void UpdateGUI();
-	private:
-		Scene& _scene;
+        ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
+            Scene& scene, SwapChain& swapChain, VkFormat depthFormat, TransformBatch& transformBatch);
+        ~ShadowPass();
 
-		CameraBuffer _directionalLight;
-		ShadowUniform _shadowBuffer;
+        void Prepare() override;
+        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-		unique_ptr<RendererBatches> _rendererBatches;
-		shared_ptr<Material> _material;
+        ShadowUniform* GetShadowBuffer() { return &_shadowBuffer; }
 
-		Texture* _shadowMap;
-	};
+    private:
+        void EnsureRenderTargets(RenderFrame& renderFrame);
+
+    private:
+        Scene& _scene;
+        VkExtent2D _shadowExtent;
+
+        unique_ptr<RendererBatches> _rendererBatches;
+        
+        ShadowUniform _shadowBuffer;
+        CameraBuffer _directionalLight;
+
+        shared_ptr<Material> _shadowMaterial;
+
+        VkSampleCountFlagBits _msaaSamples;
+
+        bool _initialized = false;
+    };
 }
 

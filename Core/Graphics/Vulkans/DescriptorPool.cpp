@@ -44,23 +44,10 @@ namespace Core
 		_uniformBufferBindings.emplace_back(binding, stage, size);
 	}
 
-	void DescriptorSetLayout::AddTextureBufferBinding(
-		uint32_t binding,
-		VkShaderStageFlags stage)
+	void DescriptorSetLayout::AddTextureBufferBinding(uint32_t binding, VkShaderStageFlags stage, 
+		VkDescriptorType descriptorType)
 	{
-		// Check if binding already exists and merge stages
-		for (auto& existingBinding : _textureBufferBindings)
-		{
-			if (existingBinding.Binding == binding)
-
-			{
-				existingBinding.Stage |= stage;
-				return;
-			}
-		}
-
-		// Add new binding
-		_textureBufferBindings.emplace_back(binding, stage);
+		_textureBufferBindings.emplace_back(binding, stage, descriptorType);
 	}
 
 	void DescriptorSetLayout::AddStorageBufferBinding(
@@ -108,15 +95,14 @@ namespace Core
 		}
 
 		// Texture buffer bindings
-		for (const auto& binding : _textureBufferBindings)
+		for (const auto& texBinding : _textureBufferBindings)
 		{
 			VkDescriptorSetLayoutBinding layoutBinding{};
-			layoutBinding.binding = binding.Binding;
-			layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			layoutBinding.binding = texBinding.Binding;
+			layoutBinding.descriptorType = texBinding.DescriptorType;
 			layoutBinding.descriptorCount = 1;
-			layoutBinding.stageFlags = binding.Stage;
+			layoutBinding.stageFlags = texBinding.Stage;
 			layoutBinding.pImmutableSamplers = nullptr;
-
 			bindings.push_back(layoutBinding);
 		}
 

@@ -67,7 +67,7 @@ private:
     }
 };
 
-vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath)
+vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath, bool gpuDrivenEnabled)
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
@@ -102,8 +102,16 @@ vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderS
         break;
     }
 
+	// FIXME: Needs shader permutation system.
+    string modifiedSource;
+    /*if (gpuDrivenEnabled)
+    {
+        modifiedSource = "#define GPU_DRIVEN_RENDERING 1\n";
+    }*/
+    modifiedSource += shaderCode;
+
     // Compile GLSL to SPIR-V binary
-    shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(shaderCode, kind, shaderPath.c_str(), options);
+    shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(modifiedSource, kind, shaderPath.c_str(), options);
 
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
         std::cerr << "Shader compilation error: " << result.GetErrorMessage() << std::endl;
@@ -164,15 +172,15 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
         shader.AddStorageBufferLayoutBinding(set, binding, shaderStage);
     }
 
-    for (const auto& resource : resources.sampled_images) 
-    {
-        uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-        uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-
+    // Sampled images (sampler2D, samplerCube..)
+	for (const auto& resource : resources.sampled_images)
+	{
+		uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+		
         // Check if this is the bindless texture array (Set 2, Binding 0)
         if (set == static_cast<uint32_t>(DescriptorSetType::Bindless))
         {
-            // Check if it's an array
             const auto& type = compiler.get_type(resource.type_id);
             if (type.array.size() > 0)
             {
@@ -182,8 +190,19 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
             }
         }
 
-        shader.AddTextureBufferLayoutBinding(set, binding, shaderStage);
-    }
+		shader.AddTextureBufferLayoutBinding(set, binding, shaderStage, 
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	}
+
+	// Storage images
+	for (const auto& resource : resources.storage_images)
+	{
+		uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+		uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+		
+		shader.AddTextureBufferLayoutBinding(set, binding, shaderStage, 
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	}
 
     for (const auto& resource : resources.push_constant_buffers) 
     {

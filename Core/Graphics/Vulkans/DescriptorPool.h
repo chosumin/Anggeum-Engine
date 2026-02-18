@@ -1,7 +1,7 @@
 #pragma once
 #include "UniformBuffer.h"
-#include "TextureBuffer.h"
 #include "StorageBuffer.h"
+#include "Texture.h"
 
 namespace Core
 {
@@ -18,7 +18,6 @@ namespace Core
 	// ============================================
 	// Descriptor Set Resources
 	// ============================================
-	// 단일 descriptor set과 관련된 버퍼를 관리하는 기본 구조체
 	struct DescriptorSetResources
 	{
 		// Descriptor set
@@ -27,7 +26,7 @@ namespace Core
 
 		// Buffers: [binding] -> Buffer*
 		unordered_map<uint32_t, UniformBuffer*> uniformBuffers;
-		unordered_map<uint32_t, TextureBuffer*> textureBuffers;
+		unordered_map<uint32_t, TextureBuffer> textureBuffers;
 		unordered_map<uint32_t, StorageBuffer*> storageBuffers;
 
 		void CleanupBuffers()
@@ -40,10 +39,6 @@ namespace Core
 			uniformBuffers.clear();
 			
 			// Cleanup texture buffers
-			for (auto& [binding, buffer] : textureBuffers)
-			{
-				delete buffer;
-			}
 			textureBuffers.clear();
 			
 			// Cleanup storage buffers
@@ -73,7 +68,8 @@ namespace Core
 
 		// Add binding methods
 		void AddUniformBufferBinding(uint32_t binding, VkShaderStageFlags stage, VkDeviceSize size);
-		void AddTextureBufferBinding(uint32_t binding, VkShaderStageFlags stage);
+		void AddTextureBufferBinding(uint32_t binding, VkShaderStageFlags stage, 
+	VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		void AddStorageBufferBinding(uint32_t binding, VkShaderStageFlags stage);
 		
 		// Finalize and create Vulkan descriptor set layout

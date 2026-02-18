@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "BindlessTextureManager.h"
-#include <stdexcept>
 
 namespace Core
 {
@@ -54,7 +53,7 @@ namespace Core
 		uint32_t slotIndex = AllocateSlot(isCubemap);
 		
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		slot.texture = texture;
+		slot.textureBuffer.texture = texture;
 		slot.generation++;
 		slot.isActive = true;
 		
@@ -89,7 +88,8 @@ namespace Core
 		if (slot.generation != handle.generation || !slot.isActive)
 			return;
 
-		slot.texture.reset();
+		slot.textureBuffer.texture = nullptr;
+		slot.textureBuffer.mipLevel = 0;
 		slot.isActive = false;
 		
 		FreeSlot(slotIndex, isCubemap);
@@ -119,7 +119,7 @@ namespace Core
 		if (slot.generation != handle.generation || !slot.isActive)
 			return;
 
-		slot.texture = texture;
+		slot.textureBuffer.texture = texture;
 		
 		_pendingUpdates.push_back(handle.index);
 		_needsUpdate = true;
@@ -130,11 +130,14 @@ namespace Core
 		if (!_needsUpdate || _pendingUpdates.empty())
 			return;
 
-		vector<VkDescriptorImageInfo> imageInfos;
 		vector<VkWriteDescriptorSet> writes;
-		
-		imageInfos.reserve(_pendingUpdates.size());
 		writes.reserve(_pendingUpdates.size());
+
+		// Use default/null texture (VK_NULL_HANDLE is valid for partially bound)
+		VkDescriptorImageInfo defaultImageInfo{};
+		defaultImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		defaultImageInfo.imageView = VK_NULL_HANDLE;
+		defaultImageInfo.sampler = VK_NULL_HANDLE;
 
 		for (uint32_t packedIndex : _pendingUpdates)
 		{
@@ -143,31 +146,29 @@ namespace Core
 			
 			auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 			
+			uint binding = isCubemap ? 1 : 0;
+
 			VkDescriptorImageInfo imageInfo{};
-			if (slot.isActive && slot.texture)
+			if (slot.isActive && slot.textureBuffer.texture)
 			{
-				imageInfo = slot.texture->GetDescriptorImageInfo();
+				auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				write.dstSet = _descriptorSet;
+				write.dstArrayElement = slotIndex;
+				writes.push_back(write);
 			}
 			else
 			{
-				// Use default/null texture (VK_NULL_HANDLE is valid for partially bound)
-				imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				imageInfo.imageView = VK_NULL_HANDLE;
-				imageInfo.sampler = VK_NULL_HANDLE;
-			}
-			
-			imageInfos.push_back(imageInfo);
+				VkWriteDescriptorSet write{};
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.dstSet = _descriptorSet;
+				write.dstBinding = binding;
+				write.dstArrayElement = slotIndex;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				write.descriptorCount = 1;
+				write.pImageInfo = &defaultImageInfo;
 
-			VkWriteDescriptorSet write{};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = _descriptorSet;
-			write.dstBinding = isCubemap ? 1 : 0; // Binding 0 = 2D, Binding 1 = Cubemap
-			write.dstArrayElement = slotIndex;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.descriptorCount = 1;
-			write.pImageInfo = &imageInfos.back();
-			
-			writes.push_back(write);
+				writes.push_back(write);
+			}
 		}
 
 		vkUpdateDescriptorSets(_device.GetDevice(), 
@@ -175,25 +176,6 @@ namespace Core
 
 		_pendingUpdates.clear();
 		_needsUpdate = false;
-	}
-
-	shared_ptr<Texture> BindlessTextureManager::GetTexture(TextureHandle handle) const
-	{
-		if (!handle.IsValid())
-			return nullptr;
-
-		bool isCubemap = (handle.index & 0x80000000) != 0;
-		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
-		
-		if (slotIndex >= _maxTextures)
-			return nullptr;
-
-		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		
-		if (slot.generation != handle.generation || !slot.isActive)
-			return nullptr;
-
-		return slot.texture;
 	}
 
 	void BindlessTextureManager::CreateDescriptorSetLayout()

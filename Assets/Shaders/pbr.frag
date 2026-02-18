@@ -1,6 +1,8 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
+#define GPU_DRIVEN_RENDERING 1
+
 // Source: https://learnopengl.com/PBR/Theory (Theory, Lighting and IBL sections)
 
 #include "lighting.h"
@@ -11,30 +13,14 @@ layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec3 worldNormal;
 layout(location = 2) in vec2 uv;
 
+#ifdef GPU_DRIVEN_RENDERING
+layout(location = 3) flat in uint drawID;
+#endif
+
 layout(location = 0) out vec4 outColor;
-
-// Set 1: Material properties with texture indices
-layout(set = 1, binding = 1) uniform PBR
-{
-    vec4 albedo;
-    float metallic;
-    float roughness;
-    float ao;
-
-	int albedoTextureSet;
-	int metallicTextureSet;
-	int roughnessTextureSet;
-	int occlusionTextureSet;
-	int debugMode;
-
-	uint basemapIndex;           // Material texture 0
-	uint normalmapIndex;         // Material texture 1
-	uint metallicRoughnessmapIndex; // Material texture 2
-} pbr;
 
 layout(set = 0, binding = 3) uniform GI
 {
-	uint shadowmapIndex;
 	uint irradiancemapIndex;
 	uint prefiltermapIndex;
 	uint brdfLutIndex;
@@ -56,6 +42,59 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
     LightVisiblity lightVisiblities[];
 };
 
+layout(set = 0, binding = 7) uniform sampler2D shadowMap;
+
+#ifdef GPU_DRIVEN_RENDERING
+struct PBR
+{
+	vec4 albedo;
+    float metallic;
+    float roughness;
+    float ao;
+	int flags;
+
+	int albedoTextureSet;
+	int metallicTextureSet;
+	int roughnessTextureSet;
+	int occlusionTextureSet;
+	int debugMode;
+
+	uint basemapIndex;           // Material texture 0
+	uint normalmapIndex;         // Material texture 1
+	uint metallicRoughnessmapIndex; // Material texture 2
+
+	vec3 padding;
+};
+
+layout(set = 0, binding = 8) uniform PBRBuffer
+{
+    PBR materials[256];
+} pbrBuffer;
+
+layout(set = 0, binding = 9) readonly buffer MaterialIndexBuffer {
+    uint materialIndices[];
+} materialIndices;
+#else
+// Set 1: Material properties with texture indices
+layout(set = 1, binding = 1) uniform PBR
+{
+    vec4 albedo;
+    float metallic;
+    float roughness;
+    float ao;
+
+	int albedoTextureSet;
+	int metallicTextureSet;
+	int roughnessTextureSet;
+	int occlusionTextureSet;
+	int debugMode;
+
+	uint basemapIndex;           // Material texture 0
+	uint normalmapIndex;         // Material texture 1
+	uint metallicRoughnessmapIndex; // Material texture 2
+} pbr;
+#endif
+
 // Set 2: Bindless texture arrays
 layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
 layout(set = 2, binding = 1) uniform samplerCube bindlessTexturesCube[];
@@ -66,7 +105,7 @@ layout(std140, push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
-vec3 Normal()
+vec3 Normal(uint normalmapIndex)
 {
 	vec3 dx = dFdx(worldPos.xyz);
 	vec3 dy = dFdy(worldPos.xyz);
@@ -79,13 +118,18 @@ vec3 Normal()
 	mat3 TBN = mat3(T, B, N);
 
 	// Modified: Use bindless texture
-	vec3 n = texture(bindlessTextures2D[nonuniformEXT(pbr.normalmapIndex)], uv).rgb;
+	vec3 n = texture(bindlessTextures2D[nonuniformEXT(normalmapIndex)], uv).rgb;
 
 	return normalize(TBN * (2.0 * n - 1.0));
 }
 
 void main()
 {
+#ifdef GPU_DRIVEN_RENDERING
+	uint materialIndex = materialIndices.materialIndices[drawID];
+    PBR pbr = pbrBuffer.materials[materialIndex];
+#endif
+
 	vec4 albedo = vec4(1.0);
 	float ao = 1.0;
 	float roughness = 0.0;
@@ -124,7 +168,7 @@ void main()
 	else
 		ao = pbr.ao;
 
-	vec3 N = normalize(Normal());
+	vec3 N = normalize(Normal(pbr.normalmapIndex));
     vec3 V = normalize(camera.pos - worldPos.xyz);
 	vec3 R = reflect(-V, N);
 
