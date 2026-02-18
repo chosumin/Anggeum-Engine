@@ -78,6 +78,13 @@ namespace Core
 
 		void SetEnableGpuDrivenRendering(bool enable) { _enableGpuDrivenRendering = enable; }
 		bool IsGpuDrivenRenderingEnabled() { return _enableGpuDrivenRendering; }
+
+		// Debug utils function pointers
+		PFN_vkCmdBeginDebugUtilsLabelEXT GetCmdBeginDebugUtilsLabelFunc() const { return _vkCmdBeginDebugUtilsLabel; }
+		PFN_vkCmdEndDebugUtilsLabelEXT GetCmdEndDebugUtilsLabelFunc() const { return _vkCmdEndDebugUtilsLabel; }
+		PFN_vkCmdInsertDebugUtilsLabelEXT GetCmdInsertDebugUtilsLabelFunc() const { return _vkCmdInsertDebugUtilsLabel; }
+		PFN_vkSetDebugUtilsObjectNameEXT GetSetDebugUtilsObjectNameFunc() const { return _vkSetDebugUtilsObjectName; }
+
 	private:
 		void CreateInstance();
 		bool CheckValidationLayerSupport();
@@ -92,6 +99,7 @@ namespace Core
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 
 		void CheckDescriptorIndexingSupport(VkPhysicalDevice device);
+		void LoadDebugUtilsFunctions();
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -128,17 +136,18 @@ namespace Core
 
 		bool _enableGpuDrivenRendering = false;
 
+		// Debug utils function pointers
+		PFN_vkCmdBeginDebugUtilsLabelEXT _vkCmdBeginDebugUtilsLabel = nullptr;
+		PFN_vkCmdEndDebugUtilsLabelEXT _vkCmdEndDebugUtilsLabel = nullptr;
+		PFN_vkCmdInsertDebugUtilsLabelEXT _vkCmdInsertDebugUtilsLabel = nullptr;
+		PFN_vkSetDebugUtilsObjectNameEXT _vkSetDebugUtilsObjectName = nullptr;
+
 		const vector<const char*> _validationLayers = 
 		{
 			"VK_LAYER_KHRONOS_validation"
 		};
 
-		const vector<const char*> _deviceExtensions =
-		{
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME // Added for bindless
-		};
+		const vector<const char*> _deviceExtensions;
 #ifdef NDEBUG
 		const bool _enableValidationLayers = false;
 #else

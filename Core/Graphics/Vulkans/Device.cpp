@@ -35,7 +35,12 @@ void DestroyDebugUtilsMessengerEXT(
 namespace Core
 {
 	Device::Device(Window& window)
-	    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(), _enableGpuDrivenRendering(true)
+	    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(), _enableGpuDrivenRendering(true),
+	    _deviceExtensions{
+	        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+	        VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+	    }
 	{
 	    CreateInstance();
 	    SetupDebugMessenger();
@@ -51,6 +56,9 @@ namespace Core
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 
 	    _resourceCache = new ResourceCache(*this);
+
+		// Load debug utils functions
+		LoadDebugUtilsFunctions();
 	}
 
 	Device::~Device()
@@ -66,6 +74,29 @@ namespace Core
 
 	    vkDestroySurfaceKHR(_instance, _surface, nullptr);
 	    vkDestroyInstance(_instance, nullptr);
+	}
+
+	void Device::LoadDebugUtilsFunctions()
+	{
+		// Load from instance, not device
+		_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdBeginDebugUtilsLabelEXT");
+		_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdEndDebugUtilsLabelEXT");
+		_vkCmdInsertDebugUtilsLabel = (PFN_vkCmdInsertDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdInsertDebugUtilsLabelEXT");
+		_vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(_instance, "vkSetDebugUtilsObjectNameEXT");
+
+		bool supportsDebugUtils = (_vkCmdBeginDebugUtilsLabel != nullptr) &&
+			(_vkCmdEndDebugUtilsLabel != nullptr) &&
+			(_vkCmdInsertDebugUtilsLabel != nullptr) &&
+			(_vkSetDebugUtilsObjectName != nullptr);
+
+		if (supportsDebugUtils)
+		{
+			cout << "Debug Utils extension supported!" << endl;
+		}
+		else
+		{
+			cout << "Warning: Debug Utils extension not fully supported." << endl;
+		}
 	}
 
 	uint32_t Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)

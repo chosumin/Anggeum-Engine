@@ -87,9 +87,28 @@ void ForwardRenderPipeline::Prepare()
 
 void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+
 	for (auto&& rendererPass : _rendererPasses)
 	{
+		// Get class name from typeid
+		const char* className = typeid(*rendererPass).name();
+		
+		// Remove "class Core::" prefix if present
+		const char* simpleName = className;
+		const char* prefix = "class Core::";
+		if (strncmp(className, prefix, strlen(prefix)) == 0)
+		{
+			simpleName = className + strlen(prefix);
+		}
+
+		// Begin debug marker for this render pass
+		commandBuffer.BeginDebugMarker(simpleName);
+
 		rendererPass->Draw(renderFrame, imageIndex);
+
+		// End debug marker
+		commandBuffer.EndDebugMarker();
 	}
 }
 

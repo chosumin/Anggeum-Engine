@@ -289,30 +289,41 @@ void Core::RendererBatches::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffe
 	function<void(shared_ptr<Shader>)> perShader, function<void(shared_ptr<Material>)> perDraw,
 	function<void()> postDraw)
 {
-	// ===== Compute: Reset + Pass 1 Culling =====
+	commandBuffer.BeginDebugMarker("Reset Draw Commands");
 	ResetDrawCommands(renderFrame, commandBuffer);
+	commandBuffer.EndDebugMarker();
+	
+	commandBuffer.BeginDebugMarker("Pass 1 Culling");
 	DispatchCulling(renderFrame, commandBuffer, camera, prevDepth,
 		_indirectCommandBuffer, _cullingShader, _cullingPipeline.get());
+	commandBuffer.EndDebugMarker();
 
-	// ===== Graphics: Pass 1 Render =====
+	commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
 	auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
 	commandBuffer.BeginRenderPass(pass1BeginInfo);
 	DrawIndirect(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
 	commandBuffer.EndRenderPass();
+	commandBuffer.EndDebugMarker();
 
-	// ===== Compute: Hi-Z Rebuild + Pass 2 Culling =====
+	commandBuffer.BeginDebugMarker("Pass 2 Culling");
 	DispatchCulling(renderFrame, commandBuffer, camera, curDepth,
 		_pass2IndirectCommandBuffer, _pass2CullingShader, _pass2CullingPipeline.get());
+	commandBuffer.EndDebugMarker();
 
-	// ===== Graphics: Pass 2 Render =====
+	commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects");
 	auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
 	commandBuffer.BeginRenderPass(pass2BeginInfo);
 	DrawIndirect(renderFrame, commandBuffer, *_pass2IndirectCommandBuffer, perShader, perDraw);
 
 	if (postDraw)
+	{
+		commandBuffer.BeginDebugMarker("Post Draw");
 		postDraw();
+		commandBuffer.EndDebugMarker();
+	}
 
 	commandBuffer.EndRenderPass();
+	commandBuffer.EndDebugMarker();
 }
 
 void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,

@@ -84,6 +84,12 @@ namespace Core
 
 		static void ImmediateSubmit(Device& device, Job& job);
 		static void ImmediateSubmit(Device& device, std::vector<Job*>& jobs);
+
+		// Debug marker functions
+		void BeginDebugMarker(const char* markerName, float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
+		void EndDebugMarker();
+		void InsertDebugMarker(const char* markerName, float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
+
 	private:
 		void BindBindlessDescriptorSet(
 			RenderFrame& renderFrame,

@@ -644,3 +644,44 @@ void Core::CommandBuffer::BindDescriptorSetsWithKey(
         pipelineLayout, (uint)DescriptorSetType::Shader, 1,
         &resources->descriptorSet, 0, nullptr);
 }
+
+void Core::CommandBuffer::BeginDebugMarker(const char* markerName, float r, float g, float b, float a)
+{
+	auto pfnCmdBeginLabel = _device.GetCmdBeginDebugUtilsLabelFunc();
+	if (!pfnCmdBeginLabel)
+		return;
+
+	VkDebugUtilsLabelEXT labelInfo{};
+	labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	labelInfo.pLabelName = markerName;
+	labelInfo.color[0] = r;
+	labelInfo.color[1] = g;
+	labelInfo.color[2] = b;
+	labelInfo.color[3] = a;
+	pfnCmdBeginLabel(_commandBuffer, &labelInfo);
+}
+
+void Core::CommandBuffer::EndDebugMarker()
+{
+	auto pfnCmdEndLabel = _device.GetCmdEndDebugUtilsLabelFunc();
+	if (!pfnCmdEndLabel)
+		return;
+
+	pfnCmdEndLabel(_commandBuffer);
+}
+
+void Core::CommandBuffer::InsertDebugMarker(const char* markerName, float r, float g, float b, float a)
+{
+	auto pfnCmdInsertLabel = _device.GetCmdInsertDebugUtilsLabelFunc();
+	if (!pfnCmdInsertLabel)
+		return;
+
+	VkDebugUtilsLabelEXT labelInfo{};
+	labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+	labelInfo.pLabelName = markerName;
+	labelInfo.color[0] = r;
+	labelInfo.color[1] = g;
+	labelInfo.color[2] = b;
+	labelInfo.color[3] = a;
+	pfnCmdInsertLabel(_commandBuffer, &labelInfo);
+}
