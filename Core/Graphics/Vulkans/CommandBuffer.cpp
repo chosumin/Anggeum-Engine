@@ -45,9 +45,9 @@ void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, co
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = flags;
 
+    VkCommandBufferInheritanceInfo inheritanceInfo = {};
 	if (_level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)
 	{
-		VkCommandBufferInheritanceInfo inheritanceInfo{};
 		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
 
 		inheritanceInfo.renderPass = renderPass != nullptr ?
@@ -55,6 +55,9 @@ void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, co
 		inheritanceInfo.framebuffer = framebuffer != nullptr ?
 			framebuffer->GetHandle() : VK_NULL_HANDLE;
 		inheritanceInfo.subpass = subpassIndex;
+		inheritanceInfo.occlusionQueryEnable = VK_FALSE;
+		inheritanceInfo.queryFlags = 0;
+		inheritanceInfo.pipelineStatistics = 0;
 
 		beginInfo.pInheritanceInfo = &inheritanceInfo;
 	}

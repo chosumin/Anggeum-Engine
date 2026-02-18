@@ -5,7 +5,7 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 
 Core::TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager)
-	:_device(device), _workerThreadManager(workerThreadManager)
+	:_device(device), _workerThreadManager(workerThreadManager), _currentFrame(0)
 {
 	_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
