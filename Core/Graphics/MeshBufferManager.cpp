@@ -7,7 +7,7 @@
 using namespace Core;
 
 MeshBufferManager::MeshBufferManager(Device& device)
-	: _device(device)
+	: _device(device), _indexBuffer(nullptr)
 {
 }
 

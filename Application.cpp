@@ -63,16 +63,6 @@ void Application::Update()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	static float f = 0.0f;
-	static int counter = 0;
-
-	ImGui::Begin("Status");
-
-	ImGuiIO& io = ImGui::GetIO();
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
-	ImGui::End();
-
 	auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
 
 	auto components = _scene->GetComponents<Core::Component>();

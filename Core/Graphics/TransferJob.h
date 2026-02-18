@@ -15,7 +15,7 @@ namespace Core
 	{
 	public:
 		VkBufferJob(Device& device, VkBufferUsageFlags usageFlag, Buffer** dstBuffer, vector<T> bufferData, bool empty = false)
-			:Job(JobType::TRANSFER), _device(device), _destination(dstBuffer), _bufferData(bufferData), _usageFlag(usageFlag)
+			:Job(JobType::TRANSFER), _device(device), _destination(dstBuffer), _bufferData(bufferData), _usageFlag(usageFlag), _dstOffset(0)
 		{
 		}
 

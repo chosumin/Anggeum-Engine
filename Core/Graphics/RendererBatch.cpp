@@ -21,7 +21,7 @@ using namespace Core;
 Core::RendererBatches::RendererBatches(Device& device, TransformBatch& transformBatch)
 	: _device(device)
 	, _transformBatch(transformBatch)
-	, _instanceBuffer(VK_NULL_HANDLE)
+	, _instanceBuffer(VK_NULL_HANDLE), _instanceCount(0)
 {
 }
 
