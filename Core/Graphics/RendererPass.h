@@ -1,8 +1,9 @@
 #pragma once
-#include "Graphics/Vulkans/RenderPass.h"
-#include "Graphics/Vulkans/Framebuffer.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
-#include "Graphics/RenderFrame.h"
+#include "Vulkans/RenderPass.h"
+#include "Vulkans/Framebuffer.h"
+#include "Vulkans/CommandBuffer.h"
+#include "Vulkans/DescriptorSetBuilder.h"
+#include "RenderFrame.h"
 #include "Foundation/WorkerThread.h"
 #include "Utils/timer.h"
 

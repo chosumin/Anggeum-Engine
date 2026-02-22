@@ -15,6 +15,7 @@ namespace Core
 	class IndirectDrawBuffer;
 	class RenderPass;
 	class Framebuffer;
+	class DescriptorSetBuilder;
 
 	struct RenderTargetDesc
 	{
@@ -106,6 +107,10 @@ namespace Core
 
 		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);
 
+		// Create a DescriptorSetBuilder for the given shader and set index.
+		// The built resources are stored in the frame and cleaned up on Reset().
+		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
+
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
@@ -142,5 +147,8 @@ namespace Core
 		shared_ptr<Sampler> _defaultSampler;
 
 		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
+
+		// Builder-created resources, cleaned up on Reset()
+		vector<DescriptorSetResources> _builderResources;
 	};
 }

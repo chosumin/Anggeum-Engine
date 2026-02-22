@@ -22,15 +22,13 @@ namespace Core
 
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-            VkSampleCountFlagBits msaaSamples,
+            VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
             Buffer* lightVisibilityBuffer, ivec2 tileNums,
             TransformBatch& transformBatch);
         ~GeometryPass();
 
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
-
-        void SetBuffer(ShadowUniform* shadowBuffer) { _shadowBuffer = shadowBuffer; }
     private:
         void RegisterGiTexturesToBindless(RenderFrame& renderContext);
 
@@ -50,7 +48,7 @@ namespace Core
         Pipeline* _skyboxPipeline = nullptr;
 
         GI _giBuffer;
-        ShadowUniform* _shadowBuffer = nullptr;
+        ShadowUniform& _shadowBuffer;
         LightBuffer _lightBuffer;
         Buffer* _lightVisibilityBuffer;
         TileInfo _tileInfo;

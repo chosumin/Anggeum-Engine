@@ -15,6 +15,7 @@ namespace Core
 	class Job;
 	class Framebuffer;
 	class MeshBufferManager;
+	struct DescriptorSetResources;
 
 	class CommandBuffer
 	{
@@ -41,6 +42,12 @@ namespace Core
 			VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
 			size_t key);
+		void BindDescriptorSet(
+			RenderFrame& renderFrame,
+			VkPipelineBindPoint pipelineBindPoint,
+			Shader& shader,
+			uint32_t setIndex,
+			DescriptorSetResources& resources);
 		void PushConstants(Material& material, uint32_t index = 0);
 		void PushConstants(Shader& shader, uint index, const void* data);
 

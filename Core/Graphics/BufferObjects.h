@@ -3,6 +3,8 @@
 #define MAX_FORWARD_LIGHT_COUNT 1000
 #define MAX_POINT_LIGHT_PER_TILE 128
 #define TILE_SIZE 16
+#define SHADOW_MAP_CASCADE_COUNT 4
+#define SHADOW_MAP_DIM 2048
 
 struct alignas(16) CameraBuffer
 {
@@ -11,9 +13,24 @@ struct alignas(16) CameraBuffer
 	vec3 Position;
 };
 
-struct ShadowUniform
+struct alignas(16) CascadeUniform
 {
-	alignas(16) mat4 Projection;
+	mat4 ViewProjection;
+	float SplitDepth;
+};
+
+// std140 float array: each element occupies 16 bytes
+struct Std140Float
+{
+	float value;
+	float _pad[3];
+};
+
+struct alignas(16) ShadowUniform
+{
+	mat4 ViewProjection[SHADOW_MAP_CASCADE_COUNT];
+	Std140Float SplitDepth[SHADOW_MAP_CASCADE_COUNT];
+	uint32_t CascadeCount = SHADOW_MAP_CASCADE_COUNT;
 };
 
 struct alignas(16) PBRBuffer

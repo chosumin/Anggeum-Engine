@@ -14,6 +14,7 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 #include "Vulkans/Texture.h"
+#include "Vulkans/DescriptorSetBuilder.h"
 #include "TransferJob.h"
 
 using namespace Core;
@@ -327,6 +328,51 @@ void Core::RendererBatches::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffe
 }
 
 void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+	DescriptorSetBuilder& builder,
+	function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
+{
+	for (auto&& shaderBatch : _shaderBatches)
+	{
+		commandBuffer.BindPipeline(shaderBatch.second.Pipeline);
+
+		auto shader = shaderBatch.second.SharedShader.lock();
+
+		// Batch fills its bindings, then builds
+		builder.SetStorageBuffer(1, _transformBatch.TransformBuffer);
+		builder.SetStorageBuffer(2, _instanceBuffer);
+		auto& resources = builder.Build();
+
+		commandBuffer.BindDescriptorSet(
+			renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			*shader, builder.GetSetIndex(), resources);
+
+		for (auto&& materialBatch : shaderBatch.second.MaterialBatches)
+		{
+			auto sharedMaterial = materialBatch.second.Material.lock();
+
+			commandBuffer.BindDescriptorSets(
+				renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial);
+
+			for (auto&& subMeshBatch : materialBatch.second.SubMeshBatches)
+			{
+				auto subMesh = subMeshBatch.second.SubMesh.lock();
+
+				perDraw(sharedMaterial, subMesh);
+
+				auto vertexAttibuteNames = sharedMaterial->GetShader().GetVertexAttirbuteNames();
+
+				commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+				commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+				commandBuffer.DrawIndexed(
+					subMesh->GetIndexCount(),
+					subMeshBatch.second.Transforms.size(),
+					subMeshBatch.second.FirstInstance);
+			}
+		}
+	}
+}
+
+void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     function<void(shared_ptr<Shader>)> perShader, 
     function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw)
 {
@@ -344,7 +390,6 @@ void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& comman
 			renderFrame,
 			VK_PIPELINE_BIND_POINT_GRAPHICS, *shader);
 
-        //1. Material batch
         for (auto&& materialBatch : shaderBatch.second.MaterialBatches)
 		{
 			auto sharedMaterial = materialBatch.second.Material.lock();
@@ -353,7 +398,6 @@ void Core::RendererBatches::Draw(RenderFrame& renderFrame, CommandBuffer& comman
 				renderFrame,
 				VK_PIPELINE_BIND_POINT_GRAPHICS, *sharedMaterial);
 
-			//2. SubMesh batch
             for (auto&& subMeshBatch : materialBatch.second.SubMeshBatches)
             {
                 auto subMesh = subMeshBatch.second.SubMesh.lock();
@@ -380,6 +424,53 @@ void Core::RendererBatches::DrawIndirect(
 	function<void(shared_ptr<Material>)> perDraw)
 {
 	DrawIndirect(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
+}
+
+void Core::RendererBatches::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& commandBuffer, DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
+{
+	if (_indirectDrawBuffer.GetDrawCount() == 0)
+		return;
+
+	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
+
+	for (auto& [shaderHash, shaderBatch] : _shaderBatches)
+	{
+		auto shader = shaderBatch.SharedShader.lock();
+		if (!shader)
+			continue;
+
+		auto vertexAttibuteNames = shader->GetVertexAttirbuteNames();
+		commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
+		commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+
+		commandBuffer.BindPipeline(shaderBatch.Pipeline);
+
+		// Batch fills its bindings, then builds
+		builder.SetStorageBuffer(1, _transformBatch.TransformBuffer);
+		builder.SetStorageBuffer(2, _instanceBuffer);
+
+		if (_needsMaterialIndexBuffer)
+		{
+			builder.SetUniformBuffer(8,
+				const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+			builder.SetStorageBuffer(9, _materialIndexBuffer);
+		}
+
+		auto& resources = builder.Build();
+
+		commandBuffer.BindDescriptorSet(
+			renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			*shader, builder.GetSetIndex(), resources);
+
+		auto material = shaderBatch.MaterialBatches.begin()->second.Material.lock();
+		perDraw(material);
+
+		commandBuffer.DrawIndexedIndirect(
+			*_indirectCommandBuffer,
+			_indirectDrawBuffer.GetDrawCount(),
+			static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+		);
+	}
 }
 
 void Core::RendererBatches::AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh)

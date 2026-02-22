@@ -45,7 +45,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	AddRendererPass(depthPrePass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, swapChain, depthFormat, _transformBatch);
+		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
 	AddRendererPass(shadowPass);
 
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
@@ -53,8 +53,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
+		_shadowBuffer,
 		_lightBuffer, tileNums, _transformBatch);
-	geometryPass->SetBuffer(shadowPass->GetShadowBuffer());
 	AddRendererPass(geometryPass);
 
 	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);

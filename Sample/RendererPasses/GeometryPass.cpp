@@ -19,7 +19,7 @@ namespace Core
 {
     GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
         Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-        VkSampleCountFlagBits msaaSamples,
+        VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
         Buffer* lightVisibilityBuffer, ivec2 tileNums,
         TransformBatch& transformBatch)
         : RendererPass(device, workerThreadManager)
@@ -27,6 +27,7 @@ namespace Core
         , _msaaSamples(msaaSamples)
         , _swapChainFormat(swapChain.GetImageFormat())
         , _lightVisibilityBuffer(lightVisibilityBuffer)
+		, _shadowBuffer(shadowBuffer)
     {
         auto swapChainExtents = swapChain.GetSwapChainExtent();
         _tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
@@ -189,7 +190,7 @@ namespace Core
         {
             renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
             renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
-            renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer->Projection);
+            renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer);
             renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
             renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
             renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);

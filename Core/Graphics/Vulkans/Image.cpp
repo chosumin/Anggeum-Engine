@@ -55,6 +55,12 @@ Core::Image::~Image()
             vkDestroyImageView(device, mipView, nullptr);
 	}
 
+    for (auto& layerView : _layerImageViews)
+    {
+        if (layerView != VK_NULL_HANDLE)
+            vkDestroyImageView(device, layerView, nullptr);
+    }
+
 	if (_image != VK_NULL_HANDLE)
 		vkDestroyImage(device, _image, nullptr);
 
@@ -80,6 +86,21 @@ VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
 	_mipImageViews[mipLevel - 1] = imageView;
 
 	return _mipImageViews[mipLevel - 1];
+}
+
+VkImageView& Core::Image::GetOrCreateLayerImageView(uint32_t layerIndex)
+{
+    if (_layerImageViews.empty())
+        _layerImageViews.resize(_layer, VK_NULL_HANDLE);
+
+    if (layerIndex >= _layer)
+        throw runtime_error("Layer index out of range!");
+
+    if (_layerImageViews[layerIndex] != VK_NULL_HANDLE)
+        return _layerImageViews[layerIndex];
+
+    _layerImageViews[layerIndex] = CreateSingleLayerImageView(layerIndex, GetAspectFlags());
+    return _layerImageViews[layerIndex];
 }
 
 void Core::Image::SetSRGBFormat()
@@ -332,6 +353,29 @@ VkImageView Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType ima
     if (vkCreateImageView(_device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
     {
         throw runtime_error("failed to create texture image view!");
+    }
+
+    return imageView;
+}
+
+VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags)
+{
+    VkImageView imageView;
+
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = _image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = _format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = layerIndex;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    if (vkCreateImageView(_device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+    {
+        throw runtime_error("failed to create single layer image view!");
     }
 
     return imageView;

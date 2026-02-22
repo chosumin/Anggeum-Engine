@@ -26,10 +26,11 @@ layout(set = 0, binding = 3) uniform GI
 	uint brdfLutIndex;
 } gi;
 
-layout(set = 0, binding = 4) uniform ShadowUniform
-{
-	mat4 projection;
-} shadow;
+layout(set = 0, binding = 4) uniform CascadeShadowUBO {
+    mat4  viewProjection[CASCADE_COUNT];
+    float splitDepth[CASCADE_COUNT];
+    uint  cascadeCount;
+} csm;
 
 layout(set = 0, binding = 5) uniform Lights 
 {
@@ -42,7 +43,7 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
     LightVisiblity lightVisiblities[];
 };
 
-layout(set = 0, binding = 7) uniform sampler2D shadowMap;
+layout(set = 0, binding = 7) uniform sampler2DArray shadowMap;
 
 #ifdef GPU_DRIVEN_RENDERING
 struct PBR
@@ -105,6 +106,48 @@ layout(std140, push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
+float ShadowCalculation(vec3 worldPos, float viewDepth)
+{
+    // Select cascade based on view-space depth
+    uint cascadeIndex = 0;
+    for (uint i = 0; i < csm.cascadeCount - 1; ++i)
+    {
+        if (viewDepth < csm.splitDepth[i])
+        {
+            cascadeIndex = i + 1;
+        }
+    }
+
+    // Project world position into selected cascade's light space
+    vec4 shadowCoord = csm.viewProjection[cascadeIndex] * vec4(worldPos, 1.0);
+    shadowCoord.xyz /= shadowCoord.w;
+
+    // Convert from [-1,1] to [0,1] for UV lookup (Vulkan depth is already [0,1])
+    shadowCoord.xy = shadowCoord.xy * 0.5 + 0.5;
+
+    // PCF filtering (3x3 kernel)
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
+
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            vec2 offset = vec2(x, y) * texelSize;
+            float closestDepth = texture(shadowMap,
+                vec3(shadowCoord.xy + offset, float(cascadeIndex))).r;
+            shadow += (shadowCoord.z > closestDepth + 0.005) ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+
+    // No shadow beyond far cascade
+    if (shadowCoord.z > 1.0)
+        shadow = 0.0;
+
+    return shadow;
+}
+
 vec3 Normal(uint normalmapIndex)
 {
 	vec3 dx = dFdx(worldPos.xyz);
@@ -117,7 +160,6 @@ vec3 Normal(uint normalmapIndex)
 	vec3 B = normalize(cross(N, T));
 	mat3 TBN = mat3(T, B, N);
 
-	// Modified: Use bindless texture
 	vec3 n = texture(bindlessTextures2D[nonuniformEXT(normalmapIndex)], uv).rgb;
 
 	return normalize(TBN * (2.0 * n - 1.0));
@@ -207,6 +249,13 @@ void main()
         Lo += (kD * albedo.rgb / PI + specular) * radiance; 
     }   
   
+	// Calculate shadow using CSM
+	float viewDepth = (camera.view * worldPos).z;
+	float shadow = ShadowCalculation(worldPos.xyz, viewDepth);
+
+	// Apply shadow to direct lighting only (ambient is unaffected)
+	Lo *= (1.0 - shadow);
+
 	// ambient lighting
 	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);
 	vec3 kD = 1.0 - kS;
@@ -224,14 +273,6 @@ void main()
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
 
 	vec3 ambient = (kD * diffuse + specular) * ao;
-
-	if(pbr.debugMode == 1)
-	{
-		float intensity = float(lightVisiblities[tileIndex].count) / 64;
-		outColor = vec4(intensity, intensity, intensity, 1.0);
-		return;
-	}
-
     vec3 color = ambient + Lo;
 	
 	// tonemapping

@@ -28,6 +28,11 @@ namespace Core
 			return _image->GetOrCreateImageView(0);
 		}
 
+		VkImageView GetLayerImageView(uint32_t layerIndex)
+		{
+			return _image->GetOrCreateLayerImageView(layerIndex);
+		}
+
 		VkSampleCountFlagBits GetSampleCount() const
 		{
 			return _image->GetSampleCount();
