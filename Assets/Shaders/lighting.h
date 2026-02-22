@@ -24,6 +24,8 @@
 #define TILE_SIZE 16
 #define MAX_POINT_LIGHT_PER_TILE 128
 
+#define CASCADE_COUNT 4
+
 struct LightVisiblity
 {
 	uint count;

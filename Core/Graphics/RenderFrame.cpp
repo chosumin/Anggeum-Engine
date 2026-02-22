@@ -6,6 +6,7 @@
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/Shader.h"
 #include "Vulkans/Framebuffer.h"
+#include "Vulkans/DescriptorSetBuilder.h"
 #include "ResourceCache.h"
 
 using namespace Core;
@@ -55,6 +56,13 @@ void RenderFrame::Reset()
 		resources.CleanupBuffers();
 	}
 	_materialResources.clear();
+
+	// Cleanup builder-created resources
+	for (auto& resources : _builderResources)
+	{
+		resources.CleanupBuffers();
+	}
+	_builderResources.clear();
 }
 
 void RenderFrame::AllocateDescriptorSets(Shader& shader)
@@ -624,7 +632,14 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     if (desc.isCubemap)
         imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-    auto viewType = desc.isCubemap ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+    VkImageViewType viewType;
+    if (desc.isCubemap)
+        viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    else if (desc.arrayLayers > 1)
+        viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    else
+        viewType = VK_IMAGE_VIEW_TYPE_2D;
+
     auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
     auto texture = make_shared<Texture>(name, image, _defaultSampler);
 
@@ -678,4 +693,9 @@ Framebuffer* Core::RenderFrame::GetFramebuffer(const string& name) const
 void Core::RenderFrame::RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer)
 {
     _framebuffers[name] = std::move(framebuffer);
+}
+
+DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex)
+{
+	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
 }

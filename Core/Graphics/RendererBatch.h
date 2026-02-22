@@ -17,6 +17,7 @@ namespace Core
 	class RenderFrame;
 	class Buffer;
 	class Framebuffer;
+	class DescriptorSetBuilder;
 
 	struct TransformBatch
 	{
@@ -66,10 +67,18 @@ namespace Core
 		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
+		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			DescriptorSetBuilder& builder,
+			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
+			function<void(shared_ptr<Material>)> perDraw);
+		void DrawIndirect(
+			RenderFrame& renderFrame,
+			CommandBuffer& commandBuffer,
+			DescriptorSetBuilder& builder,
 			function<void(shared_ptr<Material>)> perDraw);
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);

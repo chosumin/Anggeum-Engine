@@ -9,6 +9,7 @@
 #include "Framebuffer.h"
 #include "Image.h"
 #include "BindlessTextureManager.h"
+#include "DescriptorPool.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Material.h"
 #include "Graphics/RenderFrame.h"
@@ -684,4 +685,25 @@ void Core::CommandBuffer::InsertDebugMarker(const char* markerName, float r, flo
 	labelInfo.color[2] = b;
 	labelInfo.color[3] = a;
 	pfnCmdInsertLabel(_commandBuffer, &labelInfo);
+}
+
+void Core::CommandBuffer::BindDescriptorSet(
+	RenderFrame& renderFrame,
+	VkPipelineBindPoint pipelineBindPoint,
+	Shader& shader,
+	uint32_t setIndex,
+	DescriptorSetResources& resources)
+{
+	if (resources.descriptorSet == VK_NULL_HANDLE)
+		return;
+
+	auto pipelineLayout = shader.GetPipelineLayout();
+
+	if (shader.UsesBindlessTextures())
+		BindBindlessDescriptorSet(renderFrame, pipelineBindPoint, pipelineLayout);
+
+	vkCmdBindDescriptorSets(
+		_commandBuffer, pipelineBindPoint,
+		pipelineLayout, setIndex, 1,
+		&resources.descriptorSet, 0, nullptr);
 }

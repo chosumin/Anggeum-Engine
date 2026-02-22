@@ -46,7 +46,7 @@ namespace Core
 		vector<RendererPass*> _rendererPasses;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 		Buffer* _lightBuffer;
-
+		ShadowUniform _shadowBuffer;
 		TransformBatch _transformBatch;
 	};
 }
