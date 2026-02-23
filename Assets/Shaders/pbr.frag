@@ -27,8 +27,8 @@ layout(set = 0, binding = 3) uniform GI
 } gi;
 
 layout(set = 0, binding = 4) uniform CascadeShadowUBO {
-    mat4  viewProjection[CASCADE_COUNT];
-    float splitDepth[CASCADE_COUNT];
+    mat4  viewProjection[SHADOW_MAP_CASCADE_COUNT];
+    float splitDepth[SHADOW_MAP_CASCADE_COUNT];
     uint  cascadeCount;
 } csm;
 

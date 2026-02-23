@@ -633,12 +633,23 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
         imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
     VkImageViewType viewType;
-    if (desc.isCubemap)
+    if (desc.viewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+    {
+        // Explicit view type override
+        viewType = desc.viewType;
+    }
+    else if (desc.isCubemap)
+    {
         viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    }
     else if (desc.arrayLayers > 1)
+    {
         viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    }
     else
+    {
         viewType = VK_IMAGE_VIEW_TYPE_2D;
+    }
 
     auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
     auto texture = make_shared<Texture>(name, image, _defaultSampler);
@@ -648,13 +659,13 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
 }
 
 Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name, 
-    RenderPass& renderPass, const vector<string>& attachmentNames)
+    RenderPass& renderPass, const vector<string>& attachmentNames, int32_t layerIndex)
 {
     auto it = _framebuffers.find(name);
     if (it != _framebuffers.end())
         return it->second.get();
 
-    vector<Texture*> attachments;
+    vector<VkImageView> imageViews;
     VkExtent2D extent = { 0, 0 };
     
     for (const auto& attachmentName : attachmentNames)
@@ -662,7 +673,18 @@ Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name,
         auto texture = GetRenderTarget(attachmentName);
         if (texture)
         {
-            attachments.push_back(texture.get());
+            if (layerIndex >= 0)
+            {
+                // Use single layer image view for array textures
+                imageViews.push_back(texture->GetLayerImageView(
+                    static_cast<uint32_t>(layerIndex)));
+            }
+            else
+            {
+                // Use full image view (default behavior)
+                imageViews.push_back(texture->GetImageView());
+            }
+
             if (extent.width == 0)
             {
                 auto texExtent = texture->GetExtent();
@@ -671,11 +693,11 @@ Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name,
         }
     }
 
-    if (attachments.empty())
+    if (imageViews.empty())
         return nullptr;
 
-    // Create framebuffer
-    auto framebuffer = make_unique<Framebuffer>(_device, renderPass, attachments);
+    // Create framebuffer with explicit image views
+    auto framebuffer = make_unique<Framebuffer>(_device, renderPass, imageViews, extent);
 
     auto* result = framebuffer.get();
     _framebuffers[name] = std::move(framebuffer);

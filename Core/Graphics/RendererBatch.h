@@ -80,6 +80,10 @@ namespace Core
 			CommandBuffer& commandBuffer,
 			DescriptorSetBuilder& builder,
 			function<void(shared_ptr<Material>)> perDraw);
+
+		void DispatchFrustumOnlyCulling(RenderFrame& renderFrame, 
+			CommandBuffer& commandBuffer,
+			const CameraBuffer& camera);
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
@@ -139,9 +143,14 @@ namespace Core
 
 		shared_ptr<Shader> _pass2CullingShader;
 		unique_ptr<Pipeline> _pass2CullingPipeline;
-
 		shared_ptr<Shader> _resetDrawCommandsShader;
 		unique_ptr<Pipeline> _resetDrawCommandsPipeline;
+
+		// Frustum-only culling resources
+		shared_ptr<Shader> _frustumCullingShader;
+		unique_ptr<Pipeline> _frustumCullingPipeline;
+		shared_ptr<Shader> _resetDrawCommandsSimpleShader;
+		unique_ptr<Pipeline> _resetDrawCommandsSimplePipeline;
 	};
 }
 
