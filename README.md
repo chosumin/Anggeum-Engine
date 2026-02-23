@@ -1,19 +1,17 @@
 # Angeum Engine
 
-A modern Vulkan-based rendering engine with GPU-driven rendering capabilities.
-
----
+--- 
 
 ## About
 
-Angeum Engine is a high-performance 3D rendering engine built from the ground up with Vulkan API. The engine showcases advanced rendering techniques including GPU-driven rendering, physically-based rendering (PBR), and bindless texture systems. It demonstrates modern Vulkan features such as descriptor indexing, buffer device address, and compute-based culling optimizations.
+Angeum Engine is a 3D rendering engine built from the ground up with Vulkan API. The engine showcases rendering techniques including GPU-driven rendering, physically-based rendering (PBR), and bindless texture systems. It demonstrates modern Vulkan features such as descriptor indexing, buffer device address, and compute-based culling optimizations.
 
 ---
 
 ## Screenshots
 
 ![PBR Rendering](https://github.com/user-attachments/assets/6c9db11f-4037-49a2-8971-c229a915bd65)
-<img width="1970" height="976" alt="sponza" src="https://github.com/user-attachments/assets/11546071-66cd-48d8-abab-f047cf41eb55" />
+<img width="1482" height="730" alt="cascade_shadows" src="https://github.com/user-attachments/assets/ce88f0b1-7e6a-4a31-85d9-900e4ccfbc88" />
 
 ---
 
@@ -115,6 +113,13 @@ Angeum Engine is a high-performance 3D rendering engine built from the ground up
     - Hierarchical depth buffer (Hi-Z) generation
     - Per-mip ImageView for efficient mip chain generation
 
+### Shadow System
+
+13. **Cascaded Shadow Maps (CSM)**
+    - Per-cascade light view-projection matrix generation
+    - Bounding sphere stabilization to reduce shadow edge shimmer
+    - Texture2DArray-based storage for all cascade layers
+      
 ---
 
 ## Build Instructions
