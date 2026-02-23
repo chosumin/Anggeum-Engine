@@ -27,6 +27,7 @@ namespace Core
 		bool isCubemap = false;
 		uint32_t mipLevels = 1;
 		uint32_t arrayLayers = 1;
+		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
 	};
 
 	class RenderFrame
@@ -102,7 +103,7 @@ namespace Core
 		const unordered_map<string, shared_ptr<Texture>>& GetAllRenderTargets() const { return _renderTargets; }
 
 		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
-			const vector<string>& attachmentNames);
+			const vector<string>& attachmentNames, int32_t layerIndex = -1);
 		Framebuffer* GetFramebuffer(const string& name) const;
 
 		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);

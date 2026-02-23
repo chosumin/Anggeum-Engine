@@ -181,9 +181,16 @@ void Core::RendererBatches::PrepareCullingResources(Core::Device& device)
 	_pass2CullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCullingPass2.comp");
 	_pass2CullingPipeline = make_unique<Pipeline>(device, *_pass2CullingShader);
 
-	// Reset draw commands shader
+	// Reset draw commands shader (2-pass)
 	_resetDrawCommandsShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommands.comp");
 	_resetDrawCommandsPipeline = make_unique<Pipeline>(device, *_resetDrawCommandsShader);
+
+	// Frustum-only culling resources
+	_frustumCullingShader = device.GetResourceCache().RequestShader("Shaders/frustumCulling.comp");
+	_frustumCullingPipeline = make_unique<Pipeline>(device, *_frustumCullingShader);
+
+	_resetDrawCommandsSimpleShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommandsSimple.comp");
+	_resetDrawCommandsSimplePipeline = make_unique<Pipeline>(device, *_resetDrawCommandsSimpleShader);
 }
 
 void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes)
@@ -805,4 +812,64 @@ void Core::RendererBatches::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
     commandBuffer.TransitionImageLayout(depthBufferImage,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+}
+
+void Core::RendererBatches::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
+	CommandBuffer& commandBuffer, const CameraBuffer& camera)
+{
+	uint32_t drawCount = _indirectDrawBuffer.GetDrawCount();
+
+	// Reset instance counts
+	commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
+
+	renderFrame.SetShaderStorageBuffer(*_resetDrawCommandsSimpleShader, 0, _indirectCommandBuffer);
+
+	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, &drawCount);
+	commandBuffer.BindDescriptorSets(renderFrame,
+		_resetDrawCommandsSimplePipeline->GetPipelineBindPoint(), *_resetDrawCommandsSimpleShader);
+
+	uint32_t groupCount = (drawCount + 63) / 64;
+	commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
+
+	commandBuffer.Barrier(
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+
+	// Dispatch frustum-only culling
+	struct FrustumCullData
+	{
+		glm::mat4 view;
+		glm::mat4 proj;
+		glm::vec4 frustumPlanes[6];
+		uint32_t drawCount;
+	} cullData{};
+
+	cullData.view = camera.View;
+	cullData.proj = camera.Projection;
+	cullData.drawCount = _instanceCount;
+
+	glm::mat4 viewProj = camera.Projection * camera.View;
+	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
+
+	commandBuffer.BindPipeline(_frustumCullingPipeline.get());
+
+	renderFrame.SetShaderUniformBuffer(*_frustumCullingShader, 0, &cullData);
+	renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 1, _objectDataBuffer);
+	renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 2, _transformBatch.TransformBuffer);
+	renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 3, _instanceBuffer);
+	renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 4, _indirectCommandBuffer);
+
+	commandBuffer.BindDescriptorSets(renderFrame,
+		_frustumCullingPipeline->GetPipelineBindPoint(), *_frustumCullingShader);
+
+	groupCount = (_instanceCount + 63) / 64;
+	commandBuffer.Dispatch(groupCount, 1, 1);
+
+	commandBuffer.Barrier(
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
 }

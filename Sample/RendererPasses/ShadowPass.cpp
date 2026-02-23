@@ -168,6 +168,7 @@ void Core::ShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 	depthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthDesc.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 	depthDesc.arrayLayers = SHADOW_MAP_CASCADE_COUNT;
+	depthDesc.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY; // Always 2D_ARRAY for sampler2DArray
 
 	renderFrame.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 }
@@ -236,38 +237,53 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	for (uint32_t cascadeIndex = 0; cascadeIndex < SHADOW_MAP_CASCADE_COUNT; ++cascadeIndex)
 	{
-		std::string fbName = "ShadowPass_Cascade" + std::to_string(cascadeIndex);
+		string fbName = "ShadowPass_Cascade" + std::to_string(cascadeIndex);
 
 		auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
-			fbName, *_renderPass, { RT_SHADOW_DEPTH });
+			fbName, *_renderPass, { RT_SHADOW_DEPTH }, cascadeIndex);
 
 		if (!framebuffer)
 			continue;
 
 		auto& commandBuffer = renderFrame.GetCommandBuffer();
 
-		commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
-
-		auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-		commandBuffer.BeginRenderPass(renderPassBeginInfo);
-
-		// Pass creates builder and fills its binding
 		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
 		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);
 
-		// RendererBatch fills the rest and builds
 		if (_device.IsGpuDrivenRenderingEnabled())
 		{
+			string cullingName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Frustum Culling";
+			commandBuffer.BeginDebugMarker(cullingName.c_str());
+			_rendererBatches->DispatchFrustumOnlyCulling(
+				renderFrame, commandBuffer, _cascadeViews[cascadeIndex]);
+			commandBuffer.EndDebugMarker();
+
+			string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
+			commandBuffer.BeginDebugMarker(drawName.c_str());
+			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+			commandBuffer.BeginRenderPass(renderPassBeginInfo);
+
 			_rendererBatches->DrawIndirect(renderFrame, commandBuffer, builder,
 			[&](shared_ptr<Material> sharedMaterial) {});
+
+			commandBuffer.EndRenderPass();
+			commandBuffer.EndDebugMarker();
 		}
 		else
 		{
+			string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
+			commandBuffer.BeginDebugMarker(drawName.c_str());
+			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+			commandBuffer.BeginRenderPass(renderPassBeginInfo);
+
 			_rendererBatches->Draw(renderFrame, commandBuffer, builder,
 			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh) {});
-		}
 
-		commandBuffer.EndRenderPass();
+			commandBuffer.EndRenderPass();
+			commandBuffer.EndDebugMarker();
+		}
 	}
 
 	UpdateGUI(renderFrame);
