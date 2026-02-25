@@ -27,14 +27,31 @@ const int   PCF_SAMPLES = 16;
 const float PCSS_MIN_FILTER_RADIUS = 0.5;
 const float PCSS_MAX_FILTER_RADIUS = 10.0;
 
+// Per-fragment random rotation angle using interleaved gradient noise
+float InterleavedGradientNoise(vec2 screenPos)
+{
+	vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+	return fract(magic.z * fract(dot(screenPos, magic.xy)));
+}
+
+// Rotate a 2D offset by angle (in radians)
+vec2 RotateOffset(vec2 offset, float cosAngle, float sinAngle)
+{
+	return vec2(
+		offset.x * cosAngle - offset.y * sinAngle,
+		offset.x * sinAngle + offset.y * cosAngle
+	);
+}
+
 struct BlockerResult
 {
-	float avgDepth;     // Average blocker depth (-1.0 if none found)
-	float confidence;   // 0.0 ~ 1.0: ratio of blockers found vs total samples
+	float avgDepth;
+	float confidence;
 };
 
 // Step 1: Find average blocker depth and confidence
-BlockerResult FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex, float searchRadius, vec2 texelSize)
+BlockerResult FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex,
+	float searchRadius, vec2 texelSize, float cosAngle, float sinAngle)
 {
 	BlockerResult result;
 	result.avgDepth = -1.0;
@@ -45,7 +62,8 @@ BlockerResult FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint 
 
 	for (int i = 0; i < BLOCKER_SEARCH_SAMPLES; ++i)
 	{
-		vec2 offset = poissonDisk[i] * searchRadius * texelSize;
+		vec2 rotated = RotateOffset(poissonDisk[i], cosAngle, sinAngle);
+		vec2 offset = rotated * searchRadius * texelSize;
 		float shadowMapDepth = texture(shadowMap,
 			vec3(shadowCoord.xy + offset, float(cascadeIndex))).r;
 
@@ -71,14 +89,16 @@ float EstimatePenumbraWidth(float receiverDepth, float blockerDepth, float light
 	return lightSize * (receiverDepth - blockerDepth) / blockerDepth;
 }
 
-// Step 3: PCF with variable filter radius ? returns visibility (1.0 = fully lit)
-float PCF_Filter(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex, float filterRadius, vec2 texelSize)
+// Step 3: PCF with variable filter radius and per-fragment rotation
+float PCF_Filter(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex,
+	float filterRadius, vec2 texelSize, float cosAngle, float sinAngle)
 {
 	float visibility = 0.0;
 
 	for (int i = 0; i < PCF_SAMPLES; ++i)
 	{
-		vec2 offset = poissonDisk[i] * filterRadius * texelSize;
+		vec2 rotated = RotateOffset(poissonDisk[i], cosAngle, sinAngle);
+		vec2 offset = rotated * filterRadius * texelSize;
 		float closestDepth = texture(shadowMap,
 			vec3(shadowCoord.xy + offset, float(cascadeIndex))).r;
 		visibility += (shadowCoord.z <= closestDepth) ? 1.0 : 0.0;
@@ -113,13 +133,20 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 
 	vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
 
+	// Per-fragment rotation to break up banding between umbra and penumbra
+	float noise = InterleavedGradientNoise(gl_FragCoord.xy);
+	float angle = noise * 6.283185; // 2¥ð
+	float cosAngle = cos(angle);
+	float sinAngle = sin(angle);
+
 	// Scale light size per cascade
 	float cascadeScale = float(cascadeIndex + 1);
 	float lightSize = LIGHT_SIZE * cascadeScale;
 
 	// Step 1: Blocker search with confidence
 	float searchRadius = lightSize * 20.0;
-	BlockerResult blocker = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex, searchRadius, texelSize);
+	BlockerResult blocker = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex,
+		searchRadius, texelSize, cosAngle, sinAngle);
 
 	// No blockers ? fully lit
 	if (blocker.avgDepth < 0.0)
@@ -132,10 +159,10 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 	float filterRadius = penumbraWidth * float(textureSize(shadowMap, 0).x);
 	filterRadius = clamp(filterRadius, PCSS_MIN_FILTER_RADIUS, PCSS_MAX_FILTER_RADIUS);
 
-	// Step 3: PCF with estimated filter radius
-	float pcfVisibility = PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex, filterRadius, texelSize);
+	// Step 3: PCF with estimated filter radius and rotation
+	float pcfVisibility = PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex,
+		filterRadius, texelSize, cosAngle, sinAngle);
 
 	// Blend towards fully lit based on blocker confidence
-	// Low confidence (few blockers at edge) ¡æ softer transition to lit
 	return mix(1.0, pcfVisibility, smoothstep(0.0, 0.5, blocker.confidence));
 }

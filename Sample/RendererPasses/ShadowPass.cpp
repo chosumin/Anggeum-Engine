@@ -97,6 +97,8 @@ void Core::ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 	glm::mat4 lightMatrix = lightTransform.GetMatrix();
 	glm::vec3 lightDir = glm::normalize(glm::vec3(lightMatrix[2]));
 
+	float shadowMapSize = static_cast<float>(SHADOW_MAP_DIM);
+
 	// Build cascade matrices
 	float lastSplitDist = 0.0f;
 	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
@@ -147,6 +149,20 @@ void Core::ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 			minExtents.x, maxExtents.x,
 			minExtents.y, maxExtents.y,
 			0.0f, maxExtents.z - minExtents.z);
+
+		// Texel snapping: round the light-space origin to shadow map texel boundaries
+		// This prevents shadow shaking/swimming when the camera moves
+		glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
+		glm::vec4 shadowOrigin = shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		shadowOrigin *= shadowMapSize / 2.0f;
+
+		glm::vec4 roundedOrigin = glm::round(shadowOrigin);
+		glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
+		roundOffset *= 2.0f / shadowMapSize;
+		roundOffset.z = 0.0f;
+		roundOffset.w = 0.0f;
+
+		lightOrthoMatrix[3] += roundOffset;
 
 		// Store cascade data
 		_shadowBuffer.SplitDepth[i].value = (nearClip + splitDist * clipRange) * -1.0f;
