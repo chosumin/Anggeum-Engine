@@ -271,8 +271,8 @@ namespace Core
 		{
 		case Utility::HashCode("PBR"):
 			pass = "Geometry";
-			vert = "shaders/pbr.vert.spv";
-			frag = "shaders/pbr.frag.spv";
+			vert = "shaders/lit.vert.spv";
+			frag = "shaders/lit.frag.spv";
 			break;
 		case Utility::HashCode("Shadow"):
 			pass = "Shadow";

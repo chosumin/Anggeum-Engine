@@ -91,3 +91,18 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 	vec3 sampleVec = H.x * tangent + H.y * bitangent + H.z * N;
 	return normalize(sampleVec);
 }
+
+vec3 Normal(vec3 normalMap, vec3 worldPos, vec3 worldNormal, vec2 uv)
+{
+	vec3 dx = dFdx(worldPos);
+	vec3 dy = dFdy(worldPos);
+	vec3 st1 = dFdx(vec3(uv, 0.0));
+	vec3 st2 = dFdy(vec3(uv, 0.0));
+	vec3 T = (st2.t * dx - st1.t * dy) / (st1.s * st2.t - st2.s * st1.t);
+	vec3 N = normalize(worldNormal);
+	T = normalize(T - N * dot(N, T));
+	vec3 B = normalize(cross(N, T));
+	mat3 TBN = mat3(T, B, N);
+
+	return normalize(TBN * (2.0 * normalMap - 1.0));
+}
