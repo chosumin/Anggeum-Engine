@@ -8,6 +8,7 @@
 #include "lighting.h"
 #include "common.glsl"
 #include "pbr.glsl"
+#include "shadow.glsl"
 
 layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec3 worldNormal;
@@ -106,48 +107,6 @@ layout(std140, push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
-float ShadowCalculation(vec3 worldPos, float viewDepth)
-{
-    // Select cascade based on view-space depth
-    uint cascadeIndex = 0;
-    for (uint i = 0; i < csm.cascadeCount - 1; ++i)
-    {
-        if (viewDepth < csm.splitDepth[i])
-        {
-            cascadeIndex = i + 1;
-        }
-    }
-
-    // Project world position into selected cascade's light space
-    vec4 shadowCoord = csm.viewProjection[cascadeIndex] * vec4(worldPos, 1.0);
-    shadowCoord.xyz /= shadowCoord.w;
-
-    // Convert from [-1,1] to [0,1] for UV lookup (Vulkan depth is already [0,1])
-    shadowCoord.xy = shadowCoord.xy * 0.5 + 0.5;
-
-    // PCF filtering (3x3 kernel)
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
-
-    for (int x = -1; x <= 1; ++x)
-    {
-        for (int y = -1; y <= 1; ++y)
-        {
-            vec2 offset = vec2(x, y) * texelSize;
-            float closestDepth = texture(shadowMap,
-                vec3(shadowCoord.xy + offset, float(cascadeIndex))).r;
-            shadow += (shadowCoord.z > closestDepth + 0.005) ? 1.0 : 0.0;
-        }
-    }
-    shadow /= 9.0;
-
-    // No shadow beyond far cascade
-    if (shadowCoord.z > 1.0)
-        shadow = 0.0;
-
-    return shadow;
-}
-
 vec3 Normal(uint normalmapIndex)
 {
 	vec3 dx = dFdx(worldPos.xyz);
@@ -210,7 +169,8 @@ void main()
 	else
 		ao = pbr.ao;
 
-	vec3 N = normalize(Normal(pbr.normalmapIndex));
+	vec3 n = texture(bindlessTextures2D[nonuniformEXT(pbr.normalmapIndex)], uv).rgb;
+	vec3 N = normalize(Normal(n, worldPos.xyz, worldNormal, uv));
     vec3 V = normalize(camera.pos - worldPos.xyz);
 	vec3 R = reflect(-V, N);
 
@@ -249,12 +209,14 @@ void main()
         Lo += (kD * albedo.rgb / PI + specular) * radiance; 
     }   
   
-	// Calculate shadow using CSM
+	// Calculate shadow visibility using CSM with PCSS (1.0 = fully lit, 0.0 = fully shadowed)
 	float viewDepth = (camera.view * worldPos).z;
-	float shadow = ShadowCalculation(worldPos.xyz, viewDepth);
+	float visibility = ShadowCalculation(shadowMap,
+		csm.viewProjection, csm.splitDepth, csm.cascadeCount,
+		worldPos.xyz, viewDepth);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)
-	Lo *= (1.0 - shadow);
+	Lo *= visibility;
 
 	// ambient lighting
 	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);

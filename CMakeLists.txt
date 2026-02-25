@@ -382,3 +382,21 @@ message(STATUS "GLFW Library: ${GLFW_LIBRARY}")
 message(STATUS "KTX Library (Debug): ${KTX_LIBRARY_DEBUG}")
 message(STATUS "KTX Library (Release): ${KTX_LIBRARY_RELEASE}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+
+# Copy compiled shaders to build output (after shader compilation)
+if(GLSLC)
+    add_custom_command(TARGET CompileShaders POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/Assets/Shaders"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
+        COMMENT "Copying compiled shaders to output directory..."
+    )
+endif()
+
+# Copy full Assets folder (post-build, only when executable is rebuilt)
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/Assets"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
+    COMMENT "Copying Assets folder..."
+)
