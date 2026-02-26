@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.26)
 project(AnggeumEngine VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++17 standard
@@ -262,14 +262,13 @@ else()
     )
 endif()
 
-# Copy Assets folder (post-build)
+# Copy Assets folder (post-build) - only copy changed files
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "Copying Assets from ${CMAKE_SOURCE_DIR}/Assets to $<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    COMMAND ${CMAKE_COMMAND} -E echo "Syncing Assets from ${CMAKE_SOURCE_DIR}/Assets to $<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${CMAKE_SOURCE_DIR}/Assets"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
-    COMMENT "Copying Assets folder..."
+    COMMENT "Syncing Assets folder (changed files only)..."
 )
 
 # Copy KTX DLL (Debug/Release, fallback if missing)
@@ -382,21 +381,3 @@ message(STATUS "GLFW Library: ${GLFW_LIBRARY}")
 message(STATUS "KTX Library (Debug): ${KTX_LIBRARY_DEBUG}")
 message(STATUS "KTX Library (Release): ${KTX_LIBRARY_RELEASE}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
-
-# Copy compiled shaders to build output (after shader compilation)
-if(GLSLC)
-    add_custom_command(TARGET CompileShaders POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/Assets/Shaders"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
-        COMMENT "Copying compiled shaders to output directory..."
-    )
-endif()
-
-# Copy full Assets folder (post-build, only when executable is rebuilt)
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/Assets"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
-    COMMENT "Copying Assets folder..."
-)
