@@ -43,20 +43,10 @@ vec2 RotateOffset(vec2 offset, float cosAngle, float sinAngle)
 	);
 }
 
-struct BlockerResult
-{
-	float avgDepth;
-	float confidence;
-};
-
-// Step 1: Find average blocker depth and confidence
-BlockerResult FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex,
+// Step 1: Find average blocker depth in the search region
+float FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex,
 	float searchRadius, vec2 texelSize, float cosAngle, float sinAngle)
 {
-	BlockerResult result;
-	result.avgDepth = -1.0;
-	result.confidence = 0.0;
-
 	float blockerSum = 0.0;
 	int blockerCount = 0;
 
@@ -74,13 +64,10 @@ BlockerResult FindBlockerDepth(sampler2DArray shadowMap, vec3 shadowCoord, uint 
 		}
 	}
 
-	if (blockerCount > 0)
-	{
-		result.avgDepth = blockerSum / float(blockerCount);
-		result.confidence = float(blockerCount) / float(BLOCKER_SEARCH_SAMPLES);
-	}
+	if (blockerCount == 0)
+		return -1.0;
 
-	return result;
+	return blockerSum / float(blockerCount);
 }
 
 // Step 2: Estimate penumbra width based on blocker distance
@@ -143,26 +130,23 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 	float cascadeScale = float(cascadeIndex + 1);
 	float lightSize = LIGHT_SIZE * cascadeScale;
 
-	// Step 1: Blocker search with confidence
+	// Step 1: Blocker search
 	float searchRadius = lightSize * 20.0;
-	BlockerResult blocker = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex,
+	float avgBlockerDepth = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex,
 		searchRadius, texelSize, cosAngle, sinAngle);
 
 	// No blockers ? fully lit
-	if (blocker.avgDepth < 0.0)
+	if (avgBlockerDepth < 0.0)
 		return 1.0;
 
 	// Step 2: Penumbra estimation
-	float penumbraWidth = EstimatePenumbraWidth(shadowCoord.z, blocker.avgDepth, lightSize);
+	float penumbraWidth = EstimatePenumbraWidth(shadowCoord.z, avgBlockerDepth, lightSize);
 
 	// Convert to texel-space and clamp to prevent extreme sampling
 	float filterRadius = penumbraWidth * float(textureSize(shadowMap, 0).x);
 	filterRadius = clamp(filterRadius, PCSS_MIN_FILTER_RADIUS, PCSS_MAX_FILTER_RADIUS);
 
 	// Step 3: PCF with estimated filter radius and rotation
-	float pcfVisibility = PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex,
+	return PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex,
 		filterRadius, texelSize, cosAngle, sinAngle);
-
-	// Blend towards fully lit based on blocker confidence
-	return mix(1.0, pcfVisibility, smoothstep(0.0, 0.5, blocker.confidence));
 }
