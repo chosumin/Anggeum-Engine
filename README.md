@@ -115,11 +115,15 @@ Angeum Engine is a 3D rendering engine built from the ground up with Vulkan API.
 
 ### Shadow System
 
-13. **Cascaded Shadow Maps (CSM)**
-    - Per-cascade light view-projection matrix generation
+13. **Cascaded Shadow Maps (CSM) with PCSS**
+    - Practical split scheme (logarithmic + uniform hybrid) for cascade partitioning
     - Bounding sphere stabilization to reduce shadow edge shimmer
-    - Texture2DArray-based storage for all cascade layers
-      
+    - PCSS (Percentage-Closer Soft Shadows):
+      - Blocker search with Poisson disk sampling
+      - Distance-based penumbra estimation (closer blocker → sharper shadow)
+      - Variable-radius PCF filtering
+    - Interleaved Gradient Noise for per-fragment sample rotation
+    - Filter radius clamping to prevent extreme sampling artifacts
 ---
 
 ## Build Instructions
