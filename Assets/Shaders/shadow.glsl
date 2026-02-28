@@ -21,11 +21,8 @@ const vec2 poissonDisk[16] = vec2[](
 );
 
 // PCSS constants
-const float LIGHT_SIZE = 0.04;
-const int   BLOCKER_SEARCH_SAMPLES = 16;
-const int   PCF_SAMPLES = 16;
-const float PCSS_MIN_FILTER_RADIUS = 0.5;
-const float PCSS_MAX_FILTER_RADIUS = 10.0;
+const int BLOCKER_SEARCH_SAMPLES = 16;
+const int PCF_SAMPLES = 16;
 
 // Per-fragment random rotation angle using interleaved gradient noise
 float InterleavedGradientNoise(vec2 screenPos)
@@ -94,9 +91,48 @@ float PCF_Filter(sampler2DArray shadowMap, vec3 shadowCoord, uint cascadeIndex,
 	return visibility / float(PCF_SAMPLES);
 }
 
-// PCSS Shadow Calculation ? returns visibility (1.0 = fully lit, 0.0 = fully shadowed)
+// PCSS for a single cascade
+float ShadowCalculationForCascade(sampler2DArray shadowMap, mat4 viewProjection,
+	float lightSize, float minFilterRadius, float maxFilterRadius,
+	uint cascadeIndex, vec3 worldPos, float cosAngle, float sinAngle)
+{
+	vec4 shadowCoord = viewProjection * vec4(worldPos, 1.0);
+	shadowCoord.xyz /= shadowCoord.w;
+	shadowCoord.xy = shadowCoord.xy * 0.5 + 0.5;
+
+	if (shadowCoord.z > 1.0)
+		return 1.0;
+
+	vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
+
+	// Sqrt scale: smooth penumbra transition between cascades
+	float cascadeScale = sqrt(float(cascadeIndex + 1));
+	float scaledLightSize = lightSize * cascadeScale;
+
+	// Step 1: Blocker search
+	float searchRadius = scaledLightSize * 20.0;
+	float avgBlockerDepth = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex,
+		searchRadius, texelSize, cosAngle, sinAngle);
+
+	if (avgBlockerDepth < 0.0)
+		return 1.0;
+
+	// Step 2: Penumbra estimation
+	float penumbraWidth = EstimatePenumbraWidth(shadowCoord.z, avgBlockerDepth, scaledLightSize);
+
+	// Step 3: PCF
+	float filterRadius = penumbraWidth * float(textureSize(shadowMap, 0).x);
+	filterRadius = clamp(filterRadius, minFilterRadius, maxFilterRadius);
+
+	return PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex,
+		filterRadius, texelSize, cosAngle, sinAngle);
+}
+
+// PCSS Shadow Calculation with cascade blending
 float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP_CASCADE_COUNT],
 	float splitDepth[SHADOW_MAP_CASCADE_COUNT], uint cascadeCount,
+	float lightSize, float minFilterRadius, float maxFilterRadius,
+	float cascadeBlendFactor,
 	vec3 worldPos, float viewDepth)
 {
 	// Select cascade based on view-space depth
@@ -109,44 +145,47 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 		}
 	}
 
-	// Project world position into selected cascade's light space
-	vec4 shadowCoord = viewProjection[cascadeIndex] * vec4(worldPos, 1.0);
-	shadowCoord.xyz /= shadowCoord.w;
-	shadowCoord.xy = shadowCoord.xy * 0.5 + 0.5;
-
-	// No shadow beyond far cascade ? fully lit
-	if (shadowCoord.z > 1.0)
-		return 1.0;
-
-	vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
-
-	// Per-fragment rotation to break up banding between umbra and penumbra
+	// Per-fragment rotation
 	float noise = InterleavedGradientNoise(gl_FragCoord.xy);
-	float angle = noise * 6.283185; // 2¥ð
+	float angle = noise * 6.283185;
 	float cosAngle = cos(angle);
 	float sinAngle = sin(angle);
 
-	// Scale light size per cascade
-	float cascadeScale = float(cascadeIndex + 1);
-	float lightSize = LIGHT_SIZE * cascadeScale;
+	// Calculate visibility for current cascade
+	float visibility = ShadowCalculationForCascade(shadowMap, viewProjection[cascadeIndex],
+		lightSize, minFilterRadius, maxFilterRadius,
+		cascadeIndex, worldPos, cosAngle, sinAngle);
 
-	// Step 1: Blocker search
-	float searchRadius = lightSize * 20.0;
-	float avgBlockerDepth = FindBlockerDepth(shadowMap, shadowCoord.xyz, cascadeIndex,
-		searchRadius, texelSize, cosAngle, sinAngle);
+	// Blend with next cascade near the split boundary
+	// splitDepth and viewDepth are negative (view space convention):
+	//   viewDepth = -15.0, splitDepth[0] = -30.0
+	//   As viewDepth approaches splitDepth from above (less negative ¡æ more negative),
+	//   distToSplit goes from positive to zero
+	if (cascadeBlendFactor > 0.0 && cascadeIndex < cascadeCount - 1)
+	{
+		float currentSplit = splitDepth[cascadeIndex];
+		float prevSplit = (cascadeIndex > 0u) ? splitDepth[cascadeIndex - 1] : 0.0;
 
-	// No blockers ? fully lit
-	if (avgBlockerDepth < 0.0)
-		return 1.0;
+		// Both values are negative, so abs gives the positive range
+		float cascadeRange = abs(currentSplit - prevSplit);
+		float blendRegion = cascadeRange * cascadeBlendFactor;
 
-	// Step 2: Penumbra estimation
-	float penumbraWidth = EstimatePenumbraWidth(shadowCoord.z, avgBlockerDepth, lightSize);
+		// Distance from fragment to next cascade boundary (positive when inside current cascade)
+		float distToSplit = abs(viewDepth - currentSplit);
 
-	// Convert to texel-space and clamp to prevent extreme sampling
-	float filterRadius = penumbraWidth * float(textureSize(shadowMap, 0).x);
-	filterRadius = clamp(filterRadius, PCSS_MIN_FILTER_RADIUS, PCSS_MAX_FILTER_RADIUS);
+		if (distToSplit < blendRegion)
+		{
+			// 1.0 at split boundary ¡æ 0.0 at blend region end
+			float blendFactor = 1.0 - smoothstep(0.0, blendRegion, distToSplit);
 
-	// Step 3: PCF with estimated filter radius and rotation
-	return PCF_Filter(shadowMap, shadowCoord.xyz, cascadeIndex,
-		filterRadius, texelSize, cosAngle, sinAngle);
+			uint nextCascade = cascadeIndex + 1;
+			float nextVisibility = ShadowCalculationForCascade(shadowMap, viewProjection[nextCascade],
+				lightSize, minFilterRadius, maxFilterRadius,
+				nextCascade, worldPos, cosAngle, sinAngle);
+
+			visibility = mix(visibility, nextVisibility, blendFactor);
+		}
+	}
+
+	return visibility;
 }

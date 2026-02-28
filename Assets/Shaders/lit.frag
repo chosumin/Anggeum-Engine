@@ -31,6 +31,10 @@ layout(set = 0, binding = 4) uniform CascadeShadowUBO {
     mat4  viewProjection[SHADOW_MAP_CASCADE_COUNT];
     float splitDepth[SHADOW_MAP_CASCADE_COUNT];
     uint  cascadeCount;
+    float lightSize;
+    float minFilterRadius;
+    float maxFilterRadius;
+    float cascadeBlendFactor;
 } csm;
 
 layout(set = 0, binding = 5) uniform Lights 
@@ -213,6 +217,8 @@ void main()
 	float viewDepth = (camera.view * worldPos).z;
 	float visibility = ShadowCalculation(shadowMap,
 		csm.viewProjection, csm.splitDepth, csm.cascadeCount,
+		csm.lightSize, csm.minFilterRadius, csm.maxFilterRadius,
+		csm.cascadeBlendFactor,
 		worldPos.xyz, viewDepth);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)

@@ -24,6 +24,10 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 		VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 	_renderPass->CreateRenderPass();
 
+	// Enable depth bias (actual values set dynamically via vkCmdSetDepthBias)
+	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
+	rasterization.depthBiasEnable = VK_TRUE;
+
 	_shadowMaterial = _device.GetResourceCache().RequestMaterial("shadow", "Shadow");
 
 	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
@@ -193,6 +197,40 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 {
 	ImGui::Begin("Shadow Maps");
 
+	// PCSS Settings
+	ImGui::SeparatorText("PCSS Settings");
+	{
+		ImGui::SliderFloat("Light Size", &_shadowBuffer.LightSize, 0.001f, 0.2f, "%.3f");
+		ImGui::SliderFloat("Min Filter Radius", &_shadowBuffer.MinFilterRadius, 0.1f, 5.0f, "%.1f");
+		ImGui::SliderFloat("Max Filter Radius", &_shadowBuffer.MaxFilterRadius, 1.0f, 30.0f, "%.1f");
+	}
+
+	ImGui::SeparatorText("Depth Bias");
+	{
+		ImGui::SliderFloat("Constant Factor", &_depthBiasConstant, 0.0f, 4.0f, "%.2f");
+		ImGui::SliderFloat("Slope Factor", &_depthBiasSlope, 0.0f, 4.0f, "%.2f");
+		ImGui::SliderFloat("Clamp", &_depthBiasClamp, 0.0f, 0.1f, "%.4f");
+	}
+
+	ImGui::SeparatorText("Cascade Settings");
+	{
+		ImGui::SliderFloat("Split Lambda", &_cascadeSplitLambda, 0.0f, 1.0f, "%.2f");
+		ImGui::SliderFloat("Blend Factor", &_shadowBuffer.CascadeBlendFactor, 0.0f, 1.0f, "%.2f");
+		ImGui::SetItemTooltip("Fraction of cascade range used for blending (0 = off, 0.3 = 30%%)");
+
+		if (ImGui::Button("Reset Defaults"))
+		{
+			_shadowBuffer.LightSize = 0.04f;
+			_shadowBuffer.MinFilterRadius = 0.5f;
+			_shadowBuffer.MaxFilterRadius = 10.0f;
+			_shadowBuffer.CascadeBlendFactor = 0.3f;
+			_depthBiasConstant = 1.25f;
+			_depthBiasSlope = 1.75f;
+			_depthBiasClamp = 0.0f;
+			_cascadeSplitLambda = 0.95f;
+		}
+	}
+
 	// CSM Shadow Map Debug View
 	ImGui::SeparatorText("Cascaded Shadow Maps");
 	{
@@ -200,7 +238,6 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 
 		if (shadowTexture)
 		{
-			// Create ImGui descriptor sets for each cascade layer (once)
 			if (!_csmDescriptorsCreated)
 			{
 				auto sampler = shadowTexture->GetSampler();
@@ -218,7 +255,8 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 			float previewSize = 200.0f;
 			for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 			{
-				ImGui::Text("Cascade %u", i);
+				ImGui::Text("Cascade %u (split: %.2f)",
+					i, _shadowBuffer.SplitDepth[i].value * -1.0f);
 				ImGui::Image((ImTextureID)_csmDescriptorSets[i],
 					ImVec2(previewSize, previewSize));
 
@@ -280,6 +318,8 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
 			commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
+			commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
+
 			_rendererBatches->DrawIndirect(renderFrame, commandBuffer, builder,
 			[&](shared_ptr<Material> sharedMaterial) {});
 
@@ -293,6 +333,8 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
 			commandBuffer.BeginRenderPass(renderPassBeginInfo);
+
+			commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
 			_rendererBatches->Draw(renderFrame, commandBuffer, builder,
 			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh) {});

@@ -48,6 +48,11 @@ namespace Core
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;
 
+		// Depth bias (adjustable via ImGui)
+		float _depthBiasConstant = 1.25f;
+		float _depthBiasSlope = 1.75f;
+		float _depthBiasClamp = 0.0f;
+
 		// CSM debug view
 		std::array<VkDescriptorSet, SHADOW_MAP_CASCADE_COUNT> _csmDescriptorSets{};
 		bool _csmDescriptorsCreated = false;

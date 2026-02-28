@@ -8,6 +8,32 @@ Core::Pipeline::Pipeline(Device& device,
 	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
 	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 {
+	CreateGraphicsPipeline(renderPass, shader, pipelineState);
+}
+
+Core::Pipeline::Pipeline(Device& device, Shader& shader)
+	:_device(device)
+{
+	_pipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+
+	VkComputePipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.layout = shader.GetPipelineLayout();
+	pipelineInfo.stage = shader.GetComputeShaderStageCreateInfo();
+
+	if (vkCreateComputePipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create compute pipeline!");
+	}
+}
+
+Core::Pipeline::~Pipeline()
+{
+	auto device = _device.GetDevice();
+	vkDestroyPipeline(device, _pipeline, nullptr);
+}
+
+void Core::Pipeline::CreateGraphicsPipeline(RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
+{
 	auto shaderStage = shader.GetShaderStageCreateInfo();
 	auto vertexInputState =
 		shader.GetVertexInputStateCreateInfo();
@@ -36,32 +62,11 @@ Core::Pipeline::Pipeline(Device& device,
 	pipelineInfo.layout = pipelineLayout;
 	pipelineInfo.renderPass = renderPass.GetHandle();
 	pipelineInfo.subpass = 0;
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-	pipelineInfo.basePipelineIndex = -1; // Optional
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
 
-	if (vkCreateGraphicsPipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS)
+	if (vkCreateGraphicsPipelines(_device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS)
 		throw std::runtime_error("failed to create graphics pipeline!");
-}
-
-Core::Pipeline::Pipeline(Device& device, Shader& shader)
-	:_device(device)
-{
-	_pipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
-
-	VkComputePipelineCreateInfo pipelineInfo{};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pipelineInfo.layout = shader.GetPipelineLayout();
-	pipelineInfo.stage = shader.GetComputeShaderStageCreateInfo();
-
-	if (vkCreateComputePipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create compute pipeline!");
-	}
-}
-
-Core::Pipeline::~Pipeline()
-{
-	auto device = _device.GetDevice();
-	vkDestroyPipeline(device, _pipeline, nullptr);
 }
 
 VkPipelineViewportStateCreateInfo Core::Pipeline::GetViewportStateCreateInfo()
@@ -80,13 +85,13 @@ VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo
 	VkPipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
-	colorBlending.blendConstants[0] = 0.0f; // Optional
-	colorBlending.blendConstants[1] = 0.0f; // Optional
-	colorBlending.blendConstants[2] = 0.0f; // Optional
-	colorBlending.blendConstants[3] = 0.0f; // Optional
+	colorBlending.blendConstants[0] = 0.0f;
+	colorBlending.blendConstants[1] = 0.0f;
+	colorBlending.blendConstants[2] = 0.0f;
+	colorBlending.blendConstants[3] = 0.0f;
 
 	return colorBlending;
 }
@@ -103,25 +108,15 @@ VkPipelineDynamicStateCreateInfo Core::Pipeline::GetDynamicStateCreateInfo()
 
 VkPipelineColorBlendAttachmentState Core::Pipeline::GetColorBlendAttachmentState()
 {
-	//Pseudocode for color blend operation below.
-	//if (blendEnable) {
-	//	finalColor.rgb = (srcColorBlendFactor * newColor.rgb) < colorBlendOp > (dstColorBlendFactor * oldColor.rgb);
-	//	finalColor.a = (srcAlphaBlendFactor * newColor.a) < alphaBlendOp > (dstAlphaBlendFactor * oldColor.a);
-	//}
-	//else {
-	//	finalColor = newColor;
-	//}
-	//finalColor = finalColor & colorWriteMask;
-
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
 	return colorBlendAttachment;
 }

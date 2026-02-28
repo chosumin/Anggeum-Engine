@@ -97,6 +97,10 @@ namespace Core
 		void EndDebugMarker();
 		void InsertDebugMarker(const char* markerName, float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
 
+		void SetDepthBias(float constantFactor, float clamp, float slopeFactor)
+		{
+			vkCmdSetDepthBias(_commandBuffer, constantFactor, clamp, slopeFactor);
+		}
 	private:
 		void BindBindlessDescriptorSet(
 			RenderFrame& renderFrame,

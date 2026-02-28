@@ -15,6 +15,7 @@ namespace Core
 		VkPipeline GetPipeline() const { return _pipeline; }
 		VkPipelineBindPoint GetPipelineBindPoint() const { return _pipelineBindPoint; }
 	private:
+		void CreateGraphicsPipeline(RenderPass& renderPass, Shader& shader, PipelineState& pipelineState);
 		VkPipelineViewportStateCreateInfo GetViewportStateCreateInfo();
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
@@ -29,6 +30,7 @@ namespace Core
 		{
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
+			VK_DYNAMIC_STATE_DEPTH_BIAS,
 		};
 	};
 }
