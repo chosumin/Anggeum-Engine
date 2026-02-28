@@ -148,18 +148,49 @@ else()
     if(CMAKE_BUILD_TYPE MATCHES Release)
         list(APPEND GLSLC_FLAGS -O)
     endif()
+
+    # Directory for shader dependency files
+    set(SHADER_DEP_DIR "${CMAKE_BINARY_DIR}/shader_deps")
+    file(MAKE_DIRECTORY "${SHADER_DEP_DIR}")
     
     # Create compilation rules for each shader file
     set(COMPILED_SHADERS)
     foreach(SHADER ${SHADER_SOURCES})
         get_filename_component(SHADER_NAME ${SHADER} NAME)
         set(SHADER_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Shaders/${SHADER_NAME}.spv")
-        
-        # Shader compilation command
+        set(SHADER_DEP_FILE "${SHADER_DEP_DIR}/${SHADER_NAME}.d")
+
+        # Generate dependency file using glslc -M
+        # This produces a Makefile-style .d file listing actual #include dependencies
+        execute_process(
+            COMMAND ${GLSLC} ${GLSLC_FLAGS} -M ${SHADER}
+            OUTPUT_FILE "${SHADER_DEP_FILE}"
+            RESULT_VARIABLE DEP_RESULT
+            ERROR_QUIET
+        )
+
+        # Parse dependency file to extract actual header dependencies
+        set(SHADER_ACTUAL_DEPS ${SHADER})
+        if(DEP_RESULT EQUAL 0 AND EXISTS "${SHADER_DEP_FILE}")
+            file(READ "${SHADER_DEP_FILE}" DEP_CONTENT)
+            # Remove the target part (everything before ':')
+            string(REGEX REPLACE "^[^:]*:" "" DEP_CONTENT "${DEP_CONTENT}")
+            # Remove backslash-newline continuations
+            string(REPLACE "\\\n" " " DEP_CONTENT "${DEP_CONTENT}")
+            # Remove extra whitespace and split into list
+            string(REGEX REPLACE "[ \t\r\n]+" ";" DEP_CONTENT "${DEP_CONTENT}")
+            foreach(DEP ${DEP_CONTENT})
+                if(EXISTS "${DEP}" AND NOT "${DEP}" STREQUAL "${SHADER}")
+                    list(APPEND SHADER_ACTUAL_DEPS "${DEP}")
+                endif()
+            endforeach()
+        endif()
+
+        # Shader compilation command with per-shader dependencies
         add_custom_command(
             OUTPUT ${SHADER_OUTPUT}
             COMMAND ${GLSLC} ${GLSLC_FLAGS} -o ${SHADER_OUTPUT} ${SHADER}
-            DEPENDS ${SHADER} ${SHADER_HEADERS}
+            DEPENDS ${SHADER_ACTUAL_DEPS}
             COMMENT "Compiling shader: ${SHADER_NAME}"
             VERBATIM
         )
