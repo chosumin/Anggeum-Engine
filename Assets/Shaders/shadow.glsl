@@ -189,3 +189,20 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 
 	return visibility;
 }
+
+// SDF Shadow sampling utility for fragment shaders
+// Used when SDF shadow map is pre-computed via compute shader
+
+// Sample the pre-computed SDF shadow map
+float SampleSDFShadow(sampler2D sdfShadowMap, vec2 screenUV)
+{
+    return texture(sdfShadowMap, screenUV).r;
+}
+
+// Combine CSM shadow with SDF shadow
+// CSM handles close-range detail, SDF provides long-range soft shadows
+float CombineShadows(float csmShadow, float sdfShadow, float blendFactor)
+{
+    // blendFactor: 0.0 = CSM only, 1.0 = SDF only
+    return mix(csmShadow, min(csmShadow, sdfShadow), blendFactor);
+}

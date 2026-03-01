@@ -1,0 +1,117 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform CameraUniform
+{
+    mat4 view;
+    mat4 proj;
+    vec3 pos;
+} camera;
+
+layout(set = 0, binding = 1) uniform sampler3D sdfVolume;
+
+layout(set = 0, binding = 2) uniform SDFParams
+{
+    vec4 volumeMin;        // AABB min (w: unused)
+    vec4 volumeMax;        // AABB max (w: unused)
+    vec4 lightDirection;   // normalized dir (w: softness)
+    vec4 volumeResolution; // xyz: res, w: max march distance
+    int  maxSteps;
+    float minDistance;
+    float maxDistance;
+    float shadowSoftness;
+} sdf;
+
+// Input: world-space position (from G-buffer or depth reconstruction)
+layout(set = 0, binding = 3) uniform sampler2D depthTexture;
+
+// Output: shadow factor (R channel, 1.0 = lit, 0.0 = shadow)
+layout(set = 0, binding = 4, r8) uniform writeonly image2D shadowOutput;
+
+// Convert screen UV + depth to world position
+vec3 ReconstructWorldPos(vec2 uv, float depth)
+{
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    mat4 invViewProj = inverse(camera.proj * camera.view);
+    vec4 worldPos = invViewProj * clipPos;
+    return worldPos.xyz / worldPos.w;
+}
+
+// Map world position to SDF volume UV [0,1]
+vec3 WorldToVolumeUV(vec3 worldPos)
+{
+    return (worldPos - sdf.volumeMin.xyz) / (sdf.volumeMax.xyz - sdf.volumeMin.xyz);
+}
+
+// SDF soft shadow via sphere tracing
+// Uses the technique from Inigo Quilez: https://iquilezles.org/articles/rmshadows/
+float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k)
+{
+    float result = 1.0;
+    float t = tMin;
+    float ph = 1e20; // previous SDF sample for improved penumbra
+
+    for (int i = 0; i < sdf.maxSteps && t < tMax; ++i)
+    {
+        vec3 pos = origin + dir * t;
+        vec3 uvw = WorldToVolumeUV(pos);
+
+        // Out of volume bounds ¡æ assume lit
+        if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
+            break;
+
+        float dist = texture(sdfVolume, uvw).r;
+
+        // Improved soft shadow (Inigo Quilez method)
+        float y = dist * dist / (2.0 * ph);
+        float d = sqrt(dist * dist - y * y);
+        result = min(result, k * d / max(0.0, t - y));
+        ph = dist;
+
+        if (dist < sdf.minDistance)
+            return 0.0; // Fully in shadow
+
+        t += dist;
+    }
+
+    return clamp(result, 0.0, 1.0);
+}
+
+void main()
+{
+    ivec2 outputSize = imageSize(shadowOutput);
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    if (pixelCoord.x >= outputSize.x || pixelCoord.y >= outputSize.y)
+        return;
+
+    vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(outputSize);
+
+    // Sample depth
+    float depth = texture(depthTexture, uv).r;
+
+    // Skip sky pixels
+    if (depth >= 1.0)
+    {
+        imageStore(shadowOutput, pixelCoord, vec4(1.0));
+        return;
+    }
+
+    // Reconstruct world position
+    vec3 worldPos = ReconstructWorldPos(uv, depth);
+
+    // Ray march toward light
+    vec3 lightDir = normalize(-sdf.lightDirection.xyz);
+
+    // Compute volume-space voxel size for the starting offset
+    vec3 volumeSize = sdf.volumeMax.xyz - sdf.volumeMin.xyz;
+    float voxelSize = max(volumeSize.x, max(volumeSize.y, volumeSize.z))
+                      / sdf.volumeResolution.x;
+    float tMin = voxelSize * 2.0; // Start slightly away from surface
+
+    float shadow = SDFSoftShadow(worldPos, lightDir,
+        tMin, sdf.maxDistance, sdf.shadowSoftness);
+
+    imageStore(shadowOutput, pixelCoord, vec4(shadow, shadow, shadow, 1.0));
+}

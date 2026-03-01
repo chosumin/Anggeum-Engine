@@ -174,6 +174,7 @@ namespace Core
         auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
         auto shadowTarget = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
+		auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
 
         UpdateLightBuffer();
 
@@ -194,6 +195,11 @@ namespace Core
             renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
             renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
             renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
+
+            if (sdfShadowTarget)
+            {
+                renderFrame.SetShaderTextureBuffer(*shader, 10, sdfShadowTarget);
+            }
         };
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)

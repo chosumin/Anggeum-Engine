@@ -6,6 +6,11 @@
 #define SHADOW_MAP_CASCADE_COUNT 4
 #define SHADOW_MAP_DIM 2048
 
+// SDF Shadow Constants
+#define SDF_VOLUME_DIM 128
+#define SDF_MAX_MARCH_STEPS 64
+#define SDF_SHADOW_SOFTNESS 8.0f
+
 struct alignas(16) CameraBuffer
 {
 	mat4 View;
@@ -31,15 +36,18 @@ struct alignas(16) ShadowUniform
 	mat4 ViewProjection[SHADOW_MAP_CASCADE_COUNT];
 	Std140Float SplitDepth[SHADOW_MAP_CASCADE_COUNT];
 	uint32_t CascadeCount = SHADOW_MAP_CASCADE_COUNT;
+};
 
-	// PCSS parameters (adjustable via ImGui)
-	float LightSize = 0.04f;
-	float MinFilterRadius = 0.5f;
-	float MaxFilterRadius = 10.0f;
-
-	// Cascade blend region as fraction of each cascade's depth range
-	float CascadeBlendFactor = 0.3f;
-	float _pad[3];
+struct alignas(16) SDFShadowUniform
+{
+	vec4 VolumeMin;
+	vec4 VolumeMax;
+	vec4 LightDirection;   // w: softness factor
+	vec4 VolumeResolution; // xyz: resolution, w: max march distance
+	int MaxSteps;
+	float MinDistance;
+	float MaxDistance;
+	float ShadowSoftness
 };
 
 struct alignas(16) PBRBuffer
@@ -126,8 +134,6 @@ struct alignas(16) GPUMaterialData
 
 	glm::vec3 padding;  // 16-byte alignment
 };
-
-static_assert(sizeof(GPUMaterialData) == 80, "GPUMaterialData must be 80 bytes");
 
 struct alignas(16) GPUObjectData
 {

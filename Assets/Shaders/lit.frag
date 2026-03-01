@@ -31,10 +31,6 @@ layout(set = 0, binding = 4) uniform CascadeShadowUBO {
     mat4  viewProjection[SHADOW_MAP_CASCADE_COUNT];
     float splitDepth[SHADOW_MAP_CASCADE_COUNT];
     uint  cascadeCount;
-    float lightSize;
-    float minFilterRadius;
-    float maxFilterRadius;
-    float cascadeBlendFactor;
 } csm;
 
 layout(set = 0, binding = 5) uniform Lights 
@@ -49,6 +45,8 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
 };
 
 layout(set = 0, binding = 7) uniform sampler2DArray shadowMap;
+
+layout(set = 0, binding = 10) uniform sampler2D sdfShadowMap;
 
 #ifdef GPU_DRIVEN_RENDERING
 struct PBR
@@ -215,11 +213,17 @@ void main()
   
 	// Calculate shadow visibility using CSM with PCSS (1.0 = fully lit, 0.0 = fully shadowed)
 	float viewDepth = (camera.view * worldPos).z;
-	float visibility = ShadowCalculation(shadowMap,
+	float csmVisibility = ShadowCalculation(shadowMap,
 		csm.viewProjection, csm.splitDepth, csm.cascadeCount,
-		csm.lightSize, csm.minFilterRadius, csm.maxFilterRadius,
-		csm.cascadeBlendFactor,
 		worldPos.xyz, viewDepth);
+
+	// Sample SDF shadow (pre-computed via compute pass)
+	vec2 screenUV = gl_FragCoord.xy / vec2(tileInfo.viewportSize);
+	float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
+
+	// Combine CSM and SDF shadows:
+	// CSM provides high-detail close shadows, SDF adds long-range soft contact shadows
+	float visibility = CombineShadows(csmVisibility, sdfVisibility, 0.5);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;
