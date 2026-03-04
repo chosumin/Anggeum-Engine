@@ -22,7 +22,7 @@ Sample::ParticlePass::ParticlePass(Device& device, WorkerThreadManager& workerTh
     , _swapChainFormat(swapChainFormat)
     , _msaaSamples(msaaSamples)
 {
-    _computeMaterial = device.GetResourceCache().RequestMaterial("particle", "shaders/particle.comp");
+    _computeMaterial = device.GetResourceCache().RequestMaterial("particle", "shaders/particle.comp.spv");
     _computePipeline = make_unique<Pipeline>(device, _computeMaterial->GetShader());
 
     _graphicsMaterial =

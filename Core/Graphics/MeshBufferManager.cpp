@@ -37,6 +37,10 @@ glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& po
 		max = glm::max(max, pos);
 	}
 
+	// Accumulate scene-wide bounds
+	_sceneBoundsMin = glm::min(_sceneBoundsMin, min);
+	_sceneBoundsMax = glm::max(_sceneBoundsMax, max);
+
 	glm::vec3 center = (min + max) * 0.5f;
 
 	float radius = 0.0f;
@@ -83,7 +87,7 @@ Buffer* MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 
 	_indexBuffer = new Core::Buffer(_device,
 		_maxIndices * size,
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
 	_indexType = indexType;
@@ -104,12 +108,12 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 	{
 		_vertexBuffers[name] = new Buffer(_device,
 			_maxVertices * stride,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			MemoryType::DEVICE_LOCAL
 		);
 	}
 
-	// If the data is position, calculate bounding sphere
+	// If the data is position, calculate bounding sphere (also accumulates scene bounds)
 	if (name == "POSITION")
 	{
 		const glm::vec3* positions = reinterpret_cast<const glm::vec3*>(data.data());

@@ -4,17 +4,23 @@
 namespace Core
 {
 	class Device;
-	class Mesh;
 	class Image;
 	class Texture;
 	class Sampler;
+	class Buffer;
+	class MeshBufferManager;
+	class Pipeline;
+	class Shader;
+	class CommandBuffer;
+	class RenderFrame;
 
-	struct SDFVolumeData
+	struct SDFGeneratePushConstants
 	{
-		std::vector<float> distanceField;
-		glm::vec3 boundsMin;
-		glm::vec3 boundsMax;
+		glm::vec4 volumeMin;
+		glm::vec4 volumeMax;
 		uint32_t resolution;
+		uint32_t triangleCount;
+		uint32_t padding[2];
 	};
 
 	class SDFGenerator
@@ -23,29 +29,29 @@ namespace Core
 		SDFGenerator(Device& device);
 		~SDFGenerator() = default;
 
-		/// Generate an SDF volume from scene meshes.
-		/// Returns a 3D texture containing signed distances.
-		shared_ptr<Texture> Generate(const std::vector<Mesh*>& meshes,
+		/// Generate SDF volume on the GPU.
+		/// Bounds are taken from MeshBufferManager's accumulated scene bounds.
+		void Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			MeshBufferManager& meshBufferManager,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
+		shared_ptr<Texture> GetSDFTexture() const { return _sdfTexture; }
 		const glm::vec3& GetBoundsMin() const { return _boundsMin; }
 		const glm::vec3& GetBoundsMax() const { return _boundsMax; }
+		bool IsGenerated() const { return _generated; }
 
 	private:
-		/// Compute the scene AABB from all mesh bounding boxes
-		void ComputeSceneBounds(const std::vector<Mesh*>& meshes);
-
-		/// Calculate the unsigned distance from a point to the nearest triangle
-		float DistanceToMeshes(const glm::vec3& point,
-			const std::vector<Mesh*>& meshes) const;
-
-		/// Upload the 3D float data into a Vulkan 3D image
-		shared_ptr<Texture> Upload3DTexture(const std::vector<float>& data,
-			uint32_t resolution);
+		void CreateSDFTexture(uint32_t resolution);
 
 	private:
 		Device& _device;
+
+		shared_ptr<Texture> _sdfTexture;
+		shared_ptr<Shader> _sdfGenerateShader;
+		unique_ptr<Pipeline> _sdfGeneratePipeline;
+
 		glm::vec3 _boundsMin{0.0f};
 		glm::vec3 _boundsMax{0.0f};
+		bool _generated = false;
 	};
 }

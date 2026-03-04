@@ -282,7 +282,13 @@ void Core::Image::CreateImage(VkImageTiling tiling,
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+
+    // Determine image type from extent depth
+    if (_extent.depth > 1)
+        imageInfo.imageType = VK_IMAGE_TYPE_3D;
+    else
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+
     imageInfo.extent = _extent;
     imageInfo.mipLevels = _mipLevels;
     imageInfo.arrayLayers = _layer;

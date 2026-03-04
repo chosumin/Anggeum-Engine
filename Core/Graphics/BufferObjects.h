@@ -36,6 +36,15 @@ struct alignas(16) ShadowUniform
 	mat4 ViewProjection[SHADOW_MAP_CASCADE_COUNT];
 	Std140Float SplitDepth[SHADOW_MAP_CASCADE_COUNT];
 	uint32_t CascadeCount = SHADOW_MAP_CASCADE_COUNT;
+
+	// PCSS parameters (adjustable via ImGui)
+	float LightSize = 0.04f;
+	float MinFilterRadius = 0.5f;
+	float MaxFilterRadius = 10.0f;
+
+	// Cascade blend region as fraction of each cascade's depth range
+	float CascadeBlendFactor = 0.3f;
+	float _pad[3];
 };
 
 struct alignas(16) SDFShadowUniform
@@ -47,7 +56,7 @@ struct alignas(16) SDFShadowUniform
 	int MaxSteps;
 	float MinDistance;
 	float MaxDistance;
-	float ShadowSoftness
+	float ShadowSoftness;
 };
 
 struct alignas(16) PBRBuffer

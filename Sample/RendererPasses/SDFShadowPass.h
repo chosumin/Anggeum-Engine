@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
@@ -11,32 +12,38 @@ namespace Core
 	{
 	public:
 		static constexpr const char* RT_SDF_SHADOW = "SDFShadow";
+		static constexpr const char* RT_SDF_RESOLVED_DEPTH = "SDFResolvedDepth";
 
 		SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, VkExtent2D screenExtent);
+			Scene& scene, VkExtent2D screenExtent,
+			VkSampleCountFlagBits msaaSamples);
 		~SDFShadowPass();
 
 		void Prepare() override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-		shared_ptr<Texture> GetSDFShadowTexture() const { return _sdfShadowTexture; }
-
 	private:
-		void GenerateSDFVolume(CommandBuffer& commandBuffer);
 		void EnsureRenderTargets(RenderFrame& renderFrame);
+		void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			shared_ptr<Texture> msaaDepth);
 		void UpdateSDFParams();
 		void UpdateGUI();
 
 	private:
 		Scene& _scene;
 		VkExtent2D _screenExtent;
+		VkSampleCountFlagBits _msaaSamples;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
-		shared_ptr<Texture> _sdfVolumeTexture;
 		shared_ptr<Texture> _sdfShadowTexture;
+		shared_ptr<Texture> _resolvedDepthTexture;
 
 		shared_ptr<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
+
+		// Depth resolve resources
+		shared_ptr<Shader> _depthResolveShader;
+		unique_ptr<Pipeline> _depthResolvePipeline;
 
 		SDFShadowUniform _sdfParams{};
 		bool _sdfGenerated = false;

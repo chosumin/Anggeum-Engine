@@ -156,7 +156,7 @@ void Core::RendererBatches::PrepareGPUDrivenRendering(Device& device, bool needM
 
 void Core::RendererBatches::PrepareCullingResources(Core::Device& device)
 {
-	_cullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCulling.comp");
+	_cullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCulling.comp.spv");
 	_cullingPipeline = make_unique<Pipeline>(device, *_cullingShader);
 
 	uint32_t drawCount = _indirectDrawBuffer.GetDrawCount();
@@ -178,18 +178,18 @@ void Core::RendererBatches::PrepareCullingResources(Core::Device& device)
 		_indirectDrawBuffer.GetDrawCommands(), 0);
 	Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
 
-	_pass2CullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCullingPass2.comp");
+	_pass2CullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCullingPass2.comp.spv");
 	_pass2CullingPipeline = make_unique<Pipeline>(device, *_pass2CullingShader);
 
 	// Reset draw commands shader (2-pass)
-	_resetDrawCommandsShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommands.comp");
+	_resetDrawCommandsShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommands.comp.spv");
 	_resetDrawCommandsPipeline = make_unique<Pipeline>(device, *_resetDrawCommandsShader);
 
 	// Frustum-only culling resources
-	_frustumCullingShader = device.GetResourceCache().RequestShader("Shaders/frustumCulling.comp");
+	_frustumCullingShader = device.GetResourceCache().RequestShader("Shaders/frustumCulling.comp.spv");
 	_frustumCullingPipeline = make_unique<Pipeline>(device, *_frustumCullingShader);
 
-	_resetDrawCommandsSimpleShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommandsSimple.comp");
+	_resetDrawCommandsSimpleShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommandsSimple.comp.spv");
 	_resetDrawCommandsSimplePipeline = make_unique<Pipeline>(device, *_resetDrawCommandsSimpleShader);
 }
 
@@ -679,10 +679,10 @@ void Core::RendererBatches::PrepareHiZResources(Device& device, VkExtent2D exten
     _hiZTexture = make_shared<Texture>("HiZ", image, sampler);
 
     // Load shaders
-    _depthResolveShader = device.GetResourceCache().RequestShader("Shaders/depthResolve.comp");
+    _depthResolveShader = device.GetResourceCache().RequestShader("Shaders/depthResolve.comp.spv");
     _depthResolvePipeline = make_unique<Pipeline>(device, *_depthResolveShader);
 
-    _hiZGenerateShader = device.GetResourceCache().RequestShader("Shaders/hiZGenerate.comp");
+    _hiZGenerateShader = device.GetResourceCache().RequestShader("Shaders/hiZGenerate.comp.spv");
     _hiZPipeline = make_unique<Pipeline>(device, *_hiZGenerateShader);
 }
 

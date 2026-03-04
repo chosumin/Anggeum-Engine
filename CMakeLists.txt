@@ -302,6 +302,15 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMENT "Syncing Assets folder (changed files only)..."
 )
 
+# Copy only .spv files and remove shader sources from output
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        -DSRC_DIR="${CMAKE_SOURCE_DIR}/Assets/Shaders"
+        -DDST_DIR="$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyShaderSpv.cmake"
+    COMMENT "Syncing shader .spv files and cleaning shader sources..."
+)
+
 # Copy KTX DLL (Debug/Release, fallback if missing)
 set(KTX_DLL_DEBUG "${KTX_DIR}/Debug/ktx.dll")
 set(KTX_DLL_RELEASE "${KTX_DIR}/Release/ktx.dll")

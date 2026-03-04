@@ -39,6 +39,11 @@ namespace Core
 		Buffer& GetIndexBuffer() { return *_indexBuffer; }
 
 		VkIndexType GetIndexType() const { return _indexType; }
+
+		// Scene-wide bounds accumulated during mesh loading
+		const glm::vec3& GetSceneBoundsMin() const { return _sceneBoundsMin; }
+		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
+
 	private:
 		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
 		Buffer* InsertBufferSpace(VkIndexType indexType);
@@ -64,5 +69,9 @@ namespace Core
 		unordered_map<uint32_t, MeshAllocation> _allocations;
 		vector<uint32_t> _freeList;
 		uint32_t _nextMeshID = 0;
+
+		// Scene-wide local-space bounds (accumulated across all POSITION allocations)
+		glm::vec3 _sceneBoundsMin{FLT_MAX};
+		glm::vec3 _sceneBoundsMax{-FLT_MAX};
 	};
 }

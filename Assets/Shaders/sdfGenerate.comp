@@ -1,0 +1,114 @@
+#version 450
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(push_constant) uniform PushConstants
+{
+    vec4 volumeMin;
+    vec4 volumeMax;
+    uint resolution;
+    uint triangleCount;
+    uint padding[2];
+} pc;
+
+layout(set = 0, binding = 0) readonly buffer PositionBuffer { float positions[]; };
+layout(set = 0, binding = 1) readonly buffer IndexBuffer { uint indices[]; };
+layout(set = 0, binding = 2, r32f) uniform writeonly image3D sdfVolume;
+
+vec3 LoadPosition(uint index)
+{
+    return vec3(
+        positions[index * 3 + 0],
+        positions[index * 3 + 1],
+        positions[index * 3 + 2]
+    );
+}
+
+float PointTriangleDistance(vec3 p, vec3 v0, vec3 v1, vec3 v2)
+{
+    vec3 edge0 = v1 - v0;
+    vec3 edge1 = v2 - v0;
+    vec3 v0p = v0 - p;
+
+    float a = dot(edge0, edge0);
+    float b = dot(edge0, edge1);
+    float c = dot(edge1, edge1);
+    float d = dot(edge0, v0p);
+    float e = dot(edge1, v0p);
+
+    float det = a * c - b * b;
+    float s = b * e - c * d;
+    float t = b * d - a * e;
+
+    if (s + t <= det)
+    {
+        if (s < 0.0)
+        {
+            if (t < 0.0)
+            {
+                if (d < 0.0) { s = clamp(-d / a, 0.0, 1.0); t = 0.0; }
+                else { s = 0.0; t = clamp(-e / c, 0.0, 1.0); }
+            }
+            else { s = 0.0; t = clamp(-e / c, 0.0, 1.0); }
+        }
+        else if (t < 0.0) { s = clamp(-d / a, 0.0, 1.0); t = 0.0; }
+        else { float invDet = 1.0 / det; s *= invDet; t *= invDet; }
+    }
+    else
+    {
+        if (s < 0.0)
+        {
+            float tmp0 = b + d;
+            float tmp1 = c + e;
+            if (tmp1 > tmp0) { float n = tmp1 - tmp0; float dn = a - 2.0*b + c; s = clamp(n/dn, 0.0, 1.0); t = 1.0 - s; }
+            else { s = 0.0; t = clamp(-e / c, 0.0, 1.0); }
+        }
+        else if (t < 0.0)
+        {
+            float tmp0 = b + e;
+            float tmp1 = a + d;
+            if (tmp1 > tmp0) { float n = tmp1 - tmp0; float dn = a - 2.0*b + c; t = clamp(n/dn, 0.0, 1.0); s = 1.0 - t; }
+            else { s = clamp(-d / a, 0.0, 1.0); t = 0.0; }
+        }
+        else
+        {
+            float n = (c + e) - (b + d);
+            if (n <= 0.0) { s = 0.0; }
+            else { float dn = a - 2.0*b + c; s = clamp(n/dn, 0.0, 1.0); }
+            t = 1.0 - s;
+        }
+    }
+
+    vec3 closest = v0 + s * edge0 + t * edge1;
+    return length(p - closest);
+}
+
+void main()
+{
+    uvec3 voxelCoord = gl_GlobalInvocationID.xyz;
+
+    if (any(greaterThanEqual(voxelCoord, uvec3(pc.resolution))))
+        return;
+
+    vec3 volumeSize = pc.volumeMax.xyz - pc.volumeMin.xyz;
+    vec3 voxelSize = volumeSize / float(pc.resolution);
+    vec3 worldPos = pc.volumeMin.xyz + (vec3(voxelCoord) + 0.5) * voxelSize;
+
+    float minDist = 1e20;
+
+    for (uint tri = 0; tri < pc.triangleCount; ++tri)
+    {
+        uint i0 = indices[tri * 3 + 0];
+        uint i1 = indices[tri * 3 + 1];
+        uint i2 = indices[tri * 3 + 2];
+
+        vec3 v0 = LoadPosition(i0);
+        vec3 v1 = LoadPosition(i1);
+        vec3 v2 = LoadPosition(i2);
+
+        float dist = PointTriangleDistance(worldPos, v0, v1, v2);
+        minDist = min(minDist, dist);
+    }
+
+    imageStore(sdfVolume, ivec3(voxelCoord), vec4(minDist));
+}

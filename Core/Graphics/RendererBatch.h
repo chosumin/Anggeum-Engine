@@ -84,6 +84,11 @@ namespace Core
 		void DispatchFrustumOnlyCulling(RenderFrame& renderFrame, 
 			CommandBuffer& commandBuffer,
 			const CameraBuffer& camera);
+
+		// GPU buffer accessors for SDF generation
+		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
+		uint32_t GetInstanceCount() const { return _instanceCount; }
+
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);

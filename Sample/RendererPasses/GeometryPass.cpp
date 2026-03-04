@@ -197,9 +197,7 @@ namespace Core
             renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
 
             if (sdfShadowTarget)
-            {
                 renderFrame.SetShaderTextureBuffer(*shader, 10, sdfShadowTarget);
-            }
         };
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)

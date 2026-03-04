@@ -49,11 +49,13 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
 	AddRendererPass(shadowPass);
 
-	// SDF Shadow Pass: runs after depth pre-pass, uses depth buffer for world pos reconstruction
-	auto sdfShadowPass = new SDFShadowPass(
-		device, workerThreadManager, scene, extent);
-	AddRendererPass(sdfShadowPass);
-
+	if (device.IsGpuDrivenRenderingEnabled())
+	{
+		auto sdfShadowPass = new SDFShadowPass(
+			device, workerThreadManager, scene, extent, _msaaSamples);
+		AddRendererPass(sdfShadowPass);
+	}
+	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
 	AddRendererPass(lightCullingPass);
 
