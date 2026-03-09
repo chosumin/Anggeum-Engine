@@ -13,6 +13,7 @@ namespace Core
 	public:
 		static constexpr const char* RT_SDF_SHADOW = "SDFShadow";
 		static constexpr const char* RT_SDF_RESOLVED_DEPTH = "SDFResolvedDepth";
+		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
 		SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, VkExtent2D screenExtent,
@@ -26,6 +27,7 @@ namespace Core
 		void EnsureRenderTargets(RenderFrame& renderFrame);
 		void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			shared_ptr<Texture> msaaDepth);
+		void RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 		void UpdateSDFParams();
 		void UpdateGUI();
 
@@ -45,6 +47,13 @@ namespace Core
 		shared_ptr<Shader> _depthResolveShader;
 		unique_ptr<Pipeline> _depthResolvePipeline;
 
+		// Volume visualization
+		shared_ptr<Shader> _volumeSliceShader;
+		unique_ptr<Pipeline> _volumeSlicePipeline;
+		shared_ptr<Texture> _volumeSliceTexture;
+		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
+		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
+
 		SDFShadowUniform _sdfParams{};
 		bool _sdfGenerated = false;
 
@@ -53,5 +62,10 @@ namespace Core
 		float _minDistance = 0.001f;
 		float _maxDistance = 100.0f;
 		int _maxSteps = SDF_MAX_MARCH_STEPS;
+		bool _showDebugWindows = true;
+
+		// Volume raytrace debug
+		float _debugHitThreshold = 0.01f;
+		int _debugMaxSteps = 128;
 	};
 }

@@ -57,7 +57,7 @@ float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k)
         vec3 pos = origin + dir * t;
         vec3 uvw = WorldToVolumeUV(pos);
 
-        // Out of volume bounds ¡æ assume lit
+        // Out of volume bounds > assume lit
         if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
             break;
 

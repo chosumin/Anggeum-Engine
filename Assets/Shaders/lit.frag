@@ -35,6 +35,7 @@ layout(set = 0, binding = 4) uniform CascadeShadowUBO {
     float minFilterRadius;
     float maxFilterRadius;
     float cascadeBlendFactor;
+	float sdfBlendFactor;
 } csm;
 
 layout(set = 0, binding = 5) uniform Lights 
@@ -223,13 +224,11 @@ void main()
 		csm.cascadeBlendFactor,
 		worldPos.xyz, viewDepth);
 
-	// Sample SDF shadow (pre-computed via compute pass)
 	vec2 screenUV = gl_FragCoord.xy / vec2(tileInfo.viewportSize);
 	float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
 
-	// Combine CSM and SDF shadows:
-	// CSM provides high-detail close shadows, SDF adds long-range soft contact shadows
-	float visibility = CombineShadows(csmVisibility, sdfVisibility, 0.5);
+	// Combine CSM and SDF shadows using adjustable blend factor from UBO
+	float visibility = CombineShadows(csmVisibility, sdfVisibility, csm.sdfBlendFactor);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;

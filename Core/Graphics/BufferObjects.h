@@ -44,7 +44,11 @@ struct alignas(16) ShadowUniform
 
 	// Cascade blend region as fraction of each cascade's depth range
 	float CascadeBlendFactor = 0.3f;
-	float _pad[3];
+
+	// SDF shadow blend: 0.0 = CSM only, 1.0 = SDF only
+	float SDFBlendFactor = 0.5f;
+
+	float _pad[2];
 };
 
 struct alignas(16) SDFShadowUniform

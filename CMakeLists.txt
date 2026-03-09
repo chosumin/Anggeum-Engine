@@ -84,7 +84,7 @@ file(GLOB ROOT_SOURCES
 )
 
 # Collect shader files
-file(GLOB_RECURSE SHADER_SOURCES
+file(GLOB_RECURSE SHADER_SOURCES CONFIGURE_DEPENDS
     "Assets/Shaders/*.vert"
     "Assets/Shaders/*.frag"
     "Assets/Shaders/*.comp"
@@ -94,10 +94,13 @@ file(GLOB_RECURSE SHADER_SOURCES
 )
 
 # Collect .glsl header files
-file(GLOB_RECURSE SHADER_HEADERS "Assets/Shaders/*.glsl" "Assets/Shaders/*.h")
+file(GLOB_RECURSE SHADER_HEADERS CONFIGURE_DEPENDS
+    "Assets/Shaders/*.glsl"
+    "Assets/Shaders/*.h"
+)
 
 # Display original shader files in IDE (exclude from build)
-file(GLOB_RECURSE SHADER_FILES
+file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "Assets/Shaders/*.vert"
     "Assets/Shaders/*.frag"
     "Assets/Shaders/*.comp"

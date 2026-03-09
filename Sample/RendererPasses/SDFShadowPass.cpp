@@ -25,13 +25,19 @@ SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	_sdfShadowShader = _device.GetResourceCache().RequestShader("Shaders/sdfShadow.comp.spv");
 	_sdfShadowPipeline = make_unique<Pipeline>(_device, *_sdfShadowShader);
 
-	// Reuse the same depth resolve shader as RendererBatches (Hi-Z)
 	_depthResolveShader = _device.GetResourceCache().RequestShader("Shaders/depthResolve.comp.spv");
 	_depthResolvePipeline = make_unique<Pipeline>(_device, *_depthResolveShader);
+
+	_volumeSliceShader = _device.GetResourceCache().RequestShader("Shaders/sdfVolumeSlice.comp.spv");
+	_volumeSlicePipeline = make_unique<Pipeline>(_device, *_volumeSliceShader);
 }
 
 SDFShadowPass::~SDFShadowPass()
 {
+	if (_sdfShadowImGuiDS != VK_NULL_HANDLE)
+		ImGui_ImplVulkan_RemoveTexture(_sdfShadowImGuiDS);
+	if (_volumeSliceImGuiDS != VK_NULL_HANDLE)
+		ImGui_ImplVulkan_RemoveTexture(_volumeSliceImGuiDS);
 }
 
 void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -48,7 +54,6 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 
 	_sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
-	// Resolved single-sample depth for compute shader sampling
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
 	{
 		RenderTargetDesc resolvedDepthDesc{};
@@ -60,6 +65,16 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 
 		_resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_RESOLVED_DEPTH, resolvedDepthDesc);
 	}
+
+	// Volume raytrace debug texture (RGBA8 for normal visualization)
+	RenderTargetDesc sliceDesc{};
+	sliceDesc.extent = { 256, 256 };
+	sliceDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
+	sliceDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	sliceDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	sliceDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	_volumeSliceTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
 }
 
 void SDFShadowPass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -98,6 +113,71 @@ void SDFShadowPass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& comman
 	commandBuffer.Dispatch(groupX, groupY, 1);
 
 	commandBuffer.TransitionImageLayout(resolvedImage,
+		VK_IMAGE_LAYOUT_GENERAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
+{
+	auto sdfTexture = _sdfGenerator->GetSDFTexture();
+	if (!sdfTexture || !_volumeSliceTexture)
+		return;
+
+	auto& sliceImage = *_volumeSliceTexture->GetImage().lock();
+	commandBuffer.TransitionImageLayout(sliceImage,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL);
+
+	PerspectiveCamera* camera = _scene.GetMainCamera();
+	glm::mat4 viewMatrix = camera->Matrices.View;
+	glm::vec3 camPos = camera->Matrices.Position;
+
+	// Extract camera axes from view matrix
+	glm::vec3 forward = -glm::vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+	glm::vec3 right = glm::vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+	glm::vec3 up = glm::vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+
+	glm::vec3 boundsSize = _sdfGenerator->GetBoundsMax() - _sdfGenerator->GetBoundsMin();
+	float maxDist = glm::length(boundsSize) * 1.5f;
+
+	struct VolumeRaytracePushConstants {
+		glm::vec4 volumeMin;
+		glm::vec4 volumeMax;
+		glm::vec4 cameraPos;
+		glm::vec4 cameraForward;
+		glm::vec4 cameraRight;
+		glm::vec4 cameraUp;
+		float fov;
+		float maxDistance;
+		int32_t maxSteps;
+		float hitThreshold;
+	} pc = {
+		glm::vec4(_sdfGenerator->GetBoundsMin(), 0.0f),
+		glm::vec4(_sdfGenerator->GetBoundsMax(), 0.0f),
+		glm::vec4(camPos, 0.0f),
+		glm::vec4(forward, 0.0f),
+		glm::vec4(right, 0.0f),
+		glm::vec4(up, 0.0f),
+		camera->GetFieldOfView(),
+		maxDist,
+		_debugMaxSteps,
+		_debugHitThreshold
+	};
+
+	auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(*_volumeSliceShader, 0);
+	sliceBuilder.SetTextureBuffer(0, sdfTexture);
+	sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	auto& sliceResources = sliceBuilder.Build();
+
+	commandBuffer.BindPipeline(_volumeSlicePipeline.get());
+	commandBuffer.BindDescriptorSet(renderFrame,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		*_volumeSliceShader, 0, sliceResources);
+	commandBuffer.PushConstants(*_volumeSliceShader, 0, &pc);
+
+	commandBuffer.Dispatch((256 + 7) / 8, (256 + 7) / 8, 1);
+
+	commandBuffer.TransitionImageLayout(sliceImage,
 		VK_IMAGE_LAYOUT_GENERAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
@@ -141,7 +221,48 @@ void SDFShadowPass::UpdateGUI()
 		_sdfGenerated = false;
 	}
 
+	ImGui::Separator();
+	ImGui::Checkbox("Show Debug Windows", &_showDebugWindows);
+
 	ImGui::End();
+
+	if (_showDebugWindows)
+	{
+		// SDF Shadow Map preview
+		if (_sdfShadowTexture)
+		{
+			if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
+			{
+				_sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
+					_sdfShadowTexture->GetSampler()->GetSampler(),
+					_sdfShadowTexture->GetImageView(),
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			}
+
+			ImGui::Begin("SDF Shadow Map");
+			ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS), ImVec2(256, 256));
+			ImGui::End();
+		}
+
+		// SDF Volume Raytrace preview (normal visualization)
+		if (_volumeSliceTexture)
+		{
+			if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
+			{
+				_volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
+					_volumeSliceTexture->GetSampler()->GetSampler(),
+					_volumeSliceTexture->GetImageView(),
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			}
+
+			ImGui::Begin("SDF Volume Raytrace");
+			ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
+			ImGui::SliderInt("Ray Max Steps", &_debugMaxSteps, 32, 256);
+			ImGui::Image(static_cast<ImTextureID>(_volumeSliceImGuiDS), ImVec2(256, 256));
+			ImGui::Text("RGB = Surface Normal (world space)");
+			ImGui::End();
+		}
+	}
 }
 
 void SDFShadowPass::Prepare()
@@ -176,14 +297,10 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	if (!depthTexture)
 		return;
 
-	commandBuffer.BeginDebugMarker("SDF Shadow Ray March");
-
-	// Transition depth to SHADER_READ_ONLY for sampling
 	commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	// Resolve MSAA depth to single-sample texture for compute shader
 	shared_ptr<Texture> depthForSampling = depthTexture;
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
 	{
@@ -220,12 +337,17 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		VK_IMAGE_LAYOUT_GENERAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	// Transition depth back for subsequent passes
+	// Render volume raytrace debug visualization
+	if (_showDebugWindows)
+	{
+		commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");
+		RenderVolumeSlice(renderFrame, commandBuffer);
+		commandBuffer.EndDebugMarker();
+	}
+
 	commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-	commandBuffer.EndDebugMarker();
 
 	UpdateGUI();
 }

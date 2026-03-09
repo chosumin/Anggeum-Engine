@@ -217,18 +217,25 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 		ImGui::SliderFloat("Split Lambda", &_cascadeSplitLambda, 0.0f, 1.0f, "%.2f");
 		ImGui::SliderFloat("Blend Factor", &_shadowBuffer.CascadeBlendFactor, 0.0f, 1.0f, "%.2f");
 		ImGui::SetItemTooltip("Fraction of cascade range used for blending (0 = off, 0.3 = 30%%)");
+	}
 
-		if (ImGui::Button("Reset Defaults"))
-		{
-			_shadowBuffer.LightSize = 0.04f;
-			_shadowBuffer.MinFilterRadius = 0.5f;
-			_shadowBuffer.MaxFilterRadius = 10.0f;
-			_shadowBuffer.CascadeBlendFactor = 0.3f;
-			_depthBiasConstant = 1.25f;
-			_depthBiasSlope = 1.75f;
-			_depthBiasClamp = 0.0f;
-			_cascadeSplitLambda = 0.95f;
-		}
+	ImGui::SeparatorText("SDF Shadow");
+	{
+		ImGui::SliderFloat("SDF Blend", &_shadowBuffer.SDFBlendFactor, 0.0f, 1.0f, "%.2f");
+		ImGui::SetItemTooltip("0.0 = CSM only, 1.0 = SDF only");
+	}
+
+	if (ImGui::Button("Reset Defaults"))
+	{
+		_shadowBuffer.LightSize = 0.04f;
+		_shadowBuffer.MinFilterRadius = 0.5f;
+		_shadowBuffer.MaxFilterRadius = 10.0f;
+		_shadowBuffer.CascadeBlendFactor = 0.3f;
+		_shadowBuffer.SDFBlendFactor = 0.5f;
+		_depthBiasConstant = 1.25f;
+		_depthBiasSlope = 1.75f;
+		_depthBiasClamp = 0.0f;
+		_cascadeSplitLambda = 0.95f;
 	}
 
 	// CSM Shadow Map Debug View
