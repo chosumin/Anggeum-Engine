@@ -54,6 +54,12 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		auto sdfShadowPass = new SDFShadowPass(
 			device, workerThreadManager, scene, extent, _msaaSamples);
 		AddRendererPass(sdfShadowPass);
+
+		auto* batches = shadowPass->GetRendererBatches();
+		sdfShadowPass->SetGPUBoundsData(
+			batches->GetObjectDataBuffer(),
+			_transformBatch.TransformBuffer,
+			batches->GetInstanceCount());
 	}
 	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);

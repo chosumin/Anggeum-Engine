@@ -23,6 +23,15 @@ namespace Core
 		void Prepare() override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
+		// Set GPU buffers from GeometryPass's RendererBatches
+		void SetGPUBoundsData(Buffer* objectDataBuffer, Buffer* transformBuffer,
+			uint32_t instanceCount)
+		{
+			_objectDataBuffer = objectDataBuffer;
+			_transformBuffer = transformBuffer;
+			_instanceCount = instanceCount;
+		}
+
 	private:
 		void EnsureRenderTargets(RenderFrame& renderFrame);
 		void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -53,6 +62,11 @@ namespace Core
 		shared_ptr<Texture> _volumeSliceTexture;
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
+
+		// GPU bounds data (from GeometryPass's RendererBatches)
+		Buffer* _objectDataBuffer = nullptr;
+		Buffer* _transformBuffer = nullptr;
+		uint32_t _instanceCount = 0;
 
 		SDFShadowUniform _sdfParams{};
 		bool _sdfGenerated = false;

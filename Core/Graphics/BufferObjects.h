@@ -53,14 +53,14 @@ struct alignas(16) ShadowUniform
 
 struct alignas(16) SDFShadowUniform
 {
-	vec4 VolumeMin;
-	vec4 VolumeMax;
 	vec4 LightDirection;   // w: softness factor
 	vec4 VolumeResolution; // xyz: resolution, w: max march distance
 	int MaxSteps;
 	float MinDistance;
 	float MaxDistance;
 	float ShadowSoftness;
+	float PaddingFactor;
+	float _pad[3];
 };
 
 struct alignas(16) PBRBuffer

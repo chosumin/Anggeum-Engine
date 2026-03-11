@@ -120,29 +120,23 @@ void SDFShadowPass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& comman
 void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
 	auto sdfTexture = _sdfGenerator->GetSDFTexture();
-	if (!sdfTexture || !_volumeSliceTexture)
+	auto* boundsBuffer = _sdfGenerator->GetBoundsBuffer();
+	if (!sdfTexture || !_volumeSliceTexture || !boundsBuffer)
 		return;
 
 	auto& sliceImage = *_volumeSliceTexture->GetImage().lock();
 	commandBuffer.TransitionImageLayout(sliceImage,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_GENERAL);
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	glm::mat4 viewMatrix = camera->Matrices.View;
 	glm::vec3 camPos = camera->Matrices.Position;
 
-	// Extract camera axes from view matrix
 	glm::vec3 forward = -glm::vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
 	glm::vec3 right = glm::vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
 	glm::vec3 up = glm::vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
 
-	glm::vec3 boundsSize = _sdfGenerator->GetBoundsMax() - _sdfGenerator->GetBoundsMin();
-	float maxDist = glm::length(boundsSize) * 1.5f;
-
 	struct VolumeRaytracePushConstants {
-		glm::vec4 volumeMin;
-		glm::vec4 volumeMax;
 		glm::vec4 cameraPos;
 		glm::vec4 cameraForward;
 		glm::vec4 cameraRight;
@@ -151,35 +145,34 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
 		float maxDistance;
 		int32_t maxSteps;
 		float hitThreshold;
+		float paddingFactor;
 	} pc = {
-		glm::vec4(_sdfGenerator->GetBoundsMin(), 0.0f),
-		glm::vec4(_sdfGenerator->GetBoundsMax(), 0.0f),
 		glm::vec4(camPos, 0.0f),
 		glm::vec4(forward, 0.0f),
 		glm::vec4(right, 0.0f),
 		glm::vec4(up, 0.0f),
 		camera->GetFieldOfView(),
-		maxDist,
+		200.0f,
 		_debugMaxSteps,
-		_debugHitThreshold
+		_debugHitThreshold,
+		0.1f
 	};
 
 	auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(*_volumeSliceShader, 0);
 	sliceBuilder.SetTextureBuffer(0, sdfTexture);
 	sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	sliceBuilder.SetStorageBuffer(2, boundsBuffer);
 	auto& sliceResources = sliceBuilder.Build();
 
 	commandBuffer.BindPipeline(_volumeSlicePipeline.get());
-	commandBuffer.BindDescriptorSet(renderFrame,
-		VK_PIPELINE_BIND_POINT_COMPUTE,
+	commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
 		*_volumeSliceShader, 0, sliceResources);
 	commandBuffer.PushConstants(*_volumeSliceShader, 0, &pc);
 
 	commandBuffer.Dispatch((256 + 7) / 8, (256 + 7) / 8, 1);
 
 	commandBuffer.TransitionImageLayout(sliceImage,
-		VK_IMAGE_LAYOUT_GENERAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void SDFShadowPass::UpdateSDFParams()
@@ -194,8 +187,6 @@ void SDFShadowPass::UpdateSDFParams()
 		_sdfParams.LightDirection = vec4(lightDir, _shadowSoftness);
 	}
 
-	_sdfParams.VolumeMin = vec4(_sdfGenerator->GetBoundsMin(), 0.0f);
-	_sdfParams.VolumeMax = vec4(_sdfGenerator->GetBoundsMax(), 0.0f);
 	_sdfParams.VolumeResolution = vec4(
 		static_cast<float>(SDF_VOLUME_DIM),
 		static_cast<float>(SDF_VOLUME_DIM),
@@ -205,6 +196,7 @@ void SDFShadowPass::UpdateSDFParams()
 	_sdfParams.MinDistance = _minDistance;
 	_sdfParams.MaxDistance = _maxDistance;
 	_sdfParams.ShadowSoftness = _shadowSoftness;
+	_sdfParams.PaddingFactor = 0.1f;
 }
 
 void SDFShadowPass::UpdateGUI()
@@ -272,7 +264,7 @@ void SDFShadowPass::Prepare()
 void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-	if (!meshBufferManager)
+	if (!meshBufferManager || !_objectDataBuffer || !_transformBuffer)
 		return;
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
@@ -281,7 +273,9 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
 		_sdfGenerator->Generate(renderFrame, commandBuffer,
-			*meshBufferManager, SDF_VOLUME_DIM);
+			*meshBufferManager,
+			_objectDataBuffer, _transformBuffer, _instanceCount,
+			SDF_VOLUME_DIM);
 		_sdfGenerated = true;
 		commandBuffer.EndDebugMarker();
 	}
@@ -322,6 +316,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	builder.SetUniformBuffer(2, &_sdfParams);
 	builder.SetTextureBuffer(3, depthForSampling);
 	builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetStorageBuffer(5, _sdfGenerator->GetBoundsBuffer());
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(_sdfShadowPipeline.get());
@@ -337,7 +332,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		VK_IMAGE_LAYOUT_GENERAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	// Render volume raytrace debug visualization
 	if (_showDebugWindows)
 	{
 		commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");

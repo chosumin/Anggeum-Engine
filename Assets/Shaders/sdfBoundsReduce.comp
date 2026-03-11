@@ -1,0 +1,66 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct GPUObjectData
+{
+    vec4 boundingSphere;   // xyz: center (local), w: radius
+    uint transformIndex;
+    uint drawCommandIndex;
+};
+
+layout(set = 0, binding = 0) readonly buffer ObjectDataBuffer
+{
+    GPUObjectData objects[];
+};
+
+layout(set = 0, binding = 1) readonly buffer TransformBuffer
+{
+    mat4 transforms[];
+};
+
+// [0..2] = encoded min xyz, [3] = pad, [4..6] = encoded max xyz, [7] = pad
+layout(set = 0, binding = 2) buffer SDFBoundsBuffer
+{
+    uint bounds[8];
+};
+
+layout(push_constant) uniform PushConstants
+{
+    uint objectCount;
+} pc;
+
+uint floatToSortableUint(float f)
+{
+    uint bits = floatBitsToUint(f);
+    uint mask = -int(bits >> 31) | 0x80000000u;
+    return bits ^ mask;
+}
+
+void main()
+{
+    uint gid = gl_GlobalInvocationID.x;
+
+    if (gid >= pc.objectCount)
+        return;
+
+    GPUObjectData obj = objects[gid];
+    mat4 worldMatrix = transforms[obj.transformIndex];
+
+    vec3 worldCenter = (worldMatrix * vec4(obj.boundingSphere.xyz, 1.0)).xyz;
+    float maxScale = max(
+        length(worldMatrix[0].xyz),
+        max(length(worldMatrix[1].xyz), length(worldMatrix[2].xyz)));
+    float worldRadius = obj.boundingSphere.w * maxScale;
+
+    vec3 wMin = worldCenter - vec3(worldRadius);
+    vec3 wMax = worldCenter + vec3(worldRadius);
+
+    atomicMin(bounds[0], floatToSortableUint(wMin.x));
+    atomicMin(bounds[1], floatToSortableUint(wMin.y));
+    atomicMin(bounds[2], floatToSortableUint(wMin.z));
+
+    atomicMax(bounds[4], floatToSortableUint(wMax.x));
+    atomicMax(bounds[5], floatToSortableUint(wMax.y));
+    atomicMax(bounds[6], floatToSortableUint(wMax.z));
+}

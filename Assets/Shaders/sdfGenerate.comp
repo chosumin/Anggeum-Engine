@@ -2,18 +2,19 @@
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
+#include "sdfCommon.glsl"
+
 layout(push_constant) uniform PushConstants
 {
-    vec4 volumeMin;
-    vec4 volumeMax;
     uint resolution;
     uint triangleCount;
-    uint padding[2];
+    float paddingFactor;
 } pc;
 
 layout(set = 0, binding = 0) readonly buffer PositionBuffer { float positions[]; };
 layout(set = 0, binding = 1) readonly buffer IndexBuffer { uint indices[]; };
 layout(set = 0, binding = 2, r32f) uniform writeonly image3D sdfVolume;
+layout(set = 0, binding = 3) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
 
 vec3 LoadPosition(uint index)
 {
@@ -90,9 +91,12 @@ void main()
     if (any(greaterThanEqual(voxelCoord, uvec3(pc.resolution))))
         return;
 
-    vec3 volumeSize = pc.volumeMax.xyz - pc.volumeMin.xyz;
+    vec3 boundsMin, boundsMax;
+    sdfDecodeBounds(rawBounds, pc.paddingFactor, boundsMin, boundsMax);
+
+    vec3 volumeSize = boundsMax - boundsMin;
     vec3 voxelSize = volumeSize / float(pc.resolution);
-    vec3 worldPos = pc.volumeMin.xyz + (vec3(voxelCoord) + 0.5) * voxelSize;
+    vec3 worldPos = boundsMin + (vec3(voxelCoord) + 0.5) * voxelSize;
 
     float minDist = 1e20;
 

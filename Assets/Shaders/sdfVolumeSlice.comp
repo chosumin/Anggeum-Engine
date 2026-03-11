@@ -2,45 +2,49 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
+#include "sdfCommon.glsl"
+
 layout(set = 0, binding = 0) uniform sampler3D sdfVolume;
 layout(set = 0, binding = 1, rgba8) uniform writeonly image2D sliceOutput;
+layout(set = 0, binding = 2) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
 
 layout(push_constant) uniform PushConstants
 {
-    vec4 volumeMin;
-    vec4 volumeMax;
-    vec4 cameraPos;     // xyz: camera position
-    vec4 cameraForward; // xyz: camera forward direction
-    vec4 cameraRight;   // xyz: camera right direction
-    vec4 cameraUp;      // xyz: camera up direction
-    float fov;          // vertical field of view in radians
-    float maxDistance;   // max ray march distance
-    int maxSteps;       // max ray march steps
-    float hitThreshold; // surface hit threshold
+    vec4 cameraPos;
+    vec4 cameraForward;
+    vec4 cameraRight;
+    vec4 cameraUp;
+    float fov;
+    float maxDistance;
+    int maxSteps;
+    float hitThreshold;
+    float paddingFactor;
 } pc;
 
-vec3 WorldToVolumeUV(vec3 worldPos)
+vec3 WorldToVolumeUV(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
 {
-    return (worldPos - pc.volumeMin.xyz) / (pc.volumeMax.xyz - pc.volumeMin.xyz);
+    return (worldPos - boundsMin) / (boundsMax - boundsMin);
 }
 
-float SampleSDF(vec3 worldPos)
+float SampleSDF(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
 {
-    vec3 uvw = WorldToVolumeUV(worldPos);
+    vec3 uvw = WorldToVolumeUV(worldPos, boundsMin, boundsMax);
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
         return pc.maxDistance;
     return texture(sdfVolume, uvw).r;
 }
 
-// Compute normal via central differences on the SDF
-vec3 ComputeNormal(vec3 pos)
+vec3 ComputeNormal(vec3 pos, vec3 boundsMin, vec3 boundsMax)
 {
-    vec3 volumeSize = pc.volumeMax.xyz - pc.volumeMin.xyz;
-    float eps = max(volumeSize.x, max(volumeSize.y, volumeSize.z)) * 0.001;
+    vec3 volSize = boundsMax - boundsMin;
+    float eps = max(volSize.x, max(volSize.y, volSize.z)) * 0.001;
 
-    float dx = SampleSDF(pos + vec3(eps, 0, 0)) - SampleSDF(pos - vec3(eps, 0, 0));
-    float dy = SampleSDF(pos + vec3(0, eps, 0)) - SampleSDF(pos - vec3(0, eps, 0));
-    float dz = SampleSDF(pos + vec3(0, 0, eps)) - SampleSDF(pos - vec3(0, 0, eps));
+    float dx = SampleSDF(pos + vec3(eps, 0, 0), boundsMin, boundsMax)
+             - SampleSDF(pos - vec3(eps, 0, 0), boundsMin, boundsMax);
+    float dy = SampleSDF(pos + vec3(0, eps, 0), boundsMin, boundsMax)
+             - SampleSDF(pos - vec3(0, eps, 0), boundsMin, boundsMax);
+    float dz = SampleSDF(pos + vec3(0, 0, eps), boundsMin, boundsMax)
+             - SampleSDF(pos - vec3(0, 0, eps), boundsMin, boundsMax);
 
     return normalize(vec3(dx, dy, dz));
 }
@@ -53,7 +57,9 @@ void main()
     if (pixelCoord.x >= outputSize.x || pixelCoord.y >= outputSize.y)
         return;
 
-    // Compute ray direction from camera
+    vec3 boundsMin, boundsMax;
+    sdfDecodeBounds(rawBounds, pc.paddingFactor, boundsMin, boundsMax);
+
     vec2 ndc = (vec2(pixelCoord) + 0.5) / vec2(outputSize) * 2.0 - 1.0;
     float aspect = float(outputSize.x) / float(outputSize.y);
     float tanHalfFov = tan(pc.fov * 0.5);
@@ -64,7 +70,6 @@ void main()
         + pc.cameraUp.xyz * ndc.y * tanHalfFov
     );
 
-    // Sphere trace through SDF volume
     vec3 rayOrigin = pc.cameraPos.xyz;
     float t = 0.0;
     bool hit = false;
@@ -73,23 +78,20 @@ void main()
     for (int i = 0; i < pc.maxSteps && t < pc.maxDistance; ++i)
     {
         hitPos = rayOrigin + rayDir * t;
-        float dist = SampleSDF(hitPos);
+        float dist = SampleSDF(hitPos, boundsMin, boundsMax);
 
         if (dist < pc.hitThreshold)
         {
             hit = true;
             break;
         }
-
         t += dist;
     }
 
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
-
     if (hit)
     {
-        vec3 normal = ComputeNormal(hitPos);
-        // Map normal from [-1,1] to [0,1] for visualization
+        vec3 normal = ComputeNormal(hitPos, boundsMin, boundsMax);
         color = vec4(normal * 0.5 + 0.5, 1.0);
     }
 
