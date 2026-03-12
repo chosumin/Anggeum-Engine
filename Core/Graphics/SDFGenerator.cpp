@@ -32,7 +32,10 @@ SDFGenerator::SDFGenerator(Device& device)
 	_boundsReduceShader = _device.GetResourceCache().RequestShader("Shaders/sdfBoundsReduce.comp.spv");
 	_boundsReducePipeline = make_unique<Pipeline>(_device, *_boundsReduceShader);
 
-	// Initialize bounds buffer with identity values via VkBufferJob
+	_triLookupShader = _device.GetResourceCache().RequestShader("Shaders/sdfTriLookup.comp.spv");
+	_triLookupPipeline = make_unique<Pipeline>(_device, *_triLookupShader);
+
+	// Initialize bounds buffer
 	uint32_t posInf = FloatToSortableUint(1e20f);
 	uint32_t negInf = FloatToSortableUint(-1e20f);
 	vector<uint32_t> initData = { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
@@ -46,6 +49,7 @@ SDFGenerator::SDFGenerator(Device& device)
 SDFGenerator::~SDFGenerator()
 {
 	if (_boundsBuffer) delete _boundsBuffer;
+	if (_triLookupBuffer) delete _triLookupBuffer;
 }
 
 void SDFGenerator::CreateSDFTexture(uint32_t resolution)
@@ -101,39 +105,88 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 		VK_ACCESS_SHADER_READ_BIT);
 }
 
+void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+	Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+	uint32_t drawCommandCount, uint32_t totalTriangles)
+{
+	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex)
+	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
+
+	if (!_triLookupBuffer)
+	{
+		_triLookupBuffer = new Buffer(_device,
+			requiredSize,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			MemoryType::DEVICE_LOCAL);
+	}
+
+	auto builder = renderFrame.CreateDescriptorSetBuilder(*_triLookupShader, 0);
+	builder.SetStorageBuffer(0, drawCommandBuffer);
+	builder.SetStorageBuffer(1, objectDataBuffer);
+	builder.SetStorageBuffer(2, _triLookupBuffer);
+	auto& resources = builder.Build();
+
+	struct TriLookupPushConstants {
+		uint32_t totalTriangles;
+		uint32_t drawCommandCount;
+	} pc = { totalTriangles, drawCommandCount };
+
+	commandBuffer.BindPipeline(_triLookupPipeline.get());
+	commandBuffer.BindDescriptorSet(renderFrame,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		*_triLookupShader, 0, resources);
+	commandBuffer.PushConstants(*_triLookupShader, 0, &pc);
+
+	uint32_t groupCount = (totalTriangles + 63) / 64;
+	commandBuffer.Dispatch(groupCount, 1, 1);
+
+	commandBuffer.Barrier(
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_SHADER_READ_BIT);
+}
+
 void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 	MeshBufferManager& meshBufferManager,
 	Buffer* objectDataBuffer, Buffer* transformBuffer,
+	Buffer* drawCommandBuffer, uint32_t drawCommandCount,
 	uint32_t instanceCount,
 	uint32_t resolution)
 {
 	if (!_sdfTexture)
-	{
 		CreateSDFTexture(resolution);
-	}
 
-	// Compute world-space bounds entirely on GPU (single pass)
+	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
+
+	// Step 1: Compute world-space bounds
 	ComputeWorldBounds(renderFrame, commandBuffer,
 		objectDataBuffer, transformBuffer, instanceCount);
 
-	// Generate SDF volume ? reads encoded bounds via SSBO, decodes in shader
+	// Step 2: Build per-triangle lookup (vertexOffset + transformIndex)
+	BuildTriangleLookup(renderFrame, commandBuffer,
+		objectDataBuffer, drawCommandBuffer,
+		drawCommandCount, totalTriangles);
+
+	// Step 3: Generate SDF volume
 	auto& sdfImage = *_sdfTexture->GetImage().lock();
 	commandBuffer.TransitionImageLayout(sdfImage,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL);
 
-	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
-
 	SDFGeneratePushConstants pc{};
 	pc.resolution = resolution;
 	pc.triangleCount = totalTriangles;
 	pc.paddingFactor = _paddingFactor;
+	pc.useUint16Indices = (meshBufferManager.GetIndexType() == VK_INDEX_TYPE_UINT16) ? 1 : 0;
 
 	auto sdfBuilder = renderFrame.CreateDescriptorSetBuilder(*_sdfGenerateShader, 0);
 	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({"POSITION"})[0]);
 	sdfBuilder.SetStorageBuffer(1, &meshBufferManager.GetIndexBuffer());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
 	sdfBuilder.SetStorageBuffer(3, _boundsBuffer);
+	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer);
+	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
 	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());

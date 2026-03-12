@@ -34,21 +34,6 @@ float SampleSDF(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
     return texture(sdfVolume, uvw).r;
 }
 
-vec3 ComputeNormal(vec3 pos, vec3 boundsMin, vec3 boundsMax)
-{
-    vec3 volSize = boundsMax - boundsMin;
-    float eps = max(volSize.x, max(volSize.y, volSize.z)) * 0.001;
-
-    float dx = SampleSDF(pos + vec3(eps, 0, 0), boundsMin, boundsMax)
-             - SampleSDF(pos - vec3(eps, 0, 0), boundsMin, boundsMax);
-    float dy = SampleSDF(pos + vec3(0, eps, 0), boundsMin, boundsMax)
-             - SampleSDF(pos - vec3(0, eps, 0), boundsMin, boundsMax);
-    float dz = SampleSDF(pos + vec3(0, 0, eps), boundsMin, boundsMax)
-             - SampleSDF(pos - vec3(0, 0, eps), boundsMin, boundsMax);
-
-    return normalize(vec3(dx, dy, dz));
-}
-
 void main()
 {
     ivec2 outputSize = imageSize(sliceOutput);
@@ -61,6 +46,7 @@ void main()
     sdfDecodeBounds(rawBounds, pc.paddingFactor, boundsMin, boundsMax);
 
     vec2 ndc = (vec2(pixelCoord) + 0.5) / vec2(outputSize) * 2.0 - 1.0;
+    ndc.y = -ndc.y; // Vulkan Y-axis points downward, flip to match screen convention
     float aspect = float(outputSize.x) / float(outputSize.y);
     float tanHalfFov = tan(pc.fov * 0.5);
 
@@ -73,26 +59,27 @@ void main()
     vec3 rayOrigin = pc.cameraPos.xyz;
     float t = 0.0;
     bool hit = false;
-    vec3 hitPos;
 
     for (int i = 0; i < pc.maxSteps && t < pc.maxDistance; ++i)
     {
-        hitPos = rayOrigin + rayDir * t;
-        float dist = SampleSDF(hitPos, boundsMin, boundsMax);
+        vec3 pos = rayOrigin + rayDir * t;
+        float dist = SampleSDF(pos, boundsMin, boundsMax);
 
-        if (dist < pc.hitThreshold)
+        if (abs(dist) < pc.hitThreshold)
         {
             hit = true;
             break;
         }
-        t += dist;
+
+        t += abs(dist);
     }
 
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
     if (hit)
     {
-        vec3 normal = ComputeNormal(hitPos, boundsMin, boundsMax);
-        color = vec4(normal * 0.5 + 0.5, 1.0);
+        float depth = t / pc.maxDistance;
+        float brightness = 1.0 - depth;
+        color = vec4(vec3(brightness), 1.0);
     }
 
     imageStore(sliceOutput, pixelCoord, color);

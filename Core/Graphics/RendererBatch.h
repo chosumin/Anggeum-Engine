@@ -87,6 +87,8 @@ namespace Core
 
 		// GPU buffer accessors for SDF generation
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
+		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
+		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
 
 	private:

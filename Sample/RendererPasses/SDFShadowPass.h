@@ -25,10 +25,13 @@ namespace Core
 
 		// Set GPU buffers from GeometryPass's RendererBatches
 		void SetGPUBoundsData(Buffer* objectDataBuffer, Buffer* transformBuffer,
+			Buffer* drawCommandBuffer, uint32_t drawCommandCount,
 			uint32_t instanceCount)
 		{
 			_objectDataBuffer = objectDataBuffer;
 			_transformBuffer = transformBuffer;
+			_drawCommandBuffer = drawCommandBuffer;
+			_drawCommandCount = drawCommandCount;
 			_instanceCount = instanceCount;
 		}
 
@@ -66,6 +69,8 @@ namespace Core
 		// GPU bounds data (from GeometryPass's RendererBatches)
 		Buffer* _objectDataBuffer = nullptr;
 		Buffer* _transformBuffer = nullptr;
+		Buffer* _drawCommandBuffer = nullptr;
+		uint32_t _drawCommandCount = 0;
 		uint32_t _instanceCount = 0;
 
 		SDFShadowUniform _sdfParams{};

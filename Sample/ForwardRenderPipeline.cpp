@@ -59,6 +59,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		sdfShadowPass->SetGPUBoundsData(
 			batches->GetObjectDataBuffer(),
 			_transformBatch.TransformBuffer,
+			batches->GetIndirectCommandBuffer(),
+			batches->GetDrawCommandCount(),
 			batches->GetInstanceCount());
 	}
 	

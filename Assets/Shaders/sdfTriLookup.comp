@@ -1,0 +1,65 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct DrawCommand
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+struct GPUObjectData
+{
+    vec4 boundingSphere;
+    uint transformIndex;
+    uint drawCommandIndex;
+};
+
+struct TriLookup
+{
+    int  vertexOffset;
+    uint transformIndex;
+};
+
+layout(set = 0, binding = 0) readonly buffer DrawCommandBuffer { DrawCommand drawCommands[]; };
+layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer { GPUObjectData objectData[]; };
+layout(set = 0, binding = 2) writeonly buffer TriLookupBuffer { TriLookup triLookups[]; };
+
+layout(push_constant) uniform PushConstants
+{
+    uint totalTriangles;
+    uint drawCommandCount;
+} pc;
+
+void main()
+{
+    uint triIdx = gl_GlobalInvocationID.x;
+
+    if (triIdx >= pc.totalTriangles)
+        return;
+
+    // globalIndexOffset is in index-element space (not byte space)
+    uint globalIndexOffset = triIdx * 3;
+
+    for (uint d = 0; d < pc.drawCommandCount; ++d)
+    {
+        uint cmdFirstIndex = drawCommands[d].firstIndex;
+        uint cmdIndexCount = drawCommands[d].indexCount;
+
+        if (globalIndexOffset >= cmdFirstIndex &&
+            globalIndexOffset < cmdFirstIndex + cmdIndexCount)
+        {
+            uint firstInstance = drawCommands[d].firstInstance;
+
+            triLookups[triIdx].vertexOffset = drawCommands[d].vertexOffset;
+            triLookups[triIdx].transformIndex = objectData[firstInstance].transformIndex;
+            return;
+        }
+    }
+
+    triLookups[triIdx].vertexOffset = 0;
+    triLookups[triIdx].transformIndex = 0;
+}

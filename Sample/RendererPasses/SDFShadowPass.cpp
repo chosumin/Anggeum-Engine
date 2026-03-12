@@ -12,6 +12,8 @@
 
 using namespace Core;
 
+static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
+
 SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 	Scene& scene, VkExtent2D screenExtent,
 	VkSampleCountFlagBits msaaSamples)
@@ -66,9 +68,12 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 		_resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_RESOLVED_DEPTH, resolvedDepthDesc);
 	}
 
-	// Volume raytrace debug texture (RGBA8 for normal visualization)
+	// Volume raytrace debug texture ? match screen aspect ratio
+	float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+	uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);
+
 	RenderTargetDesc sliceDesc{};
-	sliceDesc.extent = { 256, 256 };
+	sliceDesc.extent = { sliceWidth, DEBUG_SLICE_HEIGHT };
 	sliceDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
 	sliceDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	sliceDesc.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -169,7 +174,10 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
 		*_volumeSliceShader, 0, sliceResources);
 	commandBuffer.PushConstants(*_volumeSliceShader, 0, &pc);
 
-	commandBuffer.Dispatch((256 + 7) / 8, (256 + 7) / 8, 1);
+	float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+	uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);
+
+	commandBuffer.Dispatch((sliceWidth + 7) / 8, (DEBUG_SLICE_HEIGHT + 7) / 8, 1);
 
 	commandBuffer.TransitionImageLayout(sliceImage,
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -231,12 +239,15 @@ void SDFShadowPass::UpdateGUI()
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			}
 
+			float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+			float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
+
 			ImGui::Begin("SDF Shadow Map");
-			ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS), ImVec2(256, 256));
+			ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS), ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
 			ImGui::End();
 		}
 
-		// SDF Volume Raytrace preview (normal visualization)
+		// SDF Volume Raytrace preview
 		if (_volumeSliceTexture)
 		{
 			if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
@@ -247,11 +258,13 @@ void SDFShadowPass::UpdateGUI()
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			}
 
+			float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+			float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
+
 			ImGui::Begin("SDF Volume Raytrace");
 			ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
 			ImGui::SliderInt("Ray Max Steps", &_debugMaxSteps, 32, 256);
-			ImGui::Image(static_cast<ImTextureID>(_volumeSliceImGuiDS), ImVec2(256, 256));
-			ImGui::Text("RGB = Surface Normal (world space)");
+			ImGui::Image(static_cast<ImTextureID>(_volumeSliceImGuiDS), ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
 			ImGui::End();
 		}
 	}
@@ -274,7 +287,9 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
 		_sdfGenerator->Generate(renderFrame, commandBuffer,
 			*meshBufferManager,
-			_objectDataBuffer, _transformBuffer, _instanceCount,
+			_objectDataBuffer, _transformBuffer,
+			_drawCommandBuffer, _drawCommandCount,
+			_instanceCount,
 			SDF_VOLUME_DIM);
 		_sdfGenerated = true;
 		commandBuffer.EndDebugMarker();

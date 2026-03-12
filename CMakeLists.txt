@@ -204,6 +204,14 @@ else()
     # Create shader compilation target
     add_custom_target(CompileShaders ALL DEPENDS ${COMPILED_SHADERS})
     
+    # Copy compiled .spv files to output directory after shader compilation
+    add_custom_command(TARGET CompileShaders POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/Assets/Shaders"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
+        COMMENT "Syncing compiled shaders to output directory..."
+    )
+
     # Make main target depend on shader compilation
     add_dependencies(${PROJECT_NAME} CompileShaders)
 endif()
@@ -303,15 +311,6 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${CMAKE_SOURCE_DIR}/Assets"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
     COMMENT "Syncing Assets folder (changed files only)..."
-)
-
-# Copy only .spv files and remove shader sources from output
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND}
-        -DSRC_DIR="${CMAKE_SOURCE_DIR}/Assets/Shaders"
-        -DDST_DIR="$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
-        -P "${CMAKE_SOURCE_DIR}/cmake/CopyShaderSpv.cmake"
-    COMMENT "Syncing shader .spv files and cleaning shader sources..."
 )
 
 # Copy KTX DLL (Debug/Release, fallback if missing)

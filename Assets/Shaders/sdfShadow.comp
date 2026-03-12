@@ -58,15 +58,22 @@ float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k,
 
         float dist = texture(sdfVolume, uvw).r;
 
-        float y = dist * dist / (2.0 * ph);
-        float d = sqrt(dist * dist - y * y);
-        result = min(result, k * d / max(0.0, t - y));
-        ph = dist;
-
-        if (dist < sdf.minDistance)
+        // For signed SDF: negative = inside mesh = fully shadowed
+        if (dist < -sdf.minDistance)
             return 0.0;
 
-        t += dist;
+        // Use absolute distance for stepping and penumbra
+        float absDist = abs(dist);
+
+        if (absDist < sdf.minDistance)
+            return 0.0;
+
+        float y = absDist * absDist / (2.0 * ph);
+        float d = sqrt(absDist * absDist - y * y);
+        result = min(result, k * d / max(0.0, t - y));
+        ph = absDist;
+
+        t += absDist;
     }
 
     return clamp(result, 0.0, 1.0);

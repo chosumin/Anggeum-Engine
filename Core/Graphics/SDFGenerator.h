@@ -19,6 +19,7 @@ namespace Core
 		uint32_t resolution;
 		uint32_t triangleCount;
 		float paddingFactor;
+		uint32_t useUint16Indices;
 	};
 
 	class SDFGenerator
@@ -30,6 +31,7 @@ namespace Core
 		void Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			MeshBufferManager& meshBufferManager,
 			Buffer* objectDataBuffer, Buffer* transformBuffer,
+			Buffer* drawCommandBuffer, uint32_t drawCommandCount,
 			uint32_t instanceCount,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
@@ -42,6 +44,9 @@ namespace Core
 		void ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			Buffer* objectDataBuffer, Buffer* transformBuffer,
 			uint32_t instanceCount);
+		void BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+			uint32_t drawCommandCount, uint32_t totalTriangles);
 
 	private:
 		Device& _device;
@@ -50,10 +55,14 @@ namespace Core
 		shared_ptr<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 
-		// Bounds reduction (single pass, no finalize)
 		shared_ptr<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;
-		Buffer* _boundsBuffer = nullptr; // 8 uints: encoded min/max
+		Buffer* _boundsBuffer = nullptr;
+
+		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
+		shared_ptr<Shader> _triLookupShader;
+		unique_ptr<Pipeline> _triLookupPipeline;
+		Buffer* _triLookupBuffer = nullptr;
 
 		float _paddingFactor = 0.1f;
 		bool _generated = false;

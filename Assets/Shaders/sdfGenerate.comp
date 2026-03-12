@@ -4,28 +4,54 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
 #include "sdfCommon.glsl"
 
+struct TriLookup
+{
+    int  vertexOffset;
+    uint transformIndex;
+};
+
 layout(push_constant) uniform PushConstants
 {
     uint resolution;
     uint triangleCount;
     float paddingFactor;
+    uint useUint16Indices; // 0 = uint32, 1 = uint16
 } pc;
 
 layout(set = 0, binding = 0) readonly buffer PositionBuffer { float positions[]; };
-layout(set = 0, binding = 1) readonly buffer IndexBuffer { uint indices[]; };
+layout(set = 0, binding = 1) readonly buffer IndexBuffer { uint indexData[]; };
 layout(set = 0, binding = 2, r32f) uniform writeonly image3D sdfVolume;
 layout(set = 0, binding = 3) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
+layout(set = 0, binding = 4) readonly buffer TriLookupBuffer { TriLookup triLookups[]; };
+layout(set = 0, binding = 5) readonly buffer TransformBuffer { mat4 transforms[]; };
 
-vec3 LoadPosition(uint index)
+// Read index correctly based on index type (uint16 or uint32)
+uint LoadIndex(uint idx)
 {
+    if (pc.useUint16Indices != 0)
+    {
+        // 2 uint16 indices packed per uint32
+        uint wordIndex = idx / 2;
+        uint word = indexData[wordIndex];
+        return (idx % 2 == 0) ? (word & 0xFFFFu) : (word >> 16);
+    }
+    else
+    {
+        return indexData[idx];
+    }
+}
+
+vec3 LoadPosition(int vertexOffset, uint localIndex)
+{
+    uint globalIndex = uint(int(localIndex) + vertexOffset);
     return vec3(
-        positions[index * 3 + 0],
-        positions[index * 3 + 1],
-        positions[index * 3 + 2]
+        positions[globalIndex * 3 + 0],
+        positions[globalIndex * 3 + 1],
+        positions[globalIndex * 3 + 2]
     );
 }
 
-float PointTriangleDistance(vec3 p, vec3 v0, vec3 v1, vec3 v2)
+float PointTriangleDistance(vec3 p, vec3 v0, vec3 v1, vec3 v2, out vec3 closestPoint)
 {
     vec3 edge0 = v1 - v0;
     vec3 edge1 = v2 - v0;
@@ -80,8 +106,8 @@ float PointTriangleDistance(vec3 p, vec3 v0, vec3 v1, vec3 v2)
         }
     }
 
-    vec3 closest = v0 + s * edge0 + t * edge1;
-    return length(p - closest);
+    closestPoint = v0 + s * edge0 + t * edge1;
+    return length(p - closestPoint);
 }
 
 void main()
@@ -99,20 +125,37 @@ void main()
     vec3 worldPos = boundsMin + (vec3(voxelCoord) + 0.5) * voxelSize;
 
     float minDist = 1e20;
+    vec3 closestNormal = vec3(0.0, 1.0, 0.0);
+    vec3 closestDir = vec3(0.0);
 
     for (uint tri = 0; tri < pc.triangleCount; ++tri)
     {
-        uint i0 = indices[tri * 3 + 0];
-        uint i1 = indices[tri * 3 + 1];
-        uint i2 = indices[tri * 3 + 2];
+        TriLookup lookup = triLookups[tri];
 
-        vec3 v0 = LoadPosition(i0);
-        vec3 v1 = LoadPosition(i1);
-        vec3 v2 = LoadPosition(i2);
+        uint i0 = LoadIndex(tri * 3 + 0);
+        uint i1 = LoadIndex(tri * 3 + 1);
+        uint i2 = LoadIndex(tri * 3 + 2);
 
-        float dist = PointTriangleDistance(worldPos, v0, v1, v2);
-        minDist = min(minDist, dist);
+        vec3 v0 = LoadPosition(lookup.vertexOffset, i0);
+        vec3 v1 = LoadPosition(lookup.vertexOffset, i1);
+        vec3 v2 = LoadPosition(lookup.vertexOffset, i2);
+
+        mat4 worldMatrix = transforms[lookup.transformIndex];
+        v0 = (worldMatrix * vec4(v0, 1.0)).xyz;
+        v1 = (worldMatrix * vec4(v1, 1.0)).xyz;
+        v2 = (worldMatrix * vec4(v2, 1.0)).xyz;
+
+        vec3 closest;
+        float dist = PointTriangleDistance(worldPos, v0, v1, v2, closest);
+
+        if (dist < minDist)
+        {
+            minDist = dist;
+            closestNormal = normalize(cross(v1 - v0, v2 - v0));
+            closestDir = worldPos - closest;
+        }
     }
 
-    imageStore(sdfVolume, ivec3(voxelCoord), vec4(minDist));
+    float sign = dot(closestDir, closestNormal) < 0.0 ? -1.0 : 1.0;
+    imageStore(sdfVolume, ivec3(voxelCoord), vec4(sign * minDist));
 }
