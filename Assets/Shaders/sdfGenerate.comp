@@ -4,6 +4,8 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
 #include "sdfCommon.glsl"
 
+#define PI 3.14159265358979
+
 struct TriLookup
 {
     int  vertexOffset;
@@ -110,6 +112,27 @@ float PointTriangleDistance(vec3 p, vec3 v0, vec3 v1, vec3 v2, out vec3 closestP
     return length(p - closestPoint);
 }
 
+// Signed solid angle of triangle (a,b,c) seen from origin.
+// Van Oosterom & Strackee (1983), numerically stable form.
+float SolidAngleAtOrigin(vec3 a, vec3 b, vec3 c)
+{
+    float la = length(a);
+    float lb = length(b);
+    float lc = length(c);
+
+    // Degenerate: point coincides with a vertex -> contribute 0
+    if (la < 1e-12 || lb < 1e-12 || lc < 1e-12)
+        return 0.0;
+
+    float numer = dot(a, cross(b, c));
+    float denom = la * lb * lc
+                + dot(a, b) * lc
+                + dot(b, c) * la
+                + dot(c, a) * lb;
+
+    return 2.0 * atan(numer, denom);
+}
+
 void main()
 {
     uvec3 voxelCoord = gl_GlobalInvocationID.xyz;
@@ -125,8 +148,7 @@ void main()
     vec3 worldPos = boundsMin + (vec3(voxelCoord) + 0.5) * voxelSize;
 
     float minDist = 1e20;
-    vec3 closestNormal = vec3(0.0, 1.0, 0.0);
-    vec3 closestDir = vec3(0.0);
+    float windingSum = 0.0; // generalized winding number * 4*PI
 
     for (uint tri = 0; tri < pc.triangleCount; ++tri)
     {
@@ -145,17 +167,18 @@ void main()
         v1 = (worldMatrix * vec4(v1, 1.0)).xyz;
         v2 = (worldMatrix * vec4(v2, 1.0)).xyz;
 
+        // unsigned distance (still uses single closest)
         vec3 closest;
         float dist = PointTriangleDistance(worldPos, v0, v1, v2, closest);
+        minDist = min(minDist, dist);
 
-        if (dist < minDist)
-        {
-            minDist = dist;
-            closestNormal = normalize(cross(v1 - v0, v2 - v0));
-            closestDir = worldPos - closest;
-        }
+        // robust sign via generalized winding number
+        windingSum += SolidAngleAtOrigin(v0 - worldPos, v1 - worldPos, v2 - worldPos);
     }
 
-    float sign = dot(closestDir, closestNormal) < 0.0 ? -1.0 : 1.0;
-    imageStore(sdfVolume, ivec3(voxelCoord), vec4(sign * minDist));
+    // winding number ~ 1 inside, ~ 0 outside (for a closed mesh)
+    float windingNumber = windingSum * (1.0 / (4.0 * PI));
+    float sgn = (windingNumber > 0.5) ? -1.0 : 1.0;
+
+    imageStore(sdfVolume, ivec3(voxelCoord), vec4(sgn * minDist));
 }

@@ -42,7 +42,7 @@ vec3 WorldToVolumeUV(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
 }
 
 float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k,
-                    vec3 boundsMin, vec3 boundsMax)
+                    vec3 boundsMin, vec3 boundsMax, float voxelSize)
 {
     float result = 1.0;
     float t = tMin;
@@ -58,22 +58,33 @@ float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k,
 
         float dist = texture(sdfVolume, uvw).r;
 
-        // For signed SDF: negative = inside mesh = fully shadowed
+        // signed SDF: inside mesh = fully shadowed
         if (dist < -sdf.minDistance)
             return 0.0;
 
-        // Use absolute distance for stepping and penumbra
         float absDist = abs(dist);
 
         if (absDist < sdf.minDistance)
             return 0.0;
 
+        // IQ improved soft shadow (parabolic closest-approach estimate)
         float y = absDist * absDist / (2.0 * ph);
-        float d = sqrt(absDist * absDist - y * y);
-        result = min(result, k * d / max(0.0, t - y));
+        float d = sqrt(max(0.0, absDist * absDist - y * y));
+
+        // Clamp d to voxel resolution.
+        // Geometry thinner than a voxel reports near-zero d,
+        // but physically can't cast a shadow sharper than the voxel footprint.
+        // This prevents thin/distant geometry from forming a wide dark cone
+        // while thick geometry (many steps with small d) still accumulates correctly.
+        float dResolved = max(d, voxelSize);
+
+        result = min(result, k * dResolved / max(0.0001, t - y));
         ph = absDist;
 
-        t += absDist;
+        // Minimum step = half voxel size.
+        // Prevents sub-voxel oscillation near thin geometry that causes
+        // the fish-bone stripe artifact.
+        t += max(absDist, voxelSize * 0.5);
     }
 
     return clamp(result, 0.0, 1.0);
@@ -109,7 +120,7 @@ void main()
 
     float shadow = SDFSoftShadow(worldPos, lightDir,
         tMin, sdf.maxDistance, sdf.shadowSoftness,
-        boundsMin, boundsMax);
+        boundsMin, boundsMax, voxelSize);
 
     imageStore(shadowOutput, pixelCoord, vec4(shadow, shadow, shadow, 1.0));
 }
