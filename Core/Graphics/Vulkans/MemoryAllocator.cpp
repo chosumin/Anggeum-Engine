@@ -112,10 +112,31 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 
 void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
+	// Only persistently mapped allocators (e.g. UNIFORM) populate block.mapped.
+	// STAGE memory is NOT persistently mapped: use MapMemory/UnmapMemory instead.
 	auto& block = *FindMemoryBlock(allocation.id);
 
 	uint8_t* mappedPtr = static_cast<uint8_t*>(block.mapped);
 	*outMappedPtr = mappedPtr + allocation.offset;
+}
+
+void Core::MemoryAllocator::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
+{
+	lock_guard<mutex> lock(_mutex);
+
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	vkMapMemory(_device.GetDevice(), block.memory,
+		allocation.offset, allocation.size, 0, outMappedPtr);
+}
+
+void Core::MemoryAllocator::UnmapMemory(MemoryAllocation& allocation)
+{
+	lock_guard<mutex> lock(_mutex);
+
+	auto& block = *FindMemoryBlock(allocation.id);
+
+	vkUnmapMemory(_device.GetDevice(), block.memory);
 }
 
 void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation)
@@ -333,6 +354,16 @@ void Core::MemoryAllocatorManager::BindImageMemory(Image& image, MemoryAllocatio
 void Core::MemoryAllocatorManager::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
 	_memoryAllocators[allocation.type]->GetMappedPtr(outMappedPtr, allocation);
+}
+
+void Core::MemoryAllocatorManager::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
+{
+	_memoryAllocators[allocation.type]->MapMemory(outMappedPtr, allocation);
+}
+
+void Core::MemoryAllocatorManager::UnmapMemory(MemoryAllocation& allocation)
+{
+	_memoryAllocators[allocation.type]->UnmapMemory(allocation);
 }
 
 void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation)

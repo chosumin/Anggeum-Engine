@@ -9,18 +9,19 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/ResourceCache.h"
-
+#include "ShadowPass.h"
 using namespace Core;
 
 static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
 
 SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 	Scene& scene, VkExtent2D screenExtent,
-	VkSampleCountFlagBits msaaSamples)
+	VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass)
 	: RendererPass(device, workerThreadManager)
 	, _scene(scene)
 	, _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
+	, _shadowPass(shadowPass)
 {
 	_sdfGenerator = make_unique<SDFGenerator>(device);
 
@@ -215,6 +216,11 @@ void SDFShadowPass::UpdateGUI()
 		if (ImGui::BeginMenu("Debug"))
 		{
 			ImGui::MenuItem("SDF Shadow", nullptr, &_showSDFShadowWindow);
+			ImGui::Separator();
+			if (ImGui::MenuItem("Generate SDF Texture"))
+			{
+				_regenerateRequested = true;
+			}
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
@@ -237,10 +243,7 @@ void SDFShadowPass::UpdateGUI()
 		ImGui::SliderFloat("Max Distance", &_maxDistance, 10.0f, 500.0f);
 		ImGui::SliderInt("Max Steps", &_maxSteps, 8, 128);
 
-		if (ImGui::Button("Regenerate SDF"))
-		{
-			_sdfGenerated = false;
-		}
+		ImGui::TextDisabled("Cache: %s", _sdfGenerator->GetCachePath().c_str());
 	}
 
 	float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -293,17 +296,37 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
-	if (!_sdfGenerated)
+	// Deferred save: the SDF was generated on a previous frame and its GPU work
+	// is now complete, so it's safe to read back the image/bounds and write to disk.
+	// Saving in the same frame as Generate() would read the image before the
+	// generation commands have executed (UNDEFINED layout).
+	if (_savePending)
 	{
-		commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
-		_sdfGenerator->Generate(renderFrame, commandBuffer,
-			*meshBufferManager,
-			_objectDataBuffer, _transformBuffer,
-			_drawCommandBuffer, _drawCommandCount,
-			_instanceCount,
-			SDF_VOLUME_DIM);
-		_sdfGenerated = true;
-		commandBuffer.EndDebugMarker();
+		_savePending = false;
+		_sdfGenerator->SaveToFile(SDF_VOLUME_DIM);
+	}
+
+	// Need SDF? Either nothing generated yet, or user clicked Regenerate.
+	if (_regenerateRequested || !_sdfGenerator->IsGenerated())
+	{
+		// User-forced regen skips the load attempt.
+		bool tryLoad = !_regenerateRequested;
+		_regenerateRequested = false;
+
+		if (!tryLoad || !_sdfGenerator->TryLoadFromFile(SDF_VOLUME_DIM))
+		{
+			commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
+			_sdfGenerator->Generate(renderFrame, commandBuffer,
+				*meshBufferManager,
+				_objectDataBuffer, _transformBuffer,
+				_drawCommandBuffer, _drawCommandCount,
+				_instanceCount,
+				SDF_VOLUME_DIM);
+			commandBuffer.EndDebugMarker();
+
+			// Save on the next frame once these commands have completed.
+			_savePending = true;
+		}
 	}
 
 	auto sdfTexture = _sdfGenerator->GetSDFTexture();

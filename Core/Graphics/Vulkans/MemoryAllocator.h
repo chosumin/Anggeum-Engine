@@ -45,6 +45,8 @@ namespace Core
 		void Deallocate(MemoryAllocation& allocation);
 		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
 		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
+		void MapMemory(void** outMappedPtr, MemoryAllocation& allocation);
+		void UnmapMemory(MemoryAllocation& allocation);
 		void BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation);
 		void BindImageMemory(Image& image, MemoryAllocation& allocation);
 	private:
@@ -80,6 +82,8 @@ namespace Core
 		void BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation);
 		void BindImageMemory(Image& image, MemoryAllocation& allocation);
 		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
+		void MapMemory(void** outMappedPtr, MemoryAllocation& allocation);
+		void UnmapMemory(MemoryAllocation& allocation);
 
 		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
 	private:
