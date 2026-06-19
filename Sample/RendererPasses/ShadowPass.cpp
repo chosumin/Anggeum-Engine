@@ -91,6 +91,28 @@ void Core::ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 		cascadeSplits[i] = (d - nearClip) / clipRange;
 	}
 
+	// Determine effective cascade count: cascades whose near plane is beyond
+	// the SDF transition distance are skipped (SDF takes over there).
+	// Include the cascade that contains the transition zone so the blend works.
+	float transitionFar = _shadowBuffer.SDFTransitionDistance
+		+ _shadowBuffer.SDFTransitionRange * 0.5f;
+
+	uint32_t effectiveCascadeCount = SHADOW_MAP_CASCADE_COUNT;
+	float lastSplitDistForCount = 0.0f;
+	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
+	{
+		float cascadeNearDist = nearClip + lastSplitDistForCount * clipRange;
+		if (cascadeNearDist >= transitionFar)
+		{
+			effectiveCascadeCount = i;
+			break;
+		}
+		lastSplitDistForCount = cascadeSplits[i];
+	}
+	effectiveCascadeCount = std::max<uint32_t>(effectiveCascadeCount, 1u);
+
+	_shadowBuffer.CascadeCount = effectiveCascadeCount;
+
 	// Get light direction
 	auto lights = _scene.GetComponents<Light>();
 	if (lights.empty())
@@ -103,15 +125,24 @@ void Core::ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 
 	float shadowMapSize = static_cast<float>(SHADOW_MAP_DIM);
 
-	// Build cascade matrices
+	// Build cascade matrices for active cascades only.
+	// The last active cascade's far plane is clamped to transitionFar so
+	// the cascade tightly fits the CSM-only region.
 	float lastSplitDist = 0.0f;
-	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
+	for (uint32_t i = 0; i < effectiveCascadeCount; ++i)
 	{
 		float splitDist = cascadeSplits[i];
 
-		// Build a sub-frustum projection with this cascade's near/far planes
 		float cascadeNear = nearClip + lastSplitDist * clipRange;
 		float cascadeFar = nearClip + splitDist * clipRange;
+
+		// Tighten the last active cascade to the transition boundary.
+		// This dramatically improves shadow resolution near the transition zone.
+		if (i == effectiveCascadeCount - 1)
+		{
+			cascadeFar = std::min(cascadeFar, transitionFar);
+			splitDist = (cascadeFar - nearClip) / clipRange;
+		}
 
 		glm::mat4 cascadeProj = glm::perspective(
 			camera->GetFieldOfView(),
@@ -177,6 +208,13 @@ void Core::ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 
 		lastSplitDist = splitDist;
 	}
+
+	// Inactive cascades: mark with a split depth that no fragment will reach,
+	// so the cascade selection loop never picks them.
+	for (uint32_t i = effectiveCascadeCount; i < SHADOW_MAP_CASCADE_COUNT; ++i)
+	{
+		_shadowBuffer.SplitDepth[i].value = -1e9f;
+	}
 }
 
 void Core::ShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -217,18 +255,30 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 		ImGui::SliderFloat("Split Lambda", &_cascadeSplitLambda, 0.0f, 1.0f, "%.2f");
 		ImGui::SliderFloat("Blend Factor", &_shadowBuffer.CascadeBlendFactor, 0.0f, 1.0f, "%.2f");
 		ImGui::SetItemTooltip("Fraction of cascade range used for blending (0 = off, 0.3 = 30%%)");
+	}
 
-		if (ImGui::Button("Reset Defaults"))
-		{
-			_shadowBuffer.LightSize = 0.04f;
-			_shadowBuffer.MinFilterRadius = 0.5f;
-			_shadowBuffer.MaxFilterRadius = 10.0f;
-			_shadowBuffer.CascadeBlendFactor = 0.3f;
-			_depthBiasConstant = 1.25f;
-			_depthBiasSlope = 1.75f;
-			_depthBiasClamp = 0.0f;
-			_cascadeSplitLambda = 0.95f;
-		}
+	ImGui::SeparatorText("SDF Shadow");
+	{
+		ImGui::SliderFloat("Transition Distance", &_shadowBuffer.SDFTransitionDistance,
+			1.0f, 200.0f, "%.1f m");
+		ImGui::SetItemTooltip("View-space distance where shadow switches from CSM to SDF");
+		ImGui::SliderFloat("Transition Range", &_shadowBuffer.SDFTransitionRange,
+			0.0f, 50.0f, "%.1f m");
+		ImGui::SetItemTooltip("Width of the smooth blend zone (0 = hard switch)");
+	}
+
+	if (ImGui::Button("Reset Defaults"))
+	{
+		_shadowBuffer.LightSize = 0.04f;
+		_shadowBuffer.MinFilterRadius = 0.5f;
+		_shadowBuffer.MaxFilterRadius = 10.0f;
+		_shadowBuffer.CascadeBlendFactor = 0.3f;
+		_shadowBuffer.SDFTransitionDistance = 30.0f;
+		_shadowBuffer.SDFTransitionRange = 5.0f;
+		_depthBiasConstant = 1.25f;
+		_depthBiasSlope = 1.75f;
+		_depthBiasClamp = 0.0f;
+		_cascadeSplitLambda = 0.95f;
 	}
 
 	// CSM Shadow Map Debug View
@@ -300,6 +350,20 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			continue;
 
 		auto& commandBuffer = renderFrame.GetCommandBuffer();
+
+		// Skip cascades beyond the SDF transition zone but still clear them
+		// so stale depth doesn't show up in the debug viewer.
+		if (cascadeIndex >= _shadowBuffer.CascadeCount)
+		{
+			string clearName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Clear (skipped)";
+			commandBuffer.BeginDebugMarker(clearName.c_str());
+			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+			commandBuffer.BeginRenderPass(renderPassBeginInfo);
+			commandBuffer.EndRenderPass();
+			commandBuffer.EndDebugMarker();
+			continue;
+		}
 
 		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
 		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);

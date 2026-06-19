@@ -42,3 +42,13 @@ void Core::Buffer::GetMappedPtr(void** data)
 {
 	_allocator->GetMappedPtr(data, *_allocation);
 }
+
+void Core::Buffer::Map(void** data)
+{
+	_allocator->MapMemory(data, *_allocation);
+}
+
+void Core::Buffer::Unmap()
+{
+	_allocator->UnmapMemory(*_allocation);
+}

@@ -13,7 +13,7 @@ Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& wo
 	:RendererPass(device, workerThreadManager), _scene(scene),
 	_lightVisibilityBuffer(lightVisibilityBuffer)
 {
-	_computeMaterial = device.GetResourceCache().RequestMaterial("lightCulling", "shaders/lightCulling.comp");
+	_computeMaterial = device.GetResourceCache().RequestMaterial("lightCulling", "shaders/lightCulling.comp.spv");
 	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial->GetShader());
 
 	_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);

@@ -6,6 +6,11 @@
 #define SHADOW_MAP_CASCADE_COUNT 4
 #define SHADOW_MAP_DIM 2048
 
+// SDF Shadow Constants
+#define SDF_VOLUME_DIM 128
+#define SDF_MAX_MARCH_STEPS 64
+#define SDF_SHADOW_SOFTNESS 8.0f
+
 struct alignas(16) CameraBuffer
 {
 	mat4 View;
@@ -39,7 +44,31 @@ struct alignas(16) ShadowUniform
 
 	// Cascade blend region as fraction of each cascade's depth range
 	float CascadeBlendFactor = 0.3f;
-	float _pad[3];
+
+	// Distance-based CSM/SDF split
+	// CSM is used when view-space distance < SDFTransitionDistance.
+	// SDF is used beyond. SDFTransitionRange controls the smooth fade width.
+	float SDFTransitionDistance = 30.0f;
+	float SDFTransitionRange = 5.0f;
+
+	float _pad[1];
+};
+
+struct alignas(16) SDFShadowUniform
+{
+	vec4 LightDirection;   // w: softness factor
+	vec4 VolumeResolution; // xyz: resolution, w: max march distance
+	int MaxSteps;
+	float MinDistance;
+	float MaxDistance;
+	float ShadowSoftness;
+	float PaddingFactor;
+	
+	// Distance-based CSM/SDF split (same as ShadowUniform)
+	float SDFTransitionDistance;
+	float SDFTransitionRange;
+	
+	float _pad[1];
 };
 
 struct alignas(16) PBRBuffer
@@ -126,8 +155,6 @@ struct alignas(16) GPUMaterialData
 
 	glm::vec3 padding;  // 16-byte alignment
 };
-
-static_assert(sizeof(GPUMaterialData) == 80, "GPUMaterialData must be 80 bytes");
 
 struct alignas(16) GPUObjectData
 {

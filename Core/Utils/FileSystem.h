@@ -9,6 +9,8 @@ namespace Core
 		static vector<uint32_t> Read32Fast(const string& fileName);
 		static vector<uint32_t> Read32(const string& fileName);
 		static vector<char> ReadChar(const string& fileName);
+		static void Write(const string& fileName, const void* data, size_t size);
+		static bool Exists(const string& fileName);
 		static string GetExtension(const string& path);
 	};
 }

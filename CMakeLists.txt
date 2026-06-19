@@ -84,7 +84,7 @@ file(GLOB ROOT_SOURCES
 )
 
 # Collect shader files
-file(GLOB_RECURSE SHADER_SOURCES
+file(GLOB_RECURSE SHADER_SOURCES CONFIGURE_DEPENDS
     "Assets/Shaders/*.vert"
     "Assets/Shaders/*.frag"
     "Assets/Shaders/*.comp"
@@ -94,10 +94,13 @@ file(GLOB_RECURSE SHADER_SOURCES
 )
 
 # Collect .glsl header files
-file(GLOB_RECURSE SHADER_HEADERS "Assets/Shaders/*.glsl" "Assets/Shaders/*.h")
+file(GLOB_RECURSE SHADER_HEADERS CONFIGURE_DEPENDS
+    "Assets/Shaders/*.glsl"
+    "Assets/Shaders/*.h"
+)
 
 # Display original shader files in IDE (exclude from build)
-file(GLOB_RECURSE SHADER_FILES
+file(GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "Assets/Shaders/*.vert"
     "Assets/Shaders/*.frag"
     "Assets/Shaders/*.comp"
@@ -201,6 +204,14 @@ else()
     # Create shader compilation target
     add_custom_target(CompileShaders ALL DEPENDS ${COMPILED_SHADERS})
     
+    # Copy compiled .spv files to output directory after shader compilation
+    add_custom_command(TARGET CompileShaders POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/Assets/Shaders"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets/Shaders"
+        COMMENT "Syncing compiled shaders to output directory..."
+    )
+
     # Make main target depend on shader compilation
     add_dependencies(${PROJECT_NAME} CompileShaders)
 endif()

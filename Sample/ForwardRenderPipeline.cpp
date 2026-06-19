@@ -13,6 +13,7 @@
 #include "Graphics/RendererPasses/LightCullingPass.h"
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
+#include "Sample/RendererPasses/SDFShadowPass.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -48,6 +49,21 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
 	AddRendererPass(shadowPass);
 
+	if (device.IsGpuDrivenRenderingEnabled())
+	{
+		auto sdfShadowPass = new SDFShadowPass(
+			device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
+		AddRendererPass(sdfShadowPass);
+
+		auto* batches = shadowPass->GetRendererBatches();
+		sdfShadowPass->SetGPUBoundsData(
+			batches->GetObjectDataBuffer(),
+			_transformBatch.TransformBuffer,
+			batches->GetIndirectCommandBuffer(),
+			batches->GetDrawCommandCount(),
+			batches->GetInstanceCount());
+	}
+	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
 	AddRendererPass(lightCullingPass);
 

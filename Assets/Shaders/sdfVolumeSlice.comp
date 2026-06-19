@@ -1,0 +1,86 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "sdfCommon.glsl"
+
+layout(set = 0, binding = 0) uniform sampler3D sdfVolume;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D sliceOutput;
+layout(set = 0, binding = 2) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
+
+layout(push_constant) uniform PushConstants
+{
+    vec4 cameraPos;
+    vec4 cameraForward;
+    vec4 cameraRight;
+    vec4 cameraUp;
+    float fov;
+    float maxDistance;
+    int maxSteps;
+    float hitThreshold;
+    float paddingFactor;
+} pc;
+
+vec3 WorldToVolumeUV(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
+{
+    return (worldPos - boundsMin) / (boundsMax - boundsMin);
+}
+
+float SampleSDF(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
+{
+    vec3 uvw = WorldToVolumeUV(worldPos, boundsMin, boundsMax);
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
+        return pc.maxDistance;
+    return texture(sdfVolume, uvw).r;
+}
+
+void main()
+{
+    ivec2 outputSize = imageSize(sliceOutput);
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    if (pixelCoord.x >= outputSize.x || pixelCoord.y >= outputSize.y)
+        return;
+
+    vec3 boundsMin, boundsMax;
+    sdfDecodeBounds(rawBounds, pc.paddingFactor, boundsMin, boundsMax);
+
+    vec2 ndc = (vec2(pixelCoord) + 0.5) / vec2(outputSize) * 2.0 - 1.0;
+    ndc.y = -ndc.y; // Vulkan Y-axis points downward, flip to match screen convention
+    float aspect = float(outputSize.x) / float(outputSize.y);
+    float tanHalfFov = tan(pc.fov * 0.5);
+
+    vec3 rayDir = normalize(
+        pc.cameraForward.xyz
+        + pc.cameraRight.xyz * ndc.x * tanHalfFov * aspect
+        + pc.cameraUp.xyz * ndc.y * tanHalfFov
+    );
+
+    vec3 rayOrigin = pc.cameraPos.xyz;
+    float t = 0.0;
+    bool hit = false;
+
+    for (int i = 0; i < pc.maxSteps && t < pc.maxDistance; ++i)
+    {
+        vec3 pos = rayOrigin + rayDir * t;
+        float dist = SampleSDF(pos, boundsMin, boundsMax);
+
+        if (abs(dist) < pc.hitThreshold)
+        {
+            hit = true;
+            break;
+        }
+
+        t += abs(dist);
+    }
+
+    vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+    if (hit)
+    {
+        float depth = t / pc.maxDistance;
+        float brightness = 1.0 - depth;
+        color = vec4(vec3(brightness), 1.0);
+    }
+
+    imageStore(sliceOutput, pixelCoord, color);
+}

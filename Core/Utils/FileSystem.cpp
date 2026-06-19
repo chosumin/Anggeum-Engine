@@ -93,6 +93,37 @@ vector<char> Core::FileSystem::ReadChar(const string& fileName)
 	return buffer;
 }
 
+void Core::FileSystem::Write(const string& fileName, const void* data, size_t size)
+{
+	// Ensure the destination directory exists before writing
+	std::filesystem::path path(fileName);
+	if (path.has_parent_path())
+	{
+		std::filesystem::create_directories(path.parent_path());
+	}
+
+	ofstream file;
+	file.open(fileName, ios::out | ios::binary | ios::trunc);
+
+	if (!file.is_open())
+	{
+		throw runtime_error("Failed to open file for writing: " + fileName);
+	}
+
+	file.write(reinterpret_cast<const char*>(data), static_cast<streamsize>(size));
+	file.close();
+
+	if (!file.good())
+	{
+		throw runtime_error("Failed to write file: " + fileName);
+	}
+}
+
+bool Core::FileSystem::Exists(const string& fileName)
+{
+	return std::filesystem::exists(fileName);
+}
+
 string Core::FileSystem::GetExtension(const string& path)
 {
 	auto dotPos = path.find_last_of('.');

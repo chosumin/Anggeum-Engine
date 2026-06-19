@@ -16,6 +16,8 @@ namespace Core
 
 		void CopyBuffer(void* data, VkDeviceSize size);
 		void GetMappedPtr(void** data);
+		void Map(void** data);
+		void Unmap();
 
 		VkDeviceSize GetSize() const { return _size; }
 	protected:

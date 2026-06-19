@@ -189,3 +189,31 @@ float ShadowCalculation(sampler2DArray shadowMap, mat4 viewProjection[SHADOW_MAP
 
 	return visibility;
 }
+
+// SDF Shadow sampling utility for fragment shaders
+// Used when SDF shadow map is pre-computed via compute shader
+
+// Sample the pre-computed SDF shadow map
+float SampleSDFShadow(sampler2D sdfShadowMap, vec2 screenUV)
+{
+    return texture(sdfShadowMap, screenUV).r;
+}
+
+// Distance-based shadow technique selection.
+// CSM is used at close range for high-quality contact shadows.
+// SDF takes over at long range where CSM resolution degrades.
+//
+// viewDepth      : view-space Z (negative; -|distance|)
+// transitionDist : world-space distance where the switch begins
+// transitionRange: world-space width of the smooth fade zone
+float CombineShadows(float csmShadow, float sdfShadow,
+    float viewDepth, float transitionDist, float transitionRange)
+{
+    float distance = -viewDepth; // view space looks down -Z
+    float fadeStart = transitionDist - transitionRange * 0.5;
+    float fadeEnd   = transitionDist + transitionRange * 0.5;
+
+    // 0.0 inside CSM zone, 1.0 inside SDF zone
+    float t = smoothstep(fadeStart, fadeEnd, distance);
+    return mix(csmShadow, sdfShadow, t);
+}

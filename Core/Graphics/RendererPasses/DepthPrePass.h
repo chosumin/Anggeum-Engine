@@ -21,6 +21,8 @@ namespace Core
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
+        RendererBatches* GetRendererBatches() const { return _rendererBatches.get(); }
+
     private:
         void EnsureRenderTargets(RenderFrame& renderFrame);
 
