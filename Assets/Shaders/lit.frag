@@ -35,7 +35,8 @@ layout(set = 0, binding = 4) uniform CascadeShadowUBO {
     float minFilterRadius;
     float maxFilterRadius;
     float cascadeBlendFactor;
-	float sdfBlendFactor;
+	float sdfTransitionDistance;
+	float sdfTransitionRange;
 } csm;
 
 layout(set = 0, binding = 5) uniform Lights 
@@ -227,8 +228,9 @@ void main()
 	vec2 screenUV = gl_FragCoord.xy / vec2(tileInfo.viewportSize);
 	float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
 
-	// Combine CSM and SDF shadows using adjustable blend factor from UBO
-	float visibility = CombineShadows(csmVisibility, sdfVisibility, csm.sdfBlendFactor);
+	// Distance-based split: near = CSM only, far = SDF only
+	float visibility = CombineShadows(csmVisibility, sdfVisibility,
+		viewDepth, csm.sdfTransitionDistance, csm.sdfTransitionRange);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;

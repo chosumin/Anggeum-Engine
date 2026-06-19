@@ -22,6 +22,8 @@ layout(set = 0, binding = 2) uniform SDFParams
     float maxDistance;
     float shadowSoftness;
     float paddingFactor;
+    float sdfTransitionDistance;
+    float sdfTransitionRange;
 } sdf;
 
 layout(set = 0, binding = 3) uniform sampler2D depthTexture;
@@ -111,6 +113,20 @@ void main()
     }
 
     vec3 worldPos = ReconstructWorldPos(uv, depth);
+    
+    // Distance-based CSM/SDF split: skip SDF shadow for pixels within CSM range.
+    // Compute view-space depth (linear depth from camera).
+    vec3 viewPos = (camera.view * vec4(worldPos, 1.0)).xyz;
+    float viewDepth = -viewPos.z;  // view-space Z is negative in front of camera
+    
+    // If within transition distance, output full light (no SDF shadow).
+    // CSM handles these pixels.
+    if (viewDepth < sdf.sdfTransitionDistance)
+    {
+        imageStore(shadowOutput, pixelCoord, vec4(1.0));
+        return;
+    }
+    
     vec3 lightDir = normalize(-sdf.lightDirection.xyz);
 
     vec3 volumeSize = boundsMax - boundsMin;

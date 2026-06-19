@@ -199,10 +199,21 @@ float SampleSDFShadow(sampler2D sdfShadowMap, vec2 screenUV)
     return texture(sdfShadowMap, screenUV).r;
 }
 
-// Combine CSM shadow with SDF shadow
-// CSM handles close-range detail, SDF provides long-range soft shadows
-float CombineShadows(float csmShadow, float sdfShadow, float blendFactor)
+// Distance-based shadow technique selection.
+// CSM is used at close range for high-quality contact shadows.
+// SDF takes over at long range where CSM resolution degrades.
+//
+// viewDepth      : view-space Z (negative; -|distance|)
+// transitionDist : world-space distance where the switch begins
+// transitionRange: world-space width of the smooth fade zone
+float CombineShadows(float csmShadow, float sdfShadow,
+    float viewDepth, float transitionDist, float transitionRange)
 {
-    // blendFactor: 0.0 = CSM only, 1.0 = SDF only
-    return mix(csmShadow, min(csmShadow, sdfShadow), blendFactor);
+    float distance = -viewDepth; // view space looks down -Z
+    float fadeStart = transitionDist - transitionRange * 0.5;
+    float fadeEnd   = transitionDist + transitionRange * 0.5;
+
+    // 0.0 inside CSM zone, 1.0 inside SDF zone
+    float t = smoothstep(fadeStart, fadeEnd, distance);
+    return mix(csmShadow, sdfShadow, t);
 }
