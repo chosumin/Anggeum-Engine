@@ -248,8 +248,10 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex)
 	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
 
-	if (!_triLookupBuffer)
+	if (!_triLookupBuffer || _triLookupBuffer->GetSize() < requiredSize)
 	{
+		if (_triLookupBuffer)
+			delete _triLookupBuffer;
 		_triLookupBuffer = new Buffer(_device,
 			requiredSize,
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
