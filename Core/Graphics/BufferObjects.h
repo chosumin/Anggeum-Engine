@@ -63,7 +63,12 @@ struct alignas(16) SDFShadowUniform
 	float MaxDistance;
 	float ShadowSoftness;
 	float PaddingFactor;
-	float _pad[3];
+	
+	// Distance-based CSM/SDF split (same as ShadowUniform)
+	float SDFTransitionDistance;
+	float SDFTransitionRange;
+	
+	float _pad[1];
 };
 
 struct alignas(16) PBRBuffer

@@ -7,6 +7,7 @@ namespace Core
 {
 	class Scene;
 	class SDFGenerator;
+	class ShadowPass;
 
 	class SDFShadowPass : public RendererPass
 	{
@@ -17,7 +18,7 @@ namespace Core
 
 		SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, VkExtent2D screenExtent,
-			VkSampleCountFlagBits msaaSamples);
+			VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass);
 		~SDFShadowPass();
 
 		void Prepare() override;
@@ -47,6 +48,7 @@ namespace Core
 		Scene& _scene;
 		VkExtent2D _screenExtent;
 		VkSampleCountFlagBits _msaaSamples;
+		ShadowPass& _shadowPass;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
 		shared_ptr<Texture> _sdfShadowTexture;
@@ -74,7 +76,10 @@ namespace Core
 		uint32_t _instanceCount = 0;
 
 		SDFShadowUniform _sdfParams{};
-		bool _sdfGenerated = false;
+
+		// Persistent SDF cache
+		bool _regenerateRequested = false;
+		bool _savePending = false;
 
 		// GUI tweakable
 		float _shadowSoftness = 8.0f;

@@ -206,6 +206,11 @@ void SDFShadowPass::UpdateSDFParams()
 	_sdfParams.MaxDistance = _maxDistance;
 	_sdfParams.ShadowSoftness = _shadowSoftness;
 	_sdfParams.PaddingFactor = 0.1f;
+	
+	// Copy transition parameters from ShadowPass
+	auto* shadowUniform = _shadowPass.GetShadowBuffer();
+	_sdfParams.SDFTransitionDistance = shadowUniform->SDFTransitionDistance;
+	_sdfParams.SDFTransitionRange = shadowUniform->SDFTransitionRange;
 }
 
 void SDFShadowPass::UpdateGUI()

@@ -52,7 +52,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	if (device.IsGpuDrivenRenderingEnabled())
 	{
 		auto sdfShadowPass = new SDFShadowPass(
-			device, workerThreadManager, scene, extent, _msaaSamples);
+			device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
 		AddRendererPass(sdfShadowPass);
 
 		auto* batches = shadowPass->GetRendererBatches();
