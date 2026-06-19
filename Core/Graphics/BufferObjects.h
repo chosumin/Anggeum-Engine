@@ -45,10 +45,13 @@ struct alignas(16) ShadowUniform
 	// Cascade blend region as fraction of each cascade's depth range
 	float CascadeBlendFactor = 0.3f;
 
-	// SDF shadow blend: 0.0 = CSM only, 1.0 = SDF only
-	float SDFBlendFactor = 0.5f;
+	// Distance-based CSM/SDF split
+	// CSM is used when view-space distance < SDFTransitionDistance.
+	// SDF is used beyond. SDFTransitionRange controls the smooth fade width.
+	float SDFTransitionDistance = 30.0f;
+	float SDFTransitionRange = 5.0f;
 
-	float _pad[2];
+	float _pad[1];
 };
 
 struct alignas(16) SDFShadowUniform

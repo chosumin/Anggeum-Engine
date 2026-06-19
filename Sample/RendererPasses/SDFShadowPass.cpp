@@ -209,65 +209,76 @@ void SDFShadowPass::UpdateSDFParams()
 
 void SDFShadowPass::UpdateGUI()
 {
-	ImGui::Begin("SDF Shadows");
-
-	ImGui::SliderFloat("Shadow Softness", &_shadowSoftness, 1.0f, 32.0f);
-	ImGui::SliderFloat("Min Distance", &_minDistance, 0.0001f, 0.1f, "%.4f");
-	ImGui::SliderFloat("Max Distance", &_maxDistance, 10.0f, 500.0f);
-	ImGui::SliderInt("Max Steps", &_maxSteps, 8, 128);
-
-	if (ImGui::Button("Regenerate SDF"))
+	// Main menu bar with Debug menu
+	if (ImGui::BeginMainMenuBar())
 	{
-		_sdfGenerated = false;
+		if (ImGui::BeginMenu("Debug"))
+		{
+			ImGui::MenuItem("SDF Shadow", nullptr, &_showSDFShadowWindow);
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
 	}
 
-	ImGui::Separator();
-	ImGui::Checkbox("Show Debug Windows", &_showDebugWindows);
+	if (!_showSDFShadowWindow)
+		return;
+
+	if (!ImGui::Begin("SDF Shadow Debug", &_showSDFShadowWindow))
+	{
+		ImGui::End();
+		return;
+	}
+
+	// Shadow parameters
+	if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::SliderFloat("Shadow Softness", &_shadowSoftness, 1.0f, 32.0f);
+		ImGui::SliderFloat("Min Distance", &_minDistance, 0.0001f, 0.1f, "%.4f");
+		ImGui::SliderFloat("Max Distance", &_maxDistance, 10.0f, 500.0f);
+		ImGui::SliderInt("Max Steps", &_maxSteps, 8, 128);
+
+		if (ImGui::Button("Regenerate SDF"))
+		{
+			_sdfGenerated = false;
+		}
+	}
+
+	float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+	float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
+
+	// Shadow map preview
+	if (_sdfShadowTexture && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
+		{
+			_sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
+				_sdfShadowTexture->GetSampler()->GetSampler(),
+				_sdfShadowTexture->GetImageView(),
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+
+		ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS),
+			ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
+	}
+
+	// Volume raytrace preview
+	if (_volumeSliceTexture && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
+		{
+			_volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
+				_volumeSliceTexture->GetSampler()->GetSampler(),
+				_volumeSliceTexture->GetImageView(),
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+
+		ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
+		ImGui::SliderInt("Ray Max Steps", &_debugMaxSteps, 32, 256);
+		ImGui::Image(static_cast<ImTextureID>(_volumeSliceImGuiDS),
+			ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
+	}
 
 	ImGui::End();
-
-	if (_showDebugWindows)
-	{
-		// SDF Shadow Map preview
-		if (_sdfShadowTexture)
-		{
-			if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
-			{
-				_sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
-					_sdfShadowTexture->GetSampler()->GetSampler(),
-					_sdfShadowTexture->GetImageView(),
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			}
-
-			float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
-			float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
-
-			ImGui::Begin("SDF Shadow Map");
-			ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS), ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
-			ImGui::End();
-		}
-
-		// SDF Volume Raytrace preview
-		if (_volumeSliceTexture)
-		{
-			if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
-			{
-				_volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
-					_volumeSliceTexture->GetSampler()->GetSampler(),
-					_volumeSliceTexture->GetImageView(),
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			}
-
-			float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
-			float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
-
-			ImGui::Begin("SDF Volume Raytrace");
-			ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
-			ImGui::SliderInt("Ray Max Steps", &_debugMaxSteps, 32, 256);
-			ImGui::Image(static_cast<ImTextureID>(_volumeSliceImGuiDS), ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
-			ImGui::End();
-		}
-	}
 }
 
 void SDFShadowPass::Prepare()
@@ -347,7 +358,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		VK_IMAGE_LAYOUT_GENERAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	if (_showDebugWindows)
+	if (_showSDFShadowWindow)
 	{
 		commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");
 		RenderVolumeSlice(renderFrame, commandBuffer);

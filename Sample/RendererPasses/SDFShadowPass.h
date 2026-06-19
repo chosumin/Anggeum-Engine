@@ -81,7 +81,7 @@ namespace Core
 		float _minDistance = 0.001f;
 		float _maxDistance = 100.0f;
 		int _maxSteps = SDF_MAX_MARCH_STEPS;
-		bool _showDebugWindows = true;
+		bool _showSDFShadowWindow = false;
 
 		// Volume raytrace debug
 		float _debugHitThreshold = 0.01f;
