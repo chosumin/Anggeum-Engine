@@ -98,6 +98,9 @@ Toy 3D rendering engine for studying Vulkan API.
     - Render shadows over large distances using Global SDF Volumes
     - Use Inigo Quilez's improved soft shadow with a parabolic closest-approach estimate
 
+15. **Distance Field Ambient Occlusion**
+    - SDF-based screen-space ambient occlusion using hemisphere sampling
+
 ---
 
 ## Build Instructions
