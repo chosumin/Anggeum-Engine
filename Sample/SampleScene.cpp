@@ -218,17 +218,15 @@ void SampleScene::Update()
 		auto& properties = lights[0]->GetProperties();
 		auto& transform = lights[0]->GetEntity().GetTransform();
 
-		auto& rotation = transform.GetRotation();
-		glm::vec3 euler = glm::eulerAngles(rotation);
-		euler = glm::degrees(euler);
-
 		auto& position = transform.GetTranslation();
 
 		ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
 		ImGui::InputFloat3("Position", &position[0]);
 		transform.SetTranslation(position);
-		ImGui::SliderFloat3("Direction", &euler[0], -90.0f, 90.0f);
-		transform.SetRotation(euler);
+
+		// DragFloat3: drag to rotate freely without clamping, enabling full 360�� rotation
+		ImGui::DragFloat3("Rotation (Pitch / Yaw / Roll)", &_dirLightEuler[0], 1.0f);
+		transform.SetRotation(_dirLightEuler);
 
 		ImGui::TreePop();
 	}

@@ -34,14 +34,13 @@ struct Light
 {
 	vec4 position;         // position.w represents type of light
 	vec4 color;            // color.w represents light intensity
-	vec4 direction;        // direction.w represents range
+	vec4 direction;        // direction.w = range
 	vec2 info;             // (only used for spot lights) info.x represents light inner cone angle, info.y represents light outer cone angle
 };
 
 vec3 ApplyDirectionalLight(Light light, vec3 normal)
 {
-	vec3 worldToLight = -light.direction.xyz;
-	worldToLight = normalize(worldToLight);
+	vec3 worldToLight = normalize(light.direction.xyz);
 	float ndotl = clamp(dot(normal, worldToLight), 0.0, 1.0);
 	return ndotl * light.color.w * light.color.rgb;
 }
@@ -87,7 +86,7 @@ vec3 ApplySpotLight(Light light, vec3 pos, vec3 normal)
 
 	// 2. Cone Attenuation (Angular falloff)
 	worldToLight = normalize(worldToLight);
-	// Calculate cosine of the angle between light direction and pixel-to-light vector
+	// -direction.xyz = cone forward (travel direction), direction.xyz = worldToLight-equivalent
 	float cosTheta = dot(worldToLight, normalize(-light.direction.xyz));
 
 	float innerCos = light.info.x; // cos(innerAngle) passed from CPU
@@ -107,7 +106,7 @@ vec3 GetLightDirection(Light light, vec3 worldPos)
 {
 	if (light.position.w == DIRECTIONAL_LIGHT)
 	{
-		return -light.direction.xyz;
+		return light.direction.xyz;
 	}
 	else
 	{
