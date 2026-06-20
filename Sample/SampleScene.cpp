@@ -222,6 +222,7 @@ void SampleScene::Update()
 		auto& position = transform.GetTranslation();
 
 		ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
+		ImGui::SliderFloat("Intensity", &properties.Intensity, 0.0f, 100.0f);
 		ImGui::InputFloat3("Position", &position[0]);
 		transform.SetTranslation(position);
 
