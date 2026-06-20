@@ -21,6 +21,8 @@ private:
 	Core::Device& _device;
 
 private:
+	glm::vec3 _dirLightEuler{ 45.0f, 45.0f, 0.0f };
+
 	std::vector<glm::vec3> _pointLightCenters;
 	std::vector<glm::vec3> _spotLightCenters;
 	std::vector<float> _pointLightAngles;
