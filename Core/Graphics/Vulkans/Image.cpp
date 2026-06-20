@@ -13,10 +13,9 @@
 
 Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
     :_device(device), _sampleCount(imageCreateInfo.sampleCount), _createFlags(imageCreateInfo.flags), _viewType(imageCreateInfo.imageViewType),
-    _filePath(imageCreateInfo.filePath),
+	_filePath(imageCreateInfo.filePath), _format(imageCreateInfo.format),
     _image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE)
 {
-    _format = VK_FORMAT_R8G8B8A8_UNORM;
     _usageFlags = 
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
@@ -201,10 +200,40 @@ void Core::Image::LoadRawImage(vector<uint8_t>& data, const string& filePath)
     {
         LoadKtxImage(data, filePath);
     }
+    else if (extension == "hdr")
+    {
+        LoadHdrImage(data, filePath);
+    }
     else if (extension == "png" || extension == "jpg")
     {
         LoadStbImage(data, filePath);
     }
+}
+
+void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
+{
+    int width, height, comp;
+    constexpr int reqComp = 4; // RGBA
+
+    float* pixels = stbi_loadf(filePath.c_str(), &width, &height, &comp, reqComp);
+
+    if (pixels == nullptr)
+        throw runtime_error("failed to load HDR image: " + filePath);
+
+    _extent.depth = 1u;
+    _extent.width = static_cast<uint32_t>(width);
+    _extent.height = static_cast<uint32_t>(height);
+    _layer = 1;
+
+    // HDR는 채널당 32bit float 포맷 사용
+    _format = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    // float 픽셀 데이터를 uint8_t 바이트 스트림으로 복사
+    const size_t byteSize = static_cast<size_t>(width) * height * reqComp * sizeof(float);
+    const uint8_t* byteData = reinterpret_cast<const uint8_t*>(pixels);
+    outData = { byteData, byteData + byteSize };
+
+    stbi_image_free(pixels);
 }
 
 void Core::Image::LoadStbImage(vector<uint8_t>& data, const string& filePath)

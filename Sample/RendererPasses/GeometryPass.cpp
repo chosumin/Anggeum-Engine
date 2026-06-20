@@ -299,14 +299,17 @@ namespace Core
         TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(_prefilteredCubemap);
         TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(_brdfLut);
 
-        _giBuffer.irradianceMapIndex = irradianceCubemapHandle.index;
-        _giBuffer.prefilterMapIndex = prefilteredCubemapHandle.index;
-        _giBuffer.brdfLUTIndex = brdfLutHandle.index;
+        // Strip the MSB cubemap flag before passing to the shader.
+        // handle.index stores 0x80000000 as a cubemap marker internally,
+        // but the shader uses the value as a direct array index (no flags expected).
+        _giBuffer.irradianceMapIndex = irradianceCubemapHandle.index & 0x7FFFFFFF;
+        _giBuffer.prefilterMapIndex  = prefilteredCubemapHandle.index & 0x7FFFFFFF;
+        _giBuffer.brdfLUTIndex       = brdfLutHandle.index & 0x7FFFFFFF;
 
         cout << "GI textures registered to bindless:" << endl;
-        cout << "  Irradiance cubemap: index " << irradianceCubemapHandle.index << endl;
-        cout << "  Prefiltered cubemap: index " << prefilteredCubemapHandle.index << endl;
-        cout << "  BRDF LUT: index " << brdfLutHandle.index << endl;
+        cout << "  Irradiance cubemap: index " << _giBuffer.irradianceMapIndex << endl;
+        cout << "  Prefiltered cubemap: index " << _giBuffer.prefilterMapIndex << endl;
+        cout << "  BRDF LUT: index " << _giBuffer.brdfLUTIndex << endl;
     }
 
     void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer)

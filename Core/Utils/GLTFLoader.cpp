@@ -296,11 +296,14 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	string textureName = path.substr(pos + 1, path.length() - 1);
 
 	//Create a cubemap
-	ImageCreateInfo imageCreateInfo{
+	ImageCreateInfo imageCreateInfo
+	{
 		path,
 		VK_SAMPLE_COUNT_1_BIT,
 		VK_IMAGE_VIEW_TYPE_CUBE,
-		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT };
+		VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
+		VK_FORMAT_R16G16B16A16_SFLOAT 
+	};
 
 	auto texture = _resourceCache.RequestTexture(textureName,
 		imageCreateInfo, DEFAULT_SAMPLER);

@@ -2,21 +2,13 @@
 
 namespace Core
 {
-	/*enum ImageFormat
-	{
-		Default = 0,
-		Grey = 1,
-		Grey_alpha = 2,
-		Rgb = 3,
-		Rgb_alpha = 4
-	};*/
-
 	struct ImageCreateInfo
 	{
 		string filePath;
 		VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 		VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
 		VkImageCreateFlags flags = 0;
+		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 	};
 
 	struct MemoryAllocation;
@@ -52,6 +44,7 @@ namespace Core
 	private:
 		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);
 		void LoadStbImage(vector<uint8_t>& outData, const string& filePath);
+		void LoadHdrImage(vector<uint8_t>& outData, const string& filePath);
 		void LoadKtxImage(vector<uint8_t>& outData, const string& path);
 		void CreateImage(VkImageTiling tiling, 
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);

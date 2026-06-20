@@ -27,7 +27,8 @@ SampleScene::SampleScene(Core::Device& device, float width, float height, Transf
 	//string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	//_gltfLoader->LoadScene(path);
 
-	string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";
+	string skyTexture = "./Assets/Textures/skybox.ktx";
+	//string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";
 	_gltfLoader->LoadSkybox(skyTexture);
 
 	auto mainCamera = GetMainCamera();
@@ -224,7 +225,7 @@ void SampleScene::Update()
 		ImGui::InputFloat3("Position", &position[0]);
 		transform.SetTranslation(position);
 
-		// DragFloat3: drag to rotate freely without clamping, enabling full 360ï¿½ï¿½ rotation
+		// DragFloat3: drag to rotate freely without clamping, enabling full 360¡Æ rotation
 		ImGui::DragFloat3("Rotation (Pitch / Yaw / Roll)", &_dirLightEuler[0], 1.0f);
 		transform.SetRotation(_dirLightEuler);
 

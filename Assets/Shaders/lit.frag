@@ -172,7 +172,7 @@ void main()
 	if (pbr.occlusionTextureSet == 1)
 	{
 		//fixme : hardcoded. needs occlusion mapping
-		ao = 1;
+		ao = 0.1;
 	}
 	else
 		ao = pbr.ao;
