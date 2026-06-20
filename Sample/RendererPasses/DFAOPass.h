@@ -22,8 +22,6 @@ namespace Core
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-        shared_ptr<Texture> GetAOTexture() const { return _aoTexture; }
-
     private:
         void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,

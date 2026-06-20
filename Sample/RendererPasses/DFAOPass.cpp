@@ -137,9 +137,6 @@ void DFAOPass::UpdateGUI()
         ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
     }
 
-    float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
-    uint32_t previewW = static_cast<uint32_t>(128 * aspect);
-
     if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_aoImGuiDS == VK_NULL_HANDLE)
@@ -149,6 +146,8 @@ void DFAOPass::UpdateGUI()
                 _aoTexture->GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
+        float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+        uint32_t previewW = static_cast<uint32_t>(128 * aspect);
         ImGui::Image(static_cast<ImTextureID>(_aoImGuiDS),
             ImVec2(static_cast<float>(previewW), 128.0f));
     }
@@ -176,12 +175,11 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     EnsureRenderTargets(renderFrame);
     UpdateParams();
-    UpdateGUI();
 
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     commandBuffer.BeginDebugMarker("DFAO");
 
-    // Reuse the resolved depth buffer.
+    // Reuse the resolved depth buffer from SDFShadowPass
     shared_ptr<Texture> depthForSampling;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
@@ -259,4 +257,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     }
 
     commandBuffer.EndDebugMarker();
+
+    UpdateGUI();
 }

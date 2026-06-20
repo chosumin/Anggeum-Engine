@@ -12,7 +12,7 @@ namespace Core
 	class SDFShadowPass : public RendererPass
 	{
 	public:
-		static constexpr const char* RT_SDF_SHADOW = "SDFShadow";
+		static constexpr const char* RT_SDF_SHADOW       = "SDFShadow";
 		static constexpr const char* RT_SDF_RESOLVED_DEPTH = "SDFResolvedDepth";
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
