@@ -244,13 +244,13 @@ void main()
 	vec3 kD = 1.0 - kS;
 	kD *= 1.0 - metallic;
 
-	vec3 irradiance = SRGBtoLINEAR(texture(bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)], N)).rgb;
+	vec3 irradiance = texture(bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)], N).rgb;
 	vec3 diffuse = irradiance * albedo.rgb;
 	
 	// split-sum approximation to get the IBL specular part.
 	const float MAX_REFLECTION_LOD = 4.0;
 
-	vec3 prefilteredColor = SRGBtoLINEAR(textureLod(bindlessTexturesCube[nonuniformEXT(gi.prefiltermapIndex)], R, roughness * MAX_REFLECTION_LOD)).rgb;
+	vec3 prefilteredColor = textureLod(bindlessTexturesCube[nonuniformEXT(gi.prefiltermapIndex)], R, roughness * MAX_REFLECTION_LOD).rgb;
 
 	vec2 brdf = texture(bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)], vec2(max(dot(N, V), 0.0), roughness)).rg;
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
@@ -259,8 +259,8 @@ void main()
 	vec3 ambient = (kD * diffuse * dfao + specular) * ao;
     vec3 color = ambient + Lo;
 	
-	// tonemapping
-    color = color / (color + vec3(1.0));
-
-    outColor = vec4(color, 1.0);
+	float exposure = 4.5;
+	vec4 mapped = Tonemap(vec4(color, 1.0), exposure, 1.0);
+	
+    outColor = vec4(mapped.rgb, 1.0);
 }
