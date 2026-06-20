@@ -256,7 +256,7 @@ void main()
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
 
 	// Combine material AO and DFAO, then apply to ambient
-	vec3 ambient = (kD * diffuse + specular) * ao * dfao;
+	vec3 ambient = (kD * diffuse * dfao + specular) * ao;
     vec3 color = ambient + Lo;
 	
 	// tonemapping

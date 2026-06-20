@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "GeometryPass.h"
+#include "DFAOPass.h"
+#include "SDFShadowPass.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Component.h"
 #include "Components/PerspectiveCamera.h"
@@ -12,6 +14,7 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
+#include "Graphics/ResourceCache.h"
 #include "PreEnvironmentPass.h"
 #include "BrdfLutPass.h"
 
@@ -173,9 +176,14 @@ namespace Core
 
         auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
-        auto shadowTarget = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
+        auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
-        auto dfaoTarget = renderFrame.GetRenderTarget("DFAOResult");
+
+        // Use DFAO texture when enabled; otherwise fall back to default white
+        // texture so ambient is unaffected (ao * 1.0 = ao)
+        auto dfaoTarget = DFAOPass::IsEnabled()
+            ? renderFrame.GetRenderTarget(DFAOPass::RT_DFAO)
+            : _device.GetResourceCache().GetDefaultTexture();
 
         UpdateLightBuffer();
 

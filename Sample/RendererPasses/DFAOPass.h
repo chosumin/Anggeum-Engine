@@ -22,6 +22,8 @@ namespace Core
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
+        static bool IsEnabled() { return _enabled; }
+
     private:
         void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -46,11 +48,13 @@ namespace Core
 
         DFAOUniform _params{};
 
+        inline static bool _enabled    = true;
         bool  _showWindow  = false;
         int   _numSamples  = 8;
         float _maxDistance = 2.0f;
         float _intensity   = 1.0f;
         float _stepScale   = 0.5f;
+        float _minAO       = 0.2f;  // prevents full black at contact surfaces
 
         VkDescriptorSet _aoImGuiDS = VK_NULL_HANDLE;
     };

@@ -106,6 +106,7 @@ void DFAOPass::UpdateParams()
     _params.Intensity     = _intensity;
     _params.StepScale     = _stepScale;
     _params.PaddingFactor = 0.1f;
+    _params.MinAO         = _minAO;
 }
 
 void DFAOPass::UpdateGUI()
@@ -129,27 +130,34 @@ void DFAOPass::UpdateGUI()
         return;
     }
 
-    if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        ImGui::SliderInt  ("Num Samples",  &_numSamples,  1,    16);
-        ImGui::SliderFloat("Max Distance", &_maxDistance, 0.1f, 10.0f);
-        ImGui::SliderFloat("Intensity",    &_intensity,   0.0f, 2.0f);
-        ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
-    }
+    ImGui::Checkbox("Enable DFAO", &_enabled);
 
-    if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_enabled)
     {
-        if (_aoImGuiDS == VK_NULL_HANDLE)
+        ImGui::Separator();
+        if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _aoTexture->GetSampler()->GetSampler(),
-                _aoTexture->GetImageView(),
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            ImGui::SliderInt  ("Num Samples",  &_numSamples,  1,    16);
+            ImGui::SliderFloat("Max Distance", &_maxDistance, 0.1f, 10.0f);
+            ImGui::SliderFloat("Intensity",    &_intensity,   0.0f, 2.0f);
+            ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
+            ImGui::SliderFloat("Min AO",       &_minAO,       0.0f, 1.0f);
         }
-        float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
-        uint32_t previewW = static_cast<uint32_t>(128 * aspect);
-        ImGui::Image(static_cast<ImTextureID>(_aoImGuiDS),
-            ImVec2(static_cast<float>(previewW), 128.0f));
+
+        if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (_aoImGuiDS == VK_NULL_HANDLE)
+            {
+                _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
+                    _aoTexture->GetSampler()->GetSampler(),
+                    _aoTexture->GetImageView(),
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+            float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+            uint32_t previewW = static_cast<uint32_t>(128 * aspect);
+            ImGui::Image(static_cast<ImTextureID>(_aoImGuiDS),
+                ImVec2(static_cast<float>(previewW), 128.0f));
+        }
     }
 
     ImGui::End();
@@ -161,6 +169,12 @@ void DFAOPass::Prepare()
 
 void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+    // Always update GUI so the checkbox remains accessible
+    UpdateGUI();
+
+    if (!_enabled)
+        return;
+
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
 
@@ -257,6 +271,4 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     }
 
     commandBuffer.EndDebugMarker();
-
-    UpdateGUI();
 }

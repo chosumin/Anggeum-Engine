@@ -19,7 +19,8 @@ layout(set = 0, binding = 5) uniform DFAOParams
     float Intensity;
     float StepScale;
     float PaddingFactor;
-    float _pad[3];
+    float MinAO;
+    float _pad[2];
 } uParams;
 
 layout(push_constant) uniform PC
@@ -91,6 +92,12 @@ void main()
     vec3 boundsMin, boundsMax;
     sdfDecodeBounds(rawBounds, uParams.PaddingFactor, boundsMin, boundsMax);
 
+    // Voxel size: used to clamp minimum cone aperture at contact surfaces.
+    // Prevents d/t from collapsing to 0 when geometry is thinner than one voxel.
+    vec3 volumeSize = boundsMax - boundsMin;
+    float voxelSize = max(volumeSize.x, max(volumeSize.y, volumeSize.z))
+                      / uParams.VolumeResolution.x;
+
     // half-res > full-res UV
     vec2  uv    = (vec2(coord) + 0.5) / vec2(aoSize);
     float depth = texture(uDepth, uv).r;
@@ -114,21 +121,35 @@ void main()
         vec2 xi     = Hammersley(uint(i), uint(N));
         vec3 rayDir = tbn * CosineSampleHemisphere(xi);
 
-        float t        = 0.02; // self-intersection bias
+        float t        = voxelSize * 2.0; // self-intersection bias scaled to voxel size
         float minRatio = 1.0;
 
         for (int s = 0; s < 32; ++s)
         {
             if (t >= uParams.MaxDistance) break;
-            float d  = SampleSDF(worldPos + rayDir * t, boundsMin, boundsMax);
-            minRatio = min(minRatio, d / t); // cone ratio
+
+            float d = SampleSDF(worldPos + rayDir * t, boundsMin, boundsMax);
+
+            // Clamp d to voxel size before computing cone ratio.
+            // At contact surfaces d approaches 0, but geometry thinner than
+            // one voxel cannot physically block more than one voxel's cone aperture.
+            // This prevents over-darkening at seams and contact edges.
+            float dResolved = max(d, voxelSize);
+            minRatio = min(minRatio, dResolved / t);
+
             if (d < 0.001) break;
-            t += max(d * uParams.StepScale, uParams.MaxDistance * 0.01);
+
+            // Minimum step = half voxel size to avoid sub-voxel oscillation
+            t += max(d * uParams.StepScale, voxelSize * 0.5);
         }
 
         occlusion += clamp(minRatio, 0.0, 1.0);
     }
 
-    float ao = clamp(pow(occlusion / float(N), uParams.Intensity), 0.0, 1.0);
+    float ao = pow(occlusion / float(N), uParams.Intensity);
+
+    // Clamp to [MinAO, 1.0]: prevents full black at contact surfaces
+    ao = clamp(ao, uParams.MinAO, 1.0);
+
     imageStore(uAO, coord, vec4(ao, 0.0, 0.0, 0.0));
 }
