@@ -24,6 +24,8 @@ namespace Core
 		void Prepare() override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
+		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
+
 		// Set GPU buffers from GeometryPass's RendererBatches
 		void SetGPUBoundsData(Buffer* objectDataBuffer, Buffer* transformBuffer,
 			Buffer* drawCommandBuffer, uint32_t drawCommandCount,

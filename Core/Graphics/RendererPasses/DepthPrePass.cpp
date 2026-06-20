@@ -24,11 +24,19 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
     auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
     multiSampling.rasterizationSamples = msaaSamples;
 
-	_renderPass->CreateDepthAttachment(depthFormat, msaaSamples,
+    // [0] Normal color attachment ? vertex world-space normal
+    _renderPass->CreateColorAttachment(
+        VK_FORMAT_R16G16B16A16_SFLOAT, msaaSamples,
+        VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // [1] Depth attachment
+    _renderPass->CreateDepthAttachment(depthFormat, msaaSamples,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+
     _renderPass->CreateRenderPass();
 
-    _depthMaterial = _device.GetResourceCache().RequestMaterial("depth", "Depth");
+    _depthMaterial = _device.GetResourceCache().RequestMaterial("depthNormal", "DepthNormal");
 
     _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 
@@ -47,12 +55,22 @@ Core::DepthPrePass::~DepthPrePass()
 
 void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
+    // [0] Normal RT - vertex world-space normal
+    RenderTargetDesc normalDesc{};
+    normalDesc.extent  = _extent;
+    normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
+    normalDesc.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    normalDesc.samples = _msaaSamples;
+    normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
+    renderFrame.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
+
+    // [1] Depth RT
     RenderTargetDesc depthDesc{};
-    depthDesc.extent = _extent;
-    depthDesc.format = VK_FORMAT_UNDEFINED;
-    depthDesc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    depthDesc.extent  = _extent;
+    depthDesc.format  = VK_FORMAT_UNDEFINED;
+    depthDesc.usage   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     depthDesc.samples = _msaaSamples;
-    depthDesc.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    depthDesc.aspect  = VK_IMAGE_ASPECT_DEPTH_BIT;
     renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
 }
 
@@ -67,7 +85,7 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "DepthPrePass",
         *_renderPass,
-        { RT_MAIN_DEPTH });
+        { RT_MAIN_NORMAL, RT_MAIN_DEPTH });
 
     if (!framebuffer)
         return;

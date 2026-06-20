@@ -71,6 +71,17 @@ struct alignas(16) SDFShadowUniform
 	float _pad[1];
 };
 
+struct alignas(16) DFAOUniform
+{
+	vec4  VolumeResolution; // xyz: SDF volume resolution, w: unused
+	int   NumSamples;       // AO ray cone sample count
+	float MaxDistance;
+	float Intensity;
+	float StepScale;        // ray march step scale
+	float PaddingFactor;    // SDF volume padding (matches SDFGenerator)
+	float _pad[3];
+};
+
 struct alignas(16) PBRBuffer
 {
 	vec4 Albedo{ 1.0f, 1.0f, 1.0f, 1.0f };

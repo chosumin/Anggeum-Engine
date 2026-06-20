@@ -11,7 +11,8 @@ namespace Core
     class DepthPrePass : public RendererPass
     {
     public:
-        static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
+        static constexpr const char* RT_MAIN_DEPTH  = "MainDepth";
+        static constexpr const char* RT_MAIN_NORMAL = "MainNormal";
 
         DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
@@ -33,7 +34,7 @@ namespace Core
 
         unique_ptr<RendererBatches> _rendererBatches;
 
-		shared_ptr<Material> _depthMaterial;
+        shared_ptr<Material> _depthMaterial;
     };
 }
 
