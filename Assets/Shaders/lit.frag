@@ -53,6 +53,7 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
 layout(set = 0, binding = 7) uniform sampler2DArray shadowMap;
 
 layout(set = 0, binding = 10) uniform sampler2D sdfShadowMap;
+layout(set = 0, binding = 11) uniform sampler2D dfaoMap;
 
 #ifdef GPU_DRIVEN_RENDERING
 struct PBR
@@ -69,8 +70,8 @@ struct PBR
 	int occlusionTextureSet;
 	int debugMode;
 
-	uint basemapIndex;           // Material texture 0
-	uint normalmapIndex;         // Material texture 1
+	uint basemapIndex;              // Material texture 0
+	uint normalmapIndex;            // Material texture 1
 	uint metallicRoughnessmapIndex; // Material texture 2
 
 	vec3 padding;
@@ -99,8 +100,8 @@ layout(set = 1, binding = 1) uniform PBR
 	int occlusionTextureSet;
 	int debugMode;
 
-	uint basemapIndex;           // Material texture 0
-	uint normalmapIndex;         // Material texture 1
+	uint basemapIndex;              // Material texture 0
+	uint normalmapIndex;            // Material texture 1
 	uint metallicRoughnessmapIndex; // Material texture 2
 } pbr;
 #endif
@@ -235,6 +236,9 @@ void main()
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;
 
+	// Sample DFAO: applied globally across the full screen to the ambient term
+	float dfao = texture(dfaoMap, screenUV).r;
+
 	// ambient lighting
 	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);
 	vec3 kD = 1.0 - kS;
@@ -251,7 +255,8 @@ void main()
 	vec2 brdf = texture(bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)], vec2(max(dot(N, V), 0.0), roughness)).rg;
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
 
-	vec3 ambient = (kD * diffuse + specular) * ao;
+	// Combine material AO and DFAO, then apply to ambient
+	vec3 ambient = (kD * diffuse * dfao + specular) * ao;
     vec3 color = ambient + Lo;
 	
 	// tonemapping

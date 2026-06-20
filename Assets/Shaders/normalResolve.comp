@@ -1,0 +1,28 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2DMS uNormalMSAA;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D uNormalOut;
+
+layout(push_constant) uniform PC
+{
+    int outputWidth;
+    int outputHeight;
+    int sampleCount;
+    int padding;
+} pc;
+
+void main()
+{
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    if (coord.x >= pc.outputWidth || coord.y >= pc.outputHeight)
+        return;
+
+    vec3 sum = vec3(0.0);
+    for (int i = 0; i < pc.sampleCount; ++i)
+        sum += texelFetch(uNormalMSAA, coord, i).xyz;
+
+    vec3 resolved = normalize(sum);
+    imageStore(uNormalOut, coord, vec4(resolved, 0.0));
+}

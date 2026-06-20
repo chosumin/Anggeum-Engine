@@ -14,6 +14,7 @@
 #include "Sample/RendererPasses/GeometryPass.h"
 #include "Sample/RendererPasses/ShadowPass.h"
 #include "Sample/RendererPasses/SDFShadowPass.h"
+#include "Sample/RendererPasses/DFAOPass.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -62,6 +63,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 			batches->GetIndirectCommandBuffer(),
 			batches->GetDrawCommandCount(),
 			batches->GetInstanceCount());
+
+		auto dfaoPass = new DFAOPass(
+			device, workerThreadManager, scene, extent, _msaaSamples,
+			sdfShadowPass->GetSDFGenerator());
+		AddRendererPass(dfaoPass);
 	}
 	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
@@ -137,21 +143,6 @@ void Core::ForwardRenderPipeline::Resize(SwapChain& swapChain)
 	Cleanup();
 
 	VkExtent2D extent = swapChain.GetSwapChainExtent();
-
-	/*if (_color != nullptr)
-	{
-		CreateColorRenderTarget(extent, _color->Format, _color->LoadOp, _color->StoreOp, _color->InitialLayout);
-	}
-
-	if (_depth != nullptr)
-	{
-		CreateDepthRenderTarget(extent, _depth->LoadOp, _depth->StoreOp);
-	}
-
-	for (auto& renderTarget : _inputRenderTargets)
-	{
-		CreateRenderTarget(extent, renderTarget->Format, renderTarget->Layout, renderTarget->UsageFlags, renderTarget->LoadOp, renderTarget->StoreOp);
-	}*/
 }
 
 VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()

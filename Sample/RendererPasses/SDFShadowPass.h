@@ -12,7 +12,7 @@ namespace Core
 	class SDFShadowPass : public RendererPass
 	{
 	public:
-		static constexpr const char* RT_SDF_SHADOW = "SDFShadow";
+		static constexpr const char* RT_SDF_SHADOW       = "SDFShadow";
 		static constexpr const char* RT_SDF_RESOLVED_DEPTH = "SDFResolvedDepth";
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
@@ -23,6 +23,8 @@ namespace Core
 
 		void Prepare() override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+
+		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
 
 		// Set GPU buffers from GeometryPass's RendererBatches
 		void SetGPUBoundsData(Buffer* objectDataBuffer, Buffer* transformBuffer,

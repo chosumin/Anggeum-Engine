@@ -1,0 +1,155 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+#include "sdfCommon.glsl"
+
+layout(set = 0, binding = 0) uniform sampler2D uDepth;
+layout(set = 0, binding = 1) uniform sampler2D uNormal;  // world-space vertex normal
+layout(set = 0, binding = 2) uniform sampler3D uSDF;
+layout(set = 0, binding = 3, r8) uniform writeonly image2D uAO;
+
+layout(set = 0, binding = 4) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
+
+layout(set = 0, binding = 5) uniform DFAOParams
+{
+    vec4  VolumeResolution;
+    int   NumSamples;
+    float MaxDistance;
+    float Intensity;
+    float StepScale;
+    float PaddingFactor;
+    float MinAO;
+    float _pad[2];
+} uParams;
+
+layout(push_constant) uniform PC
+{
+    mat4  InvView;
+    mat4  InvProj;
+    vec2  ScreenSize;
+    float _pad[2];
+} pc;
+
+// Helpers
+
+vec3 ReconstructWorldPos(vec2 uv, float depth)
+{
+    vec4 ndc  = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 view = pc.InvProj * ndc;
+    view     /= view.w;
+    return (pc.InvView * view).xyz;
+}
+
+vec3 WorldToUVW(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
+{
+    return (worldPos - boundsMin) / (boundsMax - boundsMin);
+}
+
+float SampleSDF(vec3 worldPos, vec3 boundsMin, vec3 boundsMax)
+{
+    vec3 uvw = WorldToUVW(worldPos, boundsMin, boundsMax);
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
+        return uParams.MaxDistance;
+    return texture(uSDF, uvw).r;
+}
+
+mat3 BuildTBN(vec3 N)
+{
+    vec3 up = abs(N.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 T  = normalize(cross(up, N));
+    vec3 B  = cross(N, T);
+    return mat3(T, B, N);
+}
+
+vec3 CosineSampleHemisphere(vec2 xi)
+{
+    float phi      = 6.28318530718 * xi.x;
+    float sinTheta = sqrt(xi.y);
+    return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, sqrt(1.0 - xi.y));
+}
+
+vec2 Hammersley(uint i, uint N)
+{
+    uint bits = i;
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    return vec2(float(i) / float(N), float(bits) * 2.3283064365386963e-10);
+}
+
+// Main
+
+void main()
+{
+    ivec2 aoSize = ivec2(pc.ScreenSize) / 2;
+    ivec2 coord  = ivec2(gl_GlobalInvocationID.xy);
+    if (coord.x >= aoSize.x || coord.y >= aoSize.y)
+        return;
+
+    vec3 boundsMin, boundsMax;
+    sdfDecodeBounds(rawBounds, uParams.PaddingFactor, boundsMin, boundsMax);
+
+    // Voxel size: used to clamp minimum cone aperture at contact surfaces.
+    // Prevents d/t from collapsing to 0 when geometry is thinner than one voxel.
+    vec3 volumeSize = boundsMax - boundsMin;
+    float voxelSize = max(volumeSize.x, max(volumeSize.y, volumeSize.z))
+                      / uParams.VolumeResolution.x;
+
+    // half-res > full-res UV
+    vec2  uv    = (vec2(coord) + 0.5) / vec2(aoSize);
+    float depth = texture(uDepth, uv).r;
+
+    if (depth >= 1.0)
+    {
+        imageStore(uAO, coord, vec4(1.0));
+        return;
+    }
+
+    vec3 worldPos    = ReconstructWorldPos(uv, depth);
+    vec3 worldNormal = normalize(texture(uNormal, uv).xyz);
+
+    mat3 tbn = BuildTBN(worldNormal);
+
+    float occlusion = 0.0;
+    int   N         = clamp(uParams.NumSamples, 1, 16);
+
+    for (int i = 0; i < N; ++i)
+    {
+        vec2 xi     = Hammersley(uint(i), uint(N));
+        vec3 rayDir = tbn * CosineSampleHemisphere(xi);
+
+        float t        = voxelSize * 2.0; // self-intersection bias scaled to voxel size
+        float minRatio = 1.0;
+
+        for (int s = 0; s < 32; ++s)
+        {
+            if (t >= uParams.MaxDistance) break;
+
+            float d = SampleSDF(worldPos + rayDir * t, boundsMin, boundsMax);
+
+            // Clamp d to voxel size before computing cone ratio.
+            // At contact surfaces d approaches 0, but geometry thinner than
+            // one voxel cannot physically block more than one voxel's cone aperture.
+            // This prevents over-darkening at seams and contact edges.
+            float dResolved = max(d, voxelSize);
+            minRatio = min(minRatio, dResolved / t);
+
+            if (d < 0.001) break;
+
+            // Minimum step = half voxel size to avoid sub-voxel oscillation
+            t += max(d * uParams.StepScale, voxelSize * 0.5);
+        }
+
+        occlusion += clamp(minRatio, 0.0, 1.0);
+    }
+
+    float ao = pow(occlusion / float(N), uParams.Intensity);
+
+    // Clamp to [MinAO, 1.0]: prevents full black at contact surfaces
+    ao = clamp(ao, uParams.MinAO, 1.0);
+
+    imageStore(uAO, coord, vec4(ao, 0.0, 0.0, 0.0));
+}

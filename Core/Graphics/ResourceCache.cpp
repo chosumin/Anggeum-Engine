@@ -284,6 +284,11 @@ namespace Core
 			vert = "shaders/depth.vert.spv";
 			frag = "shaders/shadow.frag.spv";
 			break;
+		case Utility::HashCode("DepthNormal"):
+			pass = "Depth";
+			vert = "shaders/depthNormal.vert.spv";
+			frag = "shaders/depthNormal.frag.spv";
+			break;
 		case Utility::HashCode("Skybox"):
 			pass = "Skybox";
 			vert = "shaders/skybox.vert.spv";
