@@ -15,6 +15,7 @@
 #include "Sample/RendererPasses/ShadowPass.h"
 #include "Sample/RendererPasses/SDFShadowPass.h"
 #include "Sample/RendererPasses/DFAOPass.h"
+#include "Sample/RendererPasses/CACAOPass.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -68,6 +69,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 			device, workerThreadManager, scene, extent, _msaaSamples,
 			sdfShadowPass->GetSDFGenerator());
 		AddRendererPass(dfaoPass);
+
+		auto cacaoPass = new CACAOPass(device, workerThreadManager, scene, extent, _msaaSamples);
+		AddRendererPass(cacaoPass);
 	}
 	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);

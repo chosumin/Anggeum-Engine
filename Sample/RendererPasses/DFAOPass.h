@@ -48,7 +48,7 @@ namespace Core
 
         DFAOUniform _params{};
 
-        inline static bool _enabled    = true;
+        inline static bool _enabled    = false;
         bool  _showWindow  = false;
         int   _numSamples  = 8;
         float _maxDistance = 2.0f;

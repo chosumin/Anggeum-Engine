@@ -250,6 +250,37 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     optimized ${VULKAN_LIB_DIR}/spirv-cross-reflect.lib
 )
 
+# Add FidelityFX CACAO
+include(FetchContent)
+
+FetchContent_Declare(
+    ffx_cacao
+    GIT_REPOSITORY https://github.com/GPUOpen-Effects/FidelityFX-CACAO.git
+    GIT_TAG        master
+    GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(ffx_cacao)
+
+# Find CACAO source files recursively
+file(GLOB_RECURSE CACAO_SOURCES
+    "${ffx_cacao_SOURCE_DIR}/ffx-cacao/src/*.cpp"
+)
+
+message(STATUS "CACAO sources found: ${CACAO_SOURCES}")
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${ffx_cacao_SOURCE_DIR}/ffx-cacao/inc
+    ${ffx_cacao_SOURCE_DIR}/ffx-cacao/src       # For ffx_cacao_defines.h, etc.
+    ${ffx_cacao_SOURCE_DIR}/ffx-cacao/src/VK    # For PrecompiledShadersSPIRV/*.h
+)
+
+if(CACAO_SOURCES)
+    target_sources(${PROJECT_NAME} PRIVATE ${CACAO_SOURCES})
+else()
+    message(WARNING "No CACAO source files found - check repository structure")
+endif()
+
 # Compiler-specific settings
 if(MSVC)
     # MSVC compiler options
@@ -265,6 +296,7 @@ if(MSVC)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
         _CRT_SECURE_NO_WARNINGS
+        FFX_CACAO_ENABLE_VULKAN     # Required: enables Vulkan impl in ffx_cacao_impl.cpp
     )
     
     # Runtime library settings
