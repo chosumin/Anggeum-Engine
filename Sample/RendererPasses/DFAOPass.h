@@ -54,7 +54,8 @@ namespace Core
         float _maxDistance = 2.0f;
         float _intensity   = 1.0f;
         float _stepScale   = 0.5f;
-        float _minAO       = 0.2f;  // prevents full black at contact surfaces
+        float _contactShadowStrength = 0.7f;  // Contact shadow enhancement strength
+        float _contactThreshold = 0.05f;      // Contact detection distance threshold
 
         VkDescriptorSet _aoImGuiDS = VK_NULL_HANDLE;
     };

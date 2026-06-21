@@ -79,8 +79,9 @@ struct alignas(16) DFAOUniform
 	float Intensity;
 	float StepScale;        // ray march step scale
 	float PaddingFactor;    // SDF volume padding (matches SDFGenerator)
-	float MinAO;            // minimum AO brightness (0 = fully dark allowed)
-	float _pad[2];
+	float ContactShadowStrength;
+	float ContactThreshold;
+	float _pad[1];
 };
 
 struct alignas(16) PBRBuffer

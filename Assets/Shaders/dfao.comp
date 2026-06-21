@@ -19,8 +19,9 @@ layout(set = 0, binding = 5) uniform DFAOParams
     float Intensity;
     float StepScale;
     float PaddingFactor;
-    float MinAO;
-    float _pad[2];
+    float ContactShadowStrength;  // Strength of contact shadow enhancement
+    float ContactThreshold;       // Distance threshold to consider as contact
+    float _pad[1];
 } uParams;
 
 layout(push_constant) uniform PC
@@ -92,8 +93,6 @@ void main()
     vec3 boundsMin, boundsMax;
     sdfDecodeBounds(rawBounds, uParams.PaddingFactor, boundsMin, boundsMax);
 
-    // Voxel size: used to clamp minimum cone aperture at contact surfaces.
-    // Prevents d/t from collapsing to 0 when geometry is thinner than one voxel.
     vec3 volumeSize = boundsMax - boundsMin;
     float voxelSize = max(volumeSize.x, max(volumeSize.y, volumeSize.z))
                       / uParams.VolumeResolution.x;
@@ -114,15 +113,21 @@ void main()
     mat3 tbn = BuildTBN(worldNormal);
 
     float occlusion = 0.0;
-    int   N         = clamp(uParams.NumSamples, 1, 16);
+    float contactOcclusion = 0.0;  // Dedicated occlusion for contact surfaces
+    int   N = clamp(uParams.NumSamples, 1, 16);
+    
+    // Use user-defined threshold directly, with voxelSize as minimum to prevent sub-voxel issues
+    float contactThreshold = max(uParams.ContactThreshold, voxelSize * 0.5);
+    float contactRange = contactThreshold * 3.0;  // Detection range for contact shadows
 
     for (int i = 0; i < N; ++i)
     {
         vec2 xi     = Hammersley(uint(i), uint(N));
         vec3 rayDir = tbn * CosineSampleHemisphere(xi);
 
-        float t        = voxelSize * 2.0; // self-intersection bias scaled to voxel size
+        float t        = voxelSize * 0.5; // Reduced start distance to detect close contacts
         float minRatio = 1.0;
+        float minContactDist = contactRange;  // Track minimum distance in contact range
 
         for (int s = 0; s < 32; ++s)
         {
@@ -130,26 +135,54 @@ void main()
 
             float d = SampleSDF(worldPos + rayDir * t, boundsMin, boundsMax);
 
-            // Clamp d to voxel size before computing cone ratio.
-            // At contact surfaces d approaches 0, but geometry thinner than
-            // one voxel cannot physically block more than one voxel's cone aperture.
-            // This prevents over-darkening at seams and contact edges.
+            // Track minimum distance within contact range for better contact detection
+            if (t < contactRange)
+            {
+                minContactDist = min(minContactDist, d);
+            }
+
+            // Standard cone tracing calculation with voxel clamping
             float dResolved = max(d, voxelSize);
-            minRatio = min(minRatio, dResolved / t);
+            float ratio = dResolved / max(t, 0.001);
+            minRatio = min(minRatio, ratio);
 
             if (d < 0.001) break;
 
-            // Minimum step = half voxel size to avoid sub-voxel oscillation
-            t += max(d * uParams.StepScale, voxelSize * 0.5);
+            // Adaptive step size: smaller steps near contact surfaces
+            float stepSize = d * uParams.StepScale;
+            if (t < contactRange)
+            {
+                stepSize = max(stepSize, voxelSize * 0.25);  // Finer steps near contacts
+            }
+            else
+            {
+                stepSize = max(stepSize, voxelSize * 0.5);
+            }
+            
+            t += stepSize;
+        }
+
+        // Apply contact shadow based on minimum distance found in contact range
+        if (minContactDist < contactThreshold)
+        {
+            float contactFactor = 1.0 - (minContactDist / contactThreshold);
+            contactFactor = pow(contactFactor, 2.0);  // Sharper falloff
+            contactOcclusion += contactFactor * uParams.ContactShadowStrength;
         }
 
         occlusion += clamp(minRatio, 0.0, 1.0);
     }
 
-    float ao = pow(occlusion / float(N), uParams.Intensity);
-
-    // Clamp to [MinAO, 1.0]: prevents full black at contact surfaces
-    ao = clamp(ao, uParams.MinAO, 1.0);
+    // Combine general occlusion with contact surface occlusion
+    float ao = occlusion / float(N);
+    float contactAO = clamp(contactOcclusion / float(N), 0.0, 1.0);
+    
+    // Apply contact occlusion multiplicatively to darken contact areas
+    ao = ao * (1.0 - contactAO);
+    
+    // Apply final intensity
+    ao = pow(ao, uParams.Intensity);
+    ao = clamp(ao, 0.0, 1.0);
 
     imageStore(uAO, coord, vec4(ao, 0.0, 0.0, 0.0));
 }

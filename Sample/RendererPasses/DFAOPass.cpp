@@ -101,12 +101,13 @@ void DFAOPass::UpdateParams()
         static_cast<float>(SDF_VOLUME_DIM),
         static_cast<float>(SDF_VOLUME_DIM),
         0.0f);
-    _params.NumSamples    = _numSamples;
-    _params.MaxDistance   = _maxDistance;
-    _params.Intensity     = _intensity;
-    _params.StepScale     = _stepScale;
+    _params.NumSamples = _numSamples;
+    _params.MaxDistance = _maxDistance;
+    _params.Intensity = _intensity;
+    _params.StepScale = _stepScale;
+    _params.ContactShadowStrength = _contactShadowStrength;
+    _params.ContactThreshold = _contactThreshold;
     _params.PaddingFactor = 0.1f;
-    _params.MinAO         = _minAO;
 }
 
 void DFAOPass::UpdateGUI()
@@ -141,7 +142,8 @@ void DFAOPass::UpdateGUI()
             ImGui::SliderFloat("Max Distance", &_maxDistance, 0.1f, 10.0f);
             ImGui::SliderFloat("Intensity",    &_intensity,   0.0f, 2.0f);
             ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
-            ImGui::SliderFloat("Min AO",       &_minAO,       0.0f, 1.0f);
+            ImGui::SliderFloat("Contact Strength", &_contactShadowStrength, 0.0f, 2.0f, "%.2f");
+            ImGui::SliderFloat("Contact Threshold", &_contactThreshold, 0.01f, 0.5f, "%.3f");
         }
 
         if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
