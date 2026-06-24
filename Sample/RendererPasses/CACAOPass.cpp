@@ -6,6 +6,10 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Components/PerspectiveCamera.h"
 #include "DFAOPass.h"
+
+// Include CACAO implementation header for Vulkan functions
+#include "ffx_cacao_impl.h"
+
 using namespace Core;
 
 CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
@@ -15,11 +19,18 @@ CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     , _scene(scene)
     , _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
+    , m_cacaoContext(nullptr)
 {
-    // Allocate opaque context on heap using the size reported by the library
+    // Allocate CACAO context
     size_t contextSize = FFX_CACAO_VkGetContextSize();
-    m_cacaoContext = reinterpret_cast<FFX_CACAO_VkContext*>(malloc(contextSize));
+    m_cacaoContext = static_cast<FFX_CACAO_VkContext*>(malloc(contextSize));
+    
+    if (!m_cacaoContext)
+    {
+        throw std::runtime_error("Failed to allocate CACAO context");
+    }
 
+    // Initialize CACAO context
     FFX_CACAO_VkCreateInfo createInfo = {};
     createInfo.physicalDevice = device.GetPhysicalDevice();
     createInfo.device = device.GetDevice();
@@ -30,9 +41,10 @@ CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     {
         free(m_cacaoContext);
         m_cacaoContext = nullptr;
-        throw std::runtime_error("Failed to initialize FFX CACAO Vulkan context");
+        throw std::runtime_error("Failed to initialize CACAO context");
     }
 
+    // Setup normal resolve pipeline if MSAA is enabled
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
         _normalResolveShader = _device.GetResourceCache().RequestShader("Shaders/normalResolve.comp.spv");
@@ -106,25 +118,30 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         normalForSampling = _resolvedNormalTexture;
     }
 
-    // Get image views from textures
-    VkImageView depthView = depthForSampling->GetImageView();
-    VkImageView normalView = normalForSampling->GetImageView();
-    VkImageView outputView = _aoTexture->GetImageView();
+    auto& aoImage = *_aoTexture->GetImage().lock();
+    commandBuffer.TransitionImageLayout(aoImage,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    // Bind screen-size-dependent resources
-    FFX_CACAO_VkScreenSizeInfo sizeInfo = {};
-    sizeInfo.width = _screenExtent.width;
-    sizeInfo.height = _screenExtent.height;
-    sizeInfo.depthView = depthForSampling->GetImageView();
-    sizeInfo.normalsView = normalForSampling->GetImageView();
-    sizeInfo.output = _aoTexture->GetImage().lock().get()->GetImage();
-    sizeInfo.outputView = _aoTexture->GetImageView();
-    sizeInfo.useDownsampledSsao = FFX_CACAO_FALSE;
+    // If size changed and we had previous resources, destroy them first
+    if (_screenSizeInitialized == false)
+    {
+        _screenSizeInitialized = true;
 
-    FFX_CACAO_VkInitScreenSizeDependentResources(m_cacaoContext, &sizeInfo);
+        // Bind screen-size-dependent resources
+        FFX_CACAO_VkScreenSizeInfo sizeInfo = {};
+        sizeInfo.width = _screenExtent.width;
+        sizeInfo.height = _screenExtent.height;
+        sizeInfo.depthView = depthForSampling->GetImageView();
+        sizeInfo.normalsView = normalForSampling->GetImageView();
+        sizeInfo.output = aoImage.GetImage();
+        sizeInfo.outputView = _aoTexture->GetImageView();
+        sizeInfo.useDownsampledSsao = FFX_CACAO_FALSE;
+
+        FFX_CACAO_VkInitScreenSizeDependentResources(m_cacaoContext, &sizeInfo);
+    }
 
     // Apply current settings
-    FFX_CACAO_Settings cacaoSettings = FFX_CACAO_DEFAULT_SETTINGS;
+    FFX_CACAO_Settings cacaoSettings = {};
     cacaoSettings.radius = m_settings.Radius;
     cacaoSettings.shadowMultiplier = m_settings.ShadowMultiplier;
     cacaoSettings.shadowPower = m_settings.ShadowPower;
@@ -230,7 +247,7 @@ void CACAOPass::UpdateGUI()
     if (!_showWindow)
         return;
 
-    if (ImGui::Begin("CACAO Settings", &_showWindow))
+    if (!ImGui::Begin("CACAO Settings", &_showWindow))
     {
 		ImGui::End();
         return;

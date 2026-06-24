@@ -1,7 +1,13 @@
 #pragma once
 #include "Core/Graphics/RendererPass.h"
 #include "Core/Graphics/BufferObjects.h"
-#include <ffx_cacao_impl.h>
+
+// Include FidelityFX CACAO headers
+#define FFX_CACAO_ENABLE_VULKAN 1
+#include "ffx_cacao.h"
+
+// Forward declare Vulkan CACAO context
+struct FFX_CACAO_VkContext;
 
 namespace Core
 {
@@ -36,7 +42,7 @@ namespace Core
             float    FadeOutTo                        = 300.0f;
             int      QualityLevel                     = 2;    // FFX_CACAO_QUALITY_HIGH
             float    AdaptiveQualityLimit             = 0.45f;
-            int BlurPassCount                    = 2;
+            int      BlurPassCount                    = 2;
             float    Sharpness                        = 0.98f;
             float    DetailShadowStrength             = 0.5f;
             bool     GenerateNormals                  = false;
@@ -55,10 +61,12 @@ namespace Core
         shared_ptr<Shader>   _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
-        // Opaque context - must be heap-allocated via FFX_CACAO_VkGetContextSize()
-        FFX_CACAO_VkContext* m_cacaoContext = nullptr;
+        // FidelityFX CACAO context
+        FFX_CACAO_VkContext* m_cacaoContext;
 
         Settings m_settings;
+
+		bool _screenSizeInitialized = false;
 
         inline static bool _enabled = true;
         bool _showWindow = false;
