@@ -7,7 +7,6 @@
 #include "Components/PerspectiveCamera.h"
 #include "DFAOPass.h"
 
-// Include CACAO implementation header for Vulkan functions
 #include "ffx_cacao_impl.h"
 
 using namespace Core;
@@ -18,31 +17,10 @@ CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     : RendererPass(device, workerThreadManager)
     , _scene(scene)
     , _screenExtent(screenExtent)
-	, _msaaSamples(msaaSamples)
-    , m_cacaoContext(nullptr)
+    , _msaaSamples(msaaSamples)
 {
-    // Allocate CACAO context
-    size_t contextSize = FFX_CACAO_VkGetContextSize();
-    m_cacaoContext = static_cast<FFX_CACAO_VkContext*>(malloc(contextSize));
-    
-    if (!m_cacaoContext)
-    {
-        throw std::runtime_error("Failed to allocate CACAO context");
-    }
-
-    // Initialize CACAO context
-    FFX_CACAO_VkCreateInfo createInfo = {};
-    createInfo.physicalDevice = device.GetPhysicalDevice();
-    createInfo.device = device.GetDevice();
-    createInfo.flags = 0;
-
-    FFX_CACAO_Status status = FFX_CACAO_VkInitContext(m_cacaoContext, &createInfo);
-    if (status != FFX_CACAO_STATUS_OK)
-    {
-        free(m_cacaoContext);
-        m_cacaoContext = nullptr;
-        throw std::runtime_error("Failed to initialize CACAO context");
-    }
+    // CACAO contexts are created lazily in GetOrCreateCacaoContext(),
+    // one per swap chain image slot, so we don't allocate anything here.
 
     // Setup normal resolve pipeline if MSAA is enabled
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
@@ -54,13 +32,17 @@ CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
 
 CACAOPass::~CACAOPass()
 {
-    if (m_cacaoContext)
+    // Destroy every per-frame CACAO context
+    for (auto& [index, ctx] : m_cacaoContexts)
     {
-        FFX_CACAO_VkDestroyScreenSizeDependentResources(m_cacaoContext);
-        FFX_CACAO_VkDestroyContext(m_cacaoContext);
-        free(m_cacaoContext);
-        m_cacaoContext = nullptr;
+        if (ctx)
+        {
+            FFX_CACAO_VkDestroyScreenSizeDependentResources(ctx);
+            FFX_CACAO_VkDestroyContext(ctx);
+            free(ctx);
+        }
     }
+    m_cacaoContexts.clear();
 
     if (_aoImGuiDS != VK_NULL_HANDLE)
         ImGui_ImplVulkan_RemoveTexture(_aoImGuiDS);
@@ -68,7 +50,51 @@ CACAOPass::~CACAOPass()
 
 void CACAOPass::Prepare()
 {
-    
+}
+
+FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
+    uint32_t imageIndex,
+    VkImageView depthView,
+    VkImageView normalsView,
+    VkImage outputImage,
+    VkImageView outputView)
+{
+    auto it = m_cacaoContexts.find(imageIndex);
+    if (it != m_cacaoContexts.end())
+        return it->second;
+
+    // Allocate a fresh context for this image slot
+    size_t contextSize = FFX_CACAO_VkGetContextSize();
+    FFX_CACAO_VkContext* ctx = static_cast<FFX_CACAO_VkContext*>(malloc(contextSize));
+    if (!ctx)
+        throw std::runtime_error("Failed to allocate CACAO context");
+
+    FFX_CACAO_VkCreateInfo createInfo = {};
+    createInfo.physicalDevice = _device.GetPhysicalDevice();
+    createInfo.device         = _device.GetDevice();
+    createInfo.flags          = 0;
+
+    FFX_CACAO_Status status = FFX_CACAO_VkInitContext(ctx, &createInfo);
+    if (status != FFX_CACAO_STATUS_OK)
+    {
+        free(ctx);
+        throw std::runtime_error("Failed to initialize CACAO context");
+    }
+
+    // Bind screen-size-dependent resources (output texture for this frame slot)
+    FFX_CACAO_VkScreenSizeInfo sizeInfo = {};
+    sizeInfo.width              = _screenExtent.width;
+    sizeInfo.height             = _screenExtent.height;
+    sizeInfo.depthView          = depthView;
+    sizeInfo.normalsView        = normalsView;
+    sizeInfo.output             = outputImage;
+    sizeInfo.outputView         = outputView;
+    sizeInfo.useDownsampledSsao = FFX_CACAO_FALSE;
+
+    FFX_CACAO_VkInitScreenSizeDependentResources(ctx, &sizeInfo);
+
+    m_cacaoContexts[imageIndex] = ctx;
+    return ctx;
 }
 
 void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
@@ -82,8 +108,7 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     CommandBuffer& commandBuffer = renderFrame.GetCommandBuffer();
 
-    // Get depth and normal render targets from previous passes
-    // Reuse the resolved depth buffer from SDFShadowPass
+    // Resolve depth input
     shared_ptr<Texture> depthForSampling;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
@@ -103,14 +128,10 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     }
 
     auto normalTexture = renderFrame.GetRenderTarget("MainNormal");
-
-    if (!depthForSampling || !normalTexture)
-    {
-        // Required inputs not available
+    if (!normalTexture)
         return;
-    }
 
-    // Normal resolve
+    // Resolve MSAA normals if needed
     shared_ptr<Texture> normalForSampling = normalTexture;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
@@ -119,77 +140,63 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     }
 
     auto& aoImage = *_aoTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    // If size changed and we had previous resources, destroy them first
-    if (_screenSizeInitialized == false)
-    {
-        _screenSizeInitialized = true;
-
-        // Bind screen-size-dependent resources
-        FFX_CACAO_VkScreenSizeInfo sizeInfo = {};
-        sizeInfo.width = _screenExtent.width;
-        sizeInfo.height = _screenExtent.height;
-        sizeInfo.depthView = depthForSampling->GetImageView();
-        sizeInfo.normalsView = normalForSampling->GetImageView();
-        sizeInfo.output = aoImage.GetImage();
-        sizeInfo.outputView = _aoTexture->GetImageView();
-        sizeInfo.useDownsampledSsao = FFX_CACAO_FALSE;
-
-        FFX_CACAO_VkInitScreenSizeDependentResources(m_cacaoContext, &sizeInfo);
-    }
+    FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
+        imageIndex,
+        depthForSampling->GetImageView(),
+        normalForSampling->GetImageView(),
+        aoImage.GetImage(),
+        _aoTexture->GetImageView());
 
     // Apply current settings
     FFX_CACAO_Settings cacaoSettings = {};
-    cacaoSettings.radius = m_settings.Radius;
-    cacaoSettings.shadowMultiplier = m_settings.ShadowMultiplier;
-    cacaoSettings.shadowPower = m_settings.ShadowPower;
-    cacaoSettings.shadowClamp = m_settings.ShadowClamp;
-    cacaoSettings.horizonAngleThreshold = m_settings.HorizonAngleThreshold;
-    cacaoSettings.fadeOutFrom = m_settings.FadeOutFrom;
-    cacaoSettings.fadeOutTo = m_settings.FadeOutTo;
-    cacaoSettings.qualityLevel = static_cast<FFX_CACAO_Quality>(m_settings.QualityLevel);
-    cacaoSettings.adaptiveQualityLimit = m_settings.AdaptiveQualityLimit;
-    cacaoSettings.blurPassCount = m_settings.BlurPassCount;
-    cacaoSettings.sharpness = m_settings.Sharpness;
-    cacaoSettings.detailShadowStrength = m_settings.DetailShadowStrength;
-    cacaoSettings.generateNormals = m_settings.GenerateNormals ? FFX_CACAO_TRUE : FFX_CACAO_FALSE;
-    cacaoSettings.bilateralSigmaSquared = m_settings.BilateralSigmaSquared;
+    cacaoSettings.radius                           = m_settings.Radius;
+    cacaoSettings.shadowMultiplier                 = m_settings.ShadowMultiplier;
+    cacaoSettings.shadowPower                      = m_settings.ShadowPower;
+    cacaoSettings.shadowClamp                      = m_settings.ShadowClamp;
+    cacaoSettings.horizonAngleThreshold            = m_settings.HorizonAngleThreshold;
+    cacaoSettings.fadeOutFrom                      = m_settings.FadeOutFrom;
+    cacaoSettings.fadeOutTo                        = m_settings.FadeOutTo;
+    cacaoSettings.qualityLevel                     = static_cast<FFX_CACAO_Quality>(m_settings.QualityLevel);
+    cacaoSettings.adaptiveQualityLimit             = m_settings.AdaptiveQualityLimit;
+    cacaoSettings.blurPassCount                    = m_settings.BlurPassCount;
+    cacaoSettings.sharpness                        = m_settings.Sharpness;
+    cacaoSettings.detailShadowStrength             = m_settings.DetailShadowStrength;
+    cacaoSettings.generateNormals                  = m_settings.GenerateNormals ? FFX_CACAO_TRUE : FFX_CACAO_FALSE;
+    cacaoSettings.bilateralSigmaSquared            = m_settings.BilateralSigmaSquared;
     cacaoSettings.bilateralSimilarityDistanceSigma = m_settings.BilateralSimilarityDistanceSigma;
 
-    FFX_CACAO_VkUpdateSettings(m_cacaoContext, &cacaoSettings);
+    FFX_CACAO_VkUpdateSettings(ctx, &cacaoSettings);
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     const mat4& projMatrix = camera->Matrices.Projection;
-    mat4 normalToViewMatrix = mat4(1.0f); // Identity for world-space normals
+    const mat4& normalToViewMatrix = camera->Matrices.View;
 
     FFX_CACAO_Matrix4x4 proj, normalsToView;
     memcpy(proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
     memcpy(normalsToView.elements, glm::value_ptr(normalToViewMatrix), sizeof(float) * 16);
-
-    // Dispatch CACAO - internally manages all compute shaders and resources
-    FFX_CACAO_VkDraw(m_cacaoContext, commandBuffer.GetHandle(), &proj, &normalsToView);
+    
+    FFX_CACAO_VkDraw(ctx, commandBuffer.GetHandle(), &proj, &normalsToView);
 }
 
 void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
     RenderTargetDesc aoDesc{};
-    aoDesc.extent = { _screenExtent.width / 2, _screenExtent.height / 2 };
-    aoDesc.format = VK_FORMAT_R8_UNORM;
-    aoDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    aoDesc.extent  = { _screenExtent.width, _screenExtent.height };
+    aoDesc.format  = VK_FORMAT_R8_UNORM;
+    aoDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-    aoDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
     _aoTexture = renderFrame.GetOrCreateRenderTarget(DFAOPass::RT_DFAO, aoDesc);
 
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
         RenderTargetDesc normalDesc{};
-        normalDesc.extent = _screenExtent;
-        normalDesc.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        normalDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        normalDesc.extent  = _screenExtent;
+        normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
+        normalDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         normalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-        normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+        normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
         _resolvedNormalTexture = renderFrame.GetOrCreateRenderTarget(DFAOPass::RT_NORMAL_RESOLVED, normalDesc);
     }
 }

@@ -2,11 +2,9 @@
 #include "Core/Graphics/RendererPass.h"
 #include "Core/Graphics/BufferObjects.h"
 
-// Include FidelityFX CACAO headers
 #define FFX_CACAO_ENABLE_VULKAN 1
 #include "ffx_cacao.h"
 
-// Forward declare Vulkan CACAO context
 struct FFX_CACAO_VkContext;
 
 namespace Core
@@ -30,6 +28,15 @@ namespace Core
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
         void UpdateGUI();
+
+        // Create and initialize a CACAO context for the given imageIndex.
+        // Called lazily on the first Draw for each swap chain image slot.
+        FFX_CACAO_VkContext* GetOrCreateCacaoContext(
+            uint32_t imageIndex,
+            VkImageView depthView,
+            VkImageView normalsView,
+            VkImage outputImage,
+            VkImageView outputView);
 
         struct Settings
         {
@@ -61,12 +68,11 @@ namespace Core
         shared_ptr<Shader>   _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
-        // FidelityFX CACAO context
-        FFX_CACAO_VkContext* m_cacaoContext;
+        // One CACAO context per swap chain image slot (lazy created on first Draw).
+        // Key: imageIndex, Value: allocated CACAO context
+        unordered_map<uint32_t, FFX_CACAO_VkContext*> m_cacaoContexts;
 
         Settings m_settings;
-
-		bool _screenSizeInitialized = false;
 
         inline static bool _enabled = true;
         bool _showWindow = false;
