@@ -53,17 +53,17 @@ void CACAOPass::Prepare()
 }
 
 FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
-    uint32_t imageIndex,
+    RenderFrame* frameKey,
     VkImageView depthView,
     VkImageView normalsView,
     VkImage outputImage,
     VkImageView outputView)
 {
-    auto it = m_cacaoContexts.find(imageIndex);
+    auto it = m_cacaoContexts.find(frameKey);
     if (it != m_cacaoContexts.end())
         return it->second;
 
-    // Allocate a fresh context for this image slot
+    // Allocate a fresh context for this frame-in-flight slot
     size_t contextSize = FFX_CACAO_VkGetContextSize();
     FFX_CACAO_VkContext* ctx = static_cast<FFX_CACAO_VkContext*>(malloc(contextSize));
     if (!ctx)
@@ -81,7 +81,7 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
         throw std::runtime_error("Failed to initialize CACAO context");
     }
 
-    // Bind screen-size-dependent resources (output texture for this frame slot)
+    // Bind screen-size-dependent resources for this frame slot's render targets
     FFX_CACAO_VkScreenSizeInfo sizeInfo = {};
     sizeInfo.width              = _screenExtent.width;
     sizeInfo.height             = _screenExtent.height;
@@ -93,7 +93,7 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
     FFX_CACAO_VkInitScreenSizeDependentResources(ctx, &sizeInfo);
 
-    m_cacaoContexts[imageIndex] = ctx;
+    m_cacaoContexts[frameKey] = ctx;
     return ctx;
 }
 
@@ -142,7 +142,7 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto& aoImage = *_aoTexture->GetImage().lock();
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
-        imageIndex,
+        &renderFrame,
         depthForSampling->GetImageView(),
         normalForSampling->GetImageView(),
         aoImage.GetImage(),
@@ -170,12 +170,12 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     const mat4& projMatrix = camera->Matrices.Projection;
-    const mat4& normalToViewMatrix = camera->Matrices.View;
+    const mat4& viewMatrix = camera->Matrices.View;
 
     FFX_CACAO_Matrix4x4 proj, normalsToView;
     memcpy(proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
-    memcpy(normalsToView.elements, glm::value_ptr(normalToViewMatrix), sizeof(float) * 16);
-    
+    memcpy(normalsToView.elements, glm::value_ptr(viewMatrix), sizeof(float) * 16);
+
     FFX_CACAO_VkDraw(ctx, commandBuffer.GetHandle(), &proj, &normalsToView);
 }
 

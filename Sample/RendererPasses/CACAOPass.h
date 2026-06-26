@@ -29,10 +29,11 @@ namespace Core
             shared_ptr<Texture> msaaNormal);
         void UpdateGUI();
 
-        // Create and initialize a CACAO context for the given imageIndex.
-        // Called lazily on the first Draw for each swap chain image slot.
+        // Create and initialize a CACAO context for the given RenderFrame.
+        // Each RenderFrame corresponds to one frame-in-flight slot, so this
+        // ensures the context is bound to the correct per-frame render targets.
         FFX_CACAO_VkContext* GetOrCreateCacaoContext(
-            uint32_t imageIndex,
+            RenderFrame* frameKey,
             VkImageView depthView,
             VkImageView normalsView,
             VkImage outputImage,
@@ -68,9 +69,9 @@ namespace Core
         shared_ptr<Shader>   _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
-        // One CACAO context per swap chain image slot (lazy created on first Draw).
-        // Key: imageIndex, Value: allocated CACAO context
-        unordered_map<uint32_t, FFX_CACAO_VkContext*> m_cacaoContexts;
+        // One CACAO context per RenderFrame (i.e., per frame-in-flight slot).
+        // Key: RenderFrame pointer (unique per slot, stable lifetime managed by RenderContext).
+        unordered_map<RenderFrame*, FFX_CACAO_VkContext*> m_cacaoContexts;
 
         Settings m_settings;
 
