@@ -169,12 +169,24 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     FFX_CACAO_VkUpdateSettings(ctx, &cacaoSettings);
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
-    const mat4& projMatrix = camera->Matrices.Projection;
+    
+    mat4 projMatrix = camera->Matrices.Projection;
+    projMatrix[1][1] = -projMatrix[1][1];
+
+    // CACAO expects a world-space normal -> view-space normal matrix.
+    // The reference sample feeds: zFlip * inverse(view), where zFlip negates
+    // the Z axis to convert from the engine's right-handed view space into the
+    // left-handed view space CACAO operates in. Because GLM is column-major and
+    // the FFX matrix is consumed row-major, copying inverse(view) * zFlip here
+    // produces exactly the same data the DX/VK sample passes to CACAO.
     const mat4& viewMatrix = camera->Matrices.View;
+    mat4 zFlip = mat4(1.0f);
+    zFlip[2][2] = -1.0f;
+    mat4 normalsWorldToView = glm::inverse(viewMatrix) * zFlip;
 
     FFX_CACAO_Matrix4x4 proj, normalsToView;
     memcpy(proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
-    memcpy(normalsToView.elements, glm::value_ptr(viewMatrix), sizeof(float) * 16);
+    memcpy(normalsToView.elements, glm::value_ptr(normalsWorldToView), sizeof(float) * 16);
 
     FFX_CACAO_VkDraw(ctx, commandBuffer.GetHandle(), &proj, &normalsToView);
 }
@@ -193,7 +205,7 @@ void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     {
         RenderTargetDesc normalDesc{};
         normalDesc.extent  = _screenExtent;
-        normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
+        normalDesc.format  = VK_FORMAT_R8G8B8A8_UNORM;
         normalDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         normalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
         normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;

@@ -23,7 +23,7 @@ void main()
     mat4 world = transformBuffer.transforms[id];
 
     mat3 normalMatrix = transpose(inverse(mat3(world)));
-    outWorldNormal    = normalize(normalMatrix * inNormal);
+    outWorldNormal = normalMatrix * inNormal;
 
     gl_Position = camera.proj * camera.view * world * vec4(inPosition, 1.0);
 }

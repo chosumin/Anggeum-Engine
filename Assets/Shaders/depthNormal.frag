@@ -6,5 +6,8 @@ layout(location = 0) out vec4 outNormal;
 
 void main()
 {
-    outNormal = vec4(normalize(inWorldNormal), 0.0);
+    vec3 N = normalize(inWorldNormal);
+    vec3 packedNormal = N * 0.5 + 0.5;
+
+    outNormal = vec4(packedNormal, 1.0);
 }
