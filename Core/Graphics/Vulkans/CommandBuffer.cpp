@@ -35,9 +35,6 @@ void Core::CommandBuffer::ResetCommandBuffer()
     _frame = Core::FrameCounter::GetFrameNumber();
 
     vkResetCommandBuffer(_commandBuffer, 0);
-
-	// Reset bindless binding state
-	_bindlessDescriptorSetBound = false;
 }
 
 void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, const RenderPass* renderPass, const Framebuffer* framebuffer, uint32_t subpassIndex, uint32_t imageIndex)
@@ -132,13 +129,6 @@ void Core::CommandBuffer::BindDescriptorSets(
     auto& shader = material.GetShader();
     auto pipelineLayout = shader.GetPipelineLayout();
 
-    // HACK: Move to RenderCotext::Begin?
-	if (shader.UsesBindlessTextures())
-		BindBindlessDescriptorSet(
-			renderFrame,
-			pipelineBindPoint,
-			pipelineLayout);
-
     auto& resources = renderFrame.GetOrCreateMaterialResources(material.GetName());
 
     // Update only if not already updated this frame
@@ -166,13 +156,6 @@ void Core::CommandBuffer::BindDescriptorSets(
     RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader)
 {
     auto pipelineLayout = shader.GetPipelineLayout();
-
-    // HACK: Move to RenderCotext::Begin?
-	if (shader.UsesBindlessTextures())
-		BindBindlessDescriptorSet(
-			renderFrame,
-			pipelineBindPoint,
-			pipelineLayout);
 
     auto& resources = renderFrame.GetOrCreateShaderResources(shader.GetHash());
 
@@ -544,21 +527,18 @@ void Core::CommandBuffer::BindBindlessDescriptorSet(
 	VkPipelineBindPoint pipelineBindPoint,
 	VkPipelineLayout pipelineLayout)
 {
-	if (_bindlessDescriptorSetBound || !renderFrame.HasBindlessSupport())
-		return;
+    if (!renderFrame.HasBindlessSupport())
+        return;
 
-	auto* bindlessManager = renderFrame.GetBindlessTextureManager();
-	VkDescriptorSet bindlessSet = bindlessManager->GetDescriptorSet();
-	
-	// Bind only Set 2 (bindless)
-	vkCmdBindDescriptorSets(
-		_commandBuffer, pipelineBindPoint,
-		pipelineLayout, 
-		static_cast<uint32_t>(DescriptorSetType::Bindless), // Set index 2
-		1, &bindlessSet,
-		0, nullptr);
+    auto* bindlessManager = renderFrame.GetBindlessTextureManager();
+    VkDescriptorSet bindlessSet = bindlessManager->GetDescriptorSet();
 
-	_bindlessDescriptorSetBound = true;
+    vkCmdBindDescriptorSets(
+        _commandBuffer, pipelineBindPoint,
+        pipelineLayout,
+        static_cast<uint32_t>(DescriptorSetType::Bindless), // Set index 2
+        1, &bindlessSet,
+        0, nullptr);
 }
 
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
@@ -698,9 +678,6 @@ void Core::CommandBuffer::BindDescriptorSet(
 		return;
 
 	auto pipelineLayout = shader.GetPipelineLayout();
-
-	if (shader.UsesBindlessTextures())
-		BindBindlessDescriptorSet(renderFrame, pipelineBindPoint, pipelineLayout);
 
 	vkCmdBindDescriptorSets(
 		_commandBuffer, pipelineBindPoint,

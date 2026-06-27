@@ -46,7 +46,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
         *_renderPass, *_pipelineState, meshes);
 
     if (_device.IsGpuDrivenRenderingEnabled())
-        _rendererBatches->PrepareGPUDrivenRendering(_device, false, swapChainExtent);
+        _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtent);
 }
 
 Core::DepthPrePass::~DepthPrePass()

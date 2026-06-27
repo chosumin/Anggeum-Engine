@@ -98,8 +98,7 @@ namespace Core
 		void PrepareCullingResources(Core::Device& device);
 		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
-		// 2-Pass Occlusion Culling
-		void DrawIndirect(
+		void DrawIndirectInternal(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
 			Core::Buffer& indirectCommandBuffer,

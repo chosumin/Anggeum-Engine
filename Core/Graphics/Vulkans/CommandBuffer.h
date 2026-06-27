@@ -48,6 +48,11 @@ namespace Core
 			Shader& shader,
 			uint32_t setIndex,
 			DescriptorSetResources& resources);
+		void BindBindlessDescriptorSet(
+			RenderFrame& renderFrame,
+			VkPipelineBindPoint pipelineBindPoint,
+			VkPipelineLayout pipelineLayout);
+
 		void PushConstants(Material& material, uint32_t index = 0);
 		void PushConstants(Shader& shader, uint index, const void* data);
 
@@ -102,11 +107,6 @@ namespace Core
 			vkCmdSetDepthBias(_commandBuffer, constantFactor, clamp, slopeFactor);
 		}
 	private:
-		void BindBindlessDescriptorSet(
-			RenderFrame& renderFrame,
-			VkPipelineBindPoint pipelineBindPoint,
-			VkPipelineLayout pipelineLayout);
-
 		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 	private:
 		Device& _device;
@@ -115,7 +115,5 @@ namespace Core
 
 		//hack : have to be managed in resource system or something
 		uint64_t _frame;
-
-		bool _bindlessDescriptorSetBound = false;
 	};
 }

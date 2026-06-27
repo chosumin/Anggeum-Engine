@@ -309,7 +309,7 @@ void Core::RendererBatches::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffe
 	commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
 	auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
 	commandBuffer.BeginRenderPass(pass1BeginInfo);
-	DrawIndirect(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
+	DrawIndirectInternal(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
 	commandBuffer.EndRenderPass();
 	commandBuffer.EndDebugMarker();
 
@@ -321,7 +321,7 @@ void Core::RendererBatches::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffe
 	commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects");
 	auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
 	commandBuffer.BeginRenderPass(pass2BeginInfo);
-	DrawIndirect(renderFrame, commandBuffer, *_pass2IndirectCommandBuffer, perShader, perDraw);
+	DrawIndirectInternal(renderFrame, commandBuffer, *_pass2IndirectCommandBuffer, perShader, perDraw);
 
 	if (postDraw)
 	{
@@ -430,7 +430,7 @@ void Core::RendererBatches::DrawIndirect(
 	function<void(shared_ptr<Shader>)> perShader,
 	function<void(shared_ptr<Material>)> perDraw)
 {
-	DrawIndirect(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
+	DrawIndirectInternal(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
 }
 
 void Core::RendererBatches::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& commandBuffer, DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
@@ -606,7 +606,7 @@ void Core::RendererBatches::ExtractFrustumPlanes(const glm::mat4& viewProj, glm:
 	}
 }
 
-void Core::RendererBatches::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Core::Buffer& indirectCommandBuffer, function<void(shared_ptr<Shader>)> perShader, function<void(shared_ptr<Material>)> perDraw)
+void Core::RendererBatches::DrawIndirectInternal(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Core::Buffer& indirectCommandBuffer, function<void(shared_ptr<Shader>)> perShader, function<void(shared_ptr<Material>)> perDraw)
 {
 	if (_indirectDrawBuffer.GetDrawCount() == 0)
 		return;
@@ -632,6 +632,14 @@ void Core::RendererBatches::DrawIndirect(RenderFrame& renderFrame, CommandBuffer
 		{
 			renderFrame.SetShaderUniformBuffer(*shader, 8, const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
 			renderFrame.SetShaderStorageBuffer(*shader, 9, _materialIndexBuffer);
+		}
+
+		if (shader->UsesBindlessTextures())
+		{
+			commandBuffer.BindBindlessDescriptorSet(
+				renderFrame,
+				shaderBatch.Pipeline->GetPipelineBindPoint(),
+				shader->GetPipelineLayout());
 		}
 
 		if (perShader)
