@@ -7,7 +7,7 @@
 #include "Graphics/ResourceCache.h"
 #include "Sample/SampleScene.h"
 #include "Sample/ForwardRenderPipeline.h"
-#include "Sample/RendererPasses/GUIRenderPass.h"
+#include "Graphics/RendererPasses/GUIRenderPass.h"
 #include "Utils/timer.h"
 
 Application::Application(const ApplicationOptions& options)

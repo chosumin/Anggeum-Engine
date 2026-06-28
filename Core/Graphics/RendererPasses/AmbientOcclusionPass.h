@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "RendererPasses/CACAOPass.h"
-#include "RendererPasses/DFAOPass.h"
+#include "CACAOPass.h"
+#include "DFAOPass.h"
 
 namespace Core
 {

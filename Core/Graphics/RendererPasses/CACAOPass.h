@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Graphics/RendererPass.h"
-#include "Core/Graphics/BufferObjects.h"
+#include "Graphics/RendererPass.h"
+#include "Graphics/BufferObjects.h"
 
 #define FFX_CACAO_ENABLE_VULKAN 1
 #include "ffx_cacao.h"
