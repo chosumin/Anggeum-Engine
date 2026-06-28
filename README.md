@@ -74,12 +74,12 @@ Toy 3D rendering engine for studying Vulkan API.
 - Blocker search with Poisson disk sampling and Interleaved Gradient Noise for sample rotation
 - Filter radius clamping to prevent extreme sampling artifacts
 
-**Distance Field Shadows**
-- Render shadows over large distances using Global SDF Volumes
-- Use Inigo Quilez's improved soft shadow with a parabolic closest-approach estimate
+**Ambient Occlusion**
+- Runtime toggle between DFAO and CACAO
+    - **Distance Field Ambient Occlusion**
+    - **FFX CACAO (Combined Adaptive Compute Ambient Occlusion)**
 
-**Distance Field Ambient Occlusion**
-- SDF-based screen-space ambient occlusion using hemisphere sampling
+
 
 ### GPU-Driven Rendering
 
@@ -121,3 +121,4 @@ For detailed build instructions, please see [BUILD.md](BUILD.md).
 - **RapidJSON** - JSON parsing library
 - **shaderc** - Runtime GLSL to SPIR-V compilation
 - **SPIRV-Cross** - SPIR-V reflection and cross-compilation
+- **AMD FidelityFX CACAO** - Combined Adaptive Compute Ambient Occlusion
