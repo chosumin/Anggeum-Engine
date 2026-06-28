@@ -27,12 +27,11 @@ namespace Core
             TransformBatch& transformBatch);
         ~GeometryPass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
     private:
         void RegisterGiTexturesToBindless(RenderFrame& renderContext);
 
-        void EnsureRenderTargets(RenderFrame& renderFrame);
         void EnsureIBLResources(RenderFrame& renderFrame);
 
         void PreparePregenerationSkybox(RenderFrame& renderFrame);

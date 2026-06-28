@@ -18,13 +18,12 @@ namespace Core
             VkSampleCountFlagBits msaaSamples);
         ~CACAOPass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
         void UpdateGUI();
 
     private:
-        void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
 
@@ -44,7 +43,7 @@ namespace Core
             float    HorizonAngleThreshold            = 0.06f;
             float    FadeOutFrom                      = 50.0f;
             float    FadeOutTo                        = 300.0f;
-            int      QualityLevel                     = 2;    // FFX_CACAO_QUALITY_HIGH
+            int      QualityLevel                     = 3;    // FFX_CACAO_QUALITY_HIGH
             float    AdaptiveQualityLimit             = 0.45f;
             int      BlurPassCount                    = 2;
             float    Sharpness                        = 0.98f;

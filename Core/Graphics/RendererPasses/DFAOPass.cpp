@@ -140,10 +140,6 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-void DFAOPass::Prepare()
-{
-}
-
 void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
@@ -158,7 +154,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     if (!normalTexture)
         return;
 
-    EnsureRenderTargets(renderFrame);
     UpdateParams();
 
     auto& commandBuffer = renderFrame.GetCommandBuffer();

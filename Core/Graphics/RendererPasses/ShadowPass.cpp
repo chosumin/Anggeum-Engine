@@ -324,14 +324,8 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 	ImGui::End();
 }
 
-void Core::ShadowPass::Prepare()
-{
-}
-
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	EnsureRenderTargets(renderFrame);
-
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
 		return;

@@ -72,14 +72,8 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
 }
 
-void Core::DepthPrePass::Prepare()
-{
-}
-
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    EnsureRenderTargets(renderFrame);
-
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "DepthPrePass",
         *_renderPass,

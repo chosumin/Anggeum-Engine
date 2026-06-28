@@ -48,10 +48,6 @@ CACAOPass::~CACAOPass()
         ImGui_ImplVulkan_RemoveTexture(_aoImGuiDS);
 }
 
-void CACAOPass::Prepare()
-{
-}
-
 FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     RenderFrame* frameKey,
     VkImageView depthView,
@@ -99,8 +95,6 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
 void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    EnsureRenderTargets(renderFrame);
-
     CommandBuffer& commandBuffer = renderFrame.GetCommandBuffer();
 
     // Resolve depth input
@@ -261,8 +255,8 @@ void CACAOPass::UpdateGUI()
     ImGui::Text("Quality Settings");
     ImGui::Separator();
 
-    const char* qualityLevels[] = { "Low", "Medium", "High", "Highest" };
-    ImGui::Combo("Quality Level", &m_settings.QualityLevel, qualityLevels, 4);
+    const char* qualityLevels[] = { "Lowest", "Low", "Medium", "High", "Highest" };
+    ImGui::Combo("Quality Level", &m_settings.QualityLevel, qualityLevels, 5);
     ImGui::SliderFloat("Adaptive Quality Limit", &m_settings.AdaptiveQualityLimit, 0.0f, 1.0f, "%.3f");
 
     ImGui::Spacing();

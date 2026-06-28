@@ -150,14 +150,9 @@ namespace Core
         _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
-    void GeometryPass::Prepare()
-    {
-    }
-
     void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     {
         // Lazy initialization
-        EnsureRenderTargets(renderFrame);
         EnsureIBLResources(renderFrame);
 
         if (!_iblGenerated)

@@ -102,14 +102,6 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
-void ForwardRenderPipeline::Prepare()
-{
-	for (auto&& rendererPass : _rendererPasses)
-	{
-		rendererPass->Prepare();
-	}
-}
-
 void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
@@ -118,7 +110,7 @@ void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		// Get class name from typeid
 		const char* className = typeid(*rendererPass).name();
-		
+
 		// Remove "class Core::" prefix if present
 		const char* simpleName = className;
 		const char* prefix = "class Core::";
@@ -130,6 +122,7 @@ void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		// Begin debug marker for this render pass
 		commandBuffer.BeginDebugMarker(simpleName);
 
+		rendererPass->EnsureRenderTargets(renderFrame);
 		rendererPass->Draw(renderFrame, imageIndex);
 
 		// End debug marker

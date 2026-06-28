@@ -36,10 +36,9 @@ namespace Sample
 			VkSampleCountFlagBits msaaSamples);
 		virtual ~ParticlePass() override;
 
-		virtual void Prepare() override;
+		void Initialize();
+		virtual void EnsureRenderTargets(Core::RenderFrame& renderFrame) override;
 		virtual void Draw(Core::RenderFrame& renderFrame, uint32_t imageIndex) override;
-	private:
-		void EnsureRenderTargets(Core::RenderFrame& renderFrame);
 	private:
 		Core::Scene& _scene;
 

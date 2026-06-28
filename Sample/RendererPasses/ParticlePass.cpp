@@ -61,7 +61,7 @@ void Sample::ParticlePass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
-void Sample::ParticlePass::Prepare()
+void Sample::ParticlePass::Initialize()
 {
     _buffers.resize(MAX_FRAMES_IN_FLIGHT * 3);
 
@@ -114,8 +114,6 @@ void Sample::ParticlePass::Prepare()
 
 void Sample::ParticlePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    EnsureRenderTargets(renderFrame);
-
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "ParticlePass",
         *_renderPass,

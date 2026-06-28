@@ -14,10 +14,8 @@ namespace Core
             SwapChain& swapChain, VkSampleCountFlagBits msaaSamples);
         ~GUIRenderPass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
-    private:
-        void EnsureRenderTargets(RenderFrame& renderFrame);
     private:
         SwapChain& _swapChain;
         VkExtent2D _extent;

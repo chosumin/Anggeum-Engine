@@ -24,10 +24,17 @@ namespace Core
     {
     }
 
-    void AmbientOcclusionPass::Prepare()
+    void AmbientOcclusionPass::EnsureRenderTargets(RenderFrame& renderFrame)
     {
-        _cacaoPass->Prepare();
-        _dfaoPass->Prepare();
+        switch (_activeMethod)
+        {
+        case AOMethod::CACAO:
+            _cacaoPass->EnsureRenderTargets(renderFrame);
+            break;
+        case AOMethod::DFAO:
+            _dfaoPass->EnsureRenderTargets(renderFrame);
+            break;
+        }
     }
 
     void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

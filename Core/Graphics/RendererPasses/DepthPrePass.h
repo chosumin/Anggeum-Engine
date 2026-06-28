@@ -18,13 +18,10 @@ namespace Core
             VkSampleCountFlagBits msaaSamples, TransformBatch& transformBatch);
         ~DepthPrePass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
         RendererBatches* GetRendererBatches() const { return _rendererBatches.get(); }
-
-    private:
-        void EnsureRenderTargets(RenderFrame& renderFrame);
 
     private:
         Scene& _scene;

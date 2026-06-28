@@ -20,7 +20,7 @@ namespace Core
             SDFGenerator* sdfGenerator);
         ~AmbientOcclusionPass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
         void SetMethod(AOMethod method);

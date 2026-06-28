@@ -16,7 +16,6 @@ namespace Core
 			Buffer* lightVisibilityBuffer);
 		virtual ~LightCullingPass() override;
 
-		virtual void Prepare() override;
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 	private:
 		void UpdateLightBuffer();

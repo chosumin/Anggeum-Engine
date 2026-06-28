@@ -38,7 +38,7 @@ Core::PreEnvironmentPass::~PreEnvironmentPass()
     delete(_prefilteredPipeline);
 }
 
-void Core::PreEnvironmentPass::Prepare()
+void Core::PreEnvironmentPass::Initialize()
 {
     auto meshes = _scene.GetComponents<Core::Mesh>();
 
@@ -228,7 +228,7 @@ Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& p
     , _pass(pass)
     , _tempRenderFrame(device)
 {
-    _pass.Prepare();
+    _pass.Initialize();
 }
 
 Core::PreEnvironmentJob::~PreEnvironmentJob()

@@ -19,13 +19,12 @@ namespace Core
             SDFGenerator* sdfGenerator);
         ~DFAOPass();
 
-        void Prepare() override;
+        void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
         void UpdateGUI();
 
     private:
-        void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
         void UpdateParams();

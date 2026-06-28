@@ -24,11 +24,6 @@ Core::LightCullingPass::~LightCullingPass()
 {
 }
 
-void Core::LightCullingPass::Prepare()
-{
-	// Note: These will be set per-frame in Draw() method now
-}
-
 void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
 	auto depthTarget = renderFrame.GetRenderTarget("MainDepth");

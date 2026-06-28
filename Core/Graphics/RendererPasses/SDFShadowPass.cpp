@@ -282,10 +282,6 @@ void SDFShadowPass::UpdateGUI()
     ImGui::End();
 }
 
-void SDFShadowPass::Prepare()
-{
-}
-
 void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
@@ -326,7 +322,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     if (!sdfTexture)
         return;
 
-    EnsureRenderTargets(renderFrame);
     UpdateSDFParams();
 
     auto depthTexture = renderFrame.GetRenderTarget("MainDepth");

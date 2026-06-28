@@ -23,7 +23,7 @@ Core::BrdfLutPass::~BrdfLutPass()
     delete(_brdfMaterial);
 }
 
-void Core::BrdfLutPass::Prepare()
+void Core::BrdfLutPass::Initialize()
 {
     _brdfMaterial = new Material(_device, "BRDF", "brdf lut");
 
@@ -59,7 +59,7 @@ Core::BrdfLutJob::BrdfLutJob(Device& device, BrdfLutPass& pass)
     , _pass(pass)
     , _tempRenderFrame(device)
 {
-    _pass.Prepare();
+    _pass.Initialize();
 }
 
 Core::BrdfLutJob::~BrdfLutJob()

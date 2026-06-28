@@ -88,14 +88,8 @@ void Core::GUIRenderPass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
-void Core::GUIRenderPass::Prepare()
-{
-}
-
 void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    EnsureRenderTargets(renderFrame);
-
     auto colorTarget = renderFrame.GetRenderTarget(RT_MAIN_COLOR);
 
 	// Create framebuffer using swapchain image view as resolve attachment for each frame

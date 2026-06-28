@@ -17,7 +17,7 @@ namespace Core
             Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap);
         ~PreEnvironmentPass();
 
-        void Prepare() override;
+        void Initialize();
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
     private:

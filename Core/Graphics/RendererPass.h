@@ -13,7 +13,7 @@ namespace Core
 		RendererPass(Device& device, WorkerThreadManager& workerThreadManager);
 		virtual ~RendererPass();
 
-		virtual void Prepare() = 0;
+		virtual void EnsureRenderTargets(RenderFrame& renderFrame) {}
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 	protected:
 		void Enqueue(Job* job);

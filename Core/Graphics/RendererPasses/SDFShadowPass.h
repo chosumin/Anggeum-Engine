@@ -21,7 +21,7 @@ namespace Core
 			VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass);
 		~SDFShadowPass();
 
-		void Prepare() override;
+		void EnsureRenderTargets(RenderFrame& renderFrame) override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
 		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
@@ -39,7 +39,6 @@ namespace Core
 		}
 
 	private:
-		void EnsureRenderTargets(RenderFrame& renderFrame);
 		void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			shared_ptr<Texture> msaaDepth);
 		void RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
