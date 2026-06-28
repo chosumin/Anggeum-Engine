@@ -6,7 +6,6 @@ namespace Core
 {
     class Scene;
     class SwapChain;
-    class Material;
 
     class DepthPrePass : public RendererPass
     {
@@ -34,7 +33,8 @@ namespace Core
 
         unique_ptr<RendererBatches> _rendererBatches;
 
-        shared_ptr<Material> _depthMaterial;
+        // Keeps override materials alive (MaterialBatch holds weak_ptr)
+        vector<shared_ptr<Material>> _overrideMaterials;
     };
 }
 

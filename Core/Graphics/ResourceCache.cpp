@@ -65,6 +65,36 @@ namespace Core
 		return material;
 	}
 
+	shared_ptr<Material> ResourceCache::RequestOverrideMaterial(const shared_ptr<Material>& source, const string& overrideShaderName)
+	{
+		lock_guard<mutex> guard(_materialMutex);
+
+		// Unique name: "originalName@synthesizeShader"
+		string overrideName = source->GetName() + "@" + overrideShaderName;
+
+		auto it = _materials.find(overrideName);
+		if (it != _materials.end())
+		{
+			if (auto shared = it->second.lock())
+				return shared;
+		}
+
+		// Copy original material (preserves PBR data, bindless handles, etc.)
+		auto overrideMaterial = make_shared<Material>(*source);
+		overrideMaterial->SetShader(RequestShader(overrideShaderName));
+
+		_materials[overrideName] = overrideMaterial;
+
+		// Register to get a valid materialIndex
+		if (_device.IsGpuDrivenRenderingEnabled())
+		{
+			MaterialManager* materialManager = _renderContext->GetMaterialManager();
+			materialManager->RegisterMaterial(overrideMaterial);
+		}
+
+		return overrideMaterial;
+	}
+
 	shared_ptr<Shader> ResourceCache::RequestShader(const string& shaderName)
 	{
 		lock_guard<mutex> guard(_shaderMutex);

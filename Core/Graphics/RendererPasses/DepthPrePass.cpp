@@ -24,7 +24,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
     auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
     multiSampling.rasterizationSamples = msaaSamples;
 
-    // [0] Normal color attachment ? vertex world-space normal
+    // [0] Normal color attachment
     _renderPass->CreateColorAttachment(
         VK_FORMAT_R16G16B16A16_SFLOAT, msaaSamples,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
@@ -36,14 +36,12 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 
     _renderPass->CreateRenderPass();
 
-    _depthMaterial = _device.GetResourceCache().RequestMaterial("depthNormal", "DepthNormal");
-
     _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
 
     auto meshes = _scene.GetComponents<Core::Mesh>();
-    _rendererBatches->PrepareSingleBatch(_device,
-        _depthMaterial,
-        *_renderPass, *_pipelineState, meshes);
+    _rendererBatches->Prepare(_device,
+        "DepthNormal",
+        *_renderPass, *_pipelineState, meshes, _overrideMaterials);
 
     if (_device.IsGpuDrivenRenderingEnabled())
         _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtent);
@@ -55,7 +53,7 @@ Core::DepthPrePass::~DepthPrePass()
 
 void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
-    // [0] Normal RT - vertex world-space normal
+    // [0] Normal RT
     RenderTargetDesc normalDesc{};
     normalDesc.extent  = _extent;
     normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -92,6 +90,14 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     PerspectiveCamera* camera = _scene.GetMainCamera();
+
+    if (_device.IsGpuDrivenRenderingEnabled())
+    {
+        commandBuffer.BeginDebugMarker("Frustum Culling");
+        _rendererBatches->DispatchFrustumOnlyCulling(
+            renderFrame, commandBuffer, camera->Matrices);
+        commandBuffer.EndDebugMarker();
+    }
 
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 

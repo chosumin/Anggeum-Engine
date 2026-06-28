@@ -209,6 +209,35 @@ void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material
 	CreateInstanceBuffer(device);
 }
 
+void Core::RendererBatches::Prepare(Device& device, const string& shaderName, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes, vector<shared_ptr<Material>>& outMaterials)
+{
+	for (auto&& mesh : meshes)
+	{
+		uint entityId = mesh->GetEntity().GetId();
+		auto& materials = mesh->GetMaterials();
+		auto& subMeshes = mesh->GetSubMeshes();
+
+		for (size_t i = 0; i < materials.size(); ++i)
+		{
+			if (materials[i]->GetShader().GetPass() != "Geometry")
+				continue;
+
+			if (i >= subMeshes.size())
+				break;
+
+			auto overrideMaterial = device.GetResourceCache()
+				.RequestOverrideMaterial(materials[i], shaderName);
+
+			outMaterials.push_back(overrideMaterial);
+
+			AddBatch(device, renderPass, pipelineState, entityId,
+				overrideMaterial, subMeshes[i]);
+		}
+	}
+
+	CreateInstanceBuffer(device);
+}
+
 void Core::RendererBatches::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
 	uint32_t drawCount = _indirectDrawBuffer.GetDrawCount();
