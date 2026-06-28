@@ -214,29 +214,13 @@ void SDFShadowPass::UpdateSDFParams()
     _sdfParams.SDFTransitionRange    = shadowUniform->SDFTransitionRange;
 }
 
-void SDFShadowPass::UpdateGUI()
+void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 {
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("Debug"))
-        {
-            ImGui::MenuItem("SDF Shadow", nullptr, &_showSDFShadowWindow);
-            ImGui::Separator();
-            if (ImGui::MenuItem("Generate SDF Texture"))
-                _regenerateRequested = true;
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-
-    if (!_showSDFShadowWindow)
+    if (!ImGui::CollapsingHeader("SDF Shadow"))
         return;
 
-    if (!ImGui::Begin("SDF Shadow Debug", &_showSDFShadowWindow))
-    {
-        ImGui::End();
-        return;
-    }
+    if (ImGui::Button("Generate SDF Texture"))
+        _regenerateRequested = true;
 
     if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -279,7 +263,7 @@ void SDFShadowPass::UpdateGUI()
             ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
     }
 
-    ImGui::End();
+    ImGui::Separator();
 }
 
 void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
@@ -370,7 +354,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    if (_showSDFShadowWindow)
     {
         commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");
         RenderVolumeSlice(renderFrame, commandBuffer);
@@ -380,6 +363,4 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-    UpdateGUI();
 }

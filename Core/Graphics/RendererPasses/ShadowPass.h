@@ -22,13 +22,13 @@ namespace Core
 
 		void EnsureRenderTargets(RenderFrame& renderFrame) override;
 		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+		void OnGUI(RenderFrame& renderFrame) override;
 
 		ShadowUniform* GetShadowBuffer() { return &_shadowBuffer; }
 		RendererBatches* GetRendererBatches() const { return _rendererBatches.get(); }
 
 	private:
 		void UpdateCascades(PerspectiveCamera* camera);
-		void UpdateGUI(RenderFrame& renderFrame);
 
 		/** Returns frustum corners in world space for the given view-projection */
 		std::array<glm::vec3, 8> GetFrustumCornersWorldSpace(const glm::mat4& viewProj);

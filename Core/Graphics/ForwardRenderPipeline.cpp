@@ -130,6 +130,27 @@ void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	}
 }
 
+void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)
+{
+	ImGui::Begin("Renderer Passes");
+	for (auto&& rendererPass : _rendererPasses)
+	{
+		// Get class name from typeid
+		const char* className = typeid(*rendererPass).name();
+
+		// Remove "class Core::" prefix if present
+		const char* simpleName = className;
+		const char* prefix = "class Core::";
+		if (strncmp(className, prefix, strlen(prefix)) == 0)
+		{
+			simpleName = className + strlen(prefix);
+		}
+
+		rendererPass->OnGUI(renderFrame);
+	}
+	ImGui::End();
+}
+
 void Core::ForwardRenderPipeline::Cleanup()
 {
 }

@@ -39,8 +39,6 @@ namespace Core
 
     void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     {
-        UpdateGUI();
-
         switch (_activeMethod)
         {
         case AOMethod::CACAO:
@@ -57,26 +55,10 @@ namespace Core
         _activeMethod = method;
     }
 
-    void AmbientOcclusionPass::UpdateGUI()
+    void AmbientOcclusionPass::OnGUI(RenderFrame& renderFrame)
     {
-        if (ImGui::BeginMainMenuBar())
-        {
-            if (ImGui::BeginMenu("Debug"))
-            {
-                ImGui::MenuItem("Ambient Occlusion", nullptr, &_showWindow);
-                ImGui::EndMenu();
-            }
-            ImGui::EndMainMenuBar();
-        }
-
-        if (!_showWindow)
+        if (!ImGui::CollapsingHeader("Ambient Occlusion"))
             return;
-
-        if (!ImGui::Begin("Ambient Occlusion", &_showWindow))
-        {
-            ImGui::End();
-            return;
-        }
 
         const char* methods[] = { "CACAO (FFX)", "DFAO (Distance Field)" };
         int current = static_cast<int>(_activeMethod);
@@ -89,7 +71,6 @@ namespace Core
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Draw active pass settings within this window
         switch (_activeMethod)
         {
         case AOMethod::CACAO:
@@ -100,6 +81,6 @@ namespace Core
             break;
         }
 
-        ImGui::End();
+        ImGui::Separator();
     }
 }

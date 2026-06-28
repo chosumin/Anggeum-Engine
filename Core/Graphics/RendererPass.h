@@ -15,6 +15,7 @@ namespace Core
 
 		virtual void EnsureRenderTargets(RenderFrame& renderFrame) {}
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
+		virtual void OnGUI(RenderFrame& renderFrame) {}
 	protected:
 		void Enqueue(Job* job);
 		void Wait();

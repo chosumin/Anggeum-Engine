@@ -22,6 +22,7 @@ namespace Core
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+		virtual void OnGUI(RenderFrame& renderFrame) override;
 
 		void Cleanup();
 		void Resize(SwapChain& swapChain);

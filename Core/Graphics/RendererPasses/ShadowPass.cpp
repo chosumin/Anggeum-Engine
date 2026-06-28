@@ -232,11 +232,11 @@ void Core::ShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 	renderFrame.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 }
 
-void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
+void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 {
-	ImGui::Begin("Shadow Maps");
+	if (!ImGui::CollapsingHeader("Shadow Pass"))
+		return;
 
-	// PCSS Settings
 	ImGui::SeparatorText("PCSS Settings");
 	{
 		ImGui::SliderFloat("Light Size", &_shadowBuffer.LightSize, 0.001f, 0.2f, "%.3f");
@@ -282,7 +282,6 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 		_cascadeSplitLambda = 0.95f;
 	}
 
-	// CSM Shadow Map Debug View
 	ImGui::SeparatorText("Cascaded Shadow Maps");
 	{
 		auto shadowTexture = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
@@ -321,7 +320,7 @@ void Core::ShadowPass::UpdateGUI(RenderFrame& renderFrame)
 		}
 	}
 
-	ImGui::End();
+	ImGui::Separator();
 }
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
@@ -402,6 +401,4 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			commandBuffer.EndDebugMarker();
 		}
 	}
-
-	UpdateGUI(renderFrame);
 }
