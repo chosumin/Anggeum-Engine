@@ -77,8 +77,6 @@ file(GLOB IMGUI_SOURCES
 
 file(GLOB ROOT_SOURCES
     "main.cpp"
-    "Application.cpp"
-    "Application.h"
     "stdafx.h"
     "stdafx.cpp"
 )

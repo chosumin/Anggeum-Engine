@@ -51,6 +51,13 @@ RenderContext::RenderContext(Device& device)
 
 	CreateRenderFrames();
 	CreateSyncObjects();	
+
+	if (_bindlessTextureManager)
+	{
+		_bindlessTextureManager->Initialize();
+		cout << "Bindless texture system initialized with "
+			<< _bindlessTextureManager->GetMaxTextures() << " slots" << endl;
+	}
 }
 
 RenderContext::~RenderContext()
@@ -88,16 +95,6 @@ void RenderContext::CreateRenderFrames()
 
 		_frames[i]->SetMeshBufferManager(_meshBufferManager.get());
 		_frames[i]->SetMaterialManager(_materialManager.get());
-	}
-}
-
-void RenderContext::Prepare()
-{
-	if (_bindlessTextureManager)
-	{
-		_bindlessTextureManager->Initialize();
-		cout << "Bindless texture system initialized with "
-			<< _bindlessTextureManager->GetMaxTextures() << " slots" << endl;
 	}
 }
 

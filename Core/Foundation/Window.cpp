@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "Window.h"
-#include "Application.h"
 #include "Utils/InputEvents.h"
 
 #define KeyCode Core::KeyCode

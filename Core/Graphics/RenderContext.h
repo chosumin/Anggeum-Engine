@@ -23,7 +23,6 @@ namespace Core
 	class CommandPool;
 	class RenderFrame;
 	class BindlessTextureManager;
-	class TransferContext;
 	class Texture;
 
 	class RenderContext
@@ -36,8 +35,7 @@ namespace Core
 	public:
 		RenderContext(Device& device);
 		~RenderContext();
-		
-		void Prepare();
+
 		void RecreateSwapChain();
 		
 		// Frame management

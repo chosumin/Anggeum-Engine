@@ -1,29 +1,21 @@
-//https://docs.google.com/document/d/1SWICNMyYS0egmK_vxbDvWTg3-vRuB9BdEQzlVJEK7rc/edit#heading=h.p894kr3lcuq1
-//https://www.vulkan.org/learn#vulkan-tutorials
-
-//https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)
-//https://fgiesen.wordpress.com/2011/07/02/a-trip-through-the-graphics-pipeline-2011-part-2/
-
 #include "stdafx.h"
-#include "Application.h"
+#include "Engine.h"
 
 int main()
 {
 	Core::Window::Instance().Initialize(1920, 1080, "Anggeum Engine");
 
-	ApplicationOptions options{ false, &Core::Window::Instance() };
-	Application application(options);
-	
-	application.Prepare();
+	Core::EngineOptions options{ false, &Core::Window::Instance() };
+	Core::Engine engine(options);
 
 	while (Core::Window::Instance().IsClosed() == false)
 	{
 		glfwPollEvents();
-		application.Update();
-		application.Draw();
+		engine.Update();
+		engine.Draw();
 	}
 
-	application.WaitIdle();
+	engine.WaitIdle();
 
 	return 0;
 }
