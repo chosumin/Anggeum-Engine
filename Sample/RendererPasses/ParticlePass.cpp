@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "ParticlePass.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceCache.h"

@@ -3,7 +3,6 @@
 #include "Foundation/Scene.h"
 #include "Foundation/Entity.h"
 #include "Components/Mesh.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Shader.h"

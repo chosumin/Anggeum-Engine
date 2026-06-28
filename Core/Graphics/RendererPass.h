@@ -2,17 +2,11 @@
 #include "Vulkans/RenderPass.h"
 #include "Vulkans/Framebuffer.h"
 #include "Vulkans/CommandBuffer.h"
-#include "Vulkans/DescriptorSetBuilder.h"
 #include "RenderFrame.h"
 #include "Foundation/WorkerThread.h"
-#include "Utils/timer.h"
 
 namespace Core
 {
-	class SwapChain;
-	class PipelineState;
-	class CommandBuffer;
-	class Job;
 	class RendererPass
 	{
 	public:

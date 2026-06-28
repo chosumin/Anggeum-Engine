@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "CACAOPass.h"
 #include "Foundation/Scene.h"
-#include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Components/PerspectiveCamera.h"
 #include "DFAOPass.h"
 

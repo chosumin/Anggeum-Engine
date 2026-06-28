@@ -8,6 +8,7 @@
 #include "Graphics/MeshBufferManager.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/ResourceCache.h"
 #include "ShadowPass.h"
 using namespace Core;

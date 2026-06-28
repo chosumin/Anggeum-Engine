@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "BrdfLutPass.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Material.h"

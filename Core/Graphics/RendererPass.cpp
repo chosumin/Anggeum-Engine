@@ -1,9 +1,5 @@
 #include "stdafx.h"
 #include "RendererPass.h"
-#include "Utils/Utility.h"
-#include "Graphics/Vulkans/SwapChain.h"
-#include "Graphics/Vulkans/RenderPass.h"
-#include "Graphics/Vulkans/Buffer.h"
 
 Core::RendererPass::RendererPass(Device& device, WorkerThreadManager& workerThreadManager)
 	:_device{ device }, _workerThreadManager(workerThreadManager)

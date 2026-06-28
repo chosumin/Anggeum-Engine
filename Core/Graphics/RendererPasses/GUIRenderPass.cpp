@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "GUIRenderPass.h"
 #include "Graphics/Vulkans/SwapChain.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 
 using namespace Core;
 
