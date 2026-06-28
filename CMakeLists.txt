@@ -232,6 +232,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${GLFW_INCLUDE_DIR}
     ${Vulkan_INCLUDE_DIRS}
     ${VULKAN_SDK}/Include
+    ${FFX_CACAO_INCLUDE_DIRS}
 )
 
 # Link libraries (Debug/Release)
@@ -248,7 +249,39 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     optimized ${VULKAN_LIB_DIR}/spirv-cross-glsl.lib
     debug ${VULKAN_LIB_DIR}/spirv-cross-reflectd.lib
     optimized ${VULKAN_LIB_DIR}/spirv-cross-reflect.lib
+    ffx_cacao_vk
 )
+
+# FidelityFX CACAO setup
+set(FFX_CACAO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParties/FidelityFX-CACAO")
+if(NOT EXISTS "${FFX_CACAO_DIR}")
+    message(FATAL_ERROR "FidelityFX-CACAO submodule not found at ${FFX_CACAO_DIR}. Please initialize the submodule.")
+endif()
+
+# Add CACAO subdirectory if it has a CMakeLists.txt
+if(EXISTS "${FFX_CACAO_DIR}/CMakeLists.txt")
+    add_subdirectory(${FFX_CACAO_DIR} EXCLUDE_FROM_ALL)
+else()
+    # Manual CACAO library setup if no CMakeLists.txt exists
+    set(FFX_CACAO_INCLUDE_DIRS 
+        "${FFX_CACAO_DIR}/ffx-cacao"
+        "${FFX_CACAO_DIR}/ffx-cacao/inc"
+        "${FFX_CACAO_DIR}/ffx-cacao/src"
+    )
+    
+    file(GLOB FFX_CACAO_SOURCES
+        "${FFX_CACAO_DIR}/ffx-cacao/src/*.cpp"
+        "${FFX_CACAO_DIR}/ffx-cacao/src/*.c"
+    )
+    
+    # Create CACAO static library
+    add_library(ffx_cacao_vk STATIC ${FFX_CACAO_SOURCES})
+    target_include_directories(ffx_cacao_vk PUBLIC ${FFX_CACAO_INCLUDE_DIRS})
+    target_compile_definitions(ffx_cacao_vk PUBLIC FFX_CACAO_ENABLE_VULKAN=1)
+    target_link_libraries(ffx_cacao_vk PUBLIC Vulkan::Vulkan)
+endif()
+
+message(STATUS "Using FidelityFX CACAO: ${FFX_CACAO_DIR}")
 
 # Compiler-specific settings
 if(MSVC)
@@ -265,6 +298,7 @@ if(MSVC)
         NOMINMAX
         WIN32_LEAN_AND_MEAN
         _CRT_SECURE_NO_WARNINGS
+        FFX_CACAO_ENABLE_VULKAN=1
     )
     
     # Runtime library settings

@@ -16,3 +16,6 @@
 [submodule "ThirdParties/ktx"]
 	path = ThirdParties/ktx
 	url = https://github.com/KhronosGroup/KTX-Software.git
+[submodule "ThirdParties/FidelityFX-CACAO"]
+	path = ThirdParties/FidelityFX-CACAO
+	url = https://github.com/GPUOpen-Effects/FidelityFX-CACAO.git

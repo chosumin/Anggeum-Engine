@@ -3,7 +3,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2DMS uNormalMSAA;
-layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D uNormalOut;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D uNormalOut;
 
 layout(push_constant) uniform PC
 {
@@ -19,10 +19,18 @@ void main()
     if (coord.x >= pc.outputWidth || coord.y >= pc.outputHeight)
         return;
 
+    // Each MSAA sample is stored as a [0,1] packed normal (N * 0.5 + 0.5).
+    // Unpack back to [-1,1] before averaging so we accumulate real directions.
     vec3 sum = vec3(0.0);
     for (int i = 0; i < pc.sampleCount; ++i)
-        sum += texelFetch(uNormalMSAA, coord, i).xyz;
+    {
+        vec3 packed = texelFetch(uNormalMSAA, coord, i).xyz;
+        sum += packed * 2.0 - 1.0;
+    }
 
+    // Average direction, then re-pack to [0,1]
     vec3 resolved = normalize(sum);
-    imageStore(uNormalOut, coord, vec4(resolved, 0.0));
+    vec3 repacked = resolved * 0.5 + 0.5;
+
+    imageStore(uNormalOut, coord, vec4(repacked, 0.0));
 }

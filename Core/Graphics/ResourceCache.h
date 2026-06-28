@@ -24,6 +24,7 @@ namespace Core
 		void Prepare(RenderContext& renderContext);
 
 		shared_ptr<Material> RequestMaterial(const string materialName, const string& shaderName);
+		shared_ptr<Material> RequestOverrideMaterial(const shared_ptr<Material>& source, const string& overrideShaderName);
 		shared_ptr<Shader> RequestShader(const string& shaderName);
 		shared_ptr<Shader> RequestShader(const string& vertPath, const string& fragPath);
 		shared_ptr<Image> RequestImage(const ImageCreateInfo imageCreateInfo);

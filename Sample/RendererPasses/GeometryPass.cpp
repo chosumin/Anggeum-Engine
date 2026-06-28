@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "GeometryPass.h"
 #include "DFAOPass.h"
+#include "CACAOPass.h"
 #include "SDFShadowPass.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Component.h"
@@ -179,9 +180,7 @@ namespace Core
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
 
-        // Use DFAO texture when enabled; otherwise fall back to default white
-        // texture so ambient is unaffected (ao * 1.0 = ao)
-        auto dfaoTarget = DFAOPass::IsEnabled()
+        auto dfaoTarget = CACAOPass::IsEnabled()
             ? renderFrame.GetRenderTarget(DFAOPass::RT_DFAO)
             : _device.GetResourceCache().GetDefaultTexture();
 
@@ -209,7 +208,7 @@ namespace Core
                 renderFrame.SetShaderTextureBuffer(*shader, 10, sdfShadowTarget);
 
             if (dfaoTarget)
-                renderFrame.SetShaderTextureBuffer(*shader, 11, dfaoTarget);
+               renderFrame.SetShaderTextureBuffer(*shader, 11, dfaoTarget);
         };
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)

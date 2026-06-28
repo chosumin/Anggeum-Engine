@@ -117,6 +117,8 @@ namespace Core
 		void SetMaterialIndex(uint32_t index) { _materialIndex = index; }
 		uint32_t GetMaterialIndex() const { return _materialIndex; }
 		bool HasMaterialIndex() const { return _materialIndex != UINT32_MAX; }
+
+		void SetShader(shared_ptr<Shader> shader) { _shader = shader; }
 	private:
 		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:

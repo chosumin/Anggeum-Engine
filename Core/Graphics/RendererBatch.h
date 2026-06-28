@@ -52,6 +52,7 @@ namespace Core
 		~RendererBatches();
 
 		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
+		void Prepare(Device& device, const string& shaderName, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes, vector<shared_ptr<Material>>& outMaterials);
 		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
 		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
 			VkExtent2D extents);
@@ -98,8 +99,7 @@ namespace Core
 		void PrepareCullingResources(Core::Device& device);
 		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
-		// 2-Pass Occlusion Culling
-		void DrawIndirect(
+		void DrawIndirectInternal(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
 			Core::Buffer& indirectCommandBuffer,
