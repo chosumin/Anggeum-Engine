@@ -58,12 +58,12 @@ set(KTX_LIBRARY_RELEASE "${KTX_DIR}/Release/ktx.lib")
 set(VULKAN_LIB_DIR "${VULKAN_SDK}/Lib")
 
 # Collect source files
-file(GLOB_RECURSE CORE_SOURCES
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS
     "Core/*.cpp"
     "Core/*.h"
 )
 
-file(GLOB_RECURSE SAMPLE_SOURCES
+file(GLOB_RECURSE SAMPLE_SOURCES CONFIGURE_DEPENDS
     "Sample/*.cpp"
     "Sample/*.h"
 )

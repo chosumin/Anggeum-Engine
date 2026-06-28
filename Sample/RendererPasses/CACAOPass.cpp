@@ -99,11 +99,6 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
 void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    UpdateGUI();
-
-    if (!_enabled)
-        return;
-
     EnsureRenderTargets(renderFrame);
 
     CommandBuffer& commandBuffer = renderFrame.GetCommandBuffer();
@@ -253,84 +248,39 @@ void CACAOPass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBu
 
 void CACAOPass::UpdateGUI()
 {
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("Debug"))
-        {
-            ImGui::MenuItem("CACAO", nullptr, &_showWindow);
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-
-    if (!_showWindow)
-        return;
-
-    if (!ImGui::Begin("CACAO Settings", &_showWindow))
-    {
-		ImGui::End();
-        return;
-    }
-
-    ImGui::Checkbox("Enable CACAO", &_enabled);
-
     ImGui::Text("AMD Combined Adaptive Compute Ambient Occlusion");
     ImGui::Separator();
 
-    bool paramsChanged = false;
-
     ImGui::Text("Basic Settings");
-    if (ImGui::SliderFloat("Radius", &m_settings.Radius, 0.1f, 5.0f, "%.2f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Shadow Multiplier", &m_settings.ShadowMultiplier, 0.0f, 5.0f, "%.2f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Shadow Power", &m_settings.ShadowPower, 0.5f, 5.0f, "%.2f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Shadow Clamp", &m_settings.ShadowClamp, 0.0f, 1.0f, "%.3f"))
-        paramsChanged = true;
+    ImGui::SliderFloat("Radius", &m_settings.Radius, 0.1f, 5.0f, "%.2f");
+    ImGui::SliderFloat("Shadow Multiplier", &m_settings.ShadowMultiplier, 0.0f, 5.0f, "%.2f");
+    ImGui::SliderFloat("Shadow Power", &m_settings.ShadowPower, 0.5f, 5.0f, "%.2f");
+    ImGui::SliderFloat("Shadow Clamp", &m_settings.ShadowClamp, 0.0f, 1.0f, "%.3f");
 
     ImGui::Spacing();
     ImGui::Text("Quality Settings");
     ImGui::Separator();
 
     const char* qualityLevels[] = { "Low", "Medium", "High", "Highest" };
-    if (ImGui::Combo("Quality Level", &m_settings.QualityLevel, qualityLevels, 4))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Adaptive Quality Limit", &m_settings.AdaptiveQualityLimit, 0.0f, 1.0f, "%.3f"))
-        paramsChanged = true;
+    ImGui::Combo("Quality Level", &m_settings.QualityLevel, qualityLevels, 4);
+    ImGui::SliderFloat("Adaptive Quality Limit", &m_settings.AdaptiveQualityLimit, 0.0f, 1.0f, "%.3f");
 
     ImGui::Spacing();
     ImGui::Text("Blur Settings");
     ImGui::Separator();
 
-    if (ImGui::SliderInt("Blur Pass Count", &m_settings.BlurPassCount, 0, 8))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Sharpness", &m_settings.Sharpness, 0.0f, 1.0f, "%.3f"))
-        paramsChanged = true;
+    ImGui::SliderInt("Blur Pass Count", &m_settings.BlurPassCount, 0, 8);
+    ImGui::SliderFloat("Sharpness", &m_settings.Sharpness, 0.0f, 1.0f, "%.3f");
 
     ImGui::Spacing();
     ImGui::Text("Advanced Settings");
     ImGui::Separator();
 
-    if (ImGui::SliderFloat("Horizon Angle Threshold", &m_settings.HorizonAngleThreshold, 0.0f, 0.2f, "%.3f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Fade Out From", &m_settings.FadeOutFrom, 0.0f, 100.0f, "%.1f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Fade Out To", &m_settings.FadeOutTo, 0.0f, 500.0f, "%.1f"))
-        paramsChanged = true;
-
-    if (ImGui::SliderFloat("Detail Shadow Strength", &m_settings.DetailShadowStrength, 0.0f, 2.0f, "%.2f"))
-        paramsChanged = true;
-
-    if (ImGui::Checkbox("Generate Normals", &m_settings.GenerateNormals))
-        paramsChanged = true;
+    ImGui::SliderFloat("Horizon Angle Threshold", &m_settings.HorizonAngleThreshold, 0.0f, 0.2f, "%.3f");
+    ImGui::SliderFloat("Fade Out From", &m_settings.FadeOutFrom, 0.0f, 100.0f, "%.1f");
+    ImGui::SliderFloat("Fade Out To", &m_settings.FadeOutTo, 0.0f, 500.0f, "%.1f");
+    ImGui::SliderFloat("Detail Shadow Strength", &m_settings.DetailShadowStrength, 0.0f, 2.0f, "%.2f");
+    ImGui::Checkbox("Generate Normals", &m_settings.GenerateNormals);
 
     ImGui::Spacing();
 
@@ -342,13 +292,10 @@ void CACAOPass::UpdateGUI()
     ImGui::Spacing();
     ImGui::Separator();
 
-    // Display AO result texture
     if (_aoImGuiDS != VK_NULL_HANDLE)
     {
         ImGui::Text("AO Output Preview:");
         ImVec2 previewSize(256, 256);
         ImGui::Image(_aoImGuiDS, previewSize);
     }
-
-    ImGui::End();
 }

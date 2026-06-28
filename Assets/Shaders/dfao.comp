@@ -85,7 +85,7 @@ vec2 Hammersley(uint i, uint N)
 
 void main()
 {
-    ivec2 aoSize = ivec2(pc.ScreenSize) / 2;
+    ivec2 aoSize = ivec2(pc.ScreenSize);
     ivec2 coord  = ivec2(gl_GlobalInvocationID.xy);
     if (coord.x >= aoSize.x || coord.y >= aoSize.y)
         return;

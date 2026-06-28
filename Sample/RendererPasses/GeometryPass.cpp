@@ -180,9 +180,7 @@ namespace Core
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
 
-        auto dfaoTarget = CACAOPass::IsEnabled()
-            ? renderFrame.GetRenderTarget(DFAOPass::RT_DFAO)
-            : _device.GetResourceCache().GetDefaultTexture();
+        auto dfaoTarget = renderFrame.GetRenderTarget(DFAOPass::RT_DFAO);
 
         UpdateLightBuffer();
 

@@ -21,17 +21,13 @@ namespace Core
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-        static bool IsEnabled() { return _enabled; }
+        void UpdateGUI();
 
     private:
         void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
-        void UpdateGUI();
 
-        // Create and initialize a CACAO context for the given RenderFrame.
-        // Each RenderFrame corresponds to one frame-in-flight slot, so this
-        // ensures the context is bound to the correct per-frame render targets.
         FFX_CACAO_VkContext* GetOrCreateCacaoContext(
             RenderFrame* frameKey,
             VkImageView depthView,
@@ -69,14 +65,9 @@ namespace Core
         shared_ptr<Shader>   _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
-        // One CACAO context per RenderFrame (i.e., per frame-in-flight slot).
-        // Key: RenderFrame pointer (unique per slot, stable lifetime managed by RenderContext).
         unordered_map<RenderFrame*, FFX_CACAO_VkContext*> m_cacaoContexts;
 
         Settings m_settings;
-
-        inline static bool _enabled = true;
-        bool _showWindow = false;
 
         VkDescriptorSet _aoImGuiDS = VK_NULL_HANDLE;
     };

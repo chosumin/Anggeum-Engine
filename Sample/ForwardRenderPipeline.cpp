@@ -17,6 +17,7 @@
 #include "Sample/RendererPasses/DFAOPass.h"
 #include "Sample/RendererPasses/CACAOPass.h"
 #include "Sample/RendererPasses/GUIRenderPass.h"
+#include "Graphics/RendererPasses/AmbientOcclusionPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -65,13 +66,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 			batches->GetDrawCommandCount(),
 			batches->GetInstanceCount());
 
-		auto dfaoPass = new DFAOPass(
-			device, workerThreadManager, scene, extent, _msaaSamples,
+		auto ambientOcclusionPass = new AmbientOcclusionPass(
+			device, workerThreadManager, scene,
+			extent, _msaaSamples,
 			sdfShadowPass->GetSDFGenerator());
-		AddRendererPass(dfaoPass);
-
-		auto cacaoPass = new CACAOPass(device, workerThreadManager, scene, extent, _msaaSamples);
-		AddRendererPass(cacaoPass);
+		AddRendererPass(ambientOcclusionPass);
 	}
 	
 	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);

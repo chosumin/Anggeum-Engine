@@ -37,7 +37,7 @@ DFAOPass::~DFAOPass()
 void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
     RenderTargetDesc aoDesc{};
-    aoDesc.extent  = { _screenExtent.width / 2, _screenExtent.height / 2 };
+    aoDesc.extent  = { _screenExtent.width, _screenExtent.height };
     aoDesc.format  = VK_FORMAT_R8_UNORM;
     aoDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -112,57 +112,31 @@ void DFAOPass::UpdateParams()
 
 void DFAOPass::UpdateGUI()
 {
-    if (ImGui::BeginMainMenuBar())
+    ImGui::Separator();
+    if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        if (ImGui::BeginMenu("Debug"))
-        {
-            ImGui::MenuItem("DFAO", nullptr, &_showWindow);
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
+        ImGui::SliderInt  ("Num Samples",  &_numSamples,  1,    16);
+        ImGui::SliderFloat("Max Distance", &_maxDistance, 0.1f, 10.0f);
+        ImGui::SliderFloat("Intensity",    &_intensity,   0.0f, 2.0f);
+        ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
+        ImGui::SliderFloat("Contact Strength", &_contactShadowStrength, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Contact Threshold", &_contactThreshold, 0.01f, 0.5f, "%.3f");
     }
 
-    if (!_showWindow)
-        return;
-
-    if (!ImGui::Begin("DFAO Debug", &_showWindow))
+    if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::End();
-        return;
-    }
-
-    ImGui::Checkbox("Enable DFAO", &_enabled);
-
-    if (_enabled)
-    {
-        ImGui::Separator();
-        if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
+        if (_aoImGuiDS == VK_NULL_HANDLE)
         {
-            ImGui::SliderInt  ("Num Samples",  &_numSamples,  1,    16);
-            ImGui::SliderFloat("Max Distance", &_maxDistance, 0.1f, 10.0f);
-            ImGui::SliderFloat("Intensity",    &_intensity,   0.0f, 2.0f);
-            ImGui::SliderFloat("Step Scale",   &_stepScale,   0.1f, 2.0f);
-            ImGui::SliderFloat("Contact Strength", &_contactShadowStrength, 0.0f, 2.0f, "%.2f");
-            ImGui::SliderFloat("Contact Threshold", &_contactThreshold, 0.01f, 0.5f, "%.3f");
+            _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
+                _aoTexture->GetSampler()->GetSampler(),
+                _aoTexture->GetImageView(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
-
-        if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            if (_aoImGuiDS == VK_NULL_HANDLE)
-            {
-                _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
-                    _aoTexture->GetSampler()->GetSampler(),
-                    _aoTexture->GetImageView(),
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            }
-            float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
-            uint32_t previewW = static_cast<uint32_t>(128 * aspect);
-            ImGui::Image(static_cast<ImTextureID>(_aoImGuiDS),
-                ImVec2(static_cast<float>(previewW), 128.0f));
-        }
+        float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
+        uint32_t previewW = static_cast<uint32_t>(128 * aspect);
+        ImGui::Image(static_cast<ImTextureID>(_aoImGuiDS),
+            ImVec2(static_cast<float>(previewW), 128.0f));
     }
-
-    ImGui::End();
 }
 
 void DFAOPass::Prepare()
@@ -171,12 +145,6 @@ void DFAOPass::Prepare()
 
 void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    // Always update GUI so the checkbox remains accessible
-    UpdateGUI();
-
-    if (!_enabled)
-        return;
-
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
 
@@ -259,8 +227,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     commandBuffer.PushConstants(*_dfaoShader, 0, &pc);
 
     commandBuffer.Dispatch(
-        (_screenExtent.width / 2 + 7) / 8,
-        (_screenExtent.height / 2 + 7) / 8, 1);
+        (_screenExtent.width + 7) / 8,
+        (_screenExtent.height + 7) / 8, 1);
 
     commandBuffer.TransitionImageLayout(aoImage,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

@@ -22,14 +22,13 @@ namespace Core
         void Prepare() override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-        static bool IsEnabled() { return _enabled; }
+        void UpdateGUI();
 
     private:
         void EnsureRenderTargets(RenderFrame& renderFrame);
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
         void UpdateParams();
-        void UpdateGUI();
 
     private:
         Scene& _scene;
@@ -48,14 +47,12 @@ namespace Core
 
         DFAOUniform _params{};
 
-        inline static bool _enabled    = false;
-        bool  _showWindow  = false;
         int   _numSamples  = 8;
         float _maxDistance = 2.0f;
         float _intensity   = 1.0f;
         float _stepScale   = 0.5f;
-        float _contactShadowStrength = 0.7f;  // Contact shadow enhancement strength
-        float _contactThreshold = 0.05f;      // Contact detection distance threshold
+        float _contactShadowStrength = 0.7f;
+        float _contactThreshold = 0.05f;
 
         VkDescriptorSet _aoImGuiDS = VK_NULL_HANDLE;
     };
