@@ -116,23 +116,6 @@ layout(std140, push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
-vec3 Normal(uint normalmapIndex)
-{
-	vec3 dx = dFdx(worldPos.xyz);
-	vec3 dy = dFdy(worldPos.xyz);
-	vec3 st1 = dFdx(vec3(uv, 0.0));
-	vec3 st2 = dFdy(vec3(uv, 0.0));
-	vec3 T = (st2.t * dx - st1.t * dy) / (st1.s * st2.t - st2.s * st1.t);
-	vec3 N = normalize(worldNormal);
-	T = normalize(T - N * dot(N, T));
-	vec3 B = normalize(cross(N, T));
-	mat3 TBN = mat3(T, B, N);
-
-	vec3 n = texture(bindlessTextures2D[nonuniformEXT(normalmapIndex)], uv).rgb;
-
-	return normalize(TBN * (2.0 * n - 1.0));
-}
-
 void main()
 {
 #ifdef GPU_DRIVEN_RENDERING
@@ -141,7 +124,6 @@ void main()
 #endif
 
 	vec4 albedo = vec4(1.0);
-	float ao = 1.0;
 	float roughness = 0.0;
 	float metallic = 0.0;
 
@@ -153,9 +135,13 @@ void main()
 		albedo = pbr.albedo;
 
 	vec4 metallicRoughness = vec4(0.0);
-	if (pbr.metallicTextureSet == 1)
+	if (pbr.metallicTextureSet == 1 || pbr.roughnessTextureSet == 1)
 	{
 		metallicRoughness = texture(bindlessTextures2D[nonuniformEXT(pbr.metallicRoughnessmapIndex)], uv);
+	}
+
+	if (pbr.metallicTextureSet == 1)
+	{
 		metallic = metallicRoughness.b;
 	}
 	else
@@ -168,15 +154,9 @@ void main()
 		roughness = metallicRoughness.g;
 	}
 	else
-		roughness = pbr.roughness;
-
-	if (pbr.occlusionTextureSet == 1)
 	{
-		//fixme : hardcoded. needs occlusion mapping
-		ao = 0.1;
+		roughness = pbr.roughness;
 	}
-	else
-		ao = pbr.ao;
 
 	vec3 n = texture(bindlessTextures2D[nonuniformEXT(pbr.normalmapIndex)], uv).rgb;
 	vec3 N = normalize(Normal(n, worldPos.xyz, worldNormal, uv));
@@ -236,8 +216,8 @@ void main()
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;
 
-	// Sample DFAO: applied globally across the full screen to the ambient term
-	float dfao = texture(dfaoMap, screenUV).r;
+	// Sample AO: applied globally across the full screen to the ambient term
+	float ao = texture(dfaoMap, screenUV).r;
 
 	// ambient lighting
 	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);
@@ -255,8 +235,8 @@ void main()
 	vec2 brdf = texture(bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)], vec2(max(dot(N, V), 0.0), roughness)).rg;
 	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
 
-	// Combine material AO and DFAO, then apply to ambient
-	vec3 ambient = (kD * diffuse * dfao + specular) * ao;
+	const float AO = 0.1; // Global AO factor to reduce ambient lighting
+	vec3 ambient = (kD * diffuse * ao + specular) * AO;
     vec3 color = ambient + Lo;
 	
 	float exposure = 4.5;

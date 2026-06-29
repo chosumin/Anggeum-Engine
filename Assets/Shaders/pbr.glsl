@@ -8,6 +8,16 @@ vec3 FresnelSchlick(float cosTheta, vec3 F0)
 	return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
 }
 
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+float SpecularOcclusion(float NdotV, float ao, float roughness)
+{
+    return clamp(pow(NdotV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
+}
+
 //the normal distribution function
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
