@@ -253,16 +253,9 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     UpdateSDFParams();
 
-    auto depthTarget = renderFrame.GetRenderTarget("MainDepth");
+    auto depthTarget = renderFrame.GetCurrentDepth();
     if (!depthTarget)
         return;
-
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        depthTarget = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
-        if (!depthTarget)
-            return;
-    }
 
     commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
         VK_IMAGE_LAYOUT_UNDEFINED,

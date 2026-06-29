@@ -48,6 +48,9 @@ void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
     resolvedNormalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     resolvedNormalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
     _resolvedNormalTexture = renderFrame.GetOrCreateRenderTarget(RT_RESOLVED_NORMAL, resolvedNormalDesc);
+
+    renderFrame.SetCurrentDepth(_resolvedDepthTexture);
+    renderFrame.SetCurrentNormal(_resolvedNormalTexture);
 }
 
 void ResolvePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

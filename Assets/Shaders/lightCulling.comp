@@ -16,7 +16,7 @@ layout(set = 0, binding = 1) writeonly buffer TileLightVisiblities
     LightVisiblity light_visiblities[];
 };
 
-layout(set = 0, binding = 2) uniform sampler2DMS depthBuffer;
+layout(set = 0, binding = 2) uniform sampler2D depthBuffer;
 
 layout(set = 0, binding = 3) uniform Lights
 {
@@ -138,7 +138,8 @@ void main()
 			for (int x = 0; x < TILE_SIZE; x++)
 			{
 				ivec2 sample_loc = ivec2(TILE_SIZE, TILE_SIZE) * tileId + ivec2(x, y);
-				float pre_depth = texelFetch(depthBuffer, sample_loc, 0).x;
+				vec2 uv = (vec2(sample_loc) + 0.5) / vec2(tileInfo.viewportSize);
+				float pre_depth = texture(depthBuffer, uv).x;
 				min_depth = min(min_depth, pre_depth);
 				max_depth = max(max_depth, pre_depth); //TODO: parallize this
 			}

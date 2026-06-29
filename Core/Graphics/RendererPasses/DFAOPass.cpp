@@ -100,23 +100,10 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     commandBuffer.BeginDebugMarker("DFAO");
 
-    // Use resolved textures from ResolvePass
-    shared_ptr<Texture> depthForSampling;
-    shared_ptr<Texture> normalForSampling;
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        depthForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
-        normalForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_NORMAL);
-        if (!depthForSampling || !normalForSampling)
-            return;
-    }
-    else
-    {
-        depthForSampling = renderFrame.GetRenderTarget("MainDepth");
-        normalForSampling = renderFrame.GetRenderTarget("MainNormal");
-        if (!depthForSampling || !normalForSampling)
-            return;
-    }
+    auto depthForSampling = renderFrame.GetCurrentDepth();
+    auto normalForSampling = renderFrame.GetCurrentNormal();
+    if (!depthForSampling || !normalForSampling)
+        return;
 
     auto& aoImage = *_aoTexture->GetImage().lock();
     commandBuffer.TransitionImageLayout(aoImage,

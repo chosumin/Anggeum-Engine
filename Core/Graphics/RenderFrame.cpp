@@ -63,6 +63,9 @@ void RenderFrame::Reset()
 		resources.CleanupBuffers();
 	}
 	_builderResources.clear();
+
+	_currentDepth = nullptr;
+	_currentNormal = nullptr;
 }
 
 void RenderFrame::AllocateDescriptorSets(Shader& shader)

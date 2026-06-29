@@ -60,7 +60,7 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     normalDesc.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     normalDesc.samples = _msaaSamples;
     normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    renderFrame.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
+    auto normalTexture = renderFrame.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
 
     // [1] Depth RT
     RenderTargetDesc depthDesc{};
@@ -69,7 +69,14 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     depthDesc.usage   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     depthDesc.samples = _msaaSamples;
     depthDesc.aspect  = VK_IMAGE_ASPECT_DEPTH_BIT;
-    renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
+    auto depthTexture = renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
+
+    // If MSAA is disabled, set current depth/normal directly (no resolve needed)
+    if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
+    {
+        renderFrame.SetCurrentDepth(depthTexture);
+        renderFrame.SetCurrentNormal(normalTexture);
+    }
 }
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)

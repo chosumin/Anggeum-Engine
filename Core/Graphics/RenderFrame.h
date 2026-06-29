@@ -99,6 +99,11 @@ namespace Core
 		void SetPreviousDepthBuffer(shared_ptr<Texture> depth);
 		shared_ptr<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
+		void SetCurrentDepth(shared_ptr<Texture> depth) { _currentDepth = depth; }
+		shared_ptr<Texture> GetCurrentDepth() const { return _currentDepth; }
+		void SetCurrentNormal(shared_ptr<Texture> normal) { _currentNormal = normal; }
+		shared_ptr<Texture> GetCurrentNormal() const { return _currentNormal; }
+
 		// For debugging purposes
 		const unordered_map<string, shared_ptr<Texture>>& GetAllRenderTargets() const { return _renderTargets; }
 
@@ -144,6 +149,8 @@ namespace Core
 
 		unordered_map<string, shared_ptr<Texture>> _renderTargets;
 		shared_ptr<Texture> _previousDepthBuffer;
+		shared_ptr<Texture> _currentDepth;
+		shared_ptr<Texture> _currentNormal;
 
 		shared_ptr<Sampler> _defaultSampler;
 

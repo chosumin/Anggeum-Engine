@@ -6,7 +6,6 @@
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Components/PerspectiveCamera.h"
 #include "DFAOPass.h"
-#include "ResolvePass.h"
 
 #include "ffx_cacao_impl.h"
 
@@ -91,31 +90,10 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
     CommandBuffer& commandBuffer = renderFrame.GetCommandBuffer();
 
-    // Resolve depth input
-    shared_ptr<Texture> depthForSampling;
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        depthForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
-    }
-    else
-    {
-        depthForSampling = renderFrame.GetRenderTarget("MainDepth");
-    }
-
-    // Resolve normal input
-    shared_ptr<Texture> normalForSampling;
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        normalForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_NORMAL);
-        if (!normalForSampling)
-            return;
-    }
-    else
-    {
-        normalForSampling = renderFrame.GetRenderTarget("MainNormal");
-        if (!normalForSampling)
-            return;
-    }
+    auto depthForSampling = renderFrame.GetCurrentDepth();
+    auto normalForSampling = renderFrame.GetCurrentNormal();
+    if (!depthForSampling || !normalForSampling)
+        return;
 
     auto& aoImage = *_aoTexture->GetImage().lock();
 
