@@ -32,10 +32,6 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
-	commandBuffer.TransitionImageLayout(*depthTarget->GetImage().lock(),
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 
 	renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(),
@@ -57,10 +53,6 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 	commandBuffer.PushConstants(*_computeMaterial, 0);
 
 	commandBuffer.Dispatch(_tileInfo.tileNums.x, _tileInfo.tileNums.y, 1);
-
-	commandBuffer.TransitionImageLayout(*depthTarget->GetImage().lock(),
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 void Core::LightCullingPass::UpdateLightBuffer()

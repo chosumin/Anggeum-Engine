@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Components/PerspectiveCamera.h"
 #include "DFAOPass.h"
+#include "ResolvePass.h"
 
 #include "ffx_cacao_impl.h"
 
@@ -21,13 +22,6 @@ CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
 {
     // CACAO contexts are created lazily in GetOrCreateCacaoContext(),
     // one per swap chain image slot, so we don't allocate anything here.
-
-    // Setup normal resolve pipeline if MSAA is enabled
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        _normalResolveShader = _device.GetResourceCache().RequestShader("Shaders/normalResolve.comp.spv");
-        _normalResolvePipeline = make_unique<Pipeline>(_device, *_normalResolveShader);
-    }
 }
 
 CACAOPass::~CACAOPass()
@@ -101,31 +95,26 @@ void CACAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     shared_ptr<Texture> depthForSampling;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        depthForSampling = renderFrame.GetRenderTarget("SDFResolvedDepth");
-        if (!depthForSampling)
-            return;
+        depthForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
     }
     else
     {
         depthForSampling = renderFrame.GetRenderTarget("MainDepth");
-        if (!depthForSampling)
-            return;
-
-        commandBuffer.TransitionImageLayout(*depthForSampling->GetImage().lock(),
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    auto normalTexture = renderFrame.GetRenderTarget("MainNormal");
-    if (!normalTexture)
-        return;
-
-    // Resolve MSAA normals if needed
-    shared_ptr<Texture> normalForSampling = normalTexture;
+    // Resolve normal input
+    shared_ptr<Texture> normalForSampling;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        ResolveNormal(renderFrame, commandBuffer, normalTexture);
-        normalForSampling = _resolvedNormalTexture;
+        normalForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_NORMAL);
+        if (!normalForSampling)
+            return;
+    }
+    else
+    {
+        normalForSampling = renderFrame.GetRenderTarget("MainNormal");
+        if (!normalForSampling)
+            return;
     }
 
     auto& aoImage = *_aoTexture->GetImage().lock();
@@ -189,55 +178,6 @@ void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
     _aoTexture = renderFrame.GetOrCreateRenderTarget(DFAOPass::RT_DFAO, aoDesc);
-
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        RenderTargetDesc normalDesc{};
-        normalDesc.extent  = _screenExtent;
-        normalDesc.format  = VK_FORMAT_R8G8B8A8_UNORM;
-        normalDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        normalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-        normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-        _resolvedNormalTexture = renderFrame.GetOrCreateRenderTarget(DFAOPass::RT_NORMAL_RESOLVED, normalDesc);
-    }
-}
-
-void CACAOPass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    shared_ptr<Texture> msaaNormal)
-{
-    auto& resolvedImage = *_resolvedNormalTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-    struct PushConstants
-    {
-        int32_t outputWidth;
-        int32_t outputHeight;
-        int32_t sampleCount;
-        int32_t padding;
-    } pc = {
-        static_cast<int32_t>(_screenExtent.width),
-        static_cast<int32_t>(_screenExtent.height),
-        static_cast<int32_t>(_msaaSamples),
-        0
-    };
-
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_normalResolveShader, 0);
-    builder.SetTextureBuffer(0, msaaNormal);
-    builder.SetTextureBuffer(1, _resolvedNormalTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    auto& resources = builder.Build();
-
-    commandBuffer.BindPipeline(_normalResolvePipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE, *_normalResolveShader, 0, resources);
-    commandBuffer.PushConstants(*_normalResolveShader, 0, &pc);
-
-    commandBuffer.Dispatch(
-        (_screenExtent.width + 7) / 8,
-        (_screenExtent.height + 7) / 8, 1);
-
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void CACAOPass::UpdateGUI()

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "ResolvePass.h"
 
 namespace Core
 {
@@ -11,7 +12,6 @@ namespace Core
     {
     public:
         static constexpr const char* RT_DFAO            = "DFAOResult";
-        static constexpr const char* RT_NORMAL_RESOLVED = "DFAONormalResolved";
 
         DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, VkExtent2D screenExtent,
@@ -25,8 +25,6 @@ namespace Core
         void UpdateGUI();
 
     private:
-        void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            shared_ptr<Texture> msaaNormal);
         void UpdateParams();
 
     private:
@@ -36,13 +34,9 @@ namespace Core
         SDFGenerator* _sdfGenerator;
 
         shared_ptr<Texture> _aoTexture;
-        shared_ptr<Texture> _resolvedNormalTexture;
 
         shared_ptr<Shader>   _dfaoShader;
         unique_ptr<Pipeline> _dfaoPipeline;
-
-        shared_ptr<Shader>   _normalResolveShader;
-        unique_ptr<Pipeline> _normalResolvePipeline;
 
         DFAOUniform _params{};
 

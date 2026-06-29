@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "ResolvePass.h"
 
 #define FFX_CACAO_ENABLE_VULKAN 1
 #include "ffx_cacao.h"
@@ -24,9 +25,6 @@ namespace Core
         void UpdateGUI();
 
     private:
-        void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            shared_ptr<Texture> msaaNormal);
-
         FFX_CACAO_VkContext* GetOrCreateCacaoContext(
             RenderFrame* frameKey,
             VkImageView depthView,
@@ -59,10 +57,6 @@ namespace Core
         VkSampleCountFlagBits _msaaSamples;
 
         shared_ptr<Texture> _aoTexture;
-        shared_ptr<Texture> _resolvedNormalTexture;
-
-        shared_ptr<Shader>   _normalResolveShader;
-        unique_ptr<Pipeline> _normalResolvePipeline;
 
         unordered_map<RenderFrame*, FFX_CACAO_VkContext*> m_cacaoContexts;
 

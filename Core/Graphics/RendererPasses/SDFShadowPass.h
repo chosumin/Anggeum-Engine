@@ -2,6 +2,7 @@
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
 #include "Graphics/RendererBatch.h"
+#include "ResolvePass.h"
 
 namespace Core
 {
@@ -13,7 +14,6 @@ namespace Core
 	{
 	public:
 		static constexpr const char* RT_SDF_SHADOW       = "SDFShadow";
-		static constexpr const char* RT_SDF_RESOLVED_DEPTH = "SDFResolvedDepth";
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
 		SDFShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
@@ -40,8 +40,6 @@ namespace Core
 		}
 
 	private:
-		void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			shared_ptr<Texture> msaaDepth);
 		void RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 		void UpdateSDFParams();
 
@@ -53,14 +51,9 @@ namespace Core
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
 		shared_ptr<Texture> _sdfShadowTexture;
-		shared_ptr<Texture> _resolvedDepthTexture;
 
 		shared_ptr<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
-
-		// Depth resolve resources
-		shared_ptr<Shader> _depthResolveShader;
-		unique_ptr<Pipeline> _depthResolvePipeline;
 
 		// Volume visualization
 		shared_ptr<Shader> _volumeSliceShader;

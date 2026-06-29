@@ -58,7 +58,6 @@ namespace Core
 			VkExtent2D extents);
 
 		void GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			shared_ptr<Texture> prevDepth, shared_ptr<Texture> curDepth,
 			CameraBuffer& camera,
 			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
 			Framebuffer& framebuffer,
@@ -137,9 +136,6 @@ namespace Core
 		unique_ptr<Pipeline> _hiZPipeline;
 		uint32_t _hiZMipLevels = 0;
 		VkExtent2D _screenExtent = {};
-
-		shared_ptr<Shader> _depthResolveShader = nullptr;
-		unique_ptr<Pipeline> _depthResolvePipeline;
 
 		bool _hiZInitialized = false;
 

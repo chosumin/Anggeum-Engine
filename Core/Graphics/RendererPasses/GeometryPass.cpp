@@ -172,6 +172,12 @@ namespace Core
 
         auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
+
+        auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
+        commandBuffer.TransitionImageLayout(*depth->GetImage().lock(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
 
@@ -212,12 +218,8 @@ namespace Core
 
         if (_device.IsGpuDrivenRenderingEnabled())
         {
-            auto previousDepth = renderFrame.GetPreviousDepthBuffer();
-            auto depthTarget = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
-
             _rendererBatches->GpuDrivenDraw(
                 renderFrame, commandBuffer,
-                previousDepth, depthTarget,
                 camera->Matrices,
                 *_renderPass, *_renderPassPass2,
                 *framebuffer,
@@ -310,10 +312,10 @@ namespace Core
         _giBuffer.prefilterMapIndex  = prefilteredCubemapHandle.index & 0x7FFFFFFF;
         _giBuffer.brdfLUTIndex       = brdfLutHandle.index & 0x7FFFFFFF;
 
-        cout << "GI textures registered to bindless:" << endl;
-        cout << "  Irradiance cubemap: index " << _giBuffer.irradianceMapIndex << endl;
-        cout << "  Prefiltered cubemap: index " << _giBuffer.prefilterMapIndex << endl;
-        cout << "  BRDF LUT: index " << _giBuffer.brdfLUTIndex << endl;
+        std::cout << "GI textures registered to bindless:" << endl;
+        std::cout << "  Irradiance cubemap: index " << _giBuffer.irradianceMapIndex << endl;
+        std::cout << "  Prefiltered cubemap: index " << _giBuffer.prefilterMapIndex << endl;
+        std::cout << "  BRDF LUT: index " << _giBuffer.brdfLUTIndex << endl;
     }
 
     void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer)

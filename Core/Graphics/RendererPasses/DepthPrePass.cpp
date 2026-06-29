@@ -26,7 +26,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 
     // [0] Normal color attachment
     _renderPass->CreateColorAttachment(
-        VK_FORMAT_R16G16B16A16_SFLOAT, msaaSamples,
+        VK_FORMAT_R8G8B8A8_UNORM, msaaSamples,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -56,7 +56,7 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     // [0] Normal RT
     RenderTargetDesc normalDesc{};
     normalDesc.extent  = _extent;
-    normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
+    normalDesc.format  = VK_FORMAT_R8G8B8A8_UNORM;
     normalDesc.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     normalDesc.samples = _msaaSamples;
     normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;

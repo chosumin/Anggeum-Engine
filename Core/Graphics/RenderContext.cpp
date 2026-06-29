@@ -144,9 +144,13 @@ void RenderContext::Submit()
 {
 	auto& currentFrame = GetCurrentFrame();
 
-	auto currentDepth = currentFrame.GetRenderTarget("MainDepth");
-	if (currentDepth)
+	auto currentResolvedDepth = currentFrame.GetRenderTarget("ResolvedDepth");
+
+	if (currentResolvedDepth)
+		_frameDepthBuffers[_currentFrame] = currentResolvedDepth;
+	else
 	{
+		auto currentDepth = currentFrame.GetRenderTarget("MainDepth");
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 

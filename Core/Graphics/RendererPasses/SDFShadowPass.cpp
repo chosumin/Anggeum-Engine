@@ -29,9 +29,6 @@ SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadMa
     _sdfShadowShader = _device.GetResourceCache().RequestShader("Shaders/sdfShadow.comp.spv");
     _sdfShadowPipeline = make_unique<Pipeline>(_device, *_sdfShadowShader);
 
-    _depthResolveShader = _device.GetResourceCache().RequestShader("Shaders/depthResolve.comp.spv");
-    _depthResolvePipeline = make_unique<Pipeline>(_device, *_depthResolveShader);
-
     _volumeSliceShader = _device.GetResourceCache().RequestShader("Shaders/sdfVolumeSlice.comp.spv");
     _volumeSlicePipeline = make_unique<Pipeline>(_device, *_volumeSliceShader);
 }
@@ -58,18 +55,6 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 
     _sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        RenderTargetDesc resolvedDepthDesc{};
-        resolvedDepthDesc.extent  = _screenExtent;
-        resolvedDepthDesc.format  = VK_FORMAT_R32_SFLOAT;
-        resolvedDepthDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        resolvedDepthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-        resolvedDepthDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-
-        _resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_RESOLVED_DEPTH, resolvedDepthDesc);
-    }
-
     // Volume raytrace debug texture - match screen aspect ratio
     float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);
@@ -82,46 +67,6 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     sliceDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 
     _volumeSliceTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
-}
-
-void SDFShadowPass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    shared_ptr<Texture> msaaDepth)
-{
-    auto& resolvedImage = *_resolvedDepthTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL);
-
-    struct DepthResolvePushConstants {
-        int32_t outputWidth;
-        int32_t outputHeight;
-        int32_t sampleCount;
-        int32_t padding;
-    } resolvePc = {
-        static_cast<int32_t>(_screenExtent.width),
-        static_cast<int32_t>(_screenExtent.height),
-        static_cast<int32_t>(_msaaSamples),
-        0
-    };
-
-    auto resolveBuilder = renderFrame.CreateDescriptorSetBuilder(*_depthResolveShader, 0);
-    resolveBuilder.SetTextureBuffer(0, msaaDepth);
-    resolveBuilder.SetTextureBuffer(1, _resolvedDepthTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    auto& resolveResources = resolveBuilder.Build();
-
-    commandBuffer.BindPipeline(_depthResolvePipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_depthResolveShader, 0, resolveResources);
-    commandBuffer.PushConstants(*_depthResolveShader, 0, &resolvePc);
-
-    uint32_t groupX = (_screenExtent.width + 7) / 8;
-    uint32_t groupY = (_screenExtent.height + 7) / 8;
-    commandBuffer.Dispatch(groupX, groupY, 1);
-
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
@@ -308,21 +253,15 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     UpdateSDFParams();
 
-    auto depthTexture = renderFrame.GetRenderTarget("MainDepth");
-    if (!depthTexture)
+    auto depthTarget = renderFrame.GetRenderTarget("MainDepth");
+    if (!depthTarget)
         return;
 
-    commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    shared_ptr<Texture> depthForSampling = depthTexture;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        commandBuffer.BeginDebugMarker("Resolve MSAA Depth");
-        ResolveDepth(renderFrame, commandBuffer, depthTexture);
-        commandBuffer.EndDebugMarker();
-        depthForSampling = _resolvedDepthTexture;
+        depthTarget = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
+        if (!depthTarget)
+            return;
     }
 
     commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
@@ -335,7 +274,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     builder.SetUniformBuffer(0, &camera->Matrices);
     builder.SetTextureBuffer(1, sdfTexture);
     builder.SetUniformBuffer(2, &_sdfParams);
-    builder.SetTextureBuffer(3, depthForSampling);
+    builder.SetTextureBuffer(3, depthTarget);
     builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     builder.SetStorageBuffer(5, _sdfGenerator->GetBoundsBuffer());
     auto& resources = builder.Build();
@@ -359,8 +298,4 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         RenderVolumeSlice(renderFrame, commandBuffer);
         commandBuffer.EndDebugMarker();
     }
-
-    commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }

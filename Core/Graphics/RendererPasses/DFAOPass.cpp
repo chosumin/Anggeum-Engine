@@ -21,12 +21,6 @@ DFAOPass::DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
 {
     _dfaoShader   = _device.GetResourceCache().RequestShader("Shaders/dfao.comp.spv");
     _dfaoPipeline = make_unique<Pipeline>(_device, *_dfaoShader);
-
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        _normalResolveShader   = _device.GetResourceCache().RequestShader("Shaders/normalResolve.comp.spv");
-        _normalResolvePipeline = make_unique<Pipeline>(_device, *_normalResolveShader);
-    }
 }
 
 DFAOPass::~DFAOPass()
@@ -44,55 +38,6 @@ void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
     _aoTexture = renderFrame.GetOrCreateRenderTarget(RT_DFAO, aoDesc);
-
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        RenderTargetDesc normalDesc{};
-        normalDesc.extent  = _screenExtent;
-        normalDesc.format  = VK_FORMAT_R16G16B16A16_SFLOAT;
-        normalDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        normalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-        normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-        _resolvedNormalTexture = renderFrame.GetOrCreateRenderTarget(RT_NORMAL_RESOLVED, normalDesc);
-    }
-}
-
-void DFAOPass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    shared_ptr<Texture> msaaNormal)
-{
-    auto& resolvedImage = *_resolvedNormalTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-    struct PushConstants
-    {
-        int32_t outputWidth;
-        int32_t outputHeight;
-        int32_t sampleCount;
-        int32_t padding;
-    } pc = {
-        static_cast<int32_t>(_screenExtent.width),
-        static_cast<int32_t>(_screenExtent.height),
-        static_cast<int32_t>(_msaaSamples),
-        0
-    };
-
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_normalResolveShader, 0);
-    builder.SetTextureBuffer(0, msaaNormal);
-    builder.SetTextureBuffer(1, _resolvedNormalTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    auto& resources = builder.Build();
-
-    commandBuffer.BindPipeline(_normalResolvePipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE, *_normalResolveShader, 0, resources);
-    commandBuffer.PushConstants(*_normalResolveShader, 0, &pc);
-
-    commandBuffer.Dispatch(
-        (_screenExtent.width  + 7) / 8,
-        (_screenExtent.height + 7) / 8, 1);
-
-    commandBuffer.TransitionImageLayout(resolvedImage,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void DFAOPass::UpdateParams()
@@ -150,40 +95,27 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     if (!sdfTexture || !boundsBuffer)
         return;
 
-    auto normalTexture = renderFrame.GetRenderTarget("MainNormal");
-    if (!normalTexture)
-        return;
-
     UpdateParams();
 
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     commandBuffer.BeginDebugMarker("DFAO");
 
-    // Reuse the resolved depth buffer from SDFShadowPass
+    // Use resolved textures from ResolvePass
     shared_ptr<Texture> depthForSampling;
+    shared_ptr<Texture> normalForSampling;
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        depthForSampling = renderFrame.GetRenderTarget("SDFResolvedDepth");
-        if (!depthForSampling)
+        depthForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
+        normalForSampling = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_NORMAL);
+        if (!depthForSampling || !normalForSampling)
             return;
     }
     else
     {
         depthForSampling = renderFrame.GetRenderTarget("MainDepth");
-        if (!depthForSampling)
+        normalForSampling = renderFrame.GetRenderTarget("MainNormal");
+        if (!depthForSampling || !normalForSampling)
             return;
-
-        commandBuffer.TransitionImageLayout(*depthForSampling->GetImage().lock(),
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
-
-    // Normal resolve
-    shared_ptr<Texture> normalForSampling = normalTexture;
-    if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-    {
-        ResolveNormal(renderFrame, commandBuffer, normalTexture);
-        normalForSampling = _resolvedNormalTexture;
     }
 
     auto& aoImage = *_aoTexture->GetImage().lock();
@@ -228,13 +160,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     commandBuffer.TransitionImageLayout(aoImage,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
-    {
-        commandBuffer.TransitionImageLayout(*depthForSampling->GetImage().lock(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    }
 
     commandBuffer.EndDebugMarker();
 }

@@ -18,6 +18,7 @@
 #include "Graphics/RendererPasses/CACAOPass.h"
 #include "Graphics/RendererPasses/GUIRenderPass.h"
 #include "Graphics/RendererPasses/AmbientOcclusionPass.h"
+#include "Graphics/RendererPasses/ResolvePass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -48,6 +49,15 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples, _transformBatch);
 	AddRendererPass(depthPrePass);
 
+	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
+	{
+		auto resolvePass = new ResolvePass(device, workerThreadManager, extent, _msaaSamples);
+		AddRendererPass(resolvePass);
+	}
+
+	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
+	AddRendererPass(lightCullingPass);
+
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
 	AddRendererPass(shadowPass);
@@ -72,9 +82,6 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 			sdfShadowPass->GetSDFGenerator());
 		AddRendererPass(ambientOcclusionPass);
 	}
-	
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
-	AddRendererPass(lightCullingPass);
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
