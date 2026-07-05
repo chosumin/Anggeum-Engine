@@ -3,6 +3,7 @@
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
+#include "Culler.h"
 
 namespace Core
 {
@@ -16,6 +17,7 @@ namespace Core
 	class RenderPass;
 	class Framebuffer;
 	class DescriptorSetBuilder;
+	class RendererBatches;
 
 	struct RenderTargetDesc
 	{
@@ -117,6 +119,11 @@ namespace Core
 		// The built resources are stored in the frame and cleaned up on Reset().
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
+		// Culler management - per RendererBatches, reused within a frame
+		Culler* GetOrCreateCuller(RendererBatches* batch, Device& device, TransformBatch& transformBatch);
+		bool IsCullerUsedThisFrame(RendererBatches* batch) const;
+		void MarkCullerUsed(RendererBatches* batch);
+
 	private:
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
@@ -158,5 +165,8 @@ namespace Core
 
 		// Builder-created resources, cleaned up on Reset()
 		vector<DescriptorSetResources> _builderResources;
+
+		// Per-RendererBatches cullers, reused within a frame
+		unordered_map<RendererBatches*, unique_ptr<Culler>> _cullers;
 	};
 }

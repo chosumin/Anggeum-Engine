@@ -64,6 +64,12 @@ void RenderFrame::Reset()
 	}
 	_builderResources.clear();
 
+	// Reset culler usage tracking for this frame
+	for (auto& culler : _cullers)
+	{
+		culler.second->MarkUsedThisFrame(false);
+	}
+
 	_currentDepth = nullptr;
 	_currentNormal = nullptr;
 }
@@ -723,4 +729,16 @@ void Core::RenderFrame::RegisterFramebuffer(const string& name, unique_ptr<Frame
 DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex)
 {
 	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
+}
+
+Culler* RenderFrame::GetOrCreateCuller(RendererBatches* batch, Device& device, TransformBatch& transformBatch)
+{
+	auto it = _cullers.find(batch);
+	if (it != _cullers.end())
+		return it->second.get();
+
+	auto culler = make_unique<Culler>(device, transformBatch);
+	auto* result = culler.get();
+	_cullers[batch] = std::move(culler);
+	return result;
 }

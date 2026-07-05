@@ -25,6 +25,9 @@ namespace Core
         Culler(Device& device, TransformBatch& transformBatch);
         ~Culler();
 
+        bool IsUsedThisFrame() const { return _markUsedThisFrame; }
+		void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
+
         // Creates the culling compute resources. The draw buffers are owned by
         // RendererBatches and only referenced by the Culler.
         void Prepare(Device& device, VkExtent2D extents,
@@ -48,6 +51,9 @@ namespace Core
             CommandBuffer& commandBuffer, const CameraBuffer& camera);
 
         Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer; }
+
+        // Check if the culler has been prepared
+        bool IsPrepared() const { return _drawCount > 0; }
 
     private:
         void PrepareCullingResources(Device& device, const IndirectDrawBuffer& indirectDrawBuffer);
@@ -100,5 +106,7 @@ namespace Core
         unique_ptr<Pipeline> _frustumCullingPipeline;
         shared_ptr<Shader> _resetDrawCommandsSimpleShader;
         unique_ptr<Pipeline> _resetDrawCommandsSimplePipeline;
+
+		bool _markUsedThisFrame = false;
     };
 }

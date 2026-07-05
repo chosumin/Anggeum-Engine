@@ -147,10 +147,8 @@ void Core::RendererBatches::PrepareGPUDrivenRendering(Device& device, bool needM
 
 	Core::CommandBuffer::ImmediateSubmit(device, jobs);
 
-	_culler = make_unique<Culler>(device, _transformBatch);
-	_culler->Prepare(device, extents,
-		_objectDataBuffer, _instanceBuffer, _indirectCommandBuffer,
-		_instanceCount, _indirectDrawBuffer);
+	// Store extents for later Culler initialization
+	_extents = extents;
 }
 
 void Core::RendererBatches::PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes)
@@ -205,44 +203,90 @@ void Core::RendererBatches::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffe
 	function<void(shared_ptr<Shader>)> perShader, function<void(shared_ptr<Material>)> perDraw,
 	function<void()> postDraw)
 {
-	auto prevDepth = renderFrame.GetPreviousDepthBuffer();
-	auto curDepth = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
-	if (curDepth == nullptr)
-		curDepth = renderFrame.GetRenderTarget("MainDepth");
+	// Get or create the Culler for this RendererBatches from RenderFrame
+	auto* culler = renderFrame.GetOrCreateCuller(this, _device, _transformBatch);
 
-	commandBuffer.BeginDebugMarker("Reset Draw Commands");
-	_culler->ResetDrawCommands(renderFrame, commandBuffer);
-	commandBuffer.EndDebugMarker();
-
-	commandBuffer.BeginDebugMarker("Pass 1 Culling");
-	_culler->DispatchPass1Culling(renderFrame, commandBuffer, camera, prevDepth);
-	commandBuffer.EndDebugMarker();
-
-	commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
-	auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
-	commandBuffer.BeginRenderPass(pass1BeginInfo);
-	DrawIndirectInternal(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
-	commandBuffer.EndRenderPass();
-	commandBuffer.EndDebugMarker();
-
-	commandBuffer.BeginDebugMarker("Pass 2 Culling");
-	_culler->DispatchPass2Culling(renderFrame, commandBuffer, camera, curDepth);
-	commandBuffer.EndDebugMarker();
-
-	commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects");
-	auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
-	commandBuffer.BeginRenderPass(pass2BeginInfo);
-	DrawIndirectInternal(renderFrame, commandBuffer, *_culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
-
-	if (postDraw)
+	// Prepare the culler if it hasn't been prepared yet (first use)
+	if (!culler->IsPrepared())
 	{
-		commandBuffer.BeginDebugMarker("Post Draw");
-		postDraw();
-		commandBuffer.EndDebugMarker();
+		culler->Prepare(_device, _extents,
+			_objectDataBuffer, _instanceBuffer, _indirectCommandBuffer,
+			_instanceCount, _indirectDrawBuffer);
 	}
 
-	commandBuffer.EndRenderPass();
-	commandBuffer.EndDebugMarker();
+	// Check if culling was already done this frame
+	bool cullerAlreadyUsed = culler->IsUsedThisFrame();
+
+	if (!cullerAlreadyUsed)
+	{
+		// First use this frame - perform full culling passes
+		auto prevDepth = renderFrame.GetPreviousDepthBuffer();
+		auto curDepth = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
+		if (curDepth == nullptr)
+			curDepth = renderFrame.GetRenderTarget("MainDepth");
+
+		commandBuffer.BeginDebugMarker("Reset Draw Commands");
+		culler->ResetDrawCommands(renderFrame, commandBuffer);
+		commandBuffer.EndDebugMarker();
+
+		commandBuffer.BeginDebugMarker("Pass 1 Culling");
+		culler->DispatchPass1Culling(renderFrame, commandBuffer, camera, prevDepth);
+		commandBuffer.EndDebugMarker();
+
+		commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
+		auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
+		commandBuffer.BeginRenderPass(pass1BeginInfo);
+		DrawIndirectInternal(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
+		commandBuffer.EndRenderPass();
+		commandBuffer.EndDebugMarker();
+
+		commandBuffer.BeginDebugMarker("Pass 2 Culling");
+		culler->DispatchPass2Culling(renderFrame, commandBuffer, camera, curDepth);
+		commandBuffer.EndDebugMarker();
+
+		commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects");
+		auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
+		commandBuffer.BeginRenderPass(pass2BeginInfo);
+		DrawIndirectInternal(renderFrame, commandBuffer, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
+
+		if (postDraw)
+		{
+			commandBuffer.BeginDebugMarker("Post Draw");
+			postDraw();
+			commandBuffer.EndDebugMarker();
+		}
+
+		commandBuffer.EndRenderPass();
+		commandBuffer.EndDebugMarker();
+
+		// Mark culler as used this frame
+		culler->MarkUsedThisFrame(true);
+	}
+	else
+	{
+		// Culler already used this frame - just render with existing culled commands
+		commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects (Reuse)");
+		auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
+		commandBuffer.BeginRenderPass(pass1BeginInfo);
+		DrawIndirectInternal(renderFrame, commandBuffer, *_indirectCommandBuffer, perShader, perDraw);
+		commandBuffer.EndRenderPass();
+		commandBuffer.EndDebugMarker();
+
+		commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects (Reuse)");
+		auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
+		commandBuffer.BeginRenderPass(pass2BeginInfo);
+		DrawIndirectInternal(renderFrame, commandBuffer, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
+
+		if (postDraw)
+		{
+			commandBuffer.BeginDebugMarker("Post Draw");
+			postDraw();
+			commandBuffer.EndDebugMarker();
+		}
+
+		commandBuffer.EndRenderPass();
+		commandBuffer.EndDebugMarker();
+	}
 }
 
 void Core::RendererBatches::DrawIndirect(
@@ -431,5 +475,16 @@ void Core::RendererBatches::DrawIndirectInternal(RenderFrame& renderFrame, Comma
 void Core::RendererBatches::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	CommandBuffer& commandBuffer, const CameraBuffer& camera)
 {
-	_culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, camera);
+	// Get or create the Culler for this RendererBatches from RenderFrame
+	auto* culler = renderFrame.GetOrCreateCuller(this, _device, _transformBatch);
+
+	// Prepare the culler if it hasn't been prepared yet
+	if (!culler->IsPrepared())
+	{
+		culler->Prepare(_device, _extents,
+			_objectDataBuffer, _instanceBuffer, _indirectCommandBuffer,
+			_instanceCount, _indirectDrawBuffer);
+	}
+
+	culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, camera);
 }

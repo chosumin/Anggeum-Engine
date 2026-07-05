@@ -82,9 +82,13 @@ namespace Core
 			const CameraBuffer& camera);
 
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
-		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
-		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
-		uint32_t GetInstanceCount() const { return _instanceCount; }
+			Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
+			uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
+			uint32_t GetInstanceCount() const { return _instanceCount; }
+			Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
+			const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
+			TransformBatch& GetTransformBatch() const { return _transformBatch; }
+			VkExtent2D GetExtents() const { return _extents; }
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
@@ -110,8 +114,8 @@ namespace Core
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Core::Buffer* _objectDataBuffer = nullptr;
 
-		// GPU culling logic (frustum/occlusion/Hi-Z) lives in a separate Culler.
-		unique_ptr<Culler> _culler;
+		// Screen extents for Culler initialization
+		VkExtent2D _extents = {};
 	};
 }
 
