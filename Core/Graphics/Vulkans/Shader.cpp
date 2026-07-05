@@ -20,7 +20,7 @@ Core::Shader::Shader(Device& device, const string pass,
 	{
 		vertShaderCode = FileSystem::Read32("Assets/" + vertFilePath);
 		const char* vert = reinterpret_cast<const char*>(vertShaderCode.data());
-		vertShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath, _device.IsGpuDrivenRenderingEnabled());
+		vertShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vert, vertFilePath);
 	}
 	else
 	{
@@ -33,7 +33,7 @@ Core::Shader::Shader(Device& device, const string pass,
 	{
 		fragShaderCode = FileSystem::Read32("Assets/" + fragFilePath);
 		const char* frag = reinterpret_cast<const char*>(fragShaderCode.data());
-		fragShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath, _device.IsGpuDrivenRenderingEnabled());
+		fragShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag, fragFilePath);
 	}
 	else
 	{
@@ -62,8 +62,7 @@ Core::Shader::Shader(Device& device, const string pass, const string& computeFil
 	{
 		computeShaderCode = FileSystem::Read32("Assets/" + computeFilePath);
 		const char* compute = reinterpret_cast<const char*>(computeShaderCode.data());
-		computeShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, compute, computeFilePath,
-			_device.IsGpuDrivenRenderingEnabled());
+		computeShaderCode = SpirvUtility::GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, compute, computeFilePath);
 	}
 	else
 	{

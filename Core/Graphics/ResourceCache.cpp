@@ -56,11 +56,8 @@ namespace Core
 			make_shared<Core::Material>(_device, shaderName, materialName);
 		_materials[materialName] = material;
 
-		if (_device.IsGpuDrivenRenderingEnabled())
-		{
-			MaterialManager* materialManager = _renderContext->GetMaterialManager();
-			uint32_t materialIndex = materialManager->RegisterMaterial(material);
-		}
+		MaterialManager* materialManager = _renderContext->GetMaterialManager();
+		materialManager->RegisterMaterial(material);
 
 		return material;
 	}
@@ -86,11 +83,8 @@ namespace Core
 		_materials[overrideName] = overrideMaterial;
 
 		// Register to get a valid materialIndex
-		if (_device.IsGpuDrivenRenderingEnabled())
-		{
-			MaterialManager* materialManager = _renderContext->GetMaterialManager();
-			materialManager->RegisterMaterial(overrideMaterial);
-		}
+		MaterialManager* materialManager = _renderContext->GetMaterialManager();
+		materialManager->RegisterMaterial(overrideMaterial);
 
 		return overrideMaterial;
 	}

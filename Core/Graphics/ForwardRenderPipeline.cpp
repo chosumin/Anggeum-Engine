@@ -62,26 +62,23 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
 	AddRendererPass(shadowPass);
 
-	if (device.IsGpuDrivenRenderingEnabled())
-	{
-		auto sdfShadowPass = new SDFShadowPass(
-			device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
-		AddRendererPass(sdfShadowPass);
+	auto sdfShadowPass = new SDFShadowPass(
+		device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
+	AddRendererPass(sdfShadowPass);
 
-		auto* batches = shadowPass->GetRendererBatches();
-		sdfShadowPass->SetGPUBoundsData(
-			batches->GetObjectDataBuffer(),
-			_transformBatch.TransformBuffer,
-			batches->GetIndirectCommandBuffer(),
-			batches->GetDrawCommandCount(),
-			batches->GetInstanceCount());
+	auto* batches = shadowPass->GetRendererBatches();
+	sdfShadowPass->SetGPUBoundsData(
+		batches->GetObjectDataBuffer(),
+		_transformBatch.TransformBuffer,
+		batches->GetIndirectCommandBuffer(),
+		batches->GetDrawCommandCount(),
+		batches->GetInstanceCount());
 
-		auto ambientOcclusionPass = new AmbientOcclusionPass(
-			device, workerThreadManager, scene,
-			extent, _msaaSamples,
-			sdfShadowPass->GetSDFGenerator());
-		AddRendererPass(ambientOcclusionPass);
-	}
+	auto ambientOcclusionPass = new AmbientOcclusionPass(
+		device, workerThreadManager, scene,
+		extent, _msaaSamples,
+		sdfShadowPass->GetSDFGenerator());
+	AddRendererPass(ambientOcclusionPass);
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,

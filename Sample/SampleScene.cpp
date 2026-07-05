@@ -162,7 +162,6 @@ void SampleScene::Update()
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
 	// GPU Driven Rendering Info Section
-	if (_device.IsGpuDrivenRenderingEnabled())
 	{
 		ImGui::SeparatorText("GPU Driven Rendering Info");
 

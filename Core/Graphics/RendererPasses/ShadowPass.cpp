@@ -38,8 +38,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 		_shadowMaterial,
 		*_renderPass, *_pipelineState, meshes);
 
-	if (_device.IsGpuDrivenRenderingEnabled())
-		_rendererBatches->PrepareGPUDrivenRendering(_device, false, _shadowExtent);
+	_rendererBatches->PrepareGPUDrivenRendering(_device, false, _shadowExtent);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -362,43 +361,24 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
 		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);
 
-		if (_device.IsGpuDrivenRenderingEnabled())
-		{
-			string cullingName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Frustum Culling";
-			commandBuffer.BeginDebugMarker(cullingName.c_str());
-			_rendererBatches->DispatchFrustumOnlyCulling(
-				renderFrame, commandBuffer, _cascadeViews[cascadeIndex]);
-			commandBuffer.EndDebugMarker();
+		string cullingName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Frustum Culling";
+		commandBuffer.BeginDebugMarker(cullingName.c_str());
+		_rendererBatches->DispatchFrustumOnlyCulling(
+			renderFrame, commandBuffer, _cascadeViews[cascadeIndex]);
+		commandBuffer.EndDebugMarker();
 
-			string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
-			commandBuffer.BeginDebugMarker(drawName.c_str());
-			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
-			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-			commandBuffer.BeginRenderPass(renderPassBeginInfo);
+		string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
+		commandBuffer.BeginDebugMarker(drawName.c_str());
+		commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+		auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
+		commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-			commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
+		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-			_rendererBatches->DrawIndirect(renderFrame, commandBuffer, builder,
-			[&](shared_ptr<Material> sharedMaterial) {});
+		_rendererBatches->DrawIndirect(renderFrame, commandBuffer, builder,
+		[&](shared_ptr<Material> sharedMaterial) {});
 
-			commandBuffer.EndRenderPass();
-			commandBuffer.EndDebugMarker();
-		}
-		else
-		{
-			string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
-			commandBuffer.BeginDebugMarker(drawName.c_str());
-			commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
-			auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-			commandBuffer.BeginRenderPass(renderPassBeginInfo);
-
-			commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
-
-			_rendererBatches->Draw(renderFrame, commandBuffer, builder,
-			[&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh) {});
-
-			commandBuffer.EndRenderPass();
-			commandBuffer.EndDebugMarker();
-		}
+		commandBuffer.EndRenderPass();
+		commandBuffer.EndDebugMarker();
 	}
 }

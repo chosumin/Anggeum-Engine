@@ -18,6 +18,7 @@ namespace Core
 	class Buffer;
 	class Framebuffer;
 	class DescriptorSetBuilder;
+	class Culler;
 
 	struct TransformBatch
 	{
@@ -64,12 +65,7 @@ namespace Core
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>)> perDraw,
 			function<void()> postDraw);
-		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			function<void(shared_ptr<Shader>)> perShader,
-			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
-		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			DescriptorSetBuilder& builder,
-			function<void(shared_ptr<Material>, shared_ptr<SubMesh>)> perDraw);
+
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
@@ -85,18 +81,13 @@ namespace Core
 			CommandBuffer& commandBuffer,
 			const CameraBuffer& camera);
 
-		// GPU buffer accessors for SDF generation
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
 		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
-
 	private:
 		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
-
-		void PrepareCullingResources(Core::Device& device);
-		void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
 		void DrawIndirectInternal(
 			RenderFrame& renderFrame,
@@ -104,15 +95,6 @@ namespace Core
 			Core::Buffer& indirectCommandBuffer,
 			function<void(shared_ptr<Shader>)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
-
-		void PrepareHiZResources(Device& device, VkExtent2D extents);
-		void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth);
-
-		void ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-		void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			const CameraBuffer& camera, shared_ptr<Texture> depth,
-			Core::Buffer* indirectCommandBuffer,
-			shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline);
 	private:
 		Device& _device;
 		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
@@ -125,35 +107,11 @@ namespace Core
 		Core::Buffer* _materialIndexBuffer;
 		bool _needsMaterialIndexBuffer = false;
 
-		// Buffers for GPU Culling
+		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Core::Buffer* _objectDataBuffer = nullptr;
-		shared_ptr<Shader> _cullingShader;
-		unique_ptr<Pipeline> _cullingPipeline;
 
-		// Hi-Z Resources
-		shared_ptr<Texture> _hiZTexture;
-		shared_ptr<Shader> _hiZGenerateShader = nullptr;
-		unique_ptr<Pipeline> _hiZPipeline;
-		uint32_t _hiZMipLevels = 0;
-		VkExtent2D _screenExtent = {};
-
-		bool _hiZInitialized = false;
-
-		// 2-Pass Resources
-		Core::Buffer* _rejectedIndicesBuffer = nullptr;
-		Core::Buffer* _rejectedCountBuffer = nullptr;
-		Core::Buffer* _pass2IndirectCommandBuffer = nullptr;
-
-		shared_ptr<Shader> _pass2CullingShader;
-		unique_ptr<Pipeline> _pass2CullingPipeline;
-		shared_ptr<Shader> _resetDrawCommandsShader;
-		unique_ptr<Pipeline> _resetDrawCommandsPipeline;
-
-		// Frustum-only culling resources
-		shared_ptr<Shader> _frustumCullingShader;
-		unique_ptr<Pipeline> _frustumCullingPipeline;
-		shared_ptr<Shader> _resetDrawCommandsSimpleShader;
-		unique_ptr<Pipeline> _resetDrawCommandsSimplePipeline;
+		// GPU culling logic (frustum/occlusion/Hi-Z) lives in a separate Culler.
+		unique_ptr<Culler> _culler;
 	};
 }
 

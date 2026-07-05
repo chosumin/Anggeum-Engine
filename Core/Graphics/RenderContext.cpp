@@ -38,11 +38,9 @@ RenderContext::RenderContext(Device& device)
 		_bindlessTextureManager = make_unique<BindlessTextureManager>(device, 4096);
 	}
 
-	if (_device.IsGpuDrivenRenderingEnabled())
-	{
-		_meshBufferManager = make_unique<MeshBufferManager>(_device);
-		_materialManager = make_unique<MaterialManager>();
-	}
+	_meshBufferManager = make_unique<MeshBufferManager>(_device);
+	_materialManager = make_unique<MaterialManager>();
+
 	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 
 	// Create command pools (owned by RenderContext)
@@ -136,8 +134,7 @@ void RenderContext::Begin()
 	if (_bindlessTextureManager)
 		_bindlessTextureManager->UpdateDescriptorSet();
 
-	if (_device.IsGpuDrivenRenderingEnabled())
-		_materialManager->RefreshDirtyMaterials();
+	_materialManager->RefreshDirtyMaterials();
 }
 
 void RenderContext::Submit()

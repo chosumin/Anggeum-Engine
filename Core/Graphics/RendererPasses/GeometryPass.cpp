@@ -63,10 +63,7 @@ namespace Core
         auto meshes = _scene.GetComponents<Core::Mesh>();
         _rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
 
-        if (_device.IsGpuDrivenRenderingEnabled())
-        {
-            _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtents);
-        }
+        _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtents);
     }
 
     GeometryPass::~GeometryPass()
@@ -216,32 +213,13 @@ namespace Core
             commandBuffer.PushConstants(*sharedMaterial, 0);
         };
 
-        if (_device.IsGpuDrivenRenderingEnabled())
-        {
-            _rendererBatches->GpuDrivenDraw(
-                renderFrame, commandBuffer,
-                camera->Matrices,
-                *_renderPass, *_renderPassPass2,
-                *framebuffer,
-                perShader, perDraw,
-                [&]() { DrawSkybox(renderFrame, commandBuffer); });
-        }
-        else
-        {
-            auto renderPassBeginInfo =
-                _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-            commandBuffer.BeginRenderPass(renderPassBeginInfo);
-
-            _rendererBatches->Draw(renderFrame, commandBuffer, perShader,
-                [&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
-                {
-                    sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-                    commandBuffer.PushConstants(*sharedMaterial, 0);
-                });
-
-            DrawSkybox(renderFrame, commandBuffer);
-            commandBuffer.EndRenderPass();
-        }
+        _rendererBatches->GpuDrivenDraw(
+            renderFrame, commandBuffer,
+            camera->Matrices,
+            *_renderPass, *_renderPassPass2,
+            *framebuffer,
+            perShader, perDraw,
+            [&]() { DrawSkybox(renderFrame, commandBuffer); });
     }
 
     void GeometryPass::PreparePregenerationSkybox(RenderFrame& renderFrame)

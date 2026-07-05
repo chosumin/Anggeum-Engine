@@ -35,12 +35,12 @@ void DestroyDebugUtilsMessengerEXT(
 namespace Core
 {
 	Device::Device(Window& window)
-	    :_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(), _enableGpuDrivenRendering(true),
-	    _deviceExtensions{
-	        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-	        VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
-	    }
+		:_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(),
+		_deviceExtensions{
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+		}
 	{
 	    CreateInstance();
 	    SetupDebugMessenger();

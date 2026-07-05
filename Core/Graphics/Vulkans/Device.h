@@ -76,8 +76,7 @@ namespace Core
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
 
-		void SetEnableGpuDrivenRendering(bool enable) { _enableGpuDrivenRendering = enable; }
-		bool IsGpuDrivenRenderingEnabled() { return _enableGpuDrivenRendering; }
+
 
 		// Debug utils function pointers
 		PFN_vkCmdBeginDebugUtilsLabelEXT GetCmdBeginDebugUtilsLabelFunc() const { return _vkCmdBeginDebugUtilsLabel; }
@@ -134,7 +133,6 @@ namespace Core
 		bool _supportsDescriptorIndexing = false;
 		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
 
-		bool _enableGpuDrivenRendering = false;
 
 		// Debug utils function pointers
 		PFN_vkCmdBeginDebugUtilsLabelEXT _vkCmdBeginDebugUtilsLabel = nullptr;

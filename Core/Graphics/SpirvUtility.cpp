@@ -67,16 +67,16 @@ private:
     }
 };
 
-vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath, bool gpuDrivenEnabled)
+vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderStage, const char* shaderCode, const string& shaderPath)
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
-    options.SetIncluder(std::make_unique<FileIncluder>());
-    options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
+	options.SetIncluder(std::make_unique<FileIncluder>());
+	options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-    options.SetOptimizationLevel(shaderc_optimization_level_zero);
-    options.SetGenerateDebugInfo();
+	options.SetOptimizationLevel(shaderc_optimization_level_zero);
+	options.SetGenerateDebugInfo();
 
     shaderc_shader_kind kind = shaderc_vertex_shader;
 
@@ -103,12 +103,8 @@ vector<unsigned int> Core::SpirvUtility::GLSLToSPV(VkShaderStageFlagBits shaderS
     }
 
 	// FIXME: Needs shader permutation system.
-    string modifiedSource;
-    /*if (gpuDrivenEnabled)
-    {
-        modifiedSource = "#define GPU_DRIVEN_RENDERING 1\n";
-    }*/
-    modifiedSource += shaderCode;
+	string modifiedSource;
+	modifiedSource += shaderCode;
 
     // Compile GLSL to SPIR-V binary
     shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(modifiedSource, kind, shaderPath.c_str(), options);

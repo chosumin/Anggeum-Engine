@@ -43,8 +43,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
         "DepthNormal",
         *_renderPass, *_pipelineState, meshes, _overrideMaterials);
 
-    if (_device.IsGpuDrivenRenderingEnabled())
-        _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtent);
+    _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtent);
 }
 
 Core::DepthPrePass::~DepthPrePass()
@@ -92,41 +91,24 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     PerspectiveCamera* camera = _scene.GetMainCamera();
 
-    if (_device.IsGpuDrivenRenderingEnabled())
-    {
-        commandBuffer.BeginDebugMarker("Frustum Culling");
-        _rendererBatches->DispatchFrustumOnlyCulling(
-            renderFrame, commandBuffer, camera->Matrices);
-        commandBuffer.EndDebugMarker();
-    }
+    commandBuffer.BeginDebugMarker("Frustum Culling");
+    _rendererBatches->DispatchFrustumOnlyCulling(
+        renderFrame, commandBuffer, camera->Matrices);
+    commandBuffer.EndDebugMarker();
 
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
     auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
     commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-    if (_device.IsGpuDrivenRenderingEnabled())
+    _rendererBatches->DrawIndirect(renderFrame, commandBuffer,
+    [&](shared_ptr<Shader> shader)
     {
-        _rendererBatches->DrawIndirect(renderFrame, commandBuffer,
-        [&](shared_ptr<Shader> shader)
-        {
-            renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-        },
-        [&](shared_ptr<Material> sharedMaterial)
-        {
-        });
-    }
-    else
+        renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
+    },
+    [&](shared_ptr<Material> sharedMaterial)
     {
-        _rendererBatches->Draw(renderFrame, commandBuffer,
-        [&](shared_ptr<Shader> shader)
-        {
-            renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-        },
-        [&](shared_ptr<Material> sharedMaterial, shared_ptr<SubMesh> subMesh)
-        {
-        });
-    }
+    });
 
     commandBuffer.EndRenderPass();
 }

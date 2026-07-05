@@ -713,7 +713,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 
 void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
 {
-	bool useGpuDriven = _device.IsGpuDrivenRenderingEnabled() && useGlobalBuffer;
+	bool useGpuDriven = useGlobalBuffer;
 	MeshBufferManager* meshBufferManager = nullptr;
 	MaterialManager* materialManager = nullptr;
 
