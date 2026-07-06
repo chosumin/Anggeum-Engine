@@ -1,11 +1,11 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
     class Scene;
     class SwapChain;
+    class RendererBatch;
 
     class DepthPrePass : public RendererPass
     {
@@ -15,23 +15,19 @@ namespace Core
 
         DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-            VkSampleCountFlagBits msaaSamples, TransformBatch& transformBatch);
+            VkSampleCountFlagBits msaaSamples);
         ~DepthPrePass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
-
-        RendererBatches* GetRendererBatches() const { return _rendererBatches.get(); }
 
     private:
         Scene& _scene;
         VkExtent2D _extent;
         VkSampleCountFlagBits _msaaSamples;
 
-        unique_ptr<RendererBatches> _rendererBatches;
-
-        // Keeps override materials alive (MaterialBatch holds weak_ptr)
-        vector<shared_ptr<Material>> _overrideMaterials;
+        shared_ptr<Shader> _depthNormalShader;
+        Pipeline* _pipeline = nullptr;
     };
 }
 

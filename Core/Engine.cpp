@@ -65,17 +65,18 @@ void Core::Engine::Update()
 
 void Core::Engine::Draw()
 {
-    _transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
-    _transferContext->Wait();
+	_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
+	_transferContext->Wait();
 
-    _renderContext->Begin();
+	auto extents = _renderContext->GetSurfaceExtent();
+	_renderContext->Begin(*_scene, extents);
 
 	_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
 
-    uint32_t imageIndex = _renderContext->GetImageIndex();
-    _renderPipeline->Draw(_renderContext->GetCurrentFrame(), imageIndex);
+	uint32_t imageIndex = _renderContext->GetImageIndex();
+	_renderPipeline->Draw(_renderContext->GetCurrentFrame(), imageIndex);
 
-    _renderContext->Submit();
+	_renderContext->Submit();
 }
 
 void Core::Engine::WaitIdle()

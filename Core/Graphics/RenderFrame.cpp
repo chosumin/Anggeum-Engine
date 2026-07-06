@@ -7,7 +7,13 @@
 #include "Vulkans/Shader.h"
 #include "Vulkans/Framebuffer.h"
 #include "Vulkans/DescriptorSetBuilder.h"
+#include "Vulkans/CommandBuffer.h"
 #include "ResourceCache.h"
+#include "TransferJob.h"
+#include "Foundation/Scene.h"
+#include "Foundation/Entity.h"
+#include "Components/Mesh.h"
+#include "Components/Transform.h"
 
 using namespace Core;
 
@@ -24,6 +30,13 @@ RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager
 RenderFrame::~RenderFrame()
 {
 	CleanupBuffers();
+
+	// Cleanup TransformBatch
+	if (_transformBatch.TransformBuffer)
+	{
+		delete _transformBatch.TransformBuffer;
+		_transformBatch.TransformBuffer = nullptr;
+	}
 
 	if (_imageAvailableSemaphore != VK_NULL_HANDLE)
 	{
@@ -731,7 +744,7 @@ DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uin
 	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
 }
 
-Culler* RenderFrame::GetOrCreateCuller(RendererBatches* batch, Device& device, TransformBatch& transformBatch)
+Culler* RenderFrame::GetOrCreateCuller(RendererBatch* batch, Device& device, TransformBatch& transformBatch)
 {
 	auto it = _cullers.find(batch);
 	if (it != _cullers.end())
@@ -741,4 +754,93 @@ Culler* RenderFrame::GetOrCreateCuller(RendererBatches* batch, Device& device, T
 	auto* result = culler.get();
 	_cullers[batch] = std::move(culler);
 	return result;
+}
+
+RendererBatch* RenderFrame::GetRendererBatch() const
+{
+	return _rendererBatch.get();
+}
+
+void RenderFrame::PrepareRendererBatch(VkExtent2D extents, bool needMaterialData)
+{
+	if (!_rendererBatch)
+		return;
+
+	_rendererBatch->Finalize(_device);
+	_rendererBatch->PrepareGPUDrivenRendering(_device, needMaterialData, extents);
+
+	// Reset culler used state for all cullers at frame start
+	for (auto& [batch, culler] : _cullers)
+	{
+		culler->MarkUsedThisFrame(false);
+	}
+}
+
+void RenderFrame::InitializeBatches(Scene& scene,
+	VkExtent2D extents, bool needMaterialData)
+{
+	if (_batchesInitialized)
+		return;
+
+	// Create transform buffer from scene meshes
+	auto meshes = scene.GetComponents<Mesh>();
+	size_t meshCount = meshes.size();
+
+	if (meshCount == 0)
+	{
+		_batchesInitialized = true;
+		return;
+	}
+
+	VkDeviceSize bufferSize = sizeof(mat4) * meshCount;
+	vector<mat4> transforms(meshCount);
+	_transformBatch.EntityIds.resize(meshCount);
+
+	for (size_t i = 0; i < meshCount; ++i)
+	{
+		auto& entity = meshes[i]->GetEntity();
+		auto& transform = entity.GetTransform();
+		transforms[i] = transform.GetMatrix();
+		_transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
+	}
+
+	_transformBatch.TransformBuffer = new Buffer(_device,
+		bufferSize,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		MemoryType::DEVICE_LOCAL);
+
+	VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+		&_transformBatch.TransformBuffer, transforms, true);
+	CommandBuffer::ImmediateSubmit(_device, job);
+
+	// Create renderer batch
+	_rendererBatch = make_unique<RendererBatch>(_device);
+	_rendererBatch->SetTransformBatch(&_transformBatch);
+
+	for (auto* mesh : meshes)
+	{
+		uint entityId = mesh->GetEntity().GetId();
+		auto& materials = mesh->GetMaterials();
+		auto& subMeshes = mesh->GetSubMeshes();
+
+		for (size_t i = 0; i < materials.size(); ++i)
+		{
+			if (i >= subMeshes.size())
+				break;
+
+			auto shaderPtr = materials[i]->GetShaderPtr().lock();
+			if (!shaderPtr)
+				continue;
+
+			// Skip non-geometry passes (Skybox, etc.)
+			const string& pass = shaderPtr->GetPass();
+			if (pass != "Geometry")
+				continue;
+
+			_rendererBatch->AddMesh(entityId, materials[i], subMeshes[i]);
+		}
+	}
+
+	PrepareRendererBatch(extents, needMaterialData);
+	_batchesInitialized = true;
 }

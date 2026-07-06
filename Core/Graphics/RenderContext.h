@@ -24,6 +24,7 @@ namespace Core
 	class RenderFrame;
 	class BindlessTextureManager;
 	class Texture;
+	class Scene;
 
 	class RenderContext
 	{
@@ -37,10 +38,10 @@ namespace Core
 		~RenderContext();
 
 		void RecreateSwapChain();
-		
-		// Frame management
-		void Begin();
-		void Submit();
+
+				// Frame management
+				void Begin(Scene& scene, VkExtent2D extents);
+				void Submit();
 		
 		// Get current frame
 		RenderFrame& GetCurrentFrame() { return *_frames[_currentFrame]; }

@@ -15,7 +15,7 @@ using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 	Scene& scene, VkFormat depthFormat, 
-	ShadowUniform& shadowBuffer, TransformBatch& transformBatch)
+	ShadowUniform& shadowBuffer)
 	: RendererPass(device, workerThreadManager)
 	, _scene(scene), _msaaSamples(VK_SAMPLE_COUNT_1_BIT), _shadowBuffer(shadowBuffer)
 {
@@ -30,19 +30,15 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	rasterization.depthBiasEnable = VK_TRUE;
 
 	_shadowMaterial = _device.GetResourceCache().RequestMaterial("shadow", "Shadow");
+	_shadowShader = _shadowMaterial->GetShaderPtr().lock();
 
-	_rendererBatches = make_unique<RendererBatches>(device, transformBatch);
-
-	auto meshes = _scene.GetComponents<Core::Mesh>();
-	_rendererBatches->PrepareSingleBatch(_device,
-		_shadowMaterial,
-		*_renderPass, *_pipelineState, meshes);
-
-	_rendererBatches->PrepareGPUDrivenRendering(_device, false, _shadowExtent);
+	// Create Pipeline for this pass
+	_pipeline = new Pipeline(device, *_renderPass, *_shadowShader, *_pipelineState);
 }
 
 Core::ShadowPass::~ShadowPass()
 {
+	delete(_pipeline);
 }
 
 std::array<glm::vec3, 8> Core::ShadowPass::GetFrustumCornersWorldSpace(const glm::mat4& viewProj)
@@ -324,6 +320,10 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+	auto* rendererBatch = renderFrame.GetRendererBatch();
+	if (!rendererBatch)
+		return;
+
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
 		return;
@@ -363,7 +363,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 		string cullingName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Frustum Culling";
 		commandBuffer.BeginDebugMarker(cullingName.c_str());
-		_rendererBatches->DispatchFrustumOnlyCulling(
+		rendererBatch->DispatchFrustumOnlyCulling(
 			renderFrame, commandBuffer, _cascadeViews[cascadeIndex]);
 		commandBuffer.EndDebugMarker();
 
@@ -375,7 +375,9 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		_rendererBatches->DrawIndirect(renderFrame, commandBuffer, builder,
+		commandBuffer.BindPipeline(_pipeline);
+
+		rendererBatch->DrawIndirect(renderFrame, commandBuffer, *_shadowShader, builder,
 		[&](shared_ptr<Material> sharedMaterial) {});
 
 		commandBuffer.EndRenderPass();

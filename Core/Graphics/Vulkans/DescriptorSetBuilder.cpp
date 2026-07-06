@@ -100,41 +100,63 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 	VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
 	_resources.descriptorSet = _pool.AllocateDescriptorSet(vkLayout);
 
-	// 2. Gather all writes
+	// Get valid bindings from shader layout
+	auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
+	auto& storageBindings = layoutIt->second->GetStorageBufferBindings();
+	auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
+
+	// Build a set of valid binding numbers for each type
+	unordered_set<uint32_t> validUniformBindings;
+	unordered_set<uint32_t> validStorageBindings;
+	unordered_set<uint32_t> validTextureBindings;
+
+	for (const auto& b : uniformBindings)
+		validUniformBindings.insert(b.Binding);
+	for (const auto& b : storageBindings)
+		validStorageBindings.insert(b.Binding);
+	for (const auto& b : textureBindings)
+		validTextureBindings.insert(b.Binding);
+
+	// 2. Gather all writes (only for bindings that exist in the shader layout)
 	vector<VkWriteDescriptorSet> writes;
 
-	// Uniform buffers
+	// Uniform buffers - only write if binding exists in shader layout
 	for (auto& [binding, buffer] : _resources.uniformBuffers)
 	{
+		if (validUniformBindings.find(binding) == validUniformBindings.end())
+			continue; // Skip bindings not in shader layout
+
 		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}
 
-	// Storage buffers
+	// Storage buffers - only write if binding exists in shader layout
 	for (auto& [binding, buffer] : _resources.storageBuffers)
 	{
+		if (validStorageBindings.find(binding) == validStorageBindings.end())
+			continue; // Skip bindings not in shader layout
+
 		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}
 
-	// Texture buffers
+	// Texture buffers - only write if binding exists in shader layout
 	for (auto& [binding, texture] : _resources.textureBuffers)
 	{
+		if (validTextureBindings.find(binding) == validTextureBindings.end())
+			continue; // Skip bindings not in shader layout
+
 		VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
 		// Find descriptor type from shader layout
-		if (layoutIt != layouts.end())
+		for (const auto& bindingInfo : textureBindings)
 		{
-			auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
-			for (const auto& bindingInfo : textureBindings)
+			if (bindingInfo.Binding == binding)
 			{
-				if (bindingInfo.Binding == binding)
-				{
-					descriptorType = bindingInfo.DescriptorType;
-					break;
-				}
+				descriptorType = bindingInfo.DescriptorType;
+				break;
 			}
 		}
 

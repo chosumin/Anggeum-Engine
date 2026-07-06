@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/RendererBatch.h"
 #include "Graphics/BufferObjects.h"
 
 namespace Core
@@ -9,6 +8,7 @@ namespace Core
 	class SwapChain;
 	class Material;
 	class PerspectiveCamera;
+	class RendererBatch;
 
 	class ShadowPass : public RendererPass
 	{
@@ -17,7 +17,7 @@ namespace Core
 
 		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
 			Scene& scene, VkFormat depthFormat,
-			ShadowUniform& shadowBuffer, TransformBatch& transformBatch);
+			ShadowUniform& shadowBuffer);
 		~ShadowPass();
 
 		void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -25,7 +25,6 @@ namespace Core
 		void OnGUI(RenderFrame& renderFrame) override;
 
 		ShadowUniform* GetShadowBuffer() { return &_shadowBuffer; }
-		RendererBatches* GetRendererBatches() const { return _rendererBatches.get(); }
 
 	private:
 		void UpdateCascades(PerspectiveCamera* camera);
@@ -37,7 +36,8 @@ namespace Core
 		Scene& _scene;
 		VkExtent2D _shadowExtent;
 
-		unique_ptr<RendererBatches> _rendererBatches;
+		shared_ptr<Shader> _shadowShader;
+		Pipeline* _pipeline = nullptr;
 
 		ShadowUniform& _shadowBuffer;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeViews{};

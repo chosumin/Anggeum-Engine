@@ -16,60 +16,58 @@
 #include "Graphics/RenderContext.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "Graphics/ResourceCache.h"
+#include "Graphics/RendererBatch.h"
 #include "PreEnvironmentPass.h"
 #include "BrdfLutPass.h"
 
 namespace Core
 {
-    GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
-        Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-        VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-        Buffer* lightVisibilityBuffer, ivec2 tileNums,
-        TransformBatch& transformBatch)
-        : RendererPass(device, workerThreadManager)
-        , _scene(scene)
-        , _msaaSamples(msaaSamples)
-        , _swapChainFormat(swapChain.GetImageFormat())
-        , _lightVisibilityBuffer(lightVisibilityBuffer)
+	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
+		Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
+		VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
+		Buffer* lightVisibilityBuffer, ivec2 tileNums)
+		: RendererPass(device, workerThreadManager)
+		, _scene(scene)
+		, _msaaSamples(msaaSamples)
+		, _swapChainFormat(swapChain.GetImageFormat())
+		, _lightVisibilityBuffer(lightVisibilityBuffer)
 		, _shadowBuffer(shadowBuffer)
-    {
-        auto swapChainExtents = swapChain.GetSwapChainExtent();
-        _tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
-        _tileInfo.tileNums = tileNums;
+	{
+		auto swapChainExtents = swapChain.GetSwapChainExtent();
+		_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
+		_tileInfo.tileNums = tileNums;
 
-        auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
-        multiSampling.rasterizationSamples = msaaSamples;
+		auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
+		multiSampling.rasterizationSamples = msaaSamples;
 
-        auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
-        depthStencil.depthWriteEnable = VK_FALSE;
+		auto& depthStencil = _pipelineState->GetDepthStencilStateCreateInfo();
+		depthStencil.depthWriteEnable = VK_FALSE;
 
-        // Pass 1: color CLEAR, depth LOAD
-        _renderPass->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
-            VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-        _renderPass->CreateDepthAttachment(depthFormat, _msaaSamples,
-            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-        _renderPass->CreateRenderPass();
+		// Pass 1: color CLEAR, depth LOAD
+		_renderPass->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
+			VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
+		_renderPass->CreateDepthAttachment(depthFormat, _msaaSamples,
+			VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+		_renderPass->CreateRenderPass();
 
-        // Pass 2: color LOAD, depth LOAD (preserves Pass 1 results)
-        _renderPassPass2 = new RenderPass(_device);
-        _renderPassPass2->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
-            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-        _renderPassPass2->CreateDepthAttachment(depthFormat, _msaaSamples,
-            VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
-        _renderPassPass2->CreateRenderPass();
-
-        _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
-
-        auto meshes = _scene.GetComponents<Core::Mesh>();
-        _rendererBatches->Prepare(_device, *_renderPass, *_pipelineState, meshes);
-
-        _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtents);
-    }
+		// Pass 2: color LOAD, depth LOAD (preserves Pass 1 results)
+		_renderPassPass2 = new RenderPass(_device);
+		_renderPassPass2->CreateColorAttachment(swapChain.GetImageFormat(), _msaaSamples,
+			VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+		_renderPassPass2->CreateDepthAttachment(depthFormat, _msaaSamples,
+			VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+		_renderPassPass2->CreateRenderPass();
+	}
 
     GeometryPass::~GeometryPass()
     {
         delete(_skyboxPipeline);
         delete(_renderPassPass2);
+
+        for (auto& [shader, pipeline] : _pipelineCache)
+        {
+            delete(pipeline);
+        }
     }
 
     void GeometryPass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -159,6 +157,10 @@ namespace Core
             _iblGenerated = true;
         }
 
+        auto* batch = renderFrame.GetRendererBatch();
+        if (!batch)
+            return;
+
         auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
             "GeometryPass",
             *_renderPass,
@@ -191,20 +193,43 @@ namespace Core
 
         commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-        auto perShader = [&](shared_ptr<Shader> shader)
+        // Get a geometry shader for rendering (use first mesh's material shader)
+        auto meshes = _scene.GetComponents<Core::Mesh>();
+        Shader* geometryShader = nullptr;
+        for (auto* mesh : meshes)
         {
-            renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-            renderFrame.SetShaderUniformBuffer(*shader, 3, &_giBuffer);
-            renderFrame.SetShaderUniformBuffer(*shader, 4, &_shadowBuffer);
-            renderFrame.SetShaderUniformBuffer(*shader, 5, &_lightBuffer);
-            renderFrame.SetShaderStorageBuffer(*shader, 6, _lightVisibilityBuffer);
-            renderFrame.SetShaderTextureBuffer(*shader, 7, shadowTarget);
+            auto& materials = mesh->GetMaterials();
+            for (auto& material : materials)
+            {
+                if (material->GetShader().GetPass() == "Geometry")
+                {
+                    geometryShader = &material->GetShader();
+                    break;
+                }
+            }
+            if (geometryShader)
+                break;
+        }
+
+        if (!geometryShader)
+            return;
+
+        Pipeline* pipeline = GetOrCreatePipeline(*geometryShader);
+
+        auto perShader = [&](Shader& shader)
+        {
+            renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
+            renderFrame.SetShaderUniformBuffer(shader, 3, &_giBuffer);
+            renderFrame.SetShaderUniformBuffer(shader, 4, &_shadowBuffer);
+            renderFrame.SetShaderUniformBuffer(shader, 5, &_lightBuffer);
+            renderFrame.SetShaderStorageBuffer(shader, 6, _lightVisibilityBuffer);
+            renderFrame.SetShaderTextureBuffer(shader, 7, shadowTarget);
 
             if (sdfShadowTarget)
-                renderFrame.SetShaderTextureBuffer(*shader, 10, sdfShadowTarget);
+                renderFrame.SetShaderTextureBuffer(shader, 10, sdfShadowTarget);
 
             if (dfaoTarget)
-               renderFrame.SetShaderTextureBuffer(*shader, 11, dfaoTarget);
+               renderFrame.SetShaderTextureBuffer(shader, 11, dfaoTarget);
         };
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)
@@ -213,13 +238,25 @@ namespace Core
             commandBuffer.PushConstants(*sharedMaterial, 0);
         };
 
-        _rendererBatches->GpuDrivenDraw(
+        batch->GpuDrivenDraw(
             renderFrame, commandBuffer,
+            *geometryShader, *pipeline,
             camera->Matrices,
             *_renderPass, *_renderPassPass2,
             *framebuffer,
             perShader, perDraw,
             [&]() { DrawSkybox(renderFrame, commandBuffer); });
+    }
+
+    Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)
+    {
+        auto it = _pipelineCache.find(&shader);
+        if (it != _pipelineCache.end())
+            return it->second;
+
+        auto* pipeline = new Pipeline(_device, *_renderPass, shader, *_pipelineState);
+        _pipelineCache[&shader] = pipeline;
+        return pipeline;
     }
 
     void GeometryPass::PreparePregenerationSkybox(RenderFrame& renderFrame)

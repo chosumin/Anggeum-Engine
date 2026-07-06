@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
+#include "Foundation/Scene.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -105,7 +106,7 @@ void RenderContext::RecreateSwapChain()
 	}
 }
 
-void RenderContext::Begin()
+void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 {
 	// Acquire swap chain image and wait
 	AcquireSwapChainAndResetFence(*_swapChain);
@@ -135,6 +136,9 @@ void RenderContext::Begin()
 		_bindlessTextureManager->UpdateDescriptorSet();
 
 	_materialManager->RefreshDirtyMaterials();
+
+	// Initialize batches once per frame (TransformBatch is now per-frame)
+	currentFrame.InitializeBatches(scene, extents, true);
 }
 
 void RenderContext::Submit()

@@ -13,7 +13,7 @@ using namespace Core;
 
 Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThreadManager,
     Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-    VkSampleCountFlagBits msaaSamples, TransformBatch& transformBatch)
+    VkSampleCountFlagBits msaaSamples)
     : RendererPass(device, workerThreadManager)
     , _scene(scene)
     , _msaaSamples(msaaSamples)
@@ -36,18 +36,16 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 
     _renderPass->CreateRenderPass();
 
-    _rendererBatches = make_unique<RendererBatches>(device, transformBatch);
+    // Get the DepthNormal shader
+    _depthNormalShader = _device.GetResourceCache().RequestShader("DepthNormal");
 
-    auto meshes = _scene.GetComponents<Core::Mesh>();
-    _rendererBatches->Prepare(_device,
-        "DepthNormal",
-        *_renderPass, *_pipelineState, meshes, _overrideMaterials);
-
-    _rendererBatches->PrepareGPUDrivenRendering(_device, true, swapChainExtent);
+    // Create Pipeline for this pass
+    _pipeline = new Pipeline(device, *_renderPass, *_depthNormalShader, *_pipelineState);
 }
 
 Core::DepthPrePass::~DepthPrePass()
 {
+    delete(_pipeline);
 }
 
 void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -80,6 +78,10 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
+    auto* rendererBatch = renderFrame.GetRendererBatch();
+    if (!rendererBatch)
+        return;
+
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "DepthPrePass",
         *_renderPass,
@@ -92,7 +94,7 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     PerspectiveCamera* camera = _scene.GetMainCamera();
 
     commandBuffer.BeginDebugMarker("Frustum Culling");
-    _rendererBatches->DispatchFrustumOnlyCulling(
+    rendererBatch->DispatchFrustumOnlyCulling(
         renderFrame, commandBuffer, camera->Matrices);
     commandBuffer.EndDebugMarker();
 
@@ -101,14 +103,15 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
     commandBuffer.BeginRenderPass(renderPassBeginInfo);
 
-    _rendererBatches->DrawIndirect(renderFrame, commandBuffer,
-    [&](shared_ptr<Shader> shader)
-    {
-        renderFrame.SetShaderUniformBuffer(*shader, 0, &camera->Matrices);
-    },
-    [&](shared_ptr<Material> sharedMaterial)
-    {
-    });
+    rendererBatch->DrawIndirect(renderFrame, commandBuffer,
+        *_depthNormalShader, *_pipeline,
+        [&](Shader& shader)
+        {
+            renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
+        },
+        [&](shared_ptr<Material> sharedMaterial)
+        {
+        });
 
     commandBuffer.EndRenderPass();
 }

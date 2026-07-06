@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/RendererBatch.h"
 
 namespace Core
 {
@@ -8,6 +7,8 @@ namespace Core
     class SwapChain;
     class Buffer;
     class RenderContext;
+    class RendererBatch;
+    struct TransformBatch;
 
     class GeometryPass : public RendererPass
     {
@@ -23,8 +24,7 @@ namespace Core
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
             VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-            Buffer* lightVisibilityBuffer, ivec2 tileNums,
-            TransformBatch& transformBatch);
+            Buffer* lightVisibilityBuffer, ivec2 tileNums);
         ~GeometryPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -38,13 +38,17 @@ namespace Core
         void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
         void UpdateLightBuffer();
 
+        Pipeline* GetOrCreatePipeline(Shader& shader);
+
     private:
         Scene& _scene;
         VkSampleCountFlagBits _msaaSamples;
         VkFormat _swapChainFormat;
 
-        unique_ptr<RendererBatches> _rendererBatches;
         Pipeline* _skyboxPipeline = nullptr;
+
+        // Per-shader pipeline cache
+        unordered_map<Shader*, Pipeline*> _pipelineCache;
 
         GI _giBuffer;
         ShadowUniform& _shadowBuffer;

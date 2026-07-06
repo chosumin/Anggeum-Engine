@@ -26,6 +26,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	WorkerThreadManager& workerThreadManager,
 	Scene& scene, SwapChain& swapChain)
 	:_device(device)
+	,_scene(scene)
+	,_swapChainExtents(swapChain.GetSwapChainExtent())
 {
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::AddResizeCallback(a);
@@ -39,14 +41,12 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		(extent.height - 1) / TILE_SIZE + 1);
 	CreateLightCullingBuffer(extent, tileNums);
 
-	CreateTransformBuffer(scene);
-
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples, _transformBatch);
+	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples);
 	AddRendererPass(depthPrePass);
 
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
@@ -59,20 +59,12 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	AddRendererPass(lightCullingPass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, depthFormat, _shadowBuffer, _transformBatch);
+		device, workerThreadManager, scene, depthFormat, _shadowBuffer);
 	AddRendererPass(shadowPass);
 
 	auto sdfShadowPass = new SDFShadowPass(
 		device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
 	AddRendererPass(sdfShadowPass);
-
-	auto* batches = shadowPass->GetRendererBatches();
-	sdfShadowPass->SetGPUBoundsData(
-		batches->GetObjectDataBuffer(),
-		_transformBatch.TransformBuffer,
-		batches->GetIndirectCommandBuffer(),
-		batches->GetDrawCommandCount(),
-		batches->GetInstanceCount());
 
 	auto ambientOcclusionPass = new AmbientOcclusionPass(
 		device, workerThreadManager, scene,
@@ -83,7 +75,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
 		_shadowBuffer,
-		_lightBuffer, tileNums, _transformBatch);
+		_lightBuffer, tileNums);
 	AddRendererPass(geometryPass);
 
 	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
@@ -100,9 +92,8 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	}
 
 	delete(_lightBuffer);
-	delete(_transformBatch.TransformBuffer);
 
-	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
+		auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
@@ -194,31 +185,4 @@ void Core::ForwardRenderPipeline::CreateLightCullingBuffer(VkExtent2D extent, iv
 		MemoryType::DEVICE_LOCAL);
 
 	_lightBuffer = lightVisibilityBuffer;
-}
-
-void Core::ForwardRenderPipeline::CreateTransformBuffer(Scene& scene)
-{
-	auto meshes = scene.GetComponents<Core::Mesh>();
-	
-	size_t meshCount = meshes.size();
-	uint bufferSize = sizeof(mat4) * meshCount;
-
-	vector<mat4> transforms(meshCount);
-	_transformBatch.EntityIds.resize(meshCount);
-
-	for (size_t i = 0; i < meshCount; ++i)
-	{
-		auto& entity = meshes[i]->GetEntity();
-		auto& transform = entity.GetTransform();
-		transforms[i] = transform.GetMatrix();
-		_transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
-	}
-
-	_transformBatch.TransformBuffer = new Core::Buffer(_device,
-		bufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
-	Core::VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_transformBatch.TransformBuffer, transforms, true);
-	Core::CommandBuffer::ImmediateSubmit(_device, job);
 }

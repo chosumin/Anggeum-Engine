@@ -17,7 +17,7 @@ namespace Core
     // Owns the compute resources used for frustum/occlusion culling (culling
     // pipelines, the Hi-Z pyramid and the 2-pass buffers) and dispatches the
     // culling passes that populate the indirect draw command buffers created by
-    // RendererBatches. The draw buffers themselves stay owned by RendererBatches
+    // RendererBatch. The draw buffers themselves stay owned by RendererBatch
     // and are only referenced here.
     class Culler
     {
@@ -29,7 +29,7 @@ namespace Core
 		void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
 
         // Creates the culling compute resources. The draw buffers are owned by
-        // RendererBatches and only referenced by the Culler.
+        // RendererBatch and only referenced by the Culler.
         void Prepare(Device& device, VkExtent2D extents,
             Buffer* objectDataBuffer, Buffer* instanceBuffer,
             Buffer* indirectCommandBuffer, uint32_t instanceCount,
@@ -71,7 +71,7 @@ namespace Core
         Device& _device;
         TransformBatch& _transformBatch;
 
-        // Draw buffers owned by RendererBatches (referenced, not owned).
+        // Draw buffers owned by RendererBatch (referenced, not owned).
         Core::Buffer* _objectDataBuffer = nullptr;
         Core::Buffer* _instanceBuffer = nullptr;
         Core::Buffer* _indirectCommandBuffer = nullptr;

@@ -27,13 +27,12 @@ namespace Core
 
 		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
 
-		// Set GPU buffers from GeometryPass's RendererBatches
-		void SetGPUBoundsData(Buffer* objectDataBuffer, Buffer* transformBuffer,
+		// Set GPU buffers from GeometryPass's RendererBatch
+		void SetGPUBoundsData(Buffer* objectDataBuffer,
 			Buffer* drawCommandBuffer, uint32_t drawCommandCount,
 			uint32_t instanceCount)
 		{
 			_objectDataBuffer = objectDataBuffer;
-			_transformBuffer = transformBuffer;
 			_drawCommandBuffer = drawCommandBuffer;
 			_drawCommandCount = drawCommandCount;
 			_instanceCount = instanceCount;
@@ -62,9 +61,8 @@ namespace Core
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
 
-		// GPU bounds data (from GeometryPass's RendererBatches)
+		// GPU bounds data (from GeometryPass's RendererBatch)
 		Buffer* _objectDataBuffer = nullptr;
-		Buffer* _transformBuffer = nullptr;
 		Buffer* _drawCommandBuffer = nullptr;
 		uint32_t _drawCommandCount = 0;
 		uint32_t _instanceCount = 0;

@@ -39,41 +39,38 @@ namespace Core
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
-	struct ShaderBatch
-	{
-		Pipeline* Pipeline;
-		weak_ptr<Shader> SharedShader;
-		unordered_map<string, MaterialBatch> MaterialBatches;
-	};
-
-	class RendererBatches
+	// RendererBatch: A batch of draw calls for meshes.
+	// Contains material batches grouped by material.
+	class RendererBatch
 	{
 	public:
-		RendererBatches(Device& device, TransformBatch& transformBatch);
-		~RendererBatches();
+		RendererBatch(Device& device);
+		~RendererBatch();
 
-		void Prepare(Device& device, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
-		void Prepare(Device& device, const string& shaderName, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes, vector<shared_ptr<Material>>& outMaterials);
-		void PrepareSingleBatch(Device& device, weak_ptr<Material> material, RenderPass& renderPass, PipelineState& pipelineState, vector<Mesh*>& meshes);
+		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
+		void Finalize(Device& device);
 		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
 			VkExtent2D extents);
 
 		void GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+			Shader& shader, Pipeline& pipeline,
 			CameraBuffer& camera,
 			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
 			Framebuffer& framebuffer,
-			function<void(shared_ptr<Shader>)> perShader,
+			function<void(Shader&)> perShader,
 			function<void(shared_ptr<Material>)> perDraw,
 			function<void()> postDraw);
 
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
-			function<void(shared_ptr<Shader>)> perShader,
+			Shader& shader, Pipeline& pipeline,
+			function<void(Shader&)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
+			Shader& shader,
 			DescriptorSetBuilder& builder,
 			function<void(shared_ptr<Material>)> perDraw);
 
@@ -82,33 +79,39 @@ namespace Core
 			const CameraBuffer& camera);
 
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
-			Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
-			uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
-			uint32_t GetInstanceCount() const { return _instanceCount; }
-			Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
-			const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
-			TransformBatch& GetTransformBatch() const { return _transformBatch; }
-			VkExtent2D GetExtents() const { return _extents; }
+		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
+		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
+		uint32_t GetInstanceCount() const { return _instanceCount; }
+		Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
+		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
+		TransformBatch* GetTransformBatch() const { return _transformBatch; }
+		void SetTransformBatch(TransformBatch* batch) { _transformBatch = batch; }
+		VkExtent2D GetExtents() const { return _extents; }
+
 	private:
-		void AddBatch(Device& device, RenderPass& renderPass, PipelineState& pipelineState, uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
 		void CreateInstanceBuffer(Device& device);
 
 		void DrawIndirectInternal(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
+			Shader& shader, Pipeline& pipeline,
 			Core::Buffer& indirectCommandBuffer,
-			function<void(shared_ptr<Shader>)> perShader,
+			function<void(Shader&)> perShader,
 			function<void(shared_ptr<Material>)> perDraw);
+
 	private:
 		Device& _device;
-		unordered_map<uint32_t, ShaderBatch> _shaderBatches;
-		TransformBatch& _transformBatch;
-		Core::Buffer* _instanceBuffer;
-		uint _instanceCount;
+		TransformBatch* _transformBatch = nullptr;
+
+		// Material batches (keyed by material name)
+		unordered_map<string, MaterialBatch> _materialBatches;
+
+		Core::Buffer* _instanceBuffer = nullptr;
+		uint _instanceCount = 0;
 
 		IndirectDrawBuffer _indirectDrawBuffer;
-		Core::Buffer* _indirectCommandBuffer;
-		Core::Buffer* _materialIndexBuffer;
+		Core::Buffer* _indirectCommandBuffer = nullptr;
+		Core::Buffer* _materialIndexBuffer = nullptr;
 		bool _needsMaterialIndexBuffer = false;
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)

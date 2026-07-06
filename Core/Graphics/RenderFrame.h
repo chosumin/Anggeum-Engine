@@ -4,6 +4,7 @@
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
 #include "Culler.h"
+#include "RendererBatch.h"
 
 namespace Core
 {
@@ -17,7 +18,9 @@ namespace Core
 	class RenderPass;
 	class Framebuffer;
 	class DescriptorSetBuilder;
-	class RendererBatches;
+	class RendererBatch;
+	class PipelineState;
+	class Scene;
 
 	struct RenderTargetDesc
 	{
@@ -119,10 +122,19 @@ namespace Core
 		// The built resources are stored in the frame and cleaned up on Reset().
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
-		// Culler management - per RendererBatches, reused within a frame
-		Culler* GetOrCreateCuller(RendererBatches* batch, Device& device, TransformBatch& transformBatch);
-		bool IsCullerUsedThisFrame(RendererBatches* batch) const;
-		void MarkCullerUsed(RendererBatches* batch);
+		// Culler management - per RendererBatch, reused within a frame
+		Culler* GetOrCreateCuller(RendererBatch* batch, Device& device, TransformBatch& transformBatch);
+
+		// RendererBatch management - single batch for all meshes
+		RendererBatch* GetRendererBatch() const;
+		void PrepareRendererBatch(VkExtent2D extents, bool needMaterialData = true);
+
+		// Batch initialization - called once at the start of rendering
+		void InitializeBatches(Scene& scene, VkExtent2D extents, bool needMaterialData = true);
+		bool IsBatchesInitialized() const { return _batchesInitialized; }
+
+		// TransformBatch access
+		TransformBatch& GetTransformBatch() { return _transformBatch; }
 
 	private:
 		void CreateSyncObjects();
@@ -166,7 +178,12 @@ namespace Core
 		// Builder-created resources, cleaned up on Reset()
 		vector<DescriptorSetResources> _builderResources;
 
-		// Per-RendererBatches cullers, reused within a frame
-		unordered_map<RendererBatches*, unique_ptr<Culler>> _cullers;
+		// Per-RendererBatch cullers, reused within a frame
+		unordered_map<RendererBatch*, unique_ptr<Culler>> _cullers;
+
+		// Single RendererBatch for all meshes
+		unique_ptr<RendererBatch> _rendererBatch;
+		TransformBatch _transformBatch{};
+		bool _batchesInitialized = false;
 	};
 }
