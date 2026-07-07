@@ -21,9 +21,38 @@
 
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device)
+Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents)
     : _device(device)
+    , _transformBatch(&transformBatch)
 {
+    auto meshes = scene.GetComponents<Mesh>();
+
+    for (auto* mesh : meshes)
+    {
+        uint entityId = mesh->GetEntity().GetId();
+        auto& materials = mesh->GetMaterials();
+        auto& subMeshes = mesh->GetSubMeshes();
+
+        for (size_t i = 0; i < materials.size(); ++i)
+        {
+            if (i >= subMeshes.size())
+                break;
+
+            auto shaderPtr = materials[i]->GetShaderPtr().lock();
+            if (!shaderPtr)
+                continue;
+
+            // Skip non-geometry passes (Skybox, etc.)
+            const string& pass = shaderPtr->GetPass();
+            if (pass != "Geometry")
+                continue;
+
+            AddMesh(entityId, materials[i], subMeshes[i]);
+        }
+    }
+
+    Finalize();
+    PrepareGPUDrivenRendering(extents);
 }
 
 Core::RendererBatch::~RendererBatch()
@@ -69,16 +98,13 @@ void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, we
     _instanceCount++;
 }
 
-void Core::RendererBatch::Finalize(Device& device)
+void Core::RendererBatch::Finalize()
 {
-    CreateInstanceBuffer(device);
+    CreateInstanceBuffer(_device);
 }
 
-void Core::RendererBatch::PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
-    VkExtent2D extents)
+void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
 {
-    _needsMaterialIndexBuffer = needMaterialData;
-
     _indirectDrawBuffer.Clear();
     uint32_t globalFirstInstance = 0;
     uint32_t drawCommandIndex = 0;
@@ -106,7 +132,7 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(Device& device, bool needMat
             _indirectDrawBuffer.AddDrawCommand(
                 allocation,
                 materialIndex,
-                _needsMaterialIndexBuffer ? 0 : instanceCount,
+                0,
                 globalFirstInstance
             );
 
@@ -129,25 +155,25 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(Device& device, bool needMat
 
     vector<Job*> jobs;
 
-    Core::VkBufferJob<DrawIndexedIndirectCommand> job(device,
+    Core::VkBufferJob<DrawIndexedIndirectCommand> job(_device,
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         &_indirectCommandBuffer,
         _indirectDrawBuffer.GetDrawCommands(), 0);
     jobs.push_back(&job);
 
-    Core::VkBufferJob<uint32_t> job2(device,
+    Core::VkBufferJob<uint32_t> job2(_device,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         &_materialIndexBuffer,
         _indirectDrawBuffer.GetMaterialIndices(), 0);
     jobs.push_back(&job2);
 
-    Core::VkBufferJob<GPUObjectData> job3(device,
+    Core::VkBufferJob<GPUObjectData> job3(_device,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         &_objectDataBuffer,
         objectData, 0);
     jobs.push_back(&job3);
 
-    Core::CommandBuffer::ImmediateSubmit(device, jobs);
+    Core::CommandBuffer::ImmediateSubmit(_device, jobs);
 
     _extents = extents;
 }
@@ -262,15 +288,12 @@ void Core::RendererBatch::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& 
     commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
     commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
 
-    builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
-    builder.SetStorageBuffer(2, _instanceBuffer);
+	builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
+	builder.SetStorageBuffer(2, _instanceBuffer);
 
-    if (_needsMaterialIndexBuffer)
-    {
-        builder.SetUniformBuffer(8,
-            const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-        builder.SetStorageBuffer(9, _materialIndexBuffer);
-    }
+	builder.SetUniformBuffer(8,
+		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+	builder.SetStorageBuffer(9, _materialIndexBuffer);
 
     auto& resources = builder.Build();
 
@@ -331,14 +354,11 @@ void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, Command
     commandBuffer.BindPipeline(&pipeline);
 
     renderFrame.SetShaderStorageBuffer(shader, 1, _transformBatch->TransformBuffer);
-    renderFrame.SetShaderStorageBuffer(shader, 2, _instanceBuffer);
+	renderFrame.SetShaderStorageBuffer(shader, 2, _instanceBuffer);
 
-    if (_needsMaterialIndexBuffer)
-    {
-        renderFrame.SetShaderUniformBuffer(shader, 8, 
-            const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-        renderFrame.SetShaderStorageBuffer(shader, 9, _materialIndexBuffer);
-    }
+	renderFrame.SetShaderUniformBuffer(shader, 8,
+		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+	renderFrame.SetShaderStorageBuffer(shader, 9, _materialIndexBuffer);
 
     if (shader.UsesBindlessTextures())
     {

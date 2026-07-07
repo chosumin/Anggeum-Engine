@@ -19,6 +19,7 @@ namespace Core
 	class Framebuffer;
 	class DescriptorSetBuilder;
 	class Culler;
+	class Scene;
 
 	struct TransformBatch
 	{
@@ -44,13 +45,8 @@ namespace Core
 	class RendererBatch
 	{
 	public:
-		RendererBatch(Device& device);
+		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
 		~RendererBatch();
-
-		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
-		void Finalize(Device& device);
-		void PrepareGPUDrivenRendering(Device& device, bool needMaterialData,
-			VkExtent2D extents);
 
 		void GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			Shader& shader, Pipeline& pipeline,
@@ -85,10 +81,12 @@ namespace Core
 		Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		TransformBatch* GetTransformBatch() const { return _transformBatch; }
-		void SetTransformBatch(TransformBatch* batch) { _transformBatch = batch; }
 		VkExtent2D GetExtents() const { return _extents; }
 
 	private:
+		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
+		void Finalize();
+		void PrepareGPUDrivenRendering(VkExtent2D extents);
 		void CreateInstanceBuffer(Device& device);
 
 		void DrawIndirectInternal(
@@ -112,7 +110,6 @@ namespace Core
 		IndirectDrawBuffer _indirectDrawBuffer;
 		Core::Buffer* _indirectCommandBuffer = nullptr;
 		Core::Buffer* _materialIndexBuffer = nullptr;
-		bool _needsMaterialIndexBuffer = false;
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Core::Buffer* _objectDataBuffer = nullptr;

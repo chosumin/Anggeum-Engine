@@ -127,10 +127,9 @@ namespace Core
 
 		// RendererBatch management - single batch for all meshes
 		RendererBatch* GetRendererBatch() const;
-		void PrepareRendererBatch(VkExtent2D extents, bool needMaterialData = true);
 
 		// Batch initialization - called once at the start of rendering
-		void InitializeBatches(Scene& scene, VkExtent2D extents, bool needMaterialData = true);
+		void InitializeBatches(Scene& scene, VkExtent2D extents);
 		bool IsBatchesInitialized() const { return _batchesInitialized; }
 
 		// TransformBatch access

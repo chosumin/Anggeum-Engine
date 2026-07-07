@@ -761,23 +761,7 @@ RendererBatch* RenderFrame::GetRendererBatch() const
 	return _rendererBatch.get();
 }
 
-void RenderFrame::PrepareRendererBatch(VkExtent2D extents, bool needMaterialData)
-{
-	if (!_rendererBatch)
-		return;
-
-	_rendererBatch->Finalize(_device);
-	_rendererBatch->PrepareGPUDrivenRendering(_device, needMaterialData, extents);
-
-	// Reset culler used state for all cullers at frame start
-	for (auto& [batch, culler] : _cullers)
-	{
-		culler->MarkUsedThisFrame(false);
-	}
-}
-
-void RenderFrame::InitializeBatches(Scene& scene,
-	VkExtent2D extents, bool needMaterialData)
+void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
 	if (_batchesInitialized)
 		return;
@@ -813,34 +797,8 @@ void RenderFrame::InitializeBatches(Scene& scene,
 		&_transformBatch.TransformBuffer, transforms, true);
 	CommandBuffer::ImmediateSubmit(_device, job);
 
-	// Create renderer batch
-	_rendererBatch = make_unique<RendererBatch>(_device);
-	_rendererBatch->SetTransformBatch(&_transformBatch);
+	// Create renderer batch (initializes meshes internally)
+	_rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, extents);
 
-	for (auto* mesh : meshes)
-	{
-		uint entityId = mesh->GetEntity().GetId();
-		auto& materials = mesh->GetMaterials();
-		auto& subMeshes = mesh->GetSubMeshes();
-
-		for (size_t i = 0; i < materials.size(); ++i)
-		{
-			if (i >= subMeshes.size())
-				break;
-
-			auto shaderPtr = materials[i]->GetShaderPtr().lock();
-			if (!shaderPtr)
-				continue;
-
-			// Skip non-geometry passes (Skybox, etc.)
-			const string& pass = shaderPtr->GetPass();
-			if (pass != "Geometry")
-				continue;
-
-			_rendererBatch->AddMesh(entityId, materials[i], subMeshes[i]);
-		}
-	}
-
-	PrepareRendererBatch(extents, needMaterialData);
 	_batchesInitialized = true;
 }
