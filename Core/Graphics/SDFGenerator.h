@@ -30,9 +30,7 @@ namespace Core
 
 		void Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			MeshBufferManager& meshBufferManager,
-			Buffer* objectDataBuffer, Buffer* transformBuffer,
-			Buffer* drawCommandBuffer, uint32_t drawCommandCount,
-			uint32_t instanceCount,
+			Buffer* transformBuffer,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
 		// Persistent storage. File format includes the bounds buffer so the

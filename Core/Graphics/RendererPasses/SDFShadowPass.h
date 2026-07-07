@@ -27,17 +27,6 @@ namespace Core
 
 		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
 
-		// Set GPU buffers from GeometryPass's RendererBatch
-		void SetGPUBoundsData(Buffer* objectDataBuffer,
-			Buffer* drawCommandBuffer, uint32_t drawCommandCount,
-			uint32_t instanceCount)
-		{
-			_objectDataBuffer = objectDataBuffer;
-			_drawCommandBuffer = drawCommandBuffer;
-			_drawCommandCount = drawCommandCount;
-			_instanceCount = instanceCount;
-		}
-
 	private:
 		void RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 		void UpdateSDFParams();

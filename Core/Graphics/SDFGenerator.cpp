@@ -287,13 +287,17 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 
 void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 	MeshBufferManager& meshBufferManager,
-	Buffer* objectDataBuffer, Buffer* transformBuffer,
-	Buffer* drawCommandBuffer, uint32_t drawCommandCount,
-	uint32_t instanceCount,
+	Buffer* transformBuffer,
 	uint32_t resolution)
 {
 	if (!_sdfTexture)
 		CreateSDFTexture(resolution);
+
+	auto batch = renderFrame.GetRendererBatch();
+	auto objectDataBuffer = batch->GetObjectDataBuffer();
+	auto indirectCommandBuffer = batch->GetIndirectCommandBuffer();
+	auto drawCommandCount = batch->GetDrawCommandCount();
+	auto instanceCount = batch->GetInstanceCount();
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 
@@ -303,7 +307,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 	// Step 2: Build per-triangle lookup (vertexOffset + transformIndex)
 	BuildTriangleLookup(renderFrame, commandBuffer,
-		objectDataBuffer, drawCommandBuffer,
+		objectDataBuffer, indirectCommandBuffer,
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
