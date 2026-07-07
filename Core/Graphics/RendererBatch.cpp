@@ -186,7 +186,7 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
     function<void(Shader&)> perShader, function<void(shared_ptr<Material>)> perDraw,
     function<void()> postDraw)
 {
-    auto* culler = renderFrame.GetOrCreateCuller(this, _device, *_transformBatch);
+    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
 
     if (!culler->IsPrepared())
     {
@@ -386,7 +386,7 @@ void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, Command
 void Core::RendererBatch::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
     CommandBuffer& commandBuffer, const CameraBuffer& camera)
 {
-    auto* culler = renderFrame.GetOrCreateCuller(this, _device, *_transformBatch);
+    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
 
     if (!culler->IsPrepared())
     {

@@ -22,6 +22,29 @@ namespace Core
 	class PipelineState;
 	class Scene;
 
+	// Key for culler cache: combination of camera pointer and batch pointer
+	struct CullerKey
+	{
+		const CameraBuffer* Camera;
+		RendererBatch* Batch;
+
+		bool operator==(const CullerKey& other) const
+		{
+			return Camera == other.Camera && Batch == other.Batch;
+		}
+	};
+
+	struct CullerKeyHash
+	{
+		size_t operator()(const CullerKey& key) const
+		{
+			size_t h = 0;
+			h ^= std::hash<const CameraBuffer*>{}(key.Camera);
+			h ^= std::hash<RendererBatch*>{}(key.Batch) << 1;
+			return h;
+		}
+	};
+
 	struct RenderTargetDesc
 	{
 		VkExtent2D extent;
@@ -122,8 +145,8 @@ namespace Core
 		// The built resources are stored in the frame and cleaned up on Reset().
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
-		// Culler management - per RendererBatch, reused within a frame
-		Culler* GetOrCreateCuller(RendererBatch* batch, Device& device, TransformBatch& transformBatch);
+		// Culler management - per camera and RendererBatch, reused within a frame
+		Culler* GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, Device& device, TransformBatch& transformBatch);
 
 		// RendererBatch management - single batch for all meshes
 		RendererBatch* GetRendererBatch() const;
@@ -177,8 +200,8 @@ namespace Core
 		// Builder-created resources, cleaned up on Reset()
 		vector<DescriptorSetResources> _builderResources;
 
-		// Per-RendererBatch cullers, reused within a frame
-		unordered_map<RendererBatch*, unique_ptr<Culler>> _cullers;
+		// Per-camera/RendererBatch cullers, reused within a frame
+		unordered_map<CullerKey, unique_ptr<Culler>, CullerKeyHash> _cullers;
 
 		// Single RendererBatch for all meshes
 		unique_ptr<RendererBatch> _rendererBatch;
