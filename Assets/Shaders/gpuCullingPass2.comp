@@ -46,9 +46,10 @@ layout(set = 0, binding = 11) buffer RejectedCountBuffer { uint rejectedCount; }
 
 bool IsOccluded(vec3 worldCenter, float worldRadius)
 {
-    // Transform to clip space
-    vec4 clipCenter = cullData.proj * cullData.view * vec4(worldCenter, 1.0);
-    
+    // Transform to view space, then clip space
+    vec4 viewCenter = cullData.view * vec4(worldCenter, 1.0);
+    vec4 clipCenter = cullData.proj * viewCenter;
+
     // Behind camera - let frustum culling handle it
     if (clipCenter.w <= 0.0)
         return false;
@@ -74,11 +75,17 @@ bool IsOccluded(vec3 worldCenter, float worldRadius)
     // Sample Hi-Z buffer
     float occluderDepth = textureLod(hiZBuffer, screenUV, float(mipLevel)).r;
     
-    // Object's nearest depth (front of sphere)
-    float objectNearZ = clipCenter.z - worldRadius;
-    float objectNearDepth = objectNearZ / clipCenter.w;
-    objectNearDepth = objectNearDepth * 0.5 + 0.5;  // Convert to [0, 1]
-    
+    // Nearest point of the sphere toward the camera (view space, camera looks down -Z)
+    float viewNearZ = viewCenter.z + worldRadius;
+
+    // Nearest point crosses the near plane - let frustum culling handle it
+    if (viewNearZ >= 0.0)
+        return false;
+
+    // Project the nearest point to get its NDC depth (already [0, 1] on Vulkan)
+    vec4 clipNear = cullData.proj * vec4(0.0, 0.0, viewNearZ, 1.0);
+    float objectNearDepth = clipNear.z / clipNear.w;
+
     // Object is occluded if its nearest point is behind the occluder
     return objectNearDepth > occluderDepth;
 }
