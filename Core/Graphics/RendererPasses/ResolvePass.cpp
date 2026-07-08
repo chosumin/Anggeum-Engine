@@ -8,10 +8,14 @@
 
 using namespace Core;
 
+// Static member definitions
+VkExtent2D ResolvePass::_screenExtent = {};
+shared_ptr<Shader> ResolvePass::_depthResolveShader = nullptr;
+unique_ptr<Pipeline> ResolvePass::_depthResolvePipeline = nullptr;
+
 ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManager,
     VkExtent2D screenExtent, VkSampleCountFlagBits msaaSamples)
     : RendererPass(device, workerThreadManager)
-    , _screenExtent(screenExtent)
     , _msaaSamples(msaaSamples)
 {
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
@@ -21,6 +25,8 @@ ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManage
 
         _normalResolveShader = _device.GetResourceCache().RequestShader("Shaders/normalResolve.comp.spv");
         _normalResolvePipeline = make_unique<Pipeline>(_device, *_normalResolveShader);
+
+        _screenExtent = screenExtent;
     }
 }
 
@@ -33,13 +39,7 @@ void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
         return;
 
-    RenderTargetDesc resolvedDepthDesc{};
-    resolvedDepthDesc.extent  = _screenExtent;
-    resolvedDepthDesc.format  = VK_FORMAT_R32_SFLOAT;
-    resolvedDepthDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    resolvedDepthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-    resolvedDepthDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    _resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, resolvedDepthDesc);
+	_resolvedDepthTexture = GetResolvedDepthTarget(renderFrame);
 
     RenderTargetDesc resolvedNormalDesc{};
     resolvedNormalDesc.extent  = _screenExtent;
@@ -62,8 +62,6 @@ void ResolvePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
-    if (!depthTexture || !normalTexture)
-        return;
 
     // Transition depth to shader read
     commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
@@ -81,12 +79,16 @@ void ResolvePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     commandBuffer.EndDebugMarker();
 }
 
-void ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     shared_ptr<Texture> msaaDepth)
 {
-    auto& resolvedImage = *_resolvedDepthTexture->GetImage().lock();
+    auto resolvedDepth = GetResolvedDepthTarget(renderFrame);
+
+    auto& resolvedImage = *resolvedDepth->GetImage().lock();
     commandBuffer.TransitionImageLayout(resolvedImage,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+	auto extent = resolvedDepth->GetExtent();
 
     struct DepthResolvePushConstants {
         int32_t outputWidth;
@@ -94,15 +96,15 @@ void ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandB
         int32_t sampleCount;
         int32_t padding;
     } resolvePc = {
-        static_cast<int32_t>(_screenExtent.width),
-        static_cast<int32_t>(_screenExtent.height),
-        static_cast<int32_t>(_msaaSamples),
+        static_cast<int32_t>(extent.width),
+        static_cast<int32_t>(extent.height),
+        static_cast<int32_t>(msaaDepth->GetSampleCount()),
         0
     };
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthResolveShader, 0);
     builder.SetTextureBuffer(0, msaaDepth);
-    builder.SetTextureBuffer(1, _resolvedDepthTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+    builder.SetTextureBuffer(1, resolvedDepth, 0, VK_IMAGE_LAYOUT_GENERAL);
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_depthResolvePipeline.get());
@@ -111,12 +113,14 @@ void ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandB
         *_depthResolveShader, 0, resources);
     commandBuffer.PushConstants(*_depthResolveShader, 0, &resolvePc);
 
-    uint32_t groupX = (_screenExtent.width + 7) / 8;
-    uint32_t groupY = (_screenExtent.height + 7) / 8;
+    uint32_t groupX = (extent.width + 7) / 8;
+    uint32_t groupY = (extent.height + 7) / 8;
     commandBuffer.Dispatch(groupX, groupY, 1);
 
     commandBuffer.TransitionImageLayout(resolvedImage,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    return resolvedDepth;
 }
 
 void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -154,4 +158,18 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
 
     commandBuffer.TransitionImageLayout(resolvedImage,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+shared_ptr<Texture> Core::ResolvePass::GetResolvedDepthTarget(RenderFrame& renderFrame)
+{
+    RenderTargetDesc resolvedDepthDesc{};
+    resolvedDepthDesc.extent = _screenExtent;
+    resolvedDepthDesc.format = VK_FORMAT_R32_SFLOAT;
+    resolvedDepthDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    resolvedDepthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+    resolvedDepthDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    
+    auto resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, resolvedDepthDesc);
+
+    return resolvedDepthTexture;
 }

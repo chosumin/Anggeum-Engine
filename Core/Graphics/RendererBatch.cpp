@@ -191,7 +191,7 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
     if (!culler->IsPrepared())
     {
         culler->Prepare(_device, _extents,
-            _objectDataBuffer, _instanceBuffer, _indirectCommandBuffer,
+            _objectDataBuffer, _instanceBuffer,
             _instanceCount, _indirectDrawBuffer);
     }
 
@@ -200,9 +200,6 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
     if (!cullerAlreadyUsed)
     {
         auto prevDepth = renderFrame.GetPreviousDepthBuffer();
-        auto curDepth = renderFrame.GetRenderTarget(ResolvePass::RT_RESOLVED_DEPTH);
-        if (curDepth == nullptr)
-            curDepth = renderFrame.GetRenderTarget("MainDepth");
 
         commandBuffer.BeginDebugMarker("Reset Draw Commands");
         culler->ResetDrawCommands(renderFrame, commandBuffer);
@@ -215,8 +212,23 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
         commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
         auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
         commandBuffer.BeginRenderPass(pass1BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *_indirectCommandBuffer, perShader, perDraw);
+        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
         commandBuffer.EndRenderPass();
+        commandBuffer.EndDebugMarker();
+
+        commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
+        auto msaaDepth = renderFrame.GetRenderTarget("MainDepth");
+
+        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        auto curDepth = ResolvePass::ResolveDepth(renderFrame, commandBuffer, msaaDepth);
+
+        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
         commandBuffer.EndDebugMarker();
 
         commandBuffer.BeginDebugMarker("Pass 2 Culling");
@@ -245,7 +257,7 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
         commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects (Reuse)");
         auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
         commandBuffer.BeginRenderPass(pass1BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *_indirectCommandBuffer, perShader, perDraw);
+        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
         commandBuffer.EndRenderPass();
         commandBuffer.EndDebugMarker();
 
@@ -266,21 +278,14 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
     }
 }
 
-void Core::RendererBatch::DrawIndirect(
-    RenderFrame& renderFrame,
-    CommandBuffer& commandBuffer,
-    Shader& shader, Pipeline& pipeline,
-    function<void(Shader&)> perShader,
-    function<void(shared_ptr<Material>)> perDraw)
-{
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *_indirectCommandBuffer, perShader, perDraw);
-}
-
 void Core::RendererBatch::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    Shader& shader, DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
+    Shader& shader, DescriptorSetBuilder& builder, const CameraBuffer& camera,
+    function<void(shared_ptr<Material>)> perDraw)
 {
     if (_indirectDrawBuffer.GetDrawCount() == 0)
         return;
+
+    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
 
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
 
@@ -305,7 +310,7 @@ void Core::RendererBatch::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& 
     perDraw(material);
 
     commandBuffer.DrawIndexedIndirect(
-        *_indirectCommandBuffer,
+        *culler->GetIndirectCommandBuffer(),
         _indirectDrawBuffer.GetDrawCount(),
         static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
     );
@@ -391,7 +396,7 @@ void Core::RendererBatch::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
     if (!culler->IsPrepared())
     {
         culler->Prepare(_device, _extents,
-            _objectDataBuffer, _instanceBuffer, _indirectCommandBuffer,
+            _objectDataBuffer, _instanceBuffer,
             _instanceCount, _indirectDrawBuffer);
     }
 

@@ -25,16 +25,29 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
     multiSampling.rasterizationSamples = msaaSamples;
 
     // [0] Normal color attachment
+    // Pass 1 finalLayout should be COLOR_ATTACHMENT_OPTIMAL to allow Pass 2 to start correctly
     _renderPass->CreateColorAttachment(
         VK_FORMAT_R8G8B8A8_UNORM, msaaSamples,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // [1] Depth attachment
     _renderPass->CreateDepthAttachment(depthFormat, msaaSamples,
         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 
     _renderPass->CreateRenderPass();
+
+    // Pass 2 RenderPass (LOAD instead of CLEAR for 2-pass occlusion culling)
+    // initialLayout will be COLOR_ATTACHMENT_OPTIMAL (from Pass 1 finalLayout)
+    // finalLayout is SHADER_READ_ONLY_OPTIMAL for later sampling
+    _renderPassPass2 = new RenderPass(device);
+    _renderPassPass2->CreateColorAttachment(
+        VK_FORMAT_R8G8B8A8_UNORM, msaaSamples,
+        VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    _renderPassPass2->CreateDepthAttachment(depthFormat, msaaSamples,
+        VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE);
+    _renderPassPass2->CreateRenderPass();
 
     // Get the DepthNormal shader
     _depthNormalShader = _device.GetResourceCache().RequestShader("DepthNormal");
@@ -46,6 +59,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
 Core::DepthPrePass::~DepthPrePass()
 {
     delete(_pipeline);
+    delete(_renderPassPass2);
 }
 
 void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
@@ -93,25 +107,23 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     auto& commandBuffer = renderFrame.GetCommandBuffer();
     PerspectiveCamera* camera = _scene.GetMainCamera();
 
-    commandBuffer.BeginDebugMarker("Frustum Culling");
-    rendererBatch->DispatchFrustumOnlyCulling(
-        renderFrame, commandBuffer, camera->Matrices);
-    commandBuffer.EndDebugMarker();
-
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-    auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-    commandBuffer.BeginRenderPass(renderPassBeginInfo);
+    auto perShader = [&](Shader& shader)
+    {
+        renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
+    };
 
-    rendererBatch->DrawIndirect(renderFrame, commandBuffer,
+    auto perDraw = [&](shared_ptr<Material> sharedMaterial)
+    {
+    };
+
+    rendererBatch->GpuDrivenDraw(
+        renderFrame, commandBuffer,
         *_depthNormalShader, *_pipeline,
-        [&](Shader& shader)
-        {
-            renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
-        },
-        [&](shared_ptr<Material> sharedMaterial)
-        {
-        });
-
-    commandBuffer.EndRenderPass();
+        camera->Matrices,
+        *_renderPass, *_renderPassPass2,
+        *framebuffer,
+        perShader, perDraw,
+        nullptr);
 }

@@ -60,14 +60,9 @@ namespace Core
 		void DrawIndirect(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
-			Shader& shader, Pipeline& pipeline,
-			function<void(Shader&)> perShader,
-			function<void(shared_ptr<Material>)> perDraw);
-		void DrawIndirect(
-			RenderFrame& renderFrame,
-			CommandBuffer& commandBuffer,
 			Shader& shader,
 			DescriptorSetBuilder& builder,
+			const CameraBuffer& camera,
 			function<void(shared_ptr<Material>)> perDraw);
 
 		void DispatchFrustumOnlyCulling(RenderFrame& renderFrame, 

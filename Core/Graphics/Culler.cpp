@@ -20,17 +20,17 @@ Core::Culler::~Culler()
 {
     if (_rejectedIndicesBuffer != nullptr) delete(_rejectedIndicesBuffer);
     if (_rejectedCountBuffer != nullptr) delete(_rejectedCountBuffer);
+    if (_indirectCommandBuffer != nullptr) delete(_indirectCommandBuffer);
     if (_pass2IndirectCommandBuffer != nullptr) delete(_pass2IndirectCommandBuffer);
 }
 
 void Core::Culler::Prepare(Device& device, VkExtent2D extents,
     Buffer* objectDataBuffer, Buffer* instanceBuffer,
-    Buffer* indirectCommandBuffer, uint32_t instanceCount,
+    uint32_t instanceCount,
     const IndirectDrawBuffer& indirectDrawBuffer)
 {
     _objectDataBuffer = objectDataBuffer;
     _instanceBuffer = instanceBuffer;
-    _indirectCommandBuffer = indirectCommandBuffer;
     _instanceCount = instanceCount;
     _drawCount = indirectDrawBuffer.GetDrawCount();
 
@@ -52,6 +52,13 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectD
         sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         MemoryType::DEVICE_LOCAL);
+
+    // Pass 1 Indirect Command Buffer (owned by this Culler)
+    Core::VkBufferJob<DrawIndexedIndirectCommand> pass1Job(device,
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        &_indirectCommandBuffer,
+        indirectDrawBuffer.GetDrawCommands(), 0);
+    Core::CommandBuffer::ImmediateSubmit(device, pass1Job);
 
     // Pass 2 Indirect Command Buffer
     Core::VkBufferJob<DrawIndexedIndirectCommand> pass2Job(device,

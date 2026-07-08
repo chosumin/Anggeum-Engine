@@ -18,23 +18,24 @@ namespace Core
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
 
-    private:
-        void ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+        static shared_ptr<Texture> ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaDepth);
+    private:
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);
-
+        
+        static shared_ptr<Texture> GetResolvedDepthTarget(RenderFrame& renderFrame);
     private:
-        VkExtent2D _screenExtent;
         VkSampleCountFlagBits _msaaSamples;
 
         shared_ptr<Texture> _resolvedDepthTexture;
         shared_ptr<Texture> _resolvedNormalTexture;
 
-        shared_ptr<Shader> _depthResolveShader;
-        unique_ptr<Pipeline> _depthResolvePipeline;
-
         shared_ptr<Shader> _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
+
+        static VkExtent2D _screenExtent;
+        static shared_ptr<Shader> _depthResolveShader;
+        static unique_ptr<Pipeline> _depthResolvePipeline;
     };
 }

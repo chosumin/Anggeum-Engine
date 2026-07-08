@@ -116,10 +116,17 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 	// If the data is position, calculate bounding sphere (also accumulates scene bounds)
 	if (name == "POSITION")
 	{
-		const glm::vec3* positions = reinterpret_cast<const glm::vec3*>(data.data());
-		size_t positionCount = data.size() / sizeof(glm::vec3);
-		vector<glm::vec3> positionVec(positions, positions + positionCount);
-		
+		// POSITION is tightly packed with the source stride (e.g. 12 bytes for float3),
+		// which does not match sizeof(glm::vec3) (16 bytes under GLM_FORCE_DEFAULT_ALIGNED_GENTYPES).
+		// Walk the raw buffer using the actual stride and copy only the 3 valid floats per vertex.
+		size_t positionCount = data.size() / stride;
+		vector<glm::vec3> positionVec(positionCount);
+
+		for (size_t i = 0; i < positionCount; ++i)
+		{
+			memcpy(&positionVec[i], data.data() + i * stride, sizeof(float) * 3);
+		}
+
 		_tempBoundingSphere = CalculateBoundingSphere(positionVec);
 	}
 

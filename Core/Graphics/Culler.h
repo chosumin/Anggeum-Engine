@@ -28,11 +28,12 @@ namespace Core
         bool IsUsedThisFrame() const { return _markUsedThisFrame; }
 		void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
 
-        // Creates the culling compute resources. The draw buffers are owned by
-        // RendererBatch and only referenced by the Culler.
+        // Creates the culling compute resources. The object/instance buffers are
+        // owned by RendererBatch and only referenced by the Culler. The Pass 1
+        // indirect command buffer is owned by the Culler itself.
         void Prepare(Device& device, VkExtent2D extents,
             Buffer* objectDataBuffer, Buffer* instanceBuffer,
-            Buffer* indirectCommandBuffer, uint32_t instanceCount,
+            uint32_t instanceCount,
             const IndirectDrawBuffer& indirectDrawBuffer);
 
         // Resets per-frame instance counts before the 2-pass culling runs.
@@ -50,6 +51,7 @@ namespace Core
         void DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
             CommandBuffer& commandBuffer, const CameraBuffer& camera);
 
+        Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
         Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer; }
 
         // Check if the culler has been prepared
@@ -71,9 +73,11 @@ namespace Core
         Device& _device;
         TransformBatch& _transformBatch;
 
-        // Draw buffers owned by RendererBatch (referenced, not owned).
+        // Object/instance buffers owned by RendererBatch (referenced, not owned).
         Core::Buffer* _objectDataBuffer = nullptr;
         Core::Buffer* _instanceBuffer = nullptr;
+        // Pass 1 indirect command buffer owned by this Culler so multiple cullers
+        // (e.g. depth pre-pass and shadow cascades) don't overwrite each other.
         Core::Buffer* _indirectCommandBuffer = nullptr;
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;

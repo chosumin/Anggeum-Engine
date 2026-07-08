@@ -28,6 +28,8 @@ namespace Core
 
         shared_ptr<Shader> _depthNormalShader;
         Pipeline* _pipeline = nullptr;
+
+        // Pass 2 RenderPass (color LOAD, depth LOAD)
+        RenderPass* _renderPassPass2 = nullptr;
     };
 }
-

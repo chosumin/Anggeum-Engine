@@ -378,6 +378,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		commandBuffer.BindPipeline(_pipeline);
 
 		rendererBatch->DrawIndirect(renderFrame, commandBuffer, *_shadowShader, builder,
+			_cascadeViews[cascadeIndex],
 		[&](shared_ptr<Material> sharedMaterial) {});
 
 		commandBuffer.EndRenderPass();
