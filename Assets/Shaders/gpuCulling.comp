@@ -78,7 +78,9 @@ bool IsOccluded(vec3 worldCenter, float worldRadius)
         return false;
     
     // Calculate screen space radius
-    float projRadius = worldRadius * cullData.proj[1][1] / clipCenter.w;
+    // Use abs() on proj[1][1] because Vulkan flips the Y axis (proj[1][1] is negative),
+    // which would otherwise make the radius negative and force mip level 0.
+    float projRadius = worldRadius * abs(cullData.proj[1][1]) / clipCenter.w;
     float screenPixelRadius = projRadius * cullData.screenSize.y * 0.5;
     
     // Select appropriate mip level based on screen size

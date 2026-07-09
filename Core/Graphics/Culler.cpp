@@ -335,6 +335,11 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             groupX = (mipWidth + 7) / 8;
             groupY = (mipHeight + 7) / 8;
             commandBuffer.Dispatch(groupX, groupY, 1);
+
+            commandBuffer.TransitionImageLayout(
+                hiZTextureImage,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_GENERAL);
         }
     }
 
