@@ -363,18 +363,22 @@ namespace Core
                 _skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
             }
 
-            auto skyBuilder = renderFrame.CreateDescriptorSetBuilder(shader, 0);
-            skyBuilder.SetUniformBuffer(0, &camera->Matrices);
-            auto& skyResources = skyBuilder.Build();
+            auto skyBuilder0 = renderFrame.CreateDescriptorSetBuilder(shader, 0);
+            skyBuilder0.SetUniformBuffer(0, &camera->Matrices);
+            auto& skyResources0 = skyBuilder0.Build();
+
+            auto skyBuilder1 = renderFrame.CreateDescriptorSetBuilder(shader, 1);
+            auto& textures = material->GetTexturesMap();
+            for (auto& [binding, texture] : textures)
+                skyBuilder1.SetTextureBuffer(binding, texture);
+            auto& skyResources1 = skyBuilder1.Build();
 
             commandBuffer.BindPipeline(_skyboxPipeline);
 
-            commandBuffer.BindDescriptorSet(
-                renderFrame,
-                _skyboxPipeline->GetPipelineBindPoint(), shader, 0, skyResources);
             commandBuffer.BindDescriptorSets(
                 renderFrame,
-                _skyboxPipeline->GetPipelineBindPoint(), *material);
+                _skyboxPipeline->GetPipelineBindPoint(), shader, 0,
+                { &skyResources0, &skyResources1 });
 
             auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
 

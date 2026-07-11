@@ -70,9 +70,6 @@ namespace Core
 		// Set command buffers (allocated from RenderContext's CommandPool)
 		void SetCommandBuffer(CommandBuffer* commandBuffer) { _commandBuffer = commandBuffer; }
 		void SetComputeCommandBuffer(CommandBuffer* computeBuffer) { _computeCommandBuffer = computeBuffer; }
-		
-		void AllocateDescriptorSets(Material& material);
-		void UpdateDescriptorSets(Material& material);
 
 		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
 		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }
@@ -83,12 +80,6 @@ namespace Core
 		// Per-shader resources access (set index 0, hash-based)
 		DescriptorSetResources& GetOrCreateShaderResources(size_t shaderHash);
 		DescriptorSetResources* GetShaderResources(size_t shaderHash);
-
-		// Per-material resources access (set index 1, name-based)
-		DescriptorSetResources& GetOrCreateMaterialResources(const string& materialName);
-		DescriptorSetResources* GetMaterialResources(const string& materialName);
-
-		void SetMaterialBuffers(Material& material);
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
@@ -149,12 +140,6 @@ namespace Core
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
 
-		void SetMaterialUniformBuffer(Material& material, uint32_t binding, void* data);
-		void SetMaterialTextureBuffer(Material& material, uint32_t binding, 
-			shared_ptr<Texture> texture, uint mipLevel,
-			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		void SetMaterialStorageBuffer(Material& material, uint32_t binding, Buffer* buffer);
-
 	private:
 		Device& _device;
 		
@@ -167,7 +152,6 @@ namespace Core
 		unique_ptr<DescriptorPool> _descriptorPool;
 
 		unordered_map<size_t, DescriptorSetResources> _shaderResources;
-		unordered_map<string, DescriptorSetResources> _materialResources;
 
 		BindlessTextureManager* _bindlessTextureManager;
 

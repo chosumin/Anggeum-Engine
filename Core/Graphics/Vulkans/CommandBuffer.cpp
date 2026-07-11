@@ -122,34 +122,32 @@ void Core::CommandBuffer::SetViewportAndScissor(VkExtent2D extent)
 }
 
 void Core::CommandBuffer::BindDescriptorSets(
-    RenderFrame& renderFrame,
-    VkPipelineBindPoint pipelineBindPoint, 
-    Material& material)
+	RenderFrame& renderFrame,
+	VkPipelineBindPoint pipelineBindPoint,
+	Shader& shader,
+	uint32_t firstSet,
+	const vector<DescriptorSetResources*>& resourcesList)
 {
-    auto& shader = material.GetShader();
-    auto pipelineLayout = shader.GetPipelineLayout();
+	vector<VkDescriptorSet> descriptorSets;
+	descriptorSets.reserve(resourcesList.size());
 
-    auto& resources = renderFrame.GetOrCreateMaterialResources(material.GetName());
+	for (auto* res : resourcesList)
+	{
+		if (!res || res->descriptorSet == VK_NULL_HANDLE)
+			return;
+		descriptorSets.push_back(res->descriptorSet);
+	}
 
-    // Update only if not already updated this frame
-    if (!resources.isDescriptorSetUpdated)
-    {
-		renderFrame.SetMaterialBuffers(material);
-		renderFrame.AllocateDescriptorSets(material);
-		renderFrame.UpdateDescriptorSets(material);
-		resources.isDescriptorSetUpdated = true;
-    }
-    
-    if (resources.descriptorSet == VK_NULL_HANDLE)
-    {
-		//Nothing to bind
-        return;
-    }
+	if (descriptorSets.empty())
+		return;
 
-    vkCmdBindDescriptorSets(
-        _commandBuffer, pipelineBindPoint,
-        pipelineLayout, (uint)DescriptorSetType::Material, 1,
-        &resources.descriptorSet, 0, nullptr);
+	auto pipelineLayout = shader.GetPipelineLayout();
+
+	vkCmdBindDescriptorSets(
+		_commandBuffer, pipelineBindPoint,
+		pipelineLayout, firstSet,
+		static_cast<uint32_t>(descriptorSets.size()),
+		descriptorSets.data(), 0, nullptr);
 }
 
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
