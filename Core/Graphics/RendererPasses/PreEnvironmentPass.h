@@ -18,7 +18,7 @@ namespace Core
         ~PreEnvironmentPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
     private:
         void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer);

@@ -40,10 +40,10 @@ void Core::CommandBuffer::ResetCommandBuffer()
 void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, const RenderPass* renderPass, const Framebuffer* framebuffer, uint32_t subpassIndex, uint32_t imageIndex)
 {
 	VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = flags;
 
-    VkCommandBufferInheritanceInfo inheritanceInfo = {};
+	VkCommandBufferInheritanceInfo inheritanceInfo = {};
 	if (_level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)
 	{
 		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -73,9 +73,9 @@ void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
 	if (isSingleTime)
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
-    if (result != VK_SUCCESS)
-        throw std::runtime_error("failed to begin recording command buffer!");
+	auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+	if (result != VK_SUCCESS)
+		throw std::runtime_error("failed to begin recording command buffer!");
 }
 
 void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers)

@@ -145,7 +145,7 @@ namespace Core
         _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
-    void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+    void GeometryPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
         // Lazy initialization
         EnsureIBLResources(renderFrame);
@@ -164,8 +164,6 @@ namespace Core
 
         if (!framebuffer)
             return;
-
-        auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);

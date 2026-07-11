@@ -8,6 +8,8 @@
 #include "Vulkans/Framebuffer.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "Vulkans/CommandBuffer.h"
+#include "Vulkans/CommandPool.h"
+#include "Vulkans/SubmitInfo.h"
 #include "ResourceCache.h"
 #include "TransferJob.h"
 #include "Foundation/Scene.h"
@@ -54,6 +56,8 @@ void RenderFrame::Reset()
 		resources.CleanupBuffers();
 	}
 	_builderResources.clear();
+
+	_submitInfos.clear();
 
 	// Reset culler usage tracking for this frame
 	_renderExecutor->ResetFrame();
@@ -256,4 +260,10 @@ RendererBatch* RenderFrame::GetRendererBatch() const
 void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
 	_renderExecutor->InitializeBatches(scene, extents);
+}
+
+SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer)
+{
+	_submitInfos.emplace_back(queueType, commandBuffer);
+	return _submitInfos.back();
 }

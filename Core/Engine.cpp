@@ -74,7 +74,7 @@ void Core::Engine::Draw()
 	_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
 
 	uint32_t imageIndex = _renderContext->GetImageIndex();
-	_renderPipeline->Draw(_renderContext->GetCurrentFrame(), imageIndex);
+	_renderPipeline->Draw(*_renderContext, _renderContext->GetCurrentFrame(), imageIndex);
 
 	_renderContext->Submit();
 }

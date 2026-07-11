@@ -13,7 +13,7 @@ namespace Core
         ~BrdfLutPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
     private:
         unique_ptr<Framebuffer> _framebuffer;

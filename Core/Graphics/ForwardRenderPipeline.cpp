@@ -6,9 +6,11 @@
 #include "Components/Mesh.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/Vulkans/SubmitInfo.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
 #include "Graphics/RendererPasses/LightCullingPass.h"
 #include "Graphics/RendererPasses/GeometryPass.h"
@@ -97,10 +99,8 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
-void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
-
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		// Get class name from typeid
@@ -114,14 +114,22 @@ void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			simpleName = className + strlen(prefix);
 		}
 
-		// Begin debug marker for this render pass
+		// Request command buffer based on queue type
+		QueueType queueType = rendererPass->GetQueueType();
+		CommandBuffer& commandBuffer = (queueType == QueueType::Compute)
+			? renderContext.RequestComputeCommandBuffer()
+			: renderContext.RequestCommandBuffer();
+
+		commandBuffer.BeginCommandBuffer();
 		commandBuffer.BeginDebugMarker(simpleName);
 
 		rendererPass->EnsureRenderTargets(renderFrame);
-		rendererPass->Draw(renderFrame, imageIndex);
+		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
 
-		// End debug marker
 		commandBuffer.EndDebugMarker();
+		commandBuffer.EndCommandBuffer();
+
+		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle());
 	}
 }
 

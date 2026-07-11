@@ -28,7 +28,7 @@ namespace Core
         ~GeometryPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
-        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
     private:
         void RegisterGiTexturesToBindless(RenderFrame& renderContext);
 

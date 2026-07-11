@@ -47,6 +47,10 @@ namespace Core
 		RenderFrame& GetCurrentFrame() { return *_frames[_currentFrame]; }
 		uint32_t GetCurrentFrameIndex() const { return _currentFrame; }
 		uint32_t GetImageIndex() const { return _imageIndex; }
+
+		// Command buffer allocation
+		CommandBuffer& RequestCommandBuffer();
+		CommandBuffer& RequestComputeCommandBuffer();
 		
 		// Swap chain
 		SwapChain& GetSwapChain() const;
@@ -65,7 +69,6 @@ namespace Core
 		void CreateRenderFrames();
 		void CreateSyncObjects();
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
-		void SubmitComputeBuffer();
 		void EndFrame(VkSemaphore* semaphore);
 		
 	private:

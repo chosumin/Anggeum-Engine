@@ -86,7 +86,7 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
@@ -97,8 +97,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         return;
 
     UpdateParams();
-
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
     commandBuffer.BeginDebugMarker("DFAO");
 
     auto depthForSampling = renderFrame.GetCurrentDepth();

@@ -25,15 +25,13 @@ Core::LightCullingPass::~LightCullingPass()
 {
 }
 
-void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto depthTarget = renderFrame.GetCurrentDepth();
 	if (!depthTarget)
 		return;
 
 	UpdateLightBuffer();
-
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 

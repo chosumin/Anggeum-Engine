@@ -21,7 +21,7 @@ namespace Core
 			WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain);
 		virtual ~ForwardRenderPipeline() override;
 
-		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+		virtual void Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex) override;
 		virtual void OnGUI(RenderFrame& renderFrame) override;
 
 		void Cleanup();

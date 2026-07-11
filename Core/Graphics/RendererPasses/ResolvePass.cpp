@@ -53,12 +53,10 @@ void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.SetCurrentNormal(_resolvedNormalTexture);
 }
 
-void ResolvePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
         return;
-
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
 
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);

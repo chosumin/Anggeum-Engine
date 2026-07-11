@@ -211,15 +211,13 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
     ImGui::Separator();
 }
 
-void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
     if (!meshBufferManager)
         return;
 
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
-
-    // Deferred save: the SDF was generated on a previous frame and its GPU work
+    // Deferred save: the SDF was generated on a previous frame
     // is now complete, so it's safe to read back the image/bounds and write to disk.
     if (_savePending)
     {

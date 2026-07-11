@@ -88,7 +88,7 @@ void Core::GUIRenderPass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
-void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto colorTarget = renderFrame.GetRenderTarget(RT_MAIN_COLOR);
 
@@ -108,8 +108,6 @@ void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         framebuffer = fb.get();
         renderFrame.RegisterFramebuffer(framebufferName, std::move(fb));
     }
-
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
 
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 

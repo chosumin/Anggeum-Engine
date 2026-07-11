@@ -39,10 +39,8 @@ void Core::BrdfLutPass::Initialize()
     _brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
 }
 
-void Core::BrdfLutPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::BrdfLutPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
-
     commandBuffer.SetViewportAndScissor(_framebuffer->GetExtent());
 
     commandBuffer.BeginRenderPass(_renderPass->CreateRenderPassBeginInfo(*_framebuffer));
@@ -68,9 +66,7 @@ Core::BrdfLutJob::~BrdfLutJob()
 
 void Core::BrdfLutJob::Execute()
 {
-    _tempRenderFrame.SetCommandBuffer(commandBuffer);
+    _pass.Draw(_tempRenderFrame, *commandBuffer, 0);
 
-    _pass.Draw(_tempRenderFrame, 0);
-    
     status = JobStatus::COMPLETE;
 }

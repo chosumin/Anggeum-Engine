@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
+#include "Vulkans/SubmitInfo.h"
 #include "Foundation/Scene.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandPool.h"
@@ -117,20 +118,8 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 	_previousFrameDepth = _frameDepthBuffers[prevIndex];
 	currentFrame.SetPreviousDepthBuffer(_previousFrameDepth);
 
-	// Allocate command buffers (from CommandPool)
-	auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-	auto& computeBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-
-	// Set command buffers to RenderFrame
-	currentFrame.SetCommandBuffer(&commandBuffer);
-	currentFrame.SetComputeCommandBuffer(&computeBuffer);
-
-	// Reset current frame (Descriptor pool, Command buffers)
+	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
-
-	// Begin command buffers
-	commandBuffer.BeginCommandBuffer();
-	computeBuffer.BeginCommandBuffer();
 
 	if (_bindlessTextureManager)
 		_bindlessTextureManager->UpdateDescriptorSet();
@@ -155,119 +144,107 @@ void RenderContext::Submit()
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 
-	auto& commandBuffer = currentFrame.GetCommandBuffer();
-	auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+	auto& submitInfos = currentFrame.GetSubmitInfos();
 
-	// End command buffers
-	commandBuffer.EndCommandBuffer();
-	computeBuffer.EndCommandBuffer();
+	// Separate submit infos by queue type
+	std::vector<VkSubmitInfo> graphicsSubmits;
+	std::vector<VkSubmitInfo> computeSubmits;
 
-	// Graphics queue submit
-	u32 waitSemaphoreCount = 1;
-
-	bool waitForComputeSemaphore = _lastComputeSemaphoreValue > 0;
-	if (waitForComputeSemaphore)
-		waitSemaphoreCount++;
-
-	bool waitForTimelineSemaphore = FrameCounter::GetFrameNumber() >= _maxFramesInFlight;
-	if (waitForTimelineSemaphore)
-		waitSemaphoreCount++;
-
-	VkSemaphore waitSemaphores[] =
+	for (auto& info : submitInfos)
 	{
-		currentFrame.GetImageAvailableSemaphore(),
-		_computeSemaphore,
-		_graphicsSemaphore
-	};
+		const VkSubmitInfo& vkInfo = info.Build();
+		if (info.GetQueueType() == QueueType::Graphics)
+			graphicsSubmits.push_back(vkInfo);
+		else
+			computeSubmits.push_back(vkInfo);
+	}
 
-	VkPipelineStageFlags waitStages[] =
+	// Inject frame-level semaphores into first/last graphics submits
+	// First graphics submit waits on imageAvailable + timeline
+	// Last graphics submit signals renderFinished + timeline
+	if (!graphicsSubmits.empty())
 	{
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-	};
+		// Add imageAvailable wait to first graphics submit info
+		auto& firstInfo = submitInfos.front();
+		if (firstInfo.GetQueueType() == QueueType::Graphics)
+		{
+			firstInfo.AddWaitSemaphore(
+				currentFrame.GetImageAvailableSemaphore(),
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
 
-	VkSemaphore signalSemaphores[] =
-	{
-		currentFrame.GetRenderFinishedSemaphore(),
-		_graphicsSemaphore
-	};
+			if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
+			{
+				firstInfo.AddWaitSemaphore(
+					_graphicsSemaphore,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+					FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1));
+			}
+		}
 
-	u64 signalValues[] = { 0, FrameCounter::GetFrameNumber() + 1 };
+		// Find last graphics submit info and add signal semaphores
+		for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
+		{
+			if (it->GetQueueType() == QueueType::Graphics)
+			{
+				it->AddSignalSemaphore(
+					currentFrame.GetRenderFinishedSemaphore(), 0);
+				it->AddSignalSemaphore(
+					_graphicsSemaphore,
+					FrameCounter::GetFrameNumber() + 1);
+				break;
+			}
+		}
 
-	VkTimelineSemaphoreSubmitInfo semaphoreSubmitInfo{};
-	semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-	semaphoreSubmitInfo.signalSemaphoreValueCount = 2;
-	semaphoreSubmitInfo.pSignalSemaphoreValues = signalValues;
+		// Rebuild after adding frame-level semaphores
+		graphicsSubmits.clear();
+		for (auto& info : submitInfos)
+		{
+			if (info.GetQueueType() == QueueType::Graphics)
+				graphicsSubmits.push_back(info.Build());
+		}
 
-	u64 waitValues[] =
-	{
-		0, _lastComputeSemaphoreValue,
-		FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1)
-	};
-
-	semaphoreSubmitInfo.waitSemaphoreValueCount = waitSemaphoreCount;
-	semaphoreSubmitInfo.pWaitSemaphoreValues = waitValues;
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = waitSemaphoreCount;
-	submitInfo.pWaitSemaphores = waitSemaphores;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
-	submitInfo.signalSemaphoreCount = 2;
-	submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.pNext = &semaphoreSubmitInfo;
-
-	if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-		throw runtime_error("failed to submit draw command buffer!");
+		if (vkQueueSubmit(_device.GetGraphicsQueue(),
+			static_cast<uint32_t>(graphicsSubmits.size()),
+			graphicsSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
+		{
+			throw runtime_error("failed to submit graphics command buffers!");
+		}
+	}
 
 	// Compute queue submit
-	SubmitComputeBuffer();
+	if (!computeSubmits.empty())
+	{
+		// Rebuild compute submits (they may have been modified)
+		computeSubmits.clear();
+		for (auto& info : submitInfos)
+		{
+			if (info.GetQueueType() == QueueType::Compute)
+				computeSubmits.push_back(info.Build());
+		}
+
+		if (vkQueueSubmit(_device.GetComputeQueue(),
+			static_cast<uint32_t>(computeSubmits.size()),
+			computeSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
+		{
+			throw runtime_error("failed to submit compute command buffers!");
+		}
+	}
 
 	// Present
-	EndFrame(signalSemaphores);
+	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
+	EndFrame(&renderFinished);
 }
 
-void RenderContext::SubmitComputeBuffer()
+CommandBuffer& RenderContext::RequestCommandBuffer()
 {
-	auto& currentFrame = GetCurrentFrame();
-	auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+	auto& cmd = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	return cmd;
+}
 
-	bool has_wait_semaphore = _lastComputeSemaphoreValue > 0;
-
-	VkSemaphore waitSemaphores[] = { _computeSemaphore };
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-
-	VkSemaphore signalSemaphores[] = { _computeSemaphore };
-
-	VkTimelineSemaphoreSubmitInfo semaphore_info{};
-	semaphore_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-
-	u64 waitValues[] = { _lastComputeSemaphoreValue };
-	semaphore_info.waitSemaphoreValueCount = has_wait_semaphore ? 1 : 0;
-	semaphore_info.pWaitSemaphoreValues = waitValues;
-
-	++_lastComputeSemaphoreValue;
-
-	u64 signalValues[] = { _lastComputeSemaphoreValue };
-	semaphore_info.signalSemaphoreValueCount = 1;
-	semaphore_info.pSignalSemaphoreValues = signalValues;
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = has_wait_semaphore ? 1 : 0;
-	submitInfo.pWaitSemaphores = waitSemaphores;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &computeBuffer.GetHandle();
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.pNext = &semaphore_info;
-
-	if (vkQueueSubmit(_device.GetComputeQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-		throw runtime_error("failed to submit compute command buffer!");
+CommandBuffer& RenderContext::RequestComputeCommandBuffer()
+{
+	auto& cmd = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	return cmd;
 }
 
 SwapChain& RenderContext::GetSwapChain() const

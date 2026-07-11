@@ -4,10 +4,13 @@
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
 #include "RenderExecutor.h"
+#include "Vulkans/SubmitInfo.h"
+#include <deque>
 
 namespace Core
 {
 	class CommandBuffer;
+	class CommandPool;
 	class Material;
 	class Shader;
 	class Texture;
@@ -42,13 +45,10 @@ namespace Core
 		
 		// Reset frame resources
 		void Reset();
-		
-		// Set command buffers (allocated from RenderContext's CommandPool)
-		void SetCommandBuffer(CommandBuffer* commandBuffer) { _commandBuffer = commandBuffer; }
-		void SetComputeCommandBuffer(CommandBuffer* computeBuffer) { _computeCommandBuffer = computeBuffer; }
 
-		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
-		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }
+		// Submit info management
+		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer);
+		std::deque<SubmitInfo>& GetSubmitInfos() { return _submitInfos; }
 
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
 		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
@@ -108,9 +108,9 @@ namespace Core
 
 	private:
 		Device& _device;
-		
-		CommandBuffer* _commandBuffer = nullptr;
-		CommandBuffer* _computeCommandBuffer = nullptr;
+
+		// Submit infos collected from passes, submitted at end of frame
+		std::deque<SubmitInfo> _submitInfos;
 		
 		VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
 		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
