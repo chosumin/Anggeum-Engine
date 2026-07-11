@@ -53,7 +53,7 @@ layout(set = 0, binding = 6) buffer readonly TileLightVisiblities
 layout(set = 0, binding = 7) uniform sampler2DArray shadowMap;
 
 layout(set = 0, binding = 10) uniform sampler2D sdfShadowMap;
-layout(set = 0, binding = 11) uniform sampler2D dfaoMap;
+layout(set = 0, binding = 11) uniform sampler2D aoMap;
 
 #ifdef GPU_DRIVEN_RENDERING
 struct PBR
@@ -217,7 +217,7 @@ void main()
 	Lo *= visibility;
 
 	// Sample AO: applied globally across the full screen to the ambient term
-	float ao = texture(dfaoMap, screenUV).r;
+	float ao = texture(aoMap, screenUV).r;
 
 	// ambient lighting
 	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);

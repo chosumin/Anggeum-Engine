@@ -5,7 +5,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Components/PerspectiveCamera.h"
-#include "DFAOPass.h"
+#include "AmbientOcclusionPass.h"
 
 #include "ffx_cacao_impl.h"
 
@@ -155,7 +155,7 @@ void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     aoDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    _aoTexture = renderFrame.GetOrCreateRenderTarget(DFAOPass::RT_DFAO, aoDesc);
+    _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void CACAOPass::UpdateGUI()

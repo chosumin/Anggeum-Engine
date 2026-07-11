@@ -14,6 +14,8 @@ namespace Core
     class AmbientOcclusionPass : public RendererPass
     {
     public:
+        static constexpr const char* RT_AO = "AOResult";
+
         AmbientOcclusionPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples,

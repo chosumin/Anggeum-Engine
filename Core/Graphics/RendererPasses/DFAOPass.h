@@ -11,8 +11,6 @@ namespace Core
     class DFAOPass : public RendererPass
     {
     public:
-        static constexpr const char* RT_DFAO            = "DFAOResult";
-
         DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples,

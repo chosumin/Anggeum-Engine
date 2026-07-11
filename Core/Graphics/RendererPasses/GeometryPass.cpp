@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "GeometryPass.h"
-#include "DFAOPass.h"
-#include "CACAOPass.h"
+#include "AmbientOcclusionPass.h"
 #include "SDFShadowPass.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Component.h"
@@ -180,7 +179,7 @@ namespace Core
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
 
-        auto dfaoTarget = renderFrame.GetRenderTarget(DFAOPass::RT_DFAO);
+        auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
         UpdateLightBuffer();
 
@@ -228,8 +227,8 @@ namespace Core
             if (sdfShadowTarget)
                 renderFrame.SetShaderTextureBuffer(shader, 10, sdfShadowTarget);
 
-            if (dfaoTarget)
-               renderFrame.SetShaderTextureBuffer(shader, 11, dfaoTarget);
+            if (aoTarget)
+               renderFrame.SetShaderTextureBuffer(shader, 11, aoTarget);
         };
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)

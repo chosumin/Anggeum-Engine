@@ -7,6 +7,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/ResourceCache.h"
+#include "AmbientOcclusionPass.h"
 using namespace Core;
 
 DFAOPass::DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
@@ -37,7 +38,7 @@ void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     aoDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    _aoTexture = renderFrame.GetOrCreateRenderTarget(RT_DFAO, aoDesc);
+    _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void DFAOPass::UpdateParams()
