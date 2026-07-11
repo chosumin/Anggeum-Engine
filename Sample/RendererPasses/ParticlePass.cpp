@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "ParticlePass.h"
 #include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/TransferJob.h"
@@ -126,18 +127,20 @@ void Sample::ParticlePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     // Compute pass
     _deltaTime.deltaTime += 0.01f;
-    renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(), 0, &_deltaTime.deltaTime);
 
-    renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 1, _buffers[0]);
-    renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 2, _buffers[1]);
-    renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 3, _buffers[3]);
-    renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(), 4, _buffers[4]);
+    auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+    builder.SetUniformBuffer(0, &_deltaTime.deltaTime);
+    builder.SetStorageBuffer(1, _buffers[0]);
+    builder.SetStorageBuffer(2, _buffers[1]);
+    builder.SetStorageBuffer(3, _buffers[3]);
+    builder.SetStorageBuffer(4, _buffers[4]);
+    auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_computePipeline.get());
 
-    commandBuffer.BindDescriptorSets(
+    commandBuffer.BindDescriptorSet(
         renderFrame,
-        _computePipeline->GetPipelineBindPoint(), _computeMaterial->GetShader());
+        _computePipeline->GetPipelineBindPoint(), _computeMaterial->GetShader(), 0, resources);
 
     commandBuffer.Dispatch(PARTICLE_COUNT / 256, 1, 1);
 

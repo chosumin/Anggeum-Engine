@@ -53,24 +53,10 @@ namespace Core
 			CameraBuffer& camera,
 			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
 			Framebuffer& framebuffer,
-			function<void(Shader&)> perShader,
+			DescriptorSetBuilder& builder,
 			function<void(shared_ptr<Material>)> perDraw,
 			function<void()> postDraw);
 
-		void DrawIndirect(
-			RenderFrame& renderFrame,
-			CommandBuffer& commandBuffer,
-			Shader& shader,
-			DescriptorSetBuilder& builder,
-			const CameraBuffer& camera,
-			function<void(shared_ptr<Material>)> perDraw);
-
-		void DispatchFrustumOnlyCulling(RenderFrame& renderFrame, 
-			CommandBuffer& commandBuffer,
-			const CameraBuffer& camera);
-
-		// Combined frustum culling + indirect draw for shadow passes and similar use cases.
-		// Dispatches frustum-only culling, then draws with the provided builder and pipeline.
 		void FrustumCullAndDraw(
 			RenderFrame& renderFrame,
 			CommandBuffer& commandBuffer,
@@ -102,7 +88,7 @@ namespace Core
 			CommandBuffer& commandBuffer,
 			Shader& shader, Pipeline& pipeline,
 			Core::Buffer& indirectCommandBuffer,
-			function<void(Shader&)> perShader,
+			DescriptorSetBuilder& builder,
 			function<void(shared_ptr<Material>)> perDraw);
 
 	private:

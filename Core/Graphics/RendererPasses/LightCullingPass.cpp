@@ -2,6 +2,7 @@
 #include "LightCullingPass.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
 #include "Graphics/ResourceCache.h"
 #include "Components/PerspectiveCamera.h"
@@ -36,20 +37,18 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 
-	renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(),
-		0, &camera->Matrices);
-	renderFrame.SetShaderStorageBuffer(_computeMaterial->GetShader(),
-		1, _lightVisibilityBuffer);
-	renderFrame.SetShaderTextureBuffer(_computeMaterial->GetShader(),
-		2, depthTarget);
-	renderFrame.SetShaderUniformBuffer(_computeMaterial->GetShader(),
-		3, &_lightBuffer);
+	auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+	builder.SetUniformBuffer(0, &camera->Matrices);
+	builder.SetStorageBuffer(1, _lightVisibilityBuffer);
+	builder.SetTextureBuffer(2, depthTarget);
+	builder.SetUniformBuffer(3, &_lightBuffer);
+	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(_computePipeline.get());
 
-	commandBuffer.BindDescriptorSets(
+	commandBuffer.BindDescriptorSet(
 		renderFrame,
-		_computePipeline->GetPipelineBindPoint(), _computeMaterial->GetShader());
+		_computePipeline->GetPipelineBindPoint(), _computeMaterial->GetShader(), 0, resources);
 
 	_computeMaterial->SetPushConstants<TileInfo>(_tileInfo);
 	commandBuffer.PushConstants(*_computeMaterial, 0);

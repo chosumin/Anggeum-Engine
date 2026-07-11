@@ -94,13 +94,6 @@ namespace Core
 		DescriptorSetResources& GetOrCreateMaterialResources(const string& materialName);
 		DescriptorSetResources* GetMaterialResources(const string& materialName);
 
-		// Per-shader buffer management (set index 0)
-		void SetShaderUniformBuffer(Shader& shader, uint32_t binding, void* data);
-		void SetShaderTextureBuffer(Shader& shader, uint32_t binding, 
-			shared_ptr<Texture> texture, uint mipLevel = 0, 
-			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		void SetShaderStorageBuffer(Shader& shader, uint32_t binding, Buffer* buffer);
-
 		void SetMaterialBuffers(Material& material);
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }

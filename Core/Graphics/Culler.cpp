@@ -89,13 +89,15 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
 
     commandBuffer.BindPipeline(_resetDrawCommandsPipeline.get());
 
-    renderFrame.SetShaderStorageBuffer(*_resetDrawCommandsShader, 0, _indirectCommandBuffer);
-    renderFrame.SetShaderStorageBuffer(*_resetDrawCommandsShader, 1, _pass2IndirectCommandBuffer);
-    renderFrame.SetShaderStorageBuffer(*_resetDrawCommandsShader, 2, _rejectedCountBuffer);
+    auto builder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsShader, 0);
+    builder.SetStorageBuffer(0, _indirectCommandBuffer);
+    builder.SetStorageBuffer(1, _pass2IndirectCommandBuffer);
+    builder.SetStorageBuffer(2, _rejectedCountBuffer);
+    auto& resources = builder.Build();
 
     commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, &drawCount);
-    commandBuffer.BindDescriptorSets(renderFrame,
-        _resetDrawCommandsPipeline->GetPipelineBindPoint(), *_resetDrawCommandsShader);
+    commandBuffer.BindDescriptorSet(renderFrame,
+        _resetDrawCommandsPipeline->GetPipelineBindPoint(), *_resetDrawCommandsShader, 0, resources);
 
     uint32_t groupCount = (drawCount + 63) / 64;
     commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
@@ -154,18 +156,19 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
 
     commandBuffer.BindPipeline(cullingPipeline);
 
-    renderFrame.SetShaderUniformBuffer(*cullingShader, 0, &cullData);
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 1, _objectDataBuffer);
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 2, _transformBatch.TransformBuffer);
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 3, _instanceBuffer);
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 4, indirectCommandBuffer);
-    renderFrame.SetShaderTextureBuffer(*cullingShader, 5, _hiZTexture);
+    auto builder = renderFrame.CreateDescriptorSetBuilder(*cullingShader, 0);
+    builder.SetUniformBuffer(0, &cullData);
+    builder.SetStorageBuffer(1, _objectDataBuffer);
+    builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
+    builder.SetStorageBuffer(3, _instanceBuffer);
+    builder.SetStorageBuffer(4, indirectCommandBuffer);
+    builder.SetTextureBuffer(5, _hiZTexture);
+    builder.SetStorageBuffer(10, _rejectedIndicesBuffer);
+    builder.SetStorageBuffer(11, _rejectedCountBuffer);
+    auto& resources = builder.Build();
 
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 10, _rejectedIndicesBuffer);
-    renderFrame.SetShaderStorageBuffer(*cullingShader, 11, _rejectedCountBuffer);
-
-    commandBuffer.BindDescriptorSets(renderFrame,
-        cullingPipeline->GetPipelineBindPoint(), *cullingShader);
+    commandBuffer.BindDescriptorSet(renderFrame,
+        cullingPipeline->GetPipelineBindPoint(), *cullingShader, 0, resources);
 
     uint32_t groupCount = (_instanceCount + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);

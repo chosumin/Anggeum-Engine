@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Material.h"
 #include "Graphics/ResourceCache.h"
@@ -86,12 +87,8 @@ void Core::PreEnvironmentPass::Initialize()
 
 void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    // Set textures through RenderFrame
-    renderFrame.SetShaderTextureBuffer(_irradianceMaterial->GetShader(), 0, _skyCubemap);
-    renderFrame.SetShaderTextureBuffer(_prefilteredMaterial->GetShader(), 0, _skyCubemap);
-
     auto& commandBuffer = renderFrame.GetCommandBuffer();
-    
+
     DrawIrradiance(renderFrame, commandBuffer);
     DrawPrefiltered(renderFrame, commandBuffer);
 }
@@ -129,9 +126,12 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
             commandBuffer.BindPipeline(_irradiancePipeline);
 
-            commandBuffer.BindDescriptorSets(
+            auto irradianceBuilder = renderFrame.CreateDescriptorSetBuilder(_irradianceMaterial->GetShader(), 0);
+            irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
+            auto& irradianceResources = irradianceBuilder.Build();
+            commandBuffer.BindDescriptorSet(
                 renderFrame,
-                _irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader());
+                _irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader(), 0, irradianceResources);
 
             auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
 
@@ -193,9 +193,12 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
             commandBuffer.BindPipeline(_prefilteredPipeline);
 
-            commandBuffer.BindDescriptorSets(
+            auto prefilteredBuilder = renderFrame.CreateDescriptorSetBuilder(_prefilteredMaterial->GetShader(), 0);
+            prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
+            auto& prefilteredResources = prefilteredBuilder.Build();
+            commandBuffer.BindDescriptorSet(
                 renderFrame,
-                _prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader());
+                _prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader(), 0, prefilteredResources);
 
             auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
 

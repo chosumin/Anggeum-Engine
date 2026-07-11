@@ -10,6 +10,7 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/RenderContext.h"
@@ -194,7 +195,7 @@ namespace Core
 
         // Get a geometry shader for rendering (use first mesh's material shader)
         auto meshes = _scene.GetComponents<Core::Mesh>();
-        Shader* geometryShader = nullptr;
+        Shader* shader = nullptr;
         for (auto* mesh : meshes)
         {
             auto& materials = mesh->GetMaterials();
@@ -202,34 +203,32 @@ namespace Core
             {
                 if (material->GetShader().GetPass() == "Geometry")
                 {
-                    geometryShader = &material->GetShader();
+                    shader = &material->GetShader();
                     break;
                 }
             }
-            if (geometryShader)
+            if (shader)
                 break;
         }
 
-        if (!geometryShader)
+        if (!shader)
             return;
 
-        Pipeline* pipeline = GetOrCreatePipeline(*geometryShader);
+        Pipeline* pipeline = GetOrCreatePipeline(*shader);
 
-        auto perShader = [&](Shader& shader)
-        {
-            renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
-            renderFrame.SetShaderUniformBuffer(shader, 3, &_giBuffer);
-            renderFrame.SetShaderUniformBuffer(shader, 4, &_shadowBuffer);
-            renderFrame.SetShaderUniformBuffer(shader, 5, &_lightBuffer);
-            renderFrame.SetShaderStorageBuffer(shader, 6, _lightVisibilityBuffer);
-            renderFrame.SetShaderTextureBuffer(shader, 7, shadowTarget);
+        auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
+        builder.SetUniformBuffer(0, &camera->Matrices);
+        builder.SetUniformBuffer(3, &_giBuffer);
+        builder.SetUniformBuffer(4, &_shadowBuffer);
+        builder.SetUniformBuffer(5, &_lightBuffer);
+        builder.SetStorageBuffer(6, _lightVisibilityBuffer);
+        builder.SetTextureBuffer(7, shadowTarget);
 
-            if (sdfShadowTarget)
-                renderFrame.SetShaderTextureBuffer(shader, 10, sdfShadowTarget);
+        if (sdfShadowTarget)
+            builder.SetTextureBuffer(10, sdfShadowTarget);
 
-            if (aoTarget)
-               renderFrame.SetShaderTextureBuffer(shader, 11, aoTarget);
-        };
+        if (aoTarget)
+            builder.SetTextureBuffer(11, aoTarget);
 
         auto perDraw = [&](shared_ptr<Material> sharedMaterial)
         {
@@ -239,11 +238,11 @@ namespace Core
 
         batch->OcclusionCullAndDraw(
             renderFrame, commandBuffer,
-            *geometryShader, *pipeline,
+            *shader, *pipeline,
             camera->Matrices,
             *_renderPass, *_renderPassPass2,
             *framebuffer,
-            perShader, perDraw,
+            builder, perDraw,
             [&]() { DrawSkybox(renderFrame, commandBuffer); });
     }
 
@@ -364,13 +363,15 @@ namespace Core
                 _skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
             }
 
-            renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
+            auto skyBuilder = renderFrame.CreateDescriptorSetBuilder(shader, 0);
+            skyBuilder.SetUniformBuffer(0, &camera->Matrices);
+            auto& skyResources = skyBuilder.Build();
 
             commandBuffer.BindPipeline(_skyboxPipeline);
 
-            commandBuffer.BindDescriptorSets(
+            commandBuffer.BindDescriptorSet(
                 renderFrame,
-                _skyboxPipeline->GetPipelineBindPoint(), material->GetShader());
+                _skyboxPipeline->GetPipelineBindPoint(), shader, 0, skyResources);
             commandBuffer.BindDescriptorSets(
                 renderFrame,
                 _skyboxPipeline->GetPipelineBindPoint(), *material);

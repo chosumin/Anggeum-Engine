@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
 #include "Graphics/ResourceCache.h"
 
@@ -109,10 +110,8 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-    auto perShader = [&](Shader& shader)
-    {
-        renderFrame.SetShaderUniformBuffer(shader, 0, &camera->Matrices);
-    };
+	auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthNormalShader, 0);
+	builder.SetUniformBuffer(0, &camera->Matrices);
 
     auto perDraw = [&](shared_ptr<Material> sharedMaterial)
     {
@@ -124,6 +123,6 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         camera->Matrices,
         *_renderPass, *_renderPassPass2,
         *framebuffer,
-        perShader, perDraw,
+        builder, perDraw,
         nullptr);
 }

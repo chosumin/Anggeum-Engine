@@ -183,7 +183,8 @@ void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, Command
     CameraBuffer& camera,
     Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
     Framebuffer& framebuffer,
-    function<void(Shader&)> perShader, function<void(shared_ptr<Material>)> perDraw,
+    DescriptorSetBuilder& builder, 
+    function<void(shared_ptr<Material>)> perDraw,
     function<void()> postDraw)
 {
     auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
@@ -214,7 +215,7 @@ void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, Command
     commandBuffer.BeginDebugMarker(pass1Label);
     auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
     commandBuffer.BeginRenderPass(pass1BeginInfo);
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
+    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
     commandBuffer.EndRenderPass();
     commandBuffer.EndDebugMarker();
 
@@ -244,7 +245,7 @@ void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, Command
     commandBuffer.BeginDebugMarker(pass2Label);
     auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
     commandBuffer.BeginRenderPass(pass2BeginInfo);
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
+    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), builder, perDraw);
 
     if (postDraw)
     {
@@ -260,44 +261,6 @@ void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, Command
     {
         culler->MarkUsedThisFrame(true);
     }
-}
-
-void Core::RendererBatch::DrawIndirect(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    Shader& shader, DescriptorSetBuilder& builder, const CameraBuffer& camera,
-    function<void(shared_ptr<Material>)> perDraw)
-{
-    if (_indirectDrawBuffer.GetDrawCount() == 0)
-        return;
-
-    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
-
-    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-
-    auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
-
-	builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
-	builder.SetStorageBuffer(2, _instanceBuffer);
-
-	builder.SetUniformBuffer(8,
-		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-	builder.SetStorageBuffer(9, _materialIndexBuffer);
-
-    auto& resources = builder.Build();
-
-    commandBuffer.BindDescriptorSet(
-        renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        shader, builder.GetSetIndex(), resources);
-
-    auto material = _materialBatches.begin()->second.Material.lock();
-    perDraw(material);
-
-    commandBuffer.DrawIndexedIndirect(
-        *culler->GetIndirectCommandBuffer(),
-        _indirectDrawBuffer.GetDrawCount(),
-        static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
-    );
 }
 
 void Core::RendererBatch::CreateInstanceBuffer(Device& device)
@@ -327,27 +290,20 @@ void Core::RendererBatch::CreateInstanceBuffer(Device& device)
 }
 
 void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    Shader& shader, Pipeline& pipeline,
-    Core::Buffer& indirectCommandBuffer,
-    function<void(Shader&)> perShader, function<void(shared_ptr<Material>)> perDraw)
+	Shader& shader, Pipeline& pipeline,
+	Core::Buffer& indirectCommandBuffer,
+	DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
 {
-    if (_indirectDrawBuffer.GetDrawCount() == 0)
-        return;
+	if (_indirectDrawBuffer.GetDrawCount() == 0)
+		return;
 
-    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
+	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
 
-    auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+	auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
+	commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
+	commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
 
-    commandBuffer.BindPipeline(&pipeline);
-
-    renderFrame.SetShaderStorageBuffer(shader, 1, _transformBatch->TransformBuffer);
-	renderFrame.SetShaderStorageBuffer(shader, 2, _instanceBuffer);
-
-	renderFrame.SetShaderUniformBuffer(shader, 8,
-		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-	renderFrame.SetShaderStorageBuffer(shader, 9, _materialIndexBuffer);
+	commandBuffer.BindPipeline(&pipeline);
 
     if (shader.UsesBindlessTextures())
     {
@@ -357,37 +313,24 @@ void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, Command
             shader.GetPipelineLayout());
     }
 
-    if (perShader)
-        perShader(shader);
+	builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
+	builder.SetStorageBuffer(2, _instanceBuffer);
+	builder.SetUniformBuffer(8,
+		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+	builder.SetStorageBuffer(9, _materialIndexBuffer);
 
-    commandBuffer.BindDescriptorSets(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader);
+	auto& resources = builder.Build();
 
-    auto material = _materialBatches.begin()->second.Material.lock();
-    perDraw(material);
+	commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader, 0, resources);
 
-    commandBuffer.DrawIndexedIndirect(
-        indirectCommandBuffer,
-        _indirectDrawBuffer.GetDrawCount(),
-        static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
-    );
-}
+	auto material = _materialBatches.begin()->second.Material.lock();
+	perDraw(material);
 
-void Core::RendererBatch::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
-    CommandBuffer& commandBuffer, const CameraBuffer& camera)
-{
-    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
-
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _extents,
-            _objectDataBuffer, _instanceBuffer,
-            _instanceCount, _indirectDrawBuffer);
-    }
-
-    // Create a fresh descriptor set for the culling shader so cullers that share
-    // the same shader (e.g. shadow cascades) don't overwrite each other's bindings.
-    auto builder = renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
-    culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, builder, camera);
+	commandBuffer.DrawIndexedIndirect(
+		indirectCommandBuffer,
+		_indirectDrawBuffer.GetDrawCount(),
+		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+	);
 }
 
 void Core::RendererBatch::FrustumCullAndDraw(
@@ -419,36 +362,7 @@ void Core::RendererBatch::FrustumCullAndDraw(
 
     commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
 
-    // Draw indirect
-    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-
-    auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
-
-    commandBuffer.BindPipeline(&pipeline);
-
-    builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
-    builder.SetStorageBuffer(2, _instanceBuffer);
-
-    builder.SetUniformBuffer(8,
-        const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-    builder.SetStorageBuffer(9, _materialIndexBuffer);
-
-    auto& resources = builder.Build();
-
-    commandBuffer.BindDescriptorSet(
-        renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        shader, builder.GetSetIndex(), resources);
-
-    auto material = _materialBatches.begin()->second.Material.lock();
-    perDraw(material);
-
-    commandBuffer.DrawIndexedIndirect(
-        *culler->GetIndirectCommandBuffer(),
-        _indirectDrawBuffer.GetDrawCount(),
-        static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
-    );
+    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
 
     commandBuffer.EndRenderPass();
 }
