@@ -138,8 +138,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     };
 
     commandBuffer.BindPipeline(_dfaoPipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE, *_dfaoShader, resources);
+    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
+        *_dfaoShader, resources);
     commandBuffer.PushConstants(*_dfaoShader, 0, &pc);
 
     commandBuffer.Dispatch(

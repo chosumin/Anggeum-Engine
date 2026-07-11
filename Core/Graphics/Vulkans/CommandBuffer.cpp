@@ -121,9 +121,7 @@ void Core::CommandBuffer::SetViewportAndScissor(VkExtent2D extent)
     vkCmdSetScissor(_commandBuffer, 0, 1, &scissor);
 }
 
-void Core::CommandBuffer::BindDescriptorSets(
-	RenderFrame& renderFrame,
-	VkPipelineBindPoint pipelineBindPoint,
+void Core::CommandBuffer::BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint,
 	Shader& shader,
 	const vector<DescriptorSetResources*>& resourcesList)
 {
@@ -598,9 +596,7 @@ void Core::CommandBuffer::InsertDebugMarker(const char* markerName, float r, flo
 	pfnCmdInsertLabel(_commandBuffer, &labelInfo);
 }
 
-void Core::CommandBuffer::BindDescriptorSet(
-	RenderFrame& renderFrame,
-	VkPipelineBindPoint pipelineBindPoint,
+void Core::CommandBuffer::BindDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
 	Shader& shader,
 	DescriptorSetResources& resources)
 {

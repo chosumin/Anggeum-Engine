@@ -130,8 +130,8 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
             irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& irradianceResources = irradianceBuilder.Build();
             commandBuffer.BindDescriptorSet(
-                renderFrame,
-                _irradiancePipeline->GetPipelineBindPoint(), _irradianceMaterial->GetShader(), irradianceResources);
+                _irradiancePipeline->GetPipelineBindPoint(),
+                _irradianceMaterial->GetShader(), irradianceResources);
 
             auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
 
@@ -197,8 +197,8 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& prefilteredResources = prefilteredBuilder.Build();
             commandBuffer.BindDescriptorSet(
-                renderFrame,
-                _prefilteredPipeline->GetPipelineBindPoint(), _prefilteredMaterial->GetShader(), prefilteredResources);
+                _prefilteredPipeline->GetPipelineBindPoint(),
+                _prefilteredMaterial->GetShader(), prefilteredResources);
 
             auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
 

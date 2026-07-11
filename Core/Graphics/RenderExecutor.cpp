@@ -245,7 +245,7 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
             resourcesList.push_back(bindlessResources);
     }
 
-    commandBuffer.BindDescriptorSets(_renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader, resourcesList);
+    commandBuffer.BindDescriptorSets(pipeline.GetPipelineBindPoint(), shader, resourcesList);
 
     auto material = _rendererBatch->GetFirstMaterial();
     perDraw(material);

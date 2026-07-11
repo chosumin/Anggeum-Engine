@@ -108,9 +108,9 @@ shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandB
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_depthResolvePipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_depthResolveShader, resources);
+    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
+        *_depthResolveShader,
+        resources);
     commandBuffer.PushConstants(*_depthResolveShader, 0, &resolvePc);
 
     uint32_t groupX = (extent.width + 7) / 8;
@@ -148,8 +148,8 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_normalResolvePipeline.get());
-    commandBuffer.BindDescriptorSet(renderFrame,
-        VK_PIPELINE_BIND_POINT_COMPUTE, *_normalResolveShader, resources);
+    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
+        *_normalResolveShader, resources);
     commandBuffer.PushConstants(*_normalResolveShader, 0, &pc);
 
     commandBuffer.Dispatch(

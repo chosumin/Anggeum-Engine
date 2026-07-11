@@ -35,14 +35,10 @@ namespace Core
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
 		
-		void BindDescriptorSets(
-			RenderFrame& renderFrame,
-			VkPipelineBindPoint pipelineBindPoint,
+		void BindDescriptorSets(VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
 			const vector<DescriptorSetResources*>& resourcesList);
-		void BindDescriptorSet(
-			RenderFrame& renderFrame,
-			VkPipelineBindPoint pipelineBindPoint,
+		void BindDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
 			DescriptorSetResources& resources);
 		void PushConstants(Material& material, uint32_t index = 0);
