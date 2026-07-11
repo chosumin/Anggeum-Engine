@@ -125,29 +125,20 @@ void Core::CommandBuffer::BindDescriptorSets(
 	RenderFrame& renderFrame,
 	VkPipelineBindPoint pipelineBindPoint,
 	Shader& shader,
-	uint32_t firstSet,
 	const vector<DescriptorSetResources*>& resourcesList)
 {
-	vector<VkDescriptorSet> descriptorSets;
-	descriptorSets.reserve(resourcesList.size());
+	auto pipelineLayout = shader.GetPipelineLayout();
 
 	for (auto* res : resourcesList)
 	{
 		if (!res || res->descriptorSet == VK_NULL_HANDLE)
-			return;
-		descriptorSets.push_back(res->descriptorSet);
+			continue;
+
+		vkCmdBindDescriptorSets(
+			_commandBuffer, pipelineBindPoint,
+			pipelineLayout, res->setIndex, 1,
+			&res->descriptorSet, 0, nullptr);
 	}
-
-	if (descriptorSets.empty())
-		return;
-
-	auto pipelineLayout = shader.GetPipelineLayout();
-
-	vkCmdBindDescriptorSets(
-		_commandBuffer, pipelineBindPoint,
-		pipelineLayout, firstSet,
-		static_cast<uint32_t>(descriptorSets.size()),
-		descriptorSets.data(), 0, nullptr);
 }
 
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
@@ -499,25 +490,6 @@ void Core::CommandBuffer::GetAccessAndStageMask(const VkImageLayout& inImageLayo
     }
 }
 
-void Core::CommandBuffer::BindBindlessDescriptorSet(
-	RenderFrame& renderFrame,
-	VkPipelineBindPoint pipelineBindPoint,
-	VkPipelineLayout pipelineLayout)
-{
-    if (!renderFrame.HasBindlessSupport())
-        return;
-
-    auto* bindlessManager = renderFrame.GetBindlessTextureManager();
-    VkDescriptorSet bindlessSet = bindlessManager->GetDescriptorSet();
-
-    vkCmdBindDescriptorSets(
-        _commandBuffer, pipelineBindPoint,
-        pipelineLayout,
-        static_cast<uint32_t>(DescriptorSetType::Bindless), // Set index 2
-        1, &bindlessSet,
-        0, nullptr);
-}
-
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
 {
 	if (drawCount == 0)
@@ -630,7 +602,6 @@ void Core::CommandBuffer::BindDescriptorSet(
 	RenderFrame& renderFrame,
 	VkPipelineBindPoint pipelineBindPoint,
 	Shader& shader,
-	uint32_t setIndex,
 	DescriptorSetResources& resources)
 {
 	if (resources.descriptorSet == VK_NULL_HANDLE)
@@ -640,6 +611,6 @@ void Core::CommandBuffer::BindDescriptorSet(
 
 	vkCmdBindDescriptorSets(
 		_commandBuffer, pipelineBindPoint,
-		pipelineLayout, setIndex, 1,
+		pipelineLayout, resources.setIndex, 1,
 		&resources.descriptorSet, 0, nullptr);
 }

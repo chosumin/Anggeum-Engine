@@ -118,7 +118,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
 
     commandBuffer.BindPipeline(_volumeSlicePipeline.get());
     commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_volumeSliceShader, 0, sliceResources);
+        *_volumeSliceShader, sliceResources);
     commandBuffer.PushConstants(*_volumeSliceShader, 0, &pc);
 
     float    aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -274,7 +274,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     commandBuffer.BindPipeline(_sdfShadowPipeline.get());
     commandBuffer.BindDescriptorSet(renderFrame,
         VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_sdfShadowShader, 0, resources);
+        *_sdfShadowShader, resources);
 
     uint32_t dispatchX = (_screenExtent.width / 2 + 7) / 8;
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;

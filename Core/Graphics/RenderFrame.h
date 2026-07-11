@@ -83,6 +83,7 @@ namespace Core
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
+		DescriptorSetResources* GetBindlessResources();
 
 		void CleanupBuffers();
 
@@ -154,6 +155,7 @@ namespace Core
 		unordered_map<size_t, DescriptorSetResources> _shaderResources;
 
 		BindlessTextureManager* _bindlessTextureManager;
+		DescriptorSetResources _bindlessResources;
 
 		// GPU Driven Rendering Buffers
 		MeshBufferManager* _meshBufferManager = nullptr;

@@ -80,6 +80,16 @@ void RenderFrame::Reset()
 	_currentNormal = nullptr;
 }
 
+DescriptorSetResources* RenderFrame::GetBindlessResources()
+{
+	if (!HasBindlessSupport())
+		return nullptr;
+
+	_bindlessResources.descriptorSet = _bindlessTextureManager->GetDescriptorSet();
+	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
+	return &_bindlessResources;
+}
+
 void RenderFrame::CleanupBuffers()
 {
 	// Cleanup shader resources (set index 0)

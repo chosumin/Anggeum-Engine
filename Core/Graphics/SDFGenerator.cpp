@@ -228,7 +228,7 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	commandBuffer.BindPipeline(_boundsReducePipeline.get());
 	commandBuffer.BindDescriptorSet(renderFrame,
 		VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_boundsReduceShader, 0, resources);
+		*_boundsReduceShader, resources);
 	commandBuffer.PushConstants(*_boundsReduceShader, 0, &instanceCount);
 
 	uint32_t groupCount = (instanceCount + 63) / 64;
@@ -272,7 +272,7 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	commandBuffer.BindPipeline(_triLookupPipeline.get());
 	commandBuffer.BindDescriptorSet(renderFrame,
 		VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_triLookupShader, 0, resources);
+		*_triLookupShader, resources);
 	commandBuffer.PushConstants(*_triLookupShader, 0, &pc);
 
 	uint32_t groupCount = (totalTriangles + 63) / 64;
@@ -334,7 +334,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());
 	commandBuffer.BindDescriptorSet(renderFrame,
 		VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_sdfGenerateShader, 0, sdfResources);
+		*_sdfGenerateShader, sdfResources);
 	commandBuffer.PushConstants(*_sdfGenerateShader, 0, &pc);
 
 	uint32_t groups = (resolution + 3) / 4;

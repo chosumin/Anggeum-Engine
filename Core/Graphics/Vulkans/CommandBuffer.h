@@ -39,19 +39,12 @@ namespace Core
 			RenderFrame& renderFrame,
 			VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
-			uint32_t firstSet,
 			const vector<DescriptorSetResources*>& resourcesList);
 		void BindDescriptorSet(
 			RenderFrame& renderFrame,
 			VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
-			uint32_t setIndex,
 			DescriptorSetResources& resources);
-		void BindBindlessDescriptorSet(
-			RenderFrame& renderFrame,
-			VkPipelineBindPoint pipelineBindPoint,
-			VkPipelineLayout pipelineLayout);
-
 		void PushConstants(Material& material, uint32_t index = 0);
 		void PushConstants(Shader& shader, uint index, const void* data);
 

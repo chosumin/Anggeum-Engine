@@ -305,14 +305,6 @@ void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, Command
 
 	commandBuffer.BindPipeline(&pipeline);
 
-    if (shader.UsesBindlessTextures())
-    {
-        commandBuffer.BindBindlessDescriptorSet(
-            renderFrame,
-            pipeline.GetPipelineBindPoint(),
-            shader.GetPipelineLayout());
-    }
-
 	builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
 	builder.SetStorageBuffer(2, _instanceBuffer);
 	builder.SetUniformBuffer(8,
@@ -321,7 +313,15 @@ void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, Command
 
 	auto& resources = builder.Build();
 
-	commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader, 0, resources);
+	vector<DescriptorSetResources*> resourcesList = { &resources };
+	if (shader.UsesBindlessTextures())
+	{
+		auto* bindlessResources = renderFrame.GetBindlessResources();
+		if (bindlessResources)
+			resourcesList.push_back(bindlessResources);
+	}
+
+	commandBuffer.BindDescriptorSets(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader, resourcesList);
 
 	auto material = _materialBatches.begin()->second.Material.lock();
 	perDraw(material);

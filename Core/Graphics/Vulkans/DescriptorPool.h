@@ -22,6 +22,7 @@ namespace Core
 	{
 		// Descriptor set
 		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		uint32_t setIndex = 0;
 		bool isDescriptorSetUpdated = false;
 
 		// Buffers: [binding] -> Buffer*

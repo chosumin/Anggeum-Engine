@@ -97,7 +97,7 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
 
     commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, &drawCount);
     commandBuffer.BindDescriptorSet(renderFrame,
-        _resetDrawCommandsPipeline->GetPipelineBindPoint(), *_resetDrawCommandsShader, 0, resources);
+        _resetDrawCommandsPipeline->GetPipelineBindPoint(), *_resetDrawCommandsShader, resources);
 
     uint32_t groupCount = (drawCount + 63) / 64;
     commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
@@ -168,7 +168,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(renderFrame,
-        cullingPipeline->GetPipelineBindPoint(), *cullingShader, 0, resources);
+        cullingPipeline->GetPipelineBindPoint(), *cullingShader, resources);
 
     uint32_t groupCount = (_instanceCount + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);
@@ -320,7 +320,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             auto& resources = builder.Build();
 
             commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
-                *_hiZGenerateShader, 0, resources);
+                *_hiZGenerateShader, resources);
 
             struct HiZPushConstants {
                 int32_t outputWidth;
@@ -364,7 +364,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, &drawCount);
 	commandBuffer.BindDescriptorSet(renderFrame,
 		_resetDrawCommandsSimplePipeline->GetPipelineBindPoint(),
-		*_resetDrawCommandsSimpleShader, resetBuilder.GetSetIndex(), resetResources);
+		*_resetDrawCommandsSimpleShader, resetResources);
 
 	uint32_t groupCount = (drawCount + 63) / 64;
 	commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
@@ -408,7 +408,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 
 	commandBuffer.BindDescriptorSet(renderFrame,
 		_frustumCullingPipeline->GetPipelineBindPoint(),
-		*_frustumCullingShader, builder.GetSetIndex(), resources);
+		*_frustumCullingShader, resources);
 
 	groupCount = (_instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);

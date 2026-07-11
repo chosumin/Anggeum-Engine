@@ -99,6 +99,7 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 
 	VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
 	_resources.descriptorSet = _pool.AllocateDescriptorSet(vkLayout);
+	_resources.setIndex = _setIndex;
 
 	// Get valid bindings from shader layout
 	auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
