@@ -238,7 +238,7 @@ namespace Core
             commandBuffer.PushConstants(*sharedMaterial, 0);
         };
 
-        batch->GpuDrivenDraw(
+        batch->OcclusionCullAndDraw(
             renderFrame, commandBuffer,
             *geometryShader, *pipeline,
             camera->Matrices,

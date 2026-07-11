@@ -178,7 +178,7 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
     _extents = extents;
 }
 
-void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     Shader& shader, Pipeline& pipeline,
     CameraBuffer& camera,
     Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
@@ -208,14 +208,18 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
         commandBuffer.BeginDebugMarker("Pass 1 Culling");
         culler->DispatchPass1Culling(renderFrame, commandBuffer, camera, prevDepth);
         commandBuffer.EndDebugMarker();
+    }
 
-        commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects");
-        auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
-        commandBuffer.BeginRenderPass(pass1BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
-        commandBuffer.EndRenderPass();
-        commandBuffer.EndDebugMarker();
+    const char* pass1Label = cullerAlreadyUsed ? "Pass 1 Render Visible Objects (Reuse)" : "Pass 1 Render Visible Objects";
+    commandBuffer.BeginDebugMarker(pass1Label);
+    auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
+    commandBuffer.BeginRenderPass(pass1BeginInfo);
+    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
+    commandBuffer.EndRenderPass();
+    commandBuffer.EndDebugMarker();
 
+    if (!cullerAlreadyUsed)
+    {
         commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
         auto msaaDepth = renderFrame.GetRenderTarget("MainDepth");
 
@@ -234,47 +238,27 @@ void Core::RendererBatch::GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer&
         commandBuffer.BeginDebugMarker("Pass 2 Culling");
         culler->DispatchPass2Culling(renderFrame, commandBuffer, camera, curDepth);
         commandBuffer.EndDebugMarker();
-
-        commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects");
-        auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
-        commandBuffer.BeginRenderPass(pass2BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
-
-        if (postDraw)
-        {
-            commandBuffer.BeginDebugMarker("Post Draw");
-            postDraw();
-            commandBuffer.EndDebugMarker();
-        }
-
-        commandBuffer.EndRenderPass();
-        commandBuffer.EndDebugMarker();
-
-        culler->MarkUsedThisFrame(true);
     }
-    else
+
+    const char* pass2Label = cullerAlreadyUsed ? "Pass 2 Render Newly Visible Objects (Reuse)" : "Pass 2 Render Newly Visible Objects";
+    commandBuffer.BeginDebugMarker(pass2Label);
+    auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
+    commandBuffer.BeginRenderPass(pass2BeginInfo);
+    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
+
+    if (postDraw)
     {
-        commandBuffer.BeginDebugMarker("Pass 1 Render Visible Objects (Reuse)");
-        auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
-        commandBuffer.BeginRenderPass(pass1BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), perShader, perDraw);
-        commandBuffer.EndRenderPass();
+        commandBuffer.BeginDebugMarker("Post Draw");
+        postDraw();
         commandBuffer.EndDebugMarker();
+    }
 
-        commandBuffer.BeginDebugMarker("Pass 2 Render Newly Visible Objects (Reuse)");
-        auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
-        commandBuffer.BeginRenderPass(pass2BeginInfo);
-        DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), perShader, perDraw);
+    commandBuffer.EndRenderPass();
+    commandBuffer.EndDebugMarker();
 
-        if (postDraw)
-        {
-            commandBuffer.BeginDebugMarker("Post Draw");
-            postDraw();
-            commandBuffer.EndDebugMarker();
-        }
-
-        commandBuffer.EndRenderPass();
-        commandBuffer.EndDebugMarker();
+    if (!cullerAlreadyUsed)
+    {
+        culler->MarkUsedThisFrame(true);
     }
 }
 

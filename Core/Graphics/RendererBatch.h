@@ -48,7 +48,7 @@ namespace Core
 		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
 		~RendererBatch();
 
-		void GpuDrivenDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+		void OcclusionCullAndDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 			Shader& shader, Pipeline& pipeline,
 			CameraBuffer& camera,
 			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,

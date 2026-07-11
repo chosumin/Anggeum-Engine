@@ -118,7 +118,7 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     {
     };
 
-    rendererBatch->GpuDrivenDraw(
+    rendererBatch->OcclusionCullAndDraw(
         renderFrame, commandBuffer,
         *_depthNormalShader, *_pipeline,
         camera->Matrices,
