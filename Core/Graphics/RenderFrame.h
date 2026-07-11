@@ -71,14 +71,8 @@ namespace Core
 		void SetCommandBuffer(CommandBuffer* commandBuffer) { _commandBuffer = commandBuffer; }
 		void SetComputeCommandBuffer(CommandBuffer* computeBuffer) { _computeCommandBuffer = computeBuffer; }
 		
-		void AllocateDescriptorSets(Shader& shader);
 		void AllocateDescriptorSets(Material& material);
-		void AllocateDescriptorSetsWithKey(Shader& shader, size_t key);
-		
-		// Descriptor set updates
-		void UpdateDescriptorSets(Shader& shader);
 		void UpdateDescriptorSets(Material& material);
-		void UpdateDescriptorSetsWithKey(Shader& shader, size_t key);
 
 		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
 		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }

@@ -36,12 +36,6 @@ namespace Core
 		void SetViewportAndScissor(VkExtent2D extent);
 		
 		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Material& material);
-		void BindDescriptorSets(RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader);
-		void BindDescriptorSetsWithKey(
-			RenderFrame& renderFrame,
-			VkPipelineBindPoint pipelineBindPoint,
-			Shader& shader,
-			size_t key);
 		void BindDescriptorSet(
 			RenderFrame& renderFrame,
 			VkPipelineBindPoint pipelineBindPoint,

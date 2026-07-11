@@ -256,7 +256,13 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     shared_ptr<Image> image = make_shared<Image>(_device, imageCreateInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-    shared_ptr<Sampler> sampler = device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
+
+    auto samplerDesc = DEFAULT_SAMPLER;
+    samplerDesc.minFilter = VK_FILTER_NEAREST;
+    samplerDesc.magFilter = VK_FILTER_NEAREST;
+    samplerDesc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+
+    shared_ptr<Sampler> sampler = device.GetResourceCache().RequestSampler(samplerDesc);
     _hiZTexture = make_shared<Texture>("HiZ", image, sampler);
 
     // Load shaders
@@ -308,26 +314,13 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             mipWidth = std::max(1u, mipWidth / 2);
             mipHeight = std::max(1u, mipHeight / 2);
 
-            size_t uniqueKey = (_hiZGenerateShader->GetHash() << 8) | mip;
-            auto& resources = renderFrame.GetOrCreateShaderResources(uniqueKey);
+            auto builder = renderFrame.CreateDescriptorSetBuilder(*_hiZGenerateShader, 0);
+            builder.SetTextureBuffer(0, _hiZTexture, mip - 1, VK_IMAGE_LAYOUT_GENERAL);
+            builder.SetTextureBuffer(1, _hiZTexture, mip, VK_IMAGE_LAYOUT_GENERAL);
+            auto& resources = builder.Build();
 
-            //HACK HACK! Needs a new descriptor set system to avoid this kind of manual setup
-            TextureBuffer srcTex{};
-            srcTex.texture = _hiZTexture;
-            srcTex.mipLevel = mip - 1;
-            srcTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            resources.textureBuffers[0] = srcTex;
-
-            TextureBuffer dstTex{};
-            dstTex.texture = _hiZTexture;
-            dstTex.mipLevel = mip;
-            dstTex.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            resources.textureBuffers[1] = dstTex;
-
-            renderFrame.AllocateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
-            renderFrame.UpdateDescriptorSetsWithKey(*_hiZGenerateShader, uniqueKey);
-            commandBuffer.BindDescriptorSetsWithKey(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
-                *_hiZGenerateShader, uniqueKey);
+            commandBuffer.BindDescriptorSet(renderFrame, VK_PIPELINE_BIND_POINT_COMPUTE,
+                *_hiZGenerateShader, 0, resources);
 
             struct HiZPushConstants {
                 int32_t outputWidth;

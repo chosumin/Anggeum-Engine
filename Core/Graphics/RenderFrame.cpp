@@ -87,41 +87,6 @@ void RenderFrame::Reset()
 	_currentNormal = nullptr;
 }
 
-void RenderFrame::AllocateDescriptorSets(Shader& shader)
-{
-	auto shaderHash = shader.GetType();
-	auto& resources = GetOrCreateShaderResources(shaderHash);
-
-	auto& layouts = shader.GetDescriptorSetLayouts();
-
-	auto layoutIt = layouts.find((uint)DescriptorSetType::Shader);
-	if (layoutIt != layouts.end())
-	{
-		VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
-
-		VkDescriptorSetAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = _descriptorPool->GetHandle();
-		allocInfo.descriptorSetCount = 1;
-		allocInfo.pSetLayouts = &vkLayout;
-
-		VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &resources.descriptorSet);
-
-		if (result != VK_SUCCESS)
-		{
-			if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
-			{
-				throw runtime_error("Descriptor pool out of memory! Increase pool size.");
-			}
-			else if (result == VK_ERROR_FRAGMENTED_POOL)
-			{
-				throw runtime_error("Descriptor pool fragmented!");
-			}
-			throw runtime_error("Failed to allocate descriptor set for shader: " + shader.GetHash());
-		}
-	}
-}
-
 void RenderFrame::AllocateDescriptorSets(Material& material)
 {
 	auto materialName = material.GetName();
@@ -246,74 +211,6 @@ void RenderFrame::CreateDescriptorPool()
 	// Create pool with sufficient descriptor sets
 	uint32_t maxSets = 1000;
 	_descriptorPool->CreatePool(poolSizes, maxSets);
-}
-
-void RenderFrame::UpdateDescriptorSets(Shader& shader)
-{
-	auto* resources = GetShaderResources(shader.GetHash());
-	if (!resources)
-		return;
-
-	auto& descriptorSet = resources->descriptorSet;
-	vector<VkWriteDescriptorSet> allDescriptorWrites;
-
-	// Get shader layout for descriptor type info
-	auto& layouts = shader.GetDescriptorSetLayouts();
-	auto layoutIt = layouts.find(static_cast<uint32_t>(DescriptorSetType::Shader));
-	
-	// Process uniform buffers
-	for (auto& [binding, buffer] : resources->uniformBuffers)
-	{
-		VkWriteDescriptorSet writeDescriptorSet =
-			buffer->CreateWriteDescriptorSet(binding);
-		writeDescriptorSet.dstSet = descriptorSet;
-		allDescriptorWrites.push_back(writeDescriptorSet);
-	}
-
-	// Process texture buffers - use layout info for descriptor type
-	for (auto& [binding, texture] : resources->textureBuffers)
-	{
-		VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		
-		// Find descriptor type from shader layout
-		if (layoutIt != layouts.end())
-		{
-			auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
-			for (const auto& bindingInfo : textureBindings)
-			{
-				if (bindingInfo.Binding == binding)
-				{
-					descriptorType = bindingInfo.DescriptorType;
-					break;
-				}
-			}
-		}
-
-		VkWriteDescriptorSet writeDescriptorSet =
-			texture.CreateWriteDescriptorSet(
-				binding, descriptorType);
-
-		writeDescriptorSet.dstSet = descriptorSet;
-		allDescriptorWrites.push_back(writeDescriptorSet);
-	}
-
-	// Process storage buffers
-	for (auto& [binding, buffer] : resources->storageBuffers)
-	{
-		VkWriteDescriptorSet writeDescriptorSet =
-			buffer->CreateWriteDescriptorSet(binding);
-
-		writeDescriptorSet.dstSet = descriptorSet;
-		allDescriptorWrites.push_back(writeDescriptorSet);
-	}
-
-	if (!allDescriptorWrites.empty())
-	{
-		vkUpdateDescriptorSets(
-			_device.GetDevice(),
-			static_cast<uint32_t>(allDescriptorWrites.size()),
-			allDescriptorWrites.data(), 0, nullptr);
-	}
 }
 
 void RenderFrame::UpdateDescriptorSets(Material& material)
@@ -468,73 +365,6 @@ void RenderFrame::SetMaterialBuffers(Material& material)
 	{
 		SetMaterialTextureBuffer(material, binding, texture, 0);
 	}
-}
-
-void RenderFrame::AllocateDescriptorSetsWithKey(Shader& shader, size_t key)
-{
-    auto& resources = GetOrCreateShaderResources(key);
-
-    auto& layouts = shader.GetDescriptorSetLayouts();
-    auto layoutIt = layouts.find((uint)DescriptorSetType::Shader);
-    if (layoutIt != layouts.end())
-    {
-        VkDescriptorSetLayout vkLayout = layoutIt->second->GetDescriptorSetLayout();
-
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = _descriptorPool->GetHandle();
-        allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &vkLayout;
-
-        VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &resources.descriptorSet);
-        if (result != VK_SUCCESS)
-            throw runtime_error("Failed to allocate descriptor set");
-    }
-}
-
-void RenderFrame::UpdateDescriptorSetsWithKey(Shader& shader, size_t key)
-{
-    auto* resources = GetShaderResources(key);
-    if (!resources)
-        return;
-
-    auto& descriptorSet = resources->descriptorSet;
-    vector<VkWriteDescriptorSet> allDescriptorWrites;
-
-    auto& layouts = shader.GetDescriptorSetLayouts();
-    auto layoutIt = layouts.find(static_cast<uint32_t>(DescriptorSetType::Shader));
-
-    for (auto& [binding, texture] : resources->textureBuffers)
-    {
-        VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        
-        if (layoutIt != layouts.end())
-        {
-            auto& textureBindings = layoutIt->second->GetTextureBufferBindings();
-            for (const auto& bindingInfo : textureBindings)
-            {
-                if (bindingInfo.Binding == binding)
-                {
-                    descriptorType = bindingInfo.DescriptorType;
-                    break;
-                }
-            }
-        }
-
-        VkWriteDescriptorSet writeDescriptorSet =
-            texture.CreateWriteDescriptorSet(binding, descriptorType);
-
-        writeDescriptorSet.dstSet = descriptorSet;
-        allDescriptorWrites.push_back(writeDescriptorSet);
-    }
-
-    if (!allDescriptorWrites.empty())
-    {
-        vkUpdateDescriptorSets(
-            _device.GetDevice(),
-            static_cast<uint32_t>(allDescriptorWrites.size()),
-            allDescriptorWrites.data(), 0, nullptr);
-    }
 }
 
 shared_ptr<Texture> Core::RenderFrame::GetRenderTarget(const string& name) const

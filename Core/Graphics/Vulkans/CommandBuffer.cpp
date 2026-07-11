@@ -152,27 +152,6 @@ void Core::CommandBuffer::BindDescriptorSets(
         &resources.descriptorSet, 0, nullptr);
 }
 
-void Core::CommandBuffer::BindDescriptorSets(
-    RenderFrame& renderFrame, VkPipelineBindPoint pipelineBindPoint, Shader& shader)
-{
-    auto pipelineLayout = shader.GetPipelineLayout();
-
-    auto& resources = renderFrame.GetOrCreateShaderResources(shader.GetHash());
-
-    // Update only if not already updated this frame
-    if (!resources.isDescriptorSetUpdated)
-    {
-        renderFrame.AllocateDescriptorSets(shader);
-		renderFrame.UpdateDescriptorSets(shader);
-        resources.isDescriptorSetUpdated = true;
-    }
-
-    vkCmdBindDescriptorSets(
-        _commandBuffer, pipelineBindPoint,
-        pipelineLayout, (uint)DescriptorSetType::Shader, 1,
-        &resources.descriptorSet, 0, nullptr);
-}
-
 void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
 {
     auto& shader = material.GetShader();
@@ -606,24 +585,6 @@ void Core::CommandBuffer::BufferBarrier(
 		0, nullptr,
 		1, &barrier,
 		0, nullptr);
-}
-
-void Core::CommandBuffer::BindDescriptorSetsWithKey(
-    RenderFrame& renderFrame, 
-    VkPipelineBindPoint pipelineBindPoint, 
-    Shader& shader,
-    size_t key)
-{
-    auto pipelineLayout = shader.GetPipelineLayout();
-    auto* resources = renderFrame.GetShaderResources(key);
-    
-    if (!resources || resources->descriptorSet == VK_NULL_HANDLE)
-        return;
-
-    vkCmdBindDescriptorSets(
-        _commandBuffer, pipelineBindPoint,
-        pipelineLayout, (uint)DescriptorSetType::Shader, 1,
-        &resources->descriptorSet, 0, nullptr);
 }
 
 void Core::CommandBuffer::BeginDebugMarker(const char* markerName, float r, float g, float b, float a)
