@@ -61,6 +61,7 @@ using namespace rapidjson;
 #include <random>
 #include <bitset>
 #include <filesystem>
+#include <deque>
 using namespace std;
 
 #include "Graphics/Vulkans/Device.h"
