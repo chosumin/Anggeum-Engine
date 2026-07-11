@@ -39,8 +39,8 @@ struct alignas(16) ShadowUniform
 
 	// PCSS parameters (adjustable via ImGui)
 	float LightSize = 0.04f;
-	float MinFilterRadius = 0.5f;
-	float MaxFilterRadius = 10.0f;
+	float MinFilterRadius = 1.0f;
+	float MaxFilterRadius = 2.0f;
 
 	// Cascade blend region as fraction of each cascade's depth range
 	float CascadeBlendFactor = 0.3f;

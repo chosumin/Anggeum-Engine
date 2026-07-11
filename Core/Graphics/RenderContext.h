@@ -39,9 +39,9 @@ namespace Core
 
 		void RecreateSwapChain();
 
-				// Frame management
-				void Begin(Scene& scene, VkExtent2D extents);
-				void Submit();
+		// Frame management
+		void Begin(Scene& scene, VkExtent2D extents);
+		void Submit();
 		
 		// Get current frame
 		RenderFrame& GetCurrentFrame() { return *_frames[_currentFrame]; }
