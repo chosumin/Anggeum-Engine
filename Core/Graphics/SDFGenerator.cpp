@@ -292,7 +292,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	if (!_sdfTexture)
 		CreateSDFTexture(resolution);
 
-	auto batch = renderFrame.GetRendererBatch();
+	auto batch = renderFrame.GetRenderExecutor().GetRendererBatch();
 	auto objectDataBuffer = batch->GetObjectDataBuffer();
 	auto indirectCommandBuffer = batch->GetIndirectCommandBuffer();
 	auto drawCommandCount = batch->GetDrawCommandCount();

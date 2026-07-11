@@ -252,11 +252,6 @@ DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uin
 	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
 }
 
-RendererBatch* RenderFrame::GetRendererBatch() const
-{
-	return _renderExecutor->GetRendererBatch();
-}
-
 void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
 	_renderExecutor->InitializeBatches(scene, extents);

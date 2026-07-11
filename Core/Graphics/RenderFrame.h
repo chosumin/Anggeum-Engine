@@ -97,9 +97,6 @@ namespace Core
 		// Culler management - per camera and RendererBatch, reused within a frame
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
-		// RendererBatch management - single batch for all meshes
-		RendererBatch* GetRendererBatch() const;
-
 		// Batch initialization - called once at the start of rendering
 		void InitializeBatches(Scene& scene, VkExtent2D extents);
 	private:
