@@ -361,27 +361,22 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
 		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);
 
-		string cullingName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Frustum Culling";
-		commandBuffer.BeginDebugMarker(cullingName.c_str());
-		rendererBatch->DispatchFrustumOnlyCulling(
-			renderFrame, commandBuffer, _cascadeViews[cascadeIndex]);
-		commandBuffer.EndDebugMarker();
-
-		string drawName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Draw";
-		commandBuffer.BeginDebugMarker(drawName.c_str());
+		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
+		commandBuffer.BeginDebugMarker(passName.c_str());
+		
 		commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 		auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
-		commandBuffer.BeginRenderPass(renderPassBeginInfo);
-
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		commandBuffer.BindPipeline(_pipeline);
+		rendererBatch->FrustumCullAndDraw(renderFrame, commandBuffer, 
+			*_renderPass, *framebuffer,
+			*_shadowShader, *_pipeline,
+			builder,
+		_cascadeViews[cascadeIndex],
+		[&](shared_ptr<Material> sharedMaterial) 
+		{
+		});
 
-		rendererBatch->DrawIndirect(renderFrame, commandBuffer, *_shadowShader, builder,
-			_cascadeViews[cascadeIndex],
-		[&](shared_ptr<Material> sharedMaterial) {});
-
-		commandBuffer.EndRenderPass();
 		commandBuffer.EndDebugMarker();
 	}
 }

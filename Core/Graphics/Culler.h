@@ -11,6 +11,7 @@ namespace Core
     class Pipeline;
     class CommandBuffer;
     class RenderFrame;
+    class DescriptorSetBuilder;
     struct TransformBatch;
 
     // GPU-driven culling helper.
@@ -48,11 +49,17 @@ namespace Core
             const CameraBuffer& camera, shared_ptr<Texture> depth);
 
         // Frustum-only culling into the primary indirect command buffer.
+        // The builder must be created for the frustum culling shader so a fresh
+        // descriptor set is used per call (multiple cullers share the shader).
         void DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
-            CommandBuffer& commandBuffer, const CameraBuffer& camera);
+            CommandBuffer& commandBuffer, DescriptorSetBuilder& builder,
+            const CameraBuffer& camera);
 
         Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
         Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer; }
+
+        // Shader used for frustum-only culling (needed to build its descriptor set).
+        Shader& GetFrustumCullingShader() const { return *_frustumCullingShader; }
 
         // Check if the culler has been prepared
         bool IsPrepared() const { return _drawCount > 0; }

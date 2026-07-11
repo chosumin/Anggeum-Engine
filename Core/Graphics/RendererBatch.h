@@ -69,6 +69,19 @@ namespace Core
 			CommandBuffer& commandBuffer,
 			const CameraBuffer& camera);
 
+		// Combined frustum culling + indirect draw for shadow passes and similar use cases.
+		// Dispatches frustum-only culling, then draws with the provided builder and pipeline.
+		void FrustumCullAndDraw(
+			RenderFrame& renderFrame,
+			CommandBuffer& commandBuffer,
+			Core::RenderPass& renderPass,
+			Framebuffer& framebuffer,
+			Shader& shader,
+			Pipeline& pipeline,
+			DescriptorSetBuilder& builder,
+			const CameraBuffer& camera,
+			function<void(shared_ptr<Material>)> perDraw);
+
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
 		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }

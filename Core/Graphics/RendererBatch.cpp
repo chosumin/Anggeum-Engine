@@ -400,5 +400,71 @@ void Core::RendererBatch::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
             _instanceCount, _indirectDrawBuffer);
     }
 
-    culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, camera);
+    // Create a fresh descriptor set for the culling shader so cullers that share
+    // the same shader (e.g. shadow cascades) don't overwrite each other's bindings.
+    auto builder = renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
+    culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, builder, camera);
+}
+
+void Core::RendererBatch::FrustumCullAndDraw(
+    RenderFrame& renderFrame,
+    CommandBuffer& commandBuffer,
+    Core::RenderPass& renderPass,
+    Framebuffer& framebuffer,
+    Shader& shader,
+    Pipeline& pipeline,
+    DescriptorSetBuilder& builder,
+    const CameraBuffer& camera,
+    function<void(shared_ptr<Material>)> perDraw)
+{
+    if (_indirectDrawBuffer.GetDrawCount() == 0)
+        return;
+
+    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
+
+    if (!culler->IsPrepared())
+    {
+        culler->Prepare(_device, _extents,
+            _objectDataBuffer, _instanceBuffer,
+            _instanceCount, _indirectDrawBuffer);
+    }
+
+    // Frustum culling dispatch
+    auto cullingBuilder = renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
+    culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, cullingBuilder, camera);
+
+    commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
+
+    // Draw indirect
+    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
+
+    auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
+    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
+    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+
+    commandBuffer.BindPipeline(&pipeline);
+
+    builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
+    builder.SetStorageBuffer(2, _instanceBuffer);
+
+    builder.SetUniformBuffer(8,
+        const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
+    builder.SetStorageBuffer(9, _materialIndexBuffer);
+
+    auto& resources = builder.Build();
+
+    commandBuffer.BindDescriptorSet(
+        renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        shader, builder.GetSetIndex(), resources);
+
+    auto material = _materialBatches.begin()->second.Material.lock();
+    perDraw(material);
+
+    commandBuffer.DrawIndexedIndirect(
+        *culler->GetIndirectCommandBuffer(),
+        _indirectDrawBuffer.GetDrawCount(),
+        static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+    );
+
+    commandBuffer.EndRenderPass();
 }

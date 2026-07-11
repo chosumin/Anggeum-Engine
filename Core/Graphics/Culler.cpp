@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 #include "Vulkans/Texture.h"
@@ -351,61 +352,75 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
 }
 
 void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
-    CommandBuffer& commandBuffer, const CameraBuffer& camera)
+	CommandBuffer& commandBuffer, DescriptorSetBuilder& builder, const CameraBuffer& camera)
 {
-    uint32_t drawCount = _drawCount;
+	uint32_t drawCount = _drawCount;
 
-    // Reset instance counts
-    commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
+	// Reset instance counts.
+	// Uses its own descriptor set so it doesn't clash with the culling dispatch
+	// or with other cullers (e.g. shadow cascades) that share the same shader.
+	commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
 
-    renderFrame.SetShaderStorageBuffer(*_resetDrawCommandsSimpleShader, 0, _indirectCommandBuffer);
+	auto resetBuilder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsSimpleShader);
+	resetBuilder.SetStorageBuffer(0, _indirectCommandBuffer);
+	auto& resetResources = resetBuilder.Build();
 
-    commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, &drawCount);
-    commandBuffer.BindDescriptorSets(renderFrame,
-        _resetDrawCommandsSimplePipeline->GetPipelineBindPoint(), *_resetDrawCommandsSimpleShader);
+	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, &drawCount);
+	commandBuffer.BindDescriptorSet(renderFrame,
+		_resetDrawCommandsSimplePipeline->GetPipelineBindPoint(),
+		*_resetDrawCommandsSimpleShader, resetBuilder.GetSetIndex(), resetResources);
 
-    uint32_t groupCount = (drawCount + 63) / 64;
-    commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
+	uint32_t groupCount = (drawCount + 63) / 64;
+	commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
 
-    commandBuffer.Barrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	commandBuffer.BufferBarrier(
+		*_indirectCommandBuffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
-    // Dispatch frustum-only culling
-    struct FrustumCullData
-    {
-        glm::mat4 view;
-        glm::mat4 proj;
-        glm::vec4 frustumPlanes[6];
-        uint32_t drawCount;
-    } cullData{};
+	// Dispatch frustum-only culling
+	struct FrustumCullData
+	{
+		glm::mat4 view;
+		glm::mat4 proj;
+		glm::vec4 frustumPlanes[6];
+		uint32_t drawCount;
+	} cullData{};
 
-    cullData.view = camera.View;
-    cullData.proj = camera.Projection;
-    cullData.drawCount = _instanceCount;
+	cullData.view = camera.View;
+	cullData.proj = camera.Projection;
+	cullData.drawCount = _instanceCount;
 
-    glm::mat4 viewProj = camera.Projection * camera.View;
-    ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
+	glm::mat4 viewProj = camera.Projection * camera.View;
+	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
-    commandBuffer.BindPipeline(_frustumCullingPipeline.get());
+	commandBuffer.BindPipeline(_frustumCullingPipeline.get());
 
-    renderFrame.SetShaderUniformBuffer(*_frustumCullingShader, 0, &cullData);
-    renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 1, _objectDataBuffer);
-    renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 2, _transformBatch.TransformBuffer);
-    renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 3, _instanceBuffer);
-    renderFrame.SetShaderStorageBuffer(*_frustumCullingShader, 4, _indirectCommandBuffer);
+	// Use the builder so each dispatch gets a fresh descriptor set. Sharing the
+	// per-shader-hash cache made multiple cullers (shadow cascades) reuse the
+	// first culler's buffers, so their planes/buffers were never bound and
+	// nothing got culled.
+	builder.SetUniformBuffer(0, &cullData);
+	builder.SetStorageBuffer(1, _objectDataBuffer);
+	builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
+	builder.SetStorageBuffer(3, _instanceBuffer);
+	builder.SetStorageBuffer(4, _indirectCommandBuffer);
 
-    commandBuffer.BindDescriptorSets(renderFrame,
-        _frustumCullingPipeline->GetPipelineBindPoint(), *_frustumCullingShader);
+	auto& resources = builder.Build();
 
-    groupCount = (_instanceCount + 63) / 64;
-    commandBuffer.Dispatch(groupCount, 1, 1);
+	commandBuffer.BindDescriptorSet(renderFrame,
+		_frustumCullingPipeline->GetPipelineBindPoint(),
+		*_frustumCullingShader, builder.GetSetIndex(), resources);
 
-    commandBuffer.Barrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
+	groupCount = (_instanceCount + 63) / 64;
+	commandBuffer.Dispatch(groupCount, 1, 1);
+
+	commandBuffer.BufferBarrier(
+		*_indirectCommandBuffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_ACCESS_SHADER_WRITE_BIT,
+		VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
 }
