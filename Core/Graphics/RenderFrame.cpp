@@ -25,17 +25,11 @@ RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager
 	CreateDescriptorPool();
 
 	_defaultSampler = device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
+	_renderExecutor = make_unique<RenderExecutor>(device, *this);
 }
 
 RenderFrame::~RenderFrame()
 {
-	// Cleanup TransformBatch
-	if (_transformBatch.TransformBuffer)
-	{
-		delete _transformBatch.TransformBuffer;
-		_transformBatch.TransformBuffer = nullptr;
-	}
-
 	if (_imageAvailableSemaphore != VK_NULL_HANDLE)
 	{
 		vkDestroySemaphore(_device.GetDevice(), _imageAvailableSemaphore, nullptr);
@@ -62,10 +56,7 @@ void RenderFrame::Reset()
 	_builderResources.clear();
 
 	// Reset culler usage tracking for this frame
-	for (auto& [key, culler] : _cullers)
-	{
-		culler->MarkUsedThisFrame(false);
-	}
+	_renderExecutor->ResetFrame();
 
 	_currentDepth = nullptr;
 	_currentNormal = nullptr;
@@ -257,62 +248,12 @@ DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uin
 	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
 }
 
-Culler* RenderFrame::GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, Device& device, TransformBatch& transformBatch)
-{
-	CullerKey key{ &camera, batch };
-	auto it = _cullers.find(key);
-	if (it != _cullers.end())
-		return it->second.get();
-
-	auto culler = make_unique<Culler>(device, transformBatch);
-	auto* result = culler.get();
-	_cullers[key] = std::move(culler);
-	return result;
-}
-
 RendererBatch* RenderFrame::GetRendererBatch() const
 {
-	return _rendererBatch.get();
+	return _renderExecutor->GetRendererBatch();
 }
 
 void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
-	if (_batchesInitialized)
-		return;
-
-	// Create transform buffer from scene meshes
-	auto meshes = scene.GetComponents<Mesh>();
-	size_t meshCount = meshes.size();
-
-	if (meshCount == 0)
-	{
-		_batchesInitialized = true;
-		return;
-	}
-
-	VkDeviceSize bufferSize = sizeof(mat4) * meshCount;
-	vector<mat4> transforms(meshCount);
-	_transformBatch.EntityIds.resize(meshCount);
-
-	for (size_t i = 0; i < meshCount; ++i)
-	{
-		auto& entity = meshes[i]->GetEntity();
-		auto& transform = entity.GetTransform();
-		transforms[i] = transform.GetMatrix();
-		_transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
-	}
-
-	_transformBatch.TransformBuffer = new Buffer(_device,
-		bufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
-	VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
-		&_transformBatch.TransformBuffer, transforms, true);
-	CommandBuffer::ImmediateSubmit(_device, job);
-
-	// Create renderer batch (initializes meshes internally)
-	_rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, extents);
-
-	_batchesInitialized = true;
+	_renderExecutor->InitializeBatches(scene, extents);
 }

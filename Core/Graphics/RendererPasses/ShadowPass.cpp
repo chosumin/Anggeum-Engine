@@ -320,10 +320,6 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto* rendererBatch = renderFrame.GetRendererBatch();
-	if (!rendererBatch)
-		return;
-
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
 		return;
@@ -363,12 +359,13 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
 		commandBuffer.BeginDebugMarker(passName.c_str());
-		
+
 		commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 		auto renderPassBeginInfo = _renderPass->CreateRenderPassBeginInfo(*framebuffer);
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		rendererBatch->FrustumCullAndDraw(renderFrame, commandBuffer, 
+		auto& executor = renderFrame.GetRenderExecutor();
+		executor.FrustumCullAndDraw(commandBuffer, 
 			*_renderPass, *framebuffer,
 			*_shadowShader, *_pipeline,
 			builder,

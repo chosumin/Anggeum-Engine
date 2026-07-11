@@ -51,7 +51,7 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
         }
     }
 
-    Finalize();
+    CreateInstanceBuffer(_device);
     PrepareGPUDrivenRendering(extents);
 }
 
@@ -96,11 +96,6 @@ void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, we
 
     subMeshBatch.Transforms.push_back(entityId);
     _instanceCount++;
-}
-
-void Core::RendererBatch::Finalize()
-{
-    CreateInstanceBuffer(_device);
 }
 
 void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
@@ -178,89 +173,11 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
     _extents = extents;
 }
 
-void Core::RendererBatch::OcclusionCullAndDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    Shader& shader, Pipeline& pipeline,
-    CameraBuffer& camera,
-    Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
-    Framebuffer& framebuffer,
-    DescriptorSetBuilder& builder, 
-    function<void(shared_ptr<Material>)> perDraw,
-    function<void()> postDraw)
+shared_ptr<Material> Core::RendererBatch::GetFirstMaterial() const
 {
-    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
-
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _extents,
-            _objectDataBuffer, _instanceBuffer,
-            _instanceCount, _indirectDrawBuffer);
-    }
-
-    bool cullerAlreadyUsed = culler->IsUsedThisFrame();
-
-    if (!cullerAlreadyUsed)
-    {
-        auto prevDepth = renderFrame.GetPreviousDepthBuffer();
-
-        commandBuffer.BeginDebugMarker("Reset Draw Commands");
-        culler->ResetDrawCommands(renderFrame, commandBuffer);
-        commandBuffer.EndDebugMarker();
-
-        commandBuffer.BeginDebugMarker("Pass 1 Culling");
-        culler->DispatchPass1Culling(renderFrame, commandBuffer, camera, prevDepth);
-        commandBuffer.EndDebugMarker();
-    }
-
-    const char* pass1Label = cullerAlreadyUsed ? "Pass 1 Render Visible Objects (Reuse)" : "Pass 1 Render Visible Objects";
-    commandBuffer.BeginDebugMarker(pass1Label);
-    auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
-    commandBuffer.BeginRenderPass(pass1BeginInfo);
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
-    commandBuffer.EndRenderPass();
-    commandBuffer.EndDebugMarker();
-
-    if (!cullerAlreadyUsed)
-    {
-        commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
-        auto msaaDepth = renderFrame.GetRenderTarget("MainDepth");
-
-        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-        auto curDepth = ResolvePass::ResolveDepth(renderFrame, commandBuffer, msaaDepth);
-
-        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-        commandBuffer.EndDebugMarker();
-
-        commandBuffer.BeginDebugMarker("Pass 2 Culling");
-        culler->DispatchPass2Culling(renderFrame, commandBuffer, camera, curDepth);
-        commandBuffer.EndDebugMarker();
-    }
-
-    const char* pass2Label = cullerAlreadyUsed ? "Pass 2 Render Newly Visible Objects (Reuse)" : "Pass 2 Render Newly Visible Objects";
-    commandBuffer.BeginDebugMarker(pass2Label);
-    auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
-    commandBuffer.BeginRenderPass(pass2BeginInfo);
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), builder, perDraw);
-
-    if (postDraw)
-    {
-        commandBuffer.BeginDebugMarker("Post Draw");
-        postDraw();
-        commandBuffer.EndDebugMarker();
-    }
-
-    commandBuffer.EndRenderPass();
-    commandBuffer.EndDebugMarker();
-
-    if (!cullerAlreadyUsed)
-    {
-        culler->MarkUsedThisFrame(true);
-    }
+    if (_materialBatches.empty())
+        return nullptr;
+    return _materialBatches.begin()->second.Material.lock();
 }
 
 void Core::RendererBatch::CreateInstanceBuffer(Device& device)
@@ -289,80 +206,3 @@ void Core::RendererBatch::CreateInstanceBuffer(Device& device)
     Core::CommandBuffer::ImmediateSubmit(device, job);
 }
 
-void Core::RendererBatch::DrawIndirectInternal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	Shader& shader, Pipeline& pipeline,
-	Core::Buffer& indirectCommandBuffer,
-	DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
-{
-	if (_indirectDrawBuffer.GetDrawCount() == 0)
-		return;
-
-	auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-
-	auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-	commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-	commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
-
-	commandBuffer.BindPipeline(&pipeline);
-
-	builder.SetStorageBuffer(1, _transformBatch->TransformBuffer);
-	builder.SetStorageBuffer(2, _instanceBuffer);
-	builder.SetUniformBuffer(8,
-		const_cast<GPUMaterialData*>(renderFrame.GetMaterialManager()->GetMaterialData()));
-	builder.SetStorageBuffer(9, _materialIndexBuffer);
-
-	auto& resources = builder.Build();
-
-	vector<DescriptorSetResources*> resourcesList = { &resources };
-	if (shader.UsesBindlessTextures())
-	{
-		auto* bindlessResources = renderFrame.GetBindlessResources();
-		if (bindlessResources)
-			resourcesList.push_back(bindlessResources);
-	}
-
-	commandBuffer.BindDescriptorSets(renderFrame, VK_PIPELINE_BIND_POINT_GRAPHICS, shader, resourcesList);
-
-	auto material = _materialBatches.begin()->second.Material.lock();
-	perDraw(material);
-
-	commandBuffer.DrawIndexedIndirect(
-		indirectCommandBuffer,
-		_indirectDrawBuffer.GetDrawCount(),
-		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
-	);
-}
-
-void Core::RendererBatch::FrustumCullAndDraw(
-    RenderFrame& renderFrame,
-    CommandBuffer& commandBuffer,
-    Core::RenderPass& renderPass,
-    Framebuffer& framebuffer,
-    Shader& shader,
-    Pipeline& pipeline,
-    DescriptorSetBuilder& builder,
-    const CameraBuffer& camera,
-    function<void(shared_ptr<Material>)> perDraw)
-{
-    if (_indirectDrawBuffer.GetDrawCount() == 0)
-        return;
-
-    auto* culler = renderFrame.GetOrCreateCuller(this, camera, _device, *_transformBatch);
-
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _extents,
-            _objectDataBuffer, _instanceBuffer,
-            _instanceCount, _indirectDrawBuffer);
-    }
-
-    // Frustum culling dispatch
-    auto cullingBuilder = renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
-    culler->DispatchFrustumOnlyCulling(renderFrame, commandBuffer, cullingBuilder, camera);
-
-    commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
-
-    DrawIndirectInternal(renderFrame, commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
-
-    commandBuffer.EndRenderPass();
-}

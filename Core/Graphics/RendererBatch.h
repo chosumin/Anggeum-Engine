@@ -48,48 +48,21 @@ namespace Core
 		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
 		~RendererBatch();
 
-		void OcclusionCullAndDraw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			Shader& shader, Pipeline& pipeline,
-			CameraBuffer& camera,
-			Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
-			Framebuffer& framebuffer,
-			DescriptorSetBuilder& builder,
-			function<void(shared_ptr<Material>)> perDraw,
-			function<void()> postDraw);
-
-		void FrustumCullAndDraw(
-			RenderFrame& renderFrame,
-			CommandBuffer& commandBuffer,
-			Core::RenderPass& renderPass,
-			Framebuffer& framebuffer,
-			Shader& shader,
-			Pipeline& pipeline,
-			DescriptorSetBuilder& builder,
-			const CameraBuffer& camera,
-			function<void(shared_ptr<Material>)> perDraw);
-
 		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
 		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
+		Buffer* GetMaterialIndexBuffer() const { return _materialIndexBuffer; }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
 		Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		TransformBatch* GetTransformBatch() const { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
+		shared_ptr<Material> GetFirstMaterial() const;
 
 	private:
 		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
-		void Finalize();
 		void PrepareGPUDrivenRendering(VkExtent2D extents);
 		void CreateInstanceBuffer(Device& device);
-
-		void DrawIndirectInternal(
-			RenderFrame& renderFrame,
-			CommandBuffer& commandBuffer,
-			Shader& shader, Pipeline& pipeline,
-			Core::Buffer& indirectCommandBuffer,
-			DescriptorSetBuilder& builder,
-			function<void(shared_ptr<Material>)> perDraw);
 
 	private:
 		Device& _device;

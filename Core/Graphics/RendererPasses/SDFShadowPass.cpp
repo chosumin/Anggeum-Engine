@@ -214,8 +214,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-    auto* transformBuffer = renderFrame.GetTransformBatch().TransformBuffer;
-    if (!meshBufferManager || !transformBuffer)
+    if (!meshBufferManager)
         return;
 
     auto& commandBuffer = renderFrame.GetCommandBuffer();
@@ -238,7 +237,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
             commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
             _sdfGenerator->Generate(renderFrame, commandBuffer,
                 *meshBufferManager,
-                transformBuffer,
                 SDF_VOLUME_DIM);
             commandBuffer.EndDebugMarker();
 

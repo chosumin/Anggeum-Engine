@@ -137,7 +137,7 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 
 	_materialManager->RefreshDirtyMaterials();
 
-	// Initialize batches once per frame (TransformBatch is now per-frame)
+	// Initialize batches once per frame
 	currentFrame.InitializeBatches(scene, extents);
 }
 

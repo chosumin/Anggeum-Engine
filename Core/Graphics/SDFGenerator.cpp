@@ -287,7 +287,6 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 
 void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 	MeshBufferManager& meshBufferManager,
-	Buffer* transformBuffer,
 	uint32_t resolution)
 {
 	if (!_sdfTexture)
@@ -298,6 +297,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	auto indirectCommandBuffer = batch->GetIndirectCommandBuffer();
 	auto drawCommandCount = batch->GetDrawCommandCount();
 	auto instanceCount = batch->GetInstanceCount();
+	auto transformBuffer = batch->GetTransformBatch()->TransformBuffer;
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 

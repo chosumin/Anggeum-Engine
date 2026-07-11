@@ -93,36 +93,33 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 {
-    auto* rendererBatch = renderFrame.GetRendererBatch();
-    if (!rendererBatch)
-        return;
+	auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+		"DepthPrePass",
+		*_renderPass,
+		{ RT_MAIN_NORMAL, RT_MAIN_DEPTH });
 
-    auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
-        "DepthPrePass",
-        *_renderPass,
-        { RT_MAIN_NORMAL, RT_MAIN_DEPTH });
+	if (!framebuffer)
+		return;
 
-    if (!framebuffer)
-        return;
+	auto& commandBuffer = renderFrame.GetCommandBuffer();
+	PerspectiveCamera* camera = _scene.GetMainCamera();
 
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
-    PerspectiveCamera* camera = _scene.GetMainCamera();
-
-    commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
+	commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
 	auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthNormalShader, 0);
 	builder.SetUniformBuffer(0, &camera->Matrices);
 
-    auto perDraw = [&](shared_ptr<Material> sharedMaterial)
-    {
-    };
+	auto perDraw = [&](shared_ptr<Material> sharedMaterial)
+	{
+	};
 
-    rendererBatch->OcclusionCullAndDraw(
-        renderFrame, commandBuffer,
-        *_depthNormalShader, *_pipeline,
-        camera->Matrices,
-        *_renderPass, *_renderPassPass2,
-        *framebuffer,
-        builder, perDraw,
-        nullptr);
+	auto& executor = renderFrame.GetRenderExecutor();
+	executor.OcclusionCullAndDraw(
+		commandBuffer,
+		*_depthNormalShader, *_pipeline,
+		camera->Matrices,
+		*_renderPass, *_renderPassPass2,
+		*framebuffer,
+		builder, perDraw,
+		nullptr);
 }

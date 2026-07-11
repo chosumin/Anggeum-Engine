@@ -157,10 +157,6 @@ namespace Core
             _iblGenerated = true;
         }
 
-        auto* batch = renderFrame.GetRendererBatch();
-        if (!batch)
-            return;
-
         auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
             "GeometryPass",
             *_renderPass,
@@ -211,9 +207,6 @@ namespace Core
                 break;
         }
 
-        if (!shader)
-            return;
-
         Pipeline* pipeline = GetOrCreatePipeline(*shader);
 
         auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
@@ -236,8 +229,9 @@ namespace Core
             commandBuffer.PushConstants(*sharedMaterial, 0);
         };
 
-        batch->OcclusionCullAndDraw(
-            renderFrame, commandBuffer,
+        auto& executor = renderFrame.GetRenderExecutor();
+        executor.OcclusionCullAndDraw(
+            commandBuffer,
             *shader, *pipeline,
             camera->Matrices,
             *_renderPass, *_renderPassPass2,
