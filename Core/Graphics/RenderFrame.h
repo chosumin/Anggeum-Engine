@@ -77,15 +77,9 @@ namespace Core
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
 		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
 
-		// Per-shader resources access (set index 0, hash-based)
-		DescriptorSetResources& GetOrCreateShaderResources(size_t shaderHash);
-		DescriptorSetResources* GetShaderResources(size_t shaderHash);
-
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
 		DescriptorSetResources* GetBindlessResources();
-
-		void CleanupBuffers();
 
 		void SetMeshBufferManager(MeshBufferManager* meshBufferManager) { _meshBufferManager = meshBufferManager; }
 		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager; }
@@ -151,8 +145,6 @@ namespace Core
 		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
 		
 		unique_ptr<DescriptorPool> _descriptorPool;
-
-		unordered_map<size_t, DescriptorSetResources> _shaderResources;
 
 		BindlessTextureManager* _bindlessTextureManager;
 		DescriptorSetResources _bindlessResources;

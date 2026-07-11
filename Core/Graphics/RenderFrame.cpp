@@ -29,8 +29,6 @@ RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager
 
 RenderFrame::~RenderFrame()
 {
-	CleanupBuffers();
-
 	// Cleanup TransformBatch
 	if (_transformBatch.TransformBuffer)
 	{
@@ -55,13 +53,6 @@ void RenderFrame::Reset()
 	{
 		_descriptorPool->Reset();
 	}
-	
-	// Clear shader resources (set index 0)
-	for (auto& [shaderHash, resources] : _shaderResources)
-	{
-		resources.CleanupBuffers();
-	}
-	_shaderResources.clear();
 
 	// Cleanup builder-created resources
 	for (auto& resources : _builderResources)
@@ -88,36 +79,6 @@ DescriptorSetResources* RenderFrame::GetBindlessResources()
 	_bindlessResources.descriptorSet = _bindlessTextureManager->GetDescriptorSet();
 	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
 	return &_bindlessResources;
-}
-
-void RenderFrame::CleanupBuffers()
-{
-	// Cleanup shader resources (set index 0)
-	for (auto& [shaderHash, resources] : _shaderResources)
-	{
-		resources.CleanupBuffers();
-	}
-	_shaderResources.clear();
-}
-
-// Per-shader resources access methods (set index 0)
-DescriptorSetResources& RenderFrame::GetOrCreateShaderResources(size_t shaderHash)
-{
-	auto it = _shaderResources.find(shaderHash);
-	if (it == _shaderResources.end())
-	{
-		// Create new shader resources
-		it = _shaderResources.emplace(shaderHash, DescriptorSetResources{}).first;
-	}
-	return it->second;
-}
-
-DescriptorSetResources* RenderFrame::GetShaderResources(size_t shaderHash)
-{
-	auto it = _shaderResources.find(shaderHash);
-	if (it == _shaderResources.end())
-		return nullptr;
-	return &(it->second);
 }
 
 void RenderFrame::CreateSyncObjects()
