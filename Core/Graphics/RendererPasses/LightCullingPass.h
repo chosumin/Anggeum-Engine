@@ -16,7 +16,9 @@ namespace Core
 			Buffer* lightVisibilityBuffer);
 		virtual ~LightCullingPass() override;
 
-		virtual void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+		virtual void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+
+		virtual QueueType GetQueueType() const override { return QueueType::Compute; }
 	private:
 		void UpdateLightBuffer();
 	private:

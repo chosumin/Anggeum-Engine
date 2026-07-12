@@ -2,7 +2,13 @@
 
 namespace Core
 {
-    enum class QueueType;
+    enum class QueueType
+    {
+        None,
+        Graphics,
+        Compute
+    };
+
     class Device;
     class SubmitInfo;
 

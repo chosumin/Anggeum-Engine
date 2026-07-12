@@ -86,7 +86,7 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-void DFAOPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
@@ -143,9 +143,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandB
     commandBuffer.Dispatch(
         (_screenExtent.width + 7) / 8,
         (_screenExtent.height + 7) / 8, 1);
-
-    commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     commandBuffer.EndDebugMarker();
 }

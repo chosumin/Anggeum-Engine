@@ -91,7 +91,7 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     }
 }
 
-void Core::DepthPrePass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
 		"DepthPrePass",

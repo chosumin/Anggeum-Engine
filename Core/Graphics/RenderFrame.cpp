@@ -257,8 +257,8 @@ void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 	_renderExecutor->InitializeBatches(scene, extents);
 }
 
-SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer)
+SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)
 {
-	_submitInfos.emplace_back(queueType, commandBuffer);
+	_submitInfos.emplace_back(queueType, commandBuffer, syncContext);
 	return _submitInfos.back();
 }

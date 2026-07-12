@@ -1,32 +1,44 @@
 #pragma once
+#include "Graphics/SyncContext.h"
 
 namespace Core
 {
-    enum class QueueType
-    {
-        Graphics,
-        Compute
-    };
-
     class SubmitInfo
     {
     public:
-        SubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer)
-            : _queueType(queueType), _commandBuffer(commandBuffer) {}
+        SubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)
+            : _queueType(queueType), _commandBuffer(commandBuffer), _syncContext(&syncContext) {}
 
         QueueType GetQueueType() const { return _queueType; }
 
-        void AddWaitSemaphore(VkSemaphore semaphore, VkPipelineStageFlags stage, uint64_t value = 0)
+        // Timeline semaphore wait on given queue's timeline (uses current value)
+        void AddWaitSemaphore(QueueType queueType, VkPipelineStageFlags stage)
+        {
+            _waitSemaphores.push_back(_syncContext->GetSemaphore(queueType));
+            _waitStages.push_back(stage);
+            _waitValues.push_back(_syncContext->GetCurrentValue(queueType));
+        }
+
+        // Timeline semaphore signal on given queue's timeline (acquires next value)
+        void AddSignalSemaphore(QueueType queueType)
+        {
+            _signalSemaphores.push_back(_syncContext->GetSemaphore(queueType));
+            _signalValues.push_back(_syncContext->AcquireNextValue(queueType));
+        }
+
+        // Binary semaphore wait (e.g. swapchain imageAvailable)
+        void AddBinaryWaitSemaphore(VkSemaphore semaphore, VkPipelineStageFlags stage)
         {
             _waitSemaphores.push_back(semaphore);
             _waitStages.push_back(stage);
-            _waitValues.push_back(value);
+            _waitValues.push_back(0);
         }
 
-        void AddSignalSemaphore(VkSemaphore semaphore, uint64_t value = 0)
+        // Binary semaphore signal (e.g. renderFinished for present)
+        void AddBinarySignalSemaphore(VkSemaphore semaphore)
         {
             _signalSemaphores.push_back(semaphore);
-            _signalValues.push_back(value);
+            _signalValues.push_back(0);
         }
 
         const VkSubmitInfo& Build()
@@ -55,6 +67,7 @@ namespace Core
     private:
         QueueType _queueType;
         VkCommandBuffer _commandBuffer;
+        SyncContext* _syncContext;
 
         std::vector<VkSemaphore>          _waitSemaphores;
         std::vector<VkPipelineStageFlags> _waitStages;

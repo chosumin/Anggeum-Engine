@@ -211,7 +211,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
     ImGui::Separator();
 }
 
-void SDFShadowPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
     if (!meshBufferManager)
@@ -275,11 +275,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, Com
     uint32_t dispatchX = (_screenExtent.width / 2 + 7) / 8;
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
-
-    // Transition to SHADER_READ_ONLY_OPTIMAL for GeometryPass sampling
-    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     {
         commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");

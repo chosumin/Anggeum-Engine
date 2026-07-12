@@ -145,8 +145,19 @@ namespace Core
         _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
-    void GeometryPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+    void GeometryPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
+        // Wait for compute queue (AmbientOcclusionPass) to finish producing the AO texture
+        renderFrame.GetCurrentSubmitInfo().AddWaitSemaphore(
+            QueueType::Compute,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+        commandBuffer.BufferBarrier(*_lightVisibilityBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT, GetQueueType());
+
         // Lazy initialization
         EnsureIBLResources(renderFrame);
 
@@ -173,8 +184,13 @@ namespace Core
 
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
+        commandBuffer.TransitionImageLayout(*sdfShadowTarget->GetImage().lock(),
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetQueueType());
 
         auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
+        commandBuffer.TransitionImageLayout(*aoTarget->GetImage().lock(),
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetQueueType());
 
         UpdateLightBuffer();
 

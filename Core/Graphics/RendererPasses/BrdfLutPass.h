@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/SyncContext.h"
 
 namespace Core
 {
@@ -14,7 +13,7 @@ namespace Core
         ~BrdfLutPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
     private:
         unique_ptr<Framebuffer> _framebuffer;
@@ -34,6 +33,5 @@ namespace Core
     private:
         BrdfLutPass& _pass;
         RenderFrame _tempRenderFrame;
-        SyncContext _tempSyncContext;
     };
 }

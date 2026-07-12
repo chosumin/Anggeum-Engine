@@ -37,17 +37,20 @@ namespace Core
         }
     }
 
-    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
         switch (_activeMethod)
         {
         case AOMethod::CACAO:
-            _cacaoPass->Draw(renderFrame, syncContext, commandBuffer, imageIndex);
+            _cacaoPass->Draw(renderFrame, commandBuffer, imageIndex);
             break;
         case AOMethod::DFAO:
-            _dfaoPass->Draw(renderFrame, syncContext, commandBuffer, imageIndex);
+            _dfaoPass->Draw(renderFrame, commandBuffer, imageIndex);
             break;
         }
+
+        // Signal compute timeline so graphics queue (GeometryPass) can consume AO output
+        renderFrame.GetCurrentSubmitInfo().AddSignalSemaphore(QueueType::Compute);
     }
 
     void AmbientOcclusionPass::SetMethod(AOMethod method)

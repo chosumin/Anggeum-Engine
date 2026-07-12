@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RendererPass.h"
-#include "Graphics/SyncContext.h"
 #include "Graphics/BufferObjects.h"
 
 namespace Core
@@ -19,7 +18,7 @@ namespace Core
         ~PreEnvironmentPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
     private:
         void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
@@ -59,6 +58,5 @@ namespace Core
     private:
         PreEnvironmentPass& _pass;
         RenderFrame _tempRenderFrame;
-        SyncContext _tempSyncContext;
     };
 }

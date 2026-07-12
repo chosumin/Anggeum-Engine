@@ -286,15 +286,35 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32
     );
 }
 
-void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout)
+void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout, QueueType destQueue)
 {
     //모든 밉맵 이미지에 같은 레이아웃을 적용.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    
+    if (destQueue == QueueType::None)
+    {
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    }
+    else
+    {
+        const auto& qfi = _device.GetQueueFamilyIndices();
+
+        if (destQueue == QueueType::Graphics)
+        {
+            barrier.srcQueueFamilyIndex = qfi.ComputeFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.GraphicsFamily.value();
+        }
+        else
+        {
+            barrier.srcQueueFamilyIndex = qfi.GraphicsFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.ComputeFamily.value();
+        }
+    }
+
     barrier.image = image.GetImage();
     barrier.subresourceRange.aspectMask = image.GetAspectFlags();
     barrier.subresourceRange.baseMipLevel = 0;
@@ -533,14 +553,35 @@ void Core::CommandBuffer::BufferBarrier(
 	VkPipelineStageFlags srcStageMask,
 	VkPipelineStageFlags dstStageMask,
 	VkAccessFlags srcAccessMask,
-	VkAccessFlags dstAccessMask)
+	VkAccessFlags dstAccessMask,
+	QueueType destQueue)
 {
 	VkBufferMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barrier.srcAccessMask = srcAccessMask;
 	barrier.dstAccessMask = dstAccessMask;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	
+    if (destQueue == QueueType::None)
+	{
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	}
+	else
+	{
+		const auto& qfi = _device.GetQueueFamilyIndices();
+
+        if (destQueue == QueueType::Graphics)
+        {
+            barrier.srcQueueFamilyIndex = qfi.ComputeFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.GraphicsFamily.value();
+        }
+        else
+        {
+            barrier.srcQueueFamilyIndex = qfi.GraphicsFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.ComputeFamily.value();
+        }
+	}
+
 	barrier.buffer = buffer.GetBuffer();
 	barrier.offset = 0;
 	barrier.size = VK_WHOLE_SIZE;

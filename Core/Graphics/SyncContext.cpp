@@ -80,9 +80,9 @@ void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
         auto& firstInfo = submitInfos.front();
         if (firstInfo.GetQueueType() == QueueType::Graphics)
         {
-            firstInfo.AddWaitSemaphore(
+            firstInfo.AddBinaryWaitSemaphore(
                 imageAvailable,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         }
 
         // Find last graphics submit info and add signal semaphores
@@ -90,10 +90,8 @@ void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
         {
             if (it->GetQueueType() == QueueType::Graphics)
             {
-                it->AddSignalSemaphore(renderFinished, 0);
-                it->AddSignalSemaphore(
-                    _graphicsSemaphore,
-                    AcquireNextValue(QueueType::Graphics));
+                it->AddBinarySignalSemaphore(renderFinished);
+                it->AddSignalSemaphore(QueueType::Graphics);
                 break;
             }
         }
@@ -122,9 +120,7 @@ void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
         {
             if (it->GetQueueType() == QueueType::Compute)
             {
-                it->AddSignalSemaphore(
-                    _computeSemaphore,
-                    AcquireNextValue(QueueType::Compute));
+                it->AddSignalSemaphore(QueueType::Compute);
                 break;
             }
         }

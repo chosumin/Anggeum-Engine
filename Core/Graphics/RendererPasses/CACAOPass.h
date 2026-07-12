@@ -20,7 +20,7 @@ namespace Core
         ~CACAOPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
-        void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
         void UpdateGUI();
 

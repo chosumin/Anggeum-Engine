@@ -47,7 +47,7 @@ namespace Core
 		void Reset();
 
 		// Submit info management
-		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer);
+		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext);
 		SubmitInfo& GetCurrentSubmitInfo() { return _submitInfos.back(); }
 		std::deque<SubmitInfo>& GetSubmitInfos() { return _submitInfos; }
 

@@ -318,7 +318,7 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 	ImGui::Separator();
 }
 
-void Core::ShadowPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)

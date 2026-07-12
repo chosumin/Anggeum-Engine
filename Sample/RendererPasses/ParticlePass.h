@@ -38,7 +38,7 @@ namespace Sample
 
 		void Initialize();
 		virtual void EnsureRenderTargets(Core::RenderFrame& renderFrame) override;
-		virtual void Draw(Core::RenderFrame& renderFrame, Core::SyncContext& syncContext, Core::CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+		virtual void Draw(Core::RenderFrame& renderFrame, Core::CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 	private:
 		Core::Scene& _scene;
 

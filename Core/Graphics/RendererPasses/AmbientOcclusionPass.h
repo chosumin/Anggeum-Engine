@@ -23,8 +23,10 @@ namespace Core
         ~AmbientOcclusionPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
-        void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
         void OnGUI(RenderFrame& renderFrame) override;
+
+        QueueType GetQueueType() const override { return QueueType::Compute; }
 
         void SetMethod(AOMethod method);
         AOMethod GetMethod() const { return _activeMethod; }

@@ -53,7 +53,7 @@ void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
     renderFrame.SetCurrentNormal(_resolvedNormalTexture);
 }
 
-void ResolvePass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
         return;
@@ -61,10 +61,7 @@ void ResolvePass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, Comma
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
-    // Transition depth to shader read
-    commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    
 
     // Resolve depth
     commandBuffer.BeginDebugMarker("Resolve MSAA Depth");
@@ -75,6 +72,9 @@ void ResolvePass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, Comma
     commandBuffer.BeginDebugMarker("Resolve MSAA Normal");
     ResolveNormal(renderFrame, commandBuffer, normalTexture);
     commandBuffer.EndDebugMarker();
+
+    // Signal graphics timeline so compute passes (LightCulling) can consume the resolved depth
+    renderFrame.GetCurrentSubmitInfo().AddSignalSemaphore(GetQueueType());
 }
 
 shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,

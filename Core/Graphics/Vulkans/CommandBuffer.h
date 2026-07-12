@@ -1,5 +1,6 @@
 #pragma once
 #include "CommandPool.h"
+#include "Graphics/SyncContext.h"
 
 
 namespace Core
@@ -66,7 +67,8 @@ namespace Core
 			VkPipelineStageFlags srcStageMask,
 			VkPipelineStageFlags dstStageMask,
 			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask);
+			VkAccessFlags dstAccessMask,
+			QueueType destQueue = QueueType::None);
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 		void CopyImage(Image& srcImage, Image& dstImage, 
@@ -74,7 +76,8 @@ namespace Core
 			uint32_t dstMipLevel, uint32_t dstLayer);
 		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
 		void TransitionImageLayout(Image& image, 
-			VkImageLayout oldLayout, VkImageLayout newLayout);
+			VkImageLayout oldLayout, VkImageLayout newLayout,
+			QueueType destQueue = QueueType::None);
 		void GenerateMipmaps(Image& image, uint32_t mipLevels);
 		void EndRenderPass();
 		void EndCommandBuffer();
