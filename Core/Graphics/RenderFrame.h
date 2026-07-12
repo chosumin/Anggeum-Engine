@@ -48,6 +48,7 @@ namespace Core
 
 		// Submit info management
 		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer);
+		SubmitInfo& GetCurrentSubmitInfo() { return _submitInfos.back(); }
 		std::deque<SubmitInfo>& GetSubmitInfos() { return _submitInfos; }
 
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }

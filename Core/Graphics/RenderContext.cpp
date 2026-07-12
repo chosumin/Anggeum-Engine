@@ -171,14 +171,6 @@ void RenderContext::Submit()
 			firstInfo.AddWaitSemaphore(
 				currentFrame.GetImageAvailableSemaphore(),
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-
-			if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
-			{
-				firstInfo.AddWaitSemaphore(
-					_graphicsSemaphore,
-					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-					FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1));
-			}
 		}
 
 		// Find last graphics submit info and add signal semaphores
@@ -190,7 +182,7 @@ void RenderContext::Submit()
 					currentFrame.GetRenderFinishedSemaphore(), 0);
 				it->AddSignalSemaphore(
 					_graphicsSemaphore,
-					FrameCounter::GetFrameNumber() + 1);
+					_graphicsSemaphoreValue + 1);
 				break;
 			}
 		}
@@ -209,12 +201,26 @@ void RenderContext::Submit()
 		{
 			throw runtime_error("failed to submit graphics command buffers!");
 		}
+
+		++_graphicsSemaphoreValue;
 	}
 
 	// Compute queue submit
 	if (!computeSubmits.empty())
 	{
-		// Rebuild compute submits (they may have been modified)
+		// Last compute submit signals current frame's compute timeline
+		for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
+		{
+			if (it->GetQueueType() == QueueType::Compute)
+			{
+				it->AddSignalSemaphore(
+					_computeSemaphore,
+					_computeSemaphoreValue + 1);
+				break;
+			}
+		}
+
+		// Rebuild compute submits after adding frame-level semaphores
 		computeSubmits.clear();
 		for (auto& info : submitInfos)
 		{
@@ -228,7 +234,13 @@ void RenderContext::Submit()
 		{
 			throw runtime_error("failed to submit compute command buffers!");
 		}
+
+		++_computeSemaphoreValue;
 	}
+
+	// Record this frame's final timeline values so the next reuse of this slot
+	// can wait for GPU completion regardless of per-frame increment count.
+	_frameSnapshots[_currentFrame] = { _graphicsSemaphoreValue, _computeSemaphoreValue, true };
 
 	// Present
 	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
@@ -282,13 +294,11 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	auto device = _device.GetDevice();
 	auto& currentFrame = GetCurrentFrame();
 
-	// Wait for GPU work completion (Timeline semaphores)
-	if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
+	// Wait for the previous use of this frame slot to complete on the GPU.
+	const auto& snapshot = _frameSnapshots[_currentFrame];
+	if (snapshot.valid)
 	{
-		u64 graphicsTimelineValue = FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1);
-		u64 computeTimelineValue = _lastComputeSemaphoreValue;
-
-		u64 waitValues[] = { graphicsTimelineValue, computeTimelineValue };
+		u64 waitValues[] = { snapshot.graphicsValue, snapshot.computeValue };
 		VkSemaphore waitSemaphores[] = { _graphicsSemaphore, _computeSemaphore };
 
 		VkSemaphoreWaitInfo waitInfo{};

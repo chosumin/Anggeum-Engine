@@ -120,6 +120,9 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 			? renderContext.RequestComputeCommandBuffer()
 			: renderContext.RequestCommandBuffer();
 
+		// Register SubmitInfo before Draw so the pass can inject wait/signal semaphores
+		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle());
+
 		commandBuffer.BeginCommandBuffer();
 		commandBuffer.BeginDebugMarker(simpleName);
 
@@ -128,8 +131,6 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 
 		commandBuffer.EndDebugMarker();
 		commandBuffer.EndCommandBuffer();
-
-		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle());
 	}
 }
 

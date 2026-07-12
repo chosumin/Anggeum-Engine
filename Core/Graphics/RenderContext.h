@@ -89,8 +89,20 @@ namespace Core
 		// Timeline semaphores
 		VkSemaphore _graphicsSemaphore = VK_NULL_HANDLE;
 		VkSemaphore _computeSemaphore = VK_NULL_HANDLE;
-		u64 _lastComputeSemaphoreValue = 0;
-		u32 _maxFramesInFlight = MAX_FRAMES_IN_FLIGHT;
+		// Last signaled timeline values per queue
+		u64 _graphicsSemaphoreValue = 0;
+		u64 _computeSemaphoreValue = 0;
+
+		// Snapshot of timeline values at the end of each in-flight frame.
+		// Used to wait for the frame slot to be reusable regardless of how many
+		// times the timeline counters are incremented per frame.
+		struct FrameTimelineSnapshot
+		{
+			u64 graphicsValue = 0;
+			u64 computeValue = 0;
+			bool valid = false;
+		};
+		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
 
