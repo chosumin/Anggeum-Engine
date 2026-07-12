@@ -127,7 +127,7 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 		commandBuffer.BeginDebugMarker(simpleName);
 
 		rendererPass->EnsureRenderTargets(renderFrame);
-		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
+		rendererPass->Draw(renderFrame, renderContext.GetSyncContext(), commandBuffer, imageIndex);
 
 		commandBuffer.EndDebugMarker();
 		commandBuffer.EndCommandBuffer();

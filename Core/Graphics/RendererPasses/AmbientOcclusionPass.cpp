@@ -37,15 +37,15 @@ namespace Core
         }
     }
 
-    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
         switch (_activeMethod)
         {
         case AOMethod::CACAO:
-            _cacaoPass->Draw(renderFrame, commandBuffer, imageIndex);
+            _cacaoPass->Draw(renderFrame, syncContext, commandBuffer, imageIndex);
             break;
         case AOMethod::DFAO:
-            _dfaoPass->Draw(renderFrame, commandBuffer, imageIndex);
+            _dfaoPass->Draw(renderFrame, syncContext, commandBuffer, imageIndex);
             break;
         }
     }

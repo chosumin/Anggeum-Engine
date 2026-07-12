@@ -4,6 +4,7 @@
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/SubmitInfo.h"
 #include "RenderFrame.h"
+#include "SyncContext.h"
 #include "Foundation/WorkerThread.h"
 
 namespace Core
@@ -15,7 +16,7 @@ namespace Core
 		virtual ~RendererPass();
 
 		virtual void EnsureRenderTargets(RenderFrame& renderFrame) {}
-		virtual void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) = 0;
+		virtual void Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex) = 0;
 		virtual void OnGUI(RenderFrame& renderFrame) {}
 
 		virtual QueueType GetQueueType() const { return QueueType::Graphics; }

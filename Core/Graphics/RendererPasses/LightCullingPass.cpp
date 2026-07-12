@@ -25,7 +25,7 @@ Core::LightCullingPass::~LightCullingPass()
 {
 }
 
-void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::LightCullingPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto depthTarget = renderFrame.GetCurrentDepth();
 	if (!depthTarget)

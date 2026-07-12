@@ -113,7 +113,7 @@ void Sample::ParticlePass::Initialize()
     }
 }
 
-void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::SyncContext& syncContext, Core::CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "ParticlePass",

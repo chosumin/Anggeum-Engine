@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
+#include "SyncContext.h"
 #include "Vulkans/SubmitInfo.h"
 #include "Foundation/Scene.h"
 #include "Graphics/Vulkans/SwapChain.h"
@@ -49,8 +50,9 @@ RenderContext::RenderContext(Device& device)
 	_commandPool = new CommandPool(device, queueFamilyIndices.GraphicsFamily.value());
 	_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
 
+	_syncContext = make_unique<SyncContext>(device);
+
 	CreateRenderFrames();
-	CreateSyncObjects();	
 
 	if (_bindlessTextureManager)
 	{
@@ -65,17 +67,11 @@ RenderContext::~RenderContext()
 	_meshBufferManager.reset();
 	_materialManager.reset();
 
-	auto device = _device.GetDevice();
-
-	// Clean up timeline semaphores
-	if (_graphicsSemaphore != VK_NULL_HANDLE)
-		vkDestroySemaphore(device, _graphicsSemaphore, nullptr);
-
-	if (_computeSemaphore != VK_NULL_HANDLE)
-		vkDestroySemaphore(device, _computeSemaphore, nullptr);
-
 	// Clean up frames
 	_frames.clear();
+
+	// Clean up sync primitives (must outlive frames only for wait; frames already destroyed)
+	_syncContext.reset();
 
 	// Clean up command pools
 	delete _commandPool;
@@ -181,8 +177,8 @@ void RenderContext::Submit()
 				it->AddSignalSemaphore(
 					currentFrame.GetRenderFinishedSemaphore(), 0);
 				it->AddSignalSemaphore(
-					_graphicsSemaphore,
-					_graphicsSemaphoreValue + 1);
+					_syncContext->GetGraphicsSemaphore(),
+					_syncContext->AcquireNextValue(QueueType::Graphics));
 				break;
 			}
 		}
@@ -201,8 +197,6 @@ void RenderContext::Submit()
 		{
 			throw runtime_error("failed to submit graphics command buffers!");
 		}
-
-		++_graphicsSemaphoreValue;
 	}
 
 	// Compute queue submit
@@ -214,8 +208,8 @@ void RenderContext::Submit()
 			if (it->GetQueueType() == QueueType::Compute)
 			{
 				it->AddSignalSemaphore(
-					_computeSemaphore,
-					_computeSemaphoreValue + 1);
+					_syncContext->GetComputeSemaphore(),
+					_syncContext->AcquireNextValue(QueueType::Compute));
 				break;
 			}
 		}
@@ -234,13 +228,11 @@ void RenderContext::Submit()
 		{
 			throw runtime_error("failed to submit compute command buffers!");
 		}
-
-		++_computeSemaphoreValue;
 	}
 
 	// Record this frame's final timeline values so the next reuse of this slot
 	// can wait for GPU completion regardless of per-frame increment count.
-	_frameSnapshots[_currentFrame] = { _graphicsSemaphoreValue, _computeSemaphoreValue, true };
+	_syncContext->RecordFrameSnapshot(_currentFrame);
 
 	// Present
 	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
@@ -269,37 +261,17 @@ VkExtent2D RenderContext::GetSurfaceExtent() const
 	return _swapChain->GetSwapChainExtent();
 }
 
-void RenderContext::CreateSyncObjects()
-{
-	auto device = _device.GetDevice();
-
-	// Create timeline semaphores
-	VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
-	semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-	semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-
-	VkSemaphoreCreateInfo semaphoreInfo{};
-	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semaphoreInfo.pNext = &semaphoreTypeInfo;
-
-	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_graphicsSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_computeSemaphore) != VK_SUCCESS)
-	{
-		throw runtime_error("Failed to create timeline semaphores!");
-	}
-}
-
 void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 {
 	auto device = _device.GetDevice();
 	auto& currentFrame = GetCurrentFrame();
 
 	// Wait for the previous use of this frame slot to complete on the GPU.
-	const auto& snapshot = _frameSnapshots[_currentFrame];
+	const auto& snapshot = _syncContext->GetFrameSnapshot(_currentFrame);
 	if (snapshot.valid)
 	{
 		u64 waitValues[] = { snapshot.graphicsValue, snapshot.computeValue };
-		VkSemaphore waitSemaphores[] = { _graphicsSemaphore, _computeSemaphore };
+		VkSemaphore waitSemaphores[] = { _syncContext->GetGraphicsSemaphore(), _syncContext->GetComputeSemaphore() };
 
 		VkSemaphoreWaitInfo waitInfo{};
 		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;

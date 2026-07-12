@@ -25,6 +25,7 @@ namespace Core
 	class BindlessTextureManager;
 	class Texture;
 	class Scene;
+	class SyncContext;
 
 	class RenderContext
 	{
@@ -65,9 +66,10 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
 
 		shared_ptr<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
+
+		SyncContext& GetSyncContext() { return *_syncContext; }
 	private:
 		void CreateRenderFrames();
-		void CreateSyncObjects();
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
 		void EndFrame(VkSemaphore* semaphore);
 		
@@ -86,23 +88,8 @@ namespace Core
 		vector<unique_ptr<RenderFrame>> _frames;
 		uint32_t _currentFrame = 0;
 		
-		// Timeline semaphores
-		VkSemaphore _graphicsSemaphore = VK_NULL_HANDLE;
-		VkSemaphore _computeSemaphore = VK_NULL_HANDLE;
-		// Last signaled timeline values per queue
-		u64 _graphicsSemaphoreValue = 0;
-		u64 _computeSemaphoreValue = 0;
-
-		// Snapshot of timeline values at the end of each in-flight frame.
-		// Used to wait for the frame slot to be reusable regardless of how many
-		// times the timeline counters are incremented per frame.
-		struct FrameTimelineSnapshot
-		{
-			u64 graphicsValue = 0;
-			u64 computeValue = 0;
-			bool valid = false;
-		};
-		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
+		// Sync primitives (timeline semaphores, timeline values, frame snapshots)
+		unique_ptr<SyncContext> _syncContext;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
 

@@ -86,7 +86,7 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void DFAOPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;

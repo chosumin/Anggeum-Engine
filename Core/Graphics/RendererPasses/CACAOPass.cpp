@@ -86,7 +86,7 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     return ctx;
 }
 
-void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void CACAOPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 
     auto depthForSampling = renderFrame.GetCurrentDepth();

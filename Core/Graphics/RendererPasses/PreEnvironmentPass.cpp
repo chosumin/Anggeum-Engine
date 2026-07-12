@@ -85,7 +85,7 @@ void Core::PreEnvironmentPass::Initialize()
     _skyCubemap = skyCubemap;
 }
 
-void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, SyncContext& syncContext, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     DrawIrradiance(renderFrame, commandBuffer);
     DrawPrefiltered(renderFrame, commandBuffer);
@@ -228,6 +228,7 @@ Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& p
     : Job(JobType::GRAPHICS_PRIMARY)
     , _pass(pass)
     , _tempRenderFrame(device)
+    , _tempSyncContext(device)
 {
     _pass.Initialize();
 }
@@ -238,7 +239,7 @@ Core::PreEnvironmentJob::~PreEnvironmentJob()
 
 void Core::PreEnvironmentJob::Execute()
 {
-    _pass.Draw(_tempRenderFrame, *commandBuffer, 0);
+    _pass.Draw(_tempRenderFrame, _tempSyncContext, *commandBuffer, 0);
 
     status = JobStatus::COMPLETE;
 }
