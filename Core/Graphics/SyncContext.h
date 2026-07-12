@@ -4,19 +4,21 @@ namespace Core
 {
     enum class QueueType;
     class Device;
+    class SubmitInfo;
+
+    struct FrameTimelineSnapshot
+    {
+        u64 graphicsValue = 0;
+        u64 computeValue = 0;
+        bool valid = false;
+    };
 
     // Owns per-queue timeline semaphores, per-queue timeline values,
     // and per-frame timeline snapshots used for frame slot reuse.
+    // Also handles queue submission with semaphore injection.
     class SyncContext
     {
     public:
-        struct FrameTimelineSnapshot
-        {
-            u64 graphicsValue = 0;
-            u64 computeValue = 0;
-            bool valid = false;
-        };
-
         SyncContext(Device& device);
         ~SyncContext();
 
@@ -31,8 +33,15 @@ namespace Core
         u64 AcquireNextValue(QueueType queueType);
 
         // Frame slot snapshots (for reusing a frame slot safely)
-        void RecordFrameSnapshot(u32 frameIndex);
-        const FrameTimelineSnapshot& GetFrameSnapshot(u32 frameIndex) const { return _frameSnapshots[frameIndex]; }
+        void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
+
+        // Queue submission with automatic semaphore injection
+        // - First graphics submit waits on imageAvailable
+        // - Last graphics submit signals renderFinished + graphics timeline
+        // - Last compute submit signals compute timeline
+        void SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
+                           VkSemaphore imageAvailable,
+                           VkSemaphore renderFinished);
 
         // Direct handle accessors (for RenderContext internal use)
         VkSemaphore GetGraphicsSemaphore() const { return _graphicsSemaphore; }
@@ -47,6 +56,5 @@ namespace Core
         u64 _graphicsSemaphoreValue = 0;
         u64 _computeSemaphoreValue = 0;
 
-        array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
     };
 }

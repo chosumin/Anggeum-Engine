@@ -1,6 +1,7 @@
 #pragma once
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
+#include "SyncContext.h"
 
 namespace Core
 {
@@ -90,6 +91,7 @@ namespace Core
 		
 		// Sync primitives (timeline semaphores, timeline values, frame snapshots)
 		unique_ptr<SyncContext> _syncContext;
+		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
 

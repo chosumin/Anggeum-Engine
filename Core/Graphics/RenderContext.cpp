@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
-#include "SyncContext.h"
 #include "Vulkans/SubmitInfo.h"
 #include "Foundation/Scene.h"
 #include "Graphics/Vulkans/SwapChain.h"
@@ -140,99 +139,14 @@ void RenderContext::Submit()
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 
-	auto& submitInfos = currentFrame.GetSubmitInfos();
+	// Submit all queues with semaphore injection
+	_syncContext->SubmitToQueues(
+		currentFrame.GetSubmitInfos(),
+		currentFrame.GetImageAvailableSemaphore(),
+		currentFrame.GetRenderFinishedSemaphore());
 
-	// Separate submit infos by queue type
-	std::vector<VkSubmitInfo> graphicsSubmits;
-	std::vector<VkSubmitInfo> computeSubmits;
-
-	for (auto& info : submitInfos)
-	{
-		const VkSubmitInfo& vkInfo = info.Build();
-		if (info.GetQueueType() == QueueType::Graphics)
-			graphicsSubmits.push_back(vkInfo);
-		else
-			computeSubmits.push_back(vkInfo);
-	}
-
-	// Inject frame-level semaphores into first/last graphics submits
-	// First graphics submit waits on imageAvailable + timeline
-	// Last graphics submit signals renderFinished + timeline
-	if (!graphicsSubmits.empty())
-	{
-		// Add imageAvailable wait to first graphics submit info
-		auto& firstInfo = submitInfos.front();
-		if (firstInfo.GetQueueType() == QueueType::Graphics)
-		{
-			firstInfo.AddWaitSemaphore(
-				currentFrame.GetImageAvailableSemaphore(),
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0);
-		}
-
-		// Find last graphics submit info and add signal semaphores
-		for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
-		{
-			if (it->GetQueueType() == QueueType::Graphics)
-			{
-				it->AddSignalSemaphore(
-					currentFrame.GetRenderFinishedSemaphore(), 0);
-				it->AddSignalSemaphore(
-					_syncContext->GetGraphicsSemaphore(),
-					_syncContext->AcquireNextValue(QueueType::Graphics));
-				break;
-			}
-		}
-
-		// Rebuild after adding frame-level semaphores
-		graphicsSubmits.clear();
-		for (auto& info : submitInfos)
-		{
-			if (info.GetQueueType() == QueueType::Graphics)
-				graphicsSubmits.push_back(info.Build());
-		}
-
-		if (vkQueueSubmit(_device.GetGraphicsQueue(),
-			static_cast<uint32_t>(graphicsSubmits.size()),
-			graphicsSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
-		{
-			throw runtime_error("failed to submit graphics command buffers!");
-		}
-	}
-
-	// Compute queue submit
-	if (!computeSubmits.empty())
-	{
-		// Last compute submit signals current frame's compute timeline
-		for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
-		{
-			if (it->GetQueueType() == QueueType::Compute)
-			{
-				it->AddSignalSemaphore(
-					_syncContext->GetComputeSemaphore(),
-					_syncContext->AcquireNextValue(QueueType::Compute));
-				break;
-			}
-		}
-
-		// Rebuild compute submits after adding frame-level semaphores
-		computeSubmits.clear();
-		for (auto& info : submitInfos)
-		{
-			if (info.GetQueueType() == QueueType::Compute)
-				computeSubmits.push_back(info.Build());
-		}
-
-		if (vkQueueSubmit(_device.GetComputeQueue(),
-			static_cast<uint32_t>(computeSubmits.size()),
-			computeSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
-		{
-			throw runtime_error("failed to submit compute command buffers!");
-		}
-	}
-
-	// Record this frame's final timeline values so the next reuse of this slot
-	// can wait for GPU completion regardless of per-frame increment count.
-	_syncContext->RecordFrameSnapshot(_currentFrame);
+	// Record this frame's final timeline values
+	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
 	// Present
 	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
@@ -267,7 +181,7 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	auto& currentFrame = GetCurrentFrame();
 
 	// Wait for the previous use of this frame slot to complete on the GPU.
-	const auto& snapshot = _syncContext->GetFrameSnapshot(_currentFrame);
+	const auto& snapshot = _frameSnapshots[_currentFrame];
 	if (snapshot.valid)
 	{
 		u64 waitValues[] = { snapshot.graphicsValue, snapshot.computeValue };
