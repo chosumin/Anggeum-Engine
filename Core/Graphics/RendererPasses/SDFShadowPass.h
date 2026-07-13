@@ -42,6 +42,11 @@ namespace Core
 		unique_ptr<SDFGenerator> _sdfGenerator;
 		shared_ptr<Texture> _sdfShadowTexture;
 
+		// Tracks whether the SDF shadow texture has been written at least once.
+		// The first frame transitions from UNDEFINED; later frames transition
+		// from the layout GeometryPass left it in (SHADER_READ_ONLY_OPTIMAL).
+		bool _sdfShadowInitialized = false;
+
 		shared_ptr<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
 

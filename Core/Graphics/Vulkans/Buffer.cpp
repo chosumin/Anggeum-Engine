@@ -9,7 +9,22 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size = size;
 	bufferInfo.usage = usage;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	const auto& qfi = device.GetQueueFamilyIndices();
+	uint32_t queueFamilies[2] = {
+		qfi.GraphicsFamily.value(),
+		qfi.ComputeFamily.value()
+	};
+	if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+	{
+		bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+		bufferInfo.queueFamilyIndexCount = 2;
+		bufferInfo.pQueueFamilyIndices = queueFamilies;
+	}
+	else
+	{
+		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	}
 
 	auto deviceHandle = _device.GetDevice();
 

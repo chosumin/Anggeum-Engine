@@ -31,11 +31,6 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 	if (!depthTarget)
 		return;
 
-	// Transition depth to shader read
-	commandBuffer.TransitionImageLayout(*depthTarget->GetImage().lock(),
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetQueueType());
-
 	// Wait for graphics queue (ResolvePass) to finish producing the resolved depth
 	renderFrame.GetCurrentSubmitInfo().AddWaitSemaphore(
 		QueueType::Graphics,

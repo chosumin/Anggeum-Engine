@@ -106,7 +106,10 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
 
     auto& aoImage = *_aoTexture->GetImage().lock();
     commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        _aoInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                       : VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL);
+    _aoInitialized = true;
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     glm::mat4 invProj = glm::inverse(camera->Matrices.Projection);

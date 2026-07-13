@@ -157,7 +157,27 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     imageInfo.samples = desc.samples;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.usage = desc.usage;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // These render targets can be produced on the compute queue and consumed on
+    // the graphics queue. Using CONCURRENT sharing lets both queues access them
+    // without explicit queue-ownership-transfer barriers. When the graphics and
+    // compute queue families are identical, CONCURRENT is invalid, so fall back
+    // to EXCLUSIVE.
+    const auto& qfi = _device.GetQueueFamilyIndices();
+    uint32_t queueFamilies[2] = {
+        qfi.GraphicsFamily.value(),
+        qfi.ComputeFamily.value()
+    };
+    if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 2;
+        imageInfo.pQueueFamilyIndices = queueFamilies;
+    }
+    else
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     if (desc.isCubemap)
         imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;

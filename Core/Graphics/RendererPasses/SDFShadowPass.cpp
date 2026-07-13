@@ -253,8 +253,10 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         return;
 
     commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_UNDEFINED,
+        _sdfShadowInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                              : VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
+    _sdfShadowInitialized = true;
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*_sdfShadowShader, 0);
 

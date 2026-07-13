@@ -152,11 +152,11 @@ namespace Core
             QueueType::Compute,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
-        commandBuffer.BufferBarrier(*_lightVisibilityBuffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT, GetQueueType());
+		commandBuffer.BufferBarrier(*_lightVisibilityBuffer,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT);
 
         // Lazy initialization
         EnsureIBLResources(renderFrame);
@@ -168,6 +168,7 @@ namespace Core
             _iblGenerated = true;
         }
 
+        std::cout << "[GEO] before framebuffer" << std::endl;
         auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
             "GeometryPass",
             *_renderPass,
@@ -175,6 +176,7 @@ namespace Core
 
         if (!framebuffer)
             return;
+        std::cout << "[GEO] after framebuffer" << std::endl;
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
@@ -184,13 +186,15 @@ namespace Core
 
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
+
         commandBuffer.TransitionImageLayout(*sdfShadowTarget->GetImage().lock(),
             VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetQueueType());
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
         commandBuffer.TransitionImageLayout(*aoTarget->GetImage().lock(),
-            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetQueueType());
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         UpdateLightBuffer();
 
@@ -244,6 +248,7 @@ namespace Core
         };
 
         auto& executor = renderFrame.GetRenderExecutor();
+        std::cout << "[GEO] before OcclusionCullAndDraw" << std::endl;
         executor.OcclusionCullAndDraw(
             commandBuffer,
             *shader, *pipeline,
@@ -252,6 +257,7 @@ namespace Core
             *framebuffer,
             builder, perDraw,
             [&]() { DrawSkybox(renderFrame, commandBuffer); });
+        std::cout << "[GEO] after OcclusionCullAndDraw" << std::endl;
     }
 
     Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)

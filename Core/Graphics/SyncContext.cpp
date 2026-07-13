@@ -60,84 +60,70 @@ void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
     VkSemaphore imageAvailable,
     VkSemaphore renderFinished)
 {
-    // Separate submit infos by queue type
-    std::vector<VkSubmitInfo> graphicsSubmits;
-    std::vector<VkSubmitInfo> computeSubmits;
+    if (submitInfos.empty())
+        return;
 
+    // Inject frame-level semaphores before building. The submission itself is
+    // done in the exact order the passes were recorded so that the validation
+    // layer (which tracks image/buffer queue ownership and layouts in
+    // vkQueueSubmit call order) observes producer releases before consumer
+    // acquires across the graphics/compute queues.
+
+    // imageAvailable wait -> first graphics submit
     for (auto& info : submitInfos)
     {
-        const VkSubmitInfo& vkInfo = info.Build();
         if (info.GetQueueType() == QueueType::Graphics)
-            graphicsSubmits.push_back(vkInfo);
-        else
-            computeSubmits.push_back(vkInfo);
-    }
-
-    // Graphics queue submission
-    if (!graphicsSubmits.empty())
-    {
-        // Add imageAvailable wait to first graphics submit info
-        auto& firstInfo = submitInfos.front();
-        if (firstInfo.GetQueueType() == QueueType::Graphics)
         {
-            firstInfo.AddBinaryWaitSemaphore(
+            info.AddBinaryWaitSemaphore(
                 imageAvailable,
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-        }
-
-        // Find last graphics submit info and add signal semaphores
-        for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
-        {
-            if (it->GetQueueType() == QueueType::Graphics)
-            {
-                it->AddBinarySignalSemaphore(renderFinished);
-                it->AddSignalSemaphore(QueueType::Graphics);
-                break;
-            }
-        }
-
-        // Rebuild after adding frame-level semaphores
-        graphicsSubmits.clear();
-        for (auto& info : submitInfos)
-        {
-            if (info.GetQueueType() == QueueType::Graphics)
-                graphicsSubmits.push_back(info.Build());
-        }
-
-        if (vkQueueSubmit(_device.GetGraphicsQueue(),
-            static_cast<uint32_t>(graphicsSubmits.size()),
-            graphicsSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
-        {
-            throw runtime_error("failed to submit graphics command buffers!");
+            break;
         }
     }
 
-    // Compute queue submission
-    if (!computeSubmits.empty())
+    // renderFinished binary + graphics timeline signal -> last graphics submit
+    for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
     {
-        // Last compute submit signals compute timeline
-        for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
+        if (it->GetQueueType() == QueueType::Graphics)
         {
-            if (it->GetQueueType() == QueueType::Compute)
-            {
-                it->AddSignalSemaphore(QueueType::Compute);
-                break;
-            }
+            it->AddBinarySignalSemaphore(renderFinished);
+            it->AddSignalSemaphore(QueueType::Graphics);
+            break;
+        }
+    }
+
+    // compute timeline signal -> last compute submit
+    for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
+    {
+        if (it->GetQueueType() == QueueType::Compute)
+        {
+            it->AddSignalSemaphore(QueueType::Compute);
+            break;
+        }
+    }
+
+    // Submit consecutive runs of the same queue type in recorded order.
+    size_t i = 0;
+    while (i < submitInfos.size())
+    {
+        QueueType queueType = submitInfos[i].GetQueueType();
+
+        std::vector<VkSubmitInfo> batch;
+        size_t j = i;
+        for (; j < submitInfos.size() && submitInfos[j].GetQueueType() == queueType; ++j)
+            batch.push_back(submitInfos[j].Build());
+
+        VkQueue queue = (queueType == QueueType::Compute)
+            ? _device.GetComputeQueue()
+            : _device.GetGraphicsQueue();
+
+        if (vkQueueSubmit(queue,
+            static_cast<uint32_t>(batch.size()),
+            batch.data(), VK_NULL_HANDLE) != VK_SUCCESS)
+        {
+            throw runtime_error("failed to submit command buffers!");
         }
 
-        // Rebuild compute submits after adding frame-level semaphores
-        computeSubmits.clear();
-        for (auto& info : submitInfos)
-        {
-            if (info.GetQueueType() == QueueType::Compute)
-                computeSubmits.push_back(info.Build());
-        }
-
-        if (vkQueueSubmit(_device.GetComputeQueue(),
-            static_cast<uint32_t>(computeSubmits.size()),
-            computeSubmits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
-        {
-            throw runtime_error("failed to submit compute command buffers!");
-        }
+        i = j;
     }
 }

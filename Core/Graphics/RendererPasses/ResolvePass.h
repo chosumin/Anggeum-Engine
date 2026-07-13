@@ -19,7 +19,7 @@ namespace Core
         void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
         static shared_ptr<Texture> ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            shared_ptr<Texture> msaaDepth);
+            shared_ptr<Texture> msaaDepth, QueueType destQueue = QueueType::None);
     private:
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             shared_ptr<Texture> msaaNormal);

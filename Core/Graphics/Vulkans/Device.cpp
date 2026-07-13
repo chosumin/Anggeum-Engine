@@ -46,10 +46,11 @@ namespace Core
 	    SetupDebugMessenger();
 	    window.CreateSurface(_instance, &_surface);
 	    PickPhysicalDevice();
-	    CreateLogicalDevice();
-
-	    _queueFamilyIndices = FindQueueFamilies();
 	    
+		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
+
+		CreateLogicalDevice();
+
 	    _graphicsCommandPool = new CommandPool(*this, 
 	        _queueFamilyIndices.GraphicsFamily.value());
 
@@ -318,23 +319,26 @@ namespace Core
 	    vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 	    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-	    int i = 0;
-	    for (const auto& queueFamily : queueFamilies) 
-	    {
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) 
+		{
 			if (indices.IsComplete())
 				break;
 
 			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
 				indices.GraphicsFamily = i;
-
-	        if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
-	            (queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT))
-	            indices.ComputeFamily = i;
-
-			if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-				(queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT) &&
-	            (queueFamily.queueFlags & ~VK_QUEUE_COMPUTE_BIT))
 				indices.TransferFamily = i;
+			}
+
+			if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+				!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+				indices.ComputeFamily = i;
+
+			//if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+			//	!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+			//	!(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			//	indices.TransferFamily = i;
 
 	        VkBool32 presentSupport = false;
 	        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
@@ -342,10 +346,16 @@ namespace Core
 	        if (presentSupport)
 	            indices.PresentFamily = i;
 
-	        i++;
-	    }
+			i++;
+		}
 
-	    return indices;
+		printf("[QUEUE] GraphicsFamily=%d ComputeFamily=%d PresentFamily=%d TransferFamily=%d\n",
+			indices.GraphicsFamily.has_value() ? (int)indices.GraphicsFamily.value() : -1,
+			indices.ComputeFamily.has_value() ? (int)indices.ComputeFamily.value() : -1,
+			indices.PresentFamily.has_value() ? (int)indices.PresentFamily.value() : -1,
+			indices.TransferFamily.has_value() ? (int)indices.TransferFamily.value() : -1);
+
+		return indices;
 	}
 
 	bool Device::IsDeviceSuitable(VkPhysicalDevice device)
@@ -418,14 +428,12 @@ namespace Core
 
 		vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
 
-	    QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
-
 	    vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	    set<uint32_t> uniqueQueueFamilies = {
-	        indices.GraphicsFamily.value(),
-	        indices.PresentFamily.value(),
-	        indices.TransferFamily.value(),
-	        indices.ComputeFamily.value() };
+			_queueFamilyIndices.GraphicsFamily.value(),
+			_queueFamilyIndices.PresentFamily.value(),
+			_queueFamilyIndices.TransferFamily.value(),
+			_queueFamilyIndices.ComputeFamily.value() };
 
 	    float queuePriority = 1.0f;
 	    for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -459,10 +467,10 @@ namespace Core
 	        throw runtime_error("failed to create logical device!");
 	    }
 
-	    vkGetDeviceQueue(_device, indices.GraphicsFamily.value(), 0, &_graphicsQueue);
-	    vkGetDeviceQueue(_device, indices.ComputeFamily.value(), 0, &_computeQueue);
-	    vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
-	    vkGetDeviceQueue(_device, indices.TransferFamily.value(), 0, &_transferQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.GraphicsFamily.value(), 0, &_graphicsQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.ComputeFamily.value(), 0, &_computeQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.PresentFamily.value(), 0, &_presentQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.TransferFamily.value(), 0, &_transferQueue);
 	}
 
 	SwapChainSupportDetails Device::QuerySwapChainSupport(VkPhysicalDevice device)

@@ -42,10 +42,6 @@ namespace Core
 			return QuerySwapChainSupport(_physicalDevice); 
 		}
 		VkSurfaceKHR GetSurface() { return _surface; }
-		QueueFamilyIndices FindQueueFamilies()
-		{
-			return FindQueueFamilies(_physicalDevice);
-		}
 
 		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
 		VkQueue GetComputeQueue() { return _computeQueue; }

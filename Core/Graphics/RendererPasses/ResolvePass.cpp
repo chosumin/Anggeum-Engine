@@ -61,11 +61,13 @@ void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, u
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
-    
+    commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     // Resolve depth
     commandBuffer.BeginDebugMarker("Resolve MSAA Depth");
-    ResolveDepth(renderFrame, commandBuffer, depthTexture);
+    ResolveDepth(renderFrame, commandBuffer, depthTexture, QueueType::Compute);
     commandBuffer.EndDebugMarker();
 
     // Resolve normal
@@ -78,7 +80,7 @@ void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, u
 }
 
 shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    shared_ptr<Texture> msaaDepth)
+    shared_ptr<Texture> msaaDepth, QueueType destQueue)
 {
     auto resolvedDepth = GetResolvedDepthTarget(renderFrame);
 

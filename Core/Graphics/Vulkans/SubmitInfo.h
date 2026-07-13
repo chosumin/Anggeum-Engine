@@ -14,16 +14,24 @@ namespace Core
         // Timeline semaphore wait on given queue's timeline (uses current value)
         void AddWaitSemaphore(QueueType queueType, VkPipelineStageFlags stage)
         {
+            uint64_t v = _syncContext->GetCurrentValue(queueType);
+            printf("[SYNC] queue=%d WAIT on %s timeline value=%llu\n",
+                (int)_queueType, queueType == QueueType::Compute ? "Compute" : "Graphics",
+                (unsigned long long)v);
             _waitSemaphores.push_back(_syncContext->GetSemaphore(queueType));
             _waitStages.push_back(stage);
-            _waitValues.push_back(_syncContext->GetCurrentValue(queueType));
+            _waitValues.push_back(v);
         }
 
         // Timeline semaphore signal on given queue's timeline (acquires next value)
         void AddSignalSemaphore(QueueType queueType)
         {
+            uint64_t v = _syncContext->AcquireNextValue(queueType);
+            printf("[SYNC] queue=%d SIGNAL %s timeline value=%llu\n",
+                (int)_queueType, queueType == QueueType::Compute ? "Compute" : "Graphics",
+                (unsigned long long)v);
             _signalSemaphores.push_back(_syncContext->GetSemaphore(queueType));
-            _signalValues.push_back(_syncContext->AcquireNextValue(queueType));
+            _signalValues.push_back(v);
         }
 
         // Binary semaphore wait (e.g. swapchain imageAvailable)
