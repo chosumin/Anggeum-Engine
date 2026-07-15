@@ -126,10 +126,8 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 		commandBuffer.BeginCommandBuffer();
 		commandBuffer.BeginDebugMarker(simpleName);
 
-		printf("[FLOW] pass BEGIN %s (queue=%d)\n", simpleName, (int)queueType);
 		rendererPass->EnsureRenderTargets(renderFrame);
 		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
-		printf("[FLOW] pass END   %s\n", simpleName);
 
 		commandBuffer.EndDebugMarker();
 		commandBuffer.EndCommandBuffer();

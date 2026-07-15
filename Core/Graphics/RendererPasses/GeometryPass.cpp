@@ -168,7 +168,6 @@ namespace Core
             _iblGenerated = true;
         }
 
-        //std::cout << "[GEO] before framebuffer" << std::endl;
         auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
             "GeometryPass",
             *_renderPass,
@@ -176,7 +175,6 @@ namespace Core
 
         if (!framebuffer)
             return;
-        //std::cout << "[GEO] after framebuffer" << std::endl;
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
@@ -240,7 +238,6 @@ namespace Core
         };
 
         auto& executor = renderFrame.GetRenderExecutor();
-        //std::cout << "[GEO] before OcclusionCullAndDraw" << std::endl;
         executor.OcclusionCullAndDraw(
             commandBuffer,
             *shader, *pipeline,
@@ -249,7 +246,6 @@ namespace Core
             *framebuffer,
             builder, perDraw,
             [&]() { DrawSkybox(renderFrame, commandBuffer); });
-        //std::cout << "[GEO] after OcclusionCullAndDraw" << std::endl;
     }
 
     Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)

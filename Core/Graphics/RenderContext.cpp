@@ -148,8 +148,6 @@ void RenderContext::Submit()
 	// Record this frame's final timeline values
 	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
-	std::cout << "[RC] before EndFrame (present)" << std::endl;
-	// Present
 	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
 
 	// Diagnostic: poll GPU timeline completion before present
@@ -157,11 +155,9 @@ void RenderContext::Submit()
 		uint64_t gVal = 0, cVal = 0;
 		vkGetSemaphoreCounterValue(_device.GetDevice(), _syncContext->GetGraphicsSemaphore(), &gVal);
 		vkGetSemaphoreCounterValue(_device.GetDevice(), _syncContext->GetComputeSemaphore(), &cVal);
-		std::cout << "[RC] pre-present timeline graphics=" << gVal << " compute=" << cVal << std::endl;
 	}
 
 	EndFrame(&renderFinished);
-	std::cout << "[RC] after EndFrame (present), currentFrame now=" << _currentFrame << std::endl;
 }
 
 CommandBuffer& RenderContext::RequestCommandBuffer()
@@ -204,12 +200,7 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 		waitInfo.pSemaphores = waitSemaphores;
 		waitInfo.pValues = waitValues;
 
-		printf("[SYNC] frame %u WAIT-FOR-SLOT graphics>=%llu compute>=%llu ...\n",
-			_currentFrame,
-			(unsigned long long)snapshot.graphicsValue,
-			(unsigned long long)snapshot.computeValue);
 		vkWaitSemaphores(device, &waitInfo, UINT64_MAX);
-		printf("[SYNC] frame %u WAIT-FOR-SLOT done\n", _currentFrame);
 	}
 
 	// Acquire swap chain image
@@ -241,7 +232,6 @@ void RenderContext::EndFrame(VkSemaphore* semaphore)
 	presentInfo.pImageIndices = &_imageIndex;
 
 	VkResult result = vkQueuePresentKHR(_device.GetPresentQueue(), &presentInfo);
-	std::cout << "[RC] vkQueuePresentKHR result=" << result << std::endl;
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
 	{
 		Window::FramebufferResized = false;
