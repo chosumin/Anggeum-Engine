@@ -253,10 +253,8 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         return;
 
     commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
-        _sdfShadowInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                              : VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
-    _sdfShadowInitialized = true;
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*_sdfShadowShader, 0);
 
@@ -277,6 +275,10 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     uint32_t dispatchX = (_screenExtent.width / 2 + 7) / 8;
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
+
+    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
+        VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     {
         commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");

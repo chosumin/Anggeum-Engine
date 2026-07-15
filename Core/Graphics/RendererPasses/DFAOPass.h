@@ -33,11 +33,6 @@ namespace Core
 
         shared_ptr<Texture> _aoTexture;
 
-        // Tracks whether the AO texture has been written at least once. The very
-        // first frame transitions from UNDEFINED; subsequent frames transition
-        // from the layout GeometryPass left it in (SHADER_READ_ONLY_OPTIMAL).
-        bool _aoInitialized = false;
-
         shared_ptr<Shader>   _dfaoShader;
         unique_ptr<Pipeline> _dfaoPipeline;
 
