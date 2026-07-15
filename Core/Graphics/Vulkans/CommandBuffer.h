@@ -99,10 +99,16 @@ namespace Core
 		}
 	private:
 		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
+		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
 		VkCommandBufferLevel _level;
+
+		// Queue family this command buffer is recorded for. Used to strip
+		// pipeline stages that the queue does not support (e.g. fragment shader
+		// stage on a dedicated compute queue).
+		uint32_t _queueFamilyIndex;
 
 		//hack : have to be managed in resource system or something
 		uint64_t _frame;

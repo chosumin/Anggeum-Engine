@@ -18,9 +18,10 @@
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
-    _frame = -2;
+	_frame = -2;
+	_queueFamilyIndex = commandPool.GetQueueFamilyIndex();
 
-    VkCommandBufferAllocateInfo allocInfo{};
+	VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool.GetHandle();
     allocInfo.level = level;
@@ -325,18 +326,21 @@ void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldL
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
-    //tranfer writes that don't need to wait on anything.
+	//tranfer writes that don't need to wait on anything.
 	GetAccessAndStageMask(oldLayout, barrier.srcAccessMask, sourceStage);
 	GetAccessAndStageMask(newLayout, barrier.dstAccessMask, destinationStage);
 
-    vkCmdPipelineBarrier(
-        _commandBuffer,
-        sourceStage, destinationStage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+	sourceStage = SanitizeStageMask(sourceStage);
+	destinationStage = SanitizeStageMask(destinationStage);
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		sourceStage, destinationStage,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
 }
 
 void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
@@ -508,6 +512,42 @@ void Core::CommandBuffer::GetAccessAndStageMask(const VkImageLayout& inImageLayo
     }
 }
 
+VkPipelineStageFlags Core::CommandBuffer::SanitizeStageMask(VkPipelineStageFlags stageMask) const
+{
+    const auto& qfi = _device.GetQueueFamilyIndices();
+
+    // Only the dedicated compute queue needs stage sanitizing. Graphics queue
+    // supports all of the stages used here.
+    if (!qfi.ComputeFamily.has_value() ||
+        _queueFamilyIndex != qfi.ComputeFamily.value())
+        return stageMask;
+
+    // Graphics-only pipeline stages are invalid on a compute queue. Replace
+    // them with the closest compute-compatible equivalent so the queue
+    // ownership barriers stay spec-compliant.
+    const VkPipelineStageFlags graphicsOnly =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+        VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+        VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+        VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
+
+    if (stageMask & graphicsOnly)
+    {
+        stageMask &= ~graphicsOnly;
+        stageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    }
+
+    if (stageMask == 0)
+        stageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    return stageMask;
+}
+
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
 {
 	if (drawCount == 0)
@@ -588,8 +628,8 @@ void Core::CommandBuffer::BufferBarrier(
 
 	vkCmdPipelineBarrier(
 		_commandBuffer,
-		srcStageMask,
-		dstStageMask,
+        SanitizeStageMask(srcStageMask),
+        SanitizeStageMask(dstStageMask),
 		0,
 		0, nullptr,
 		1, &barrier,

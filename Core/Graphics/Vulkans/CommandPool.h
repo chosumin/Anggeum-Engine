@@ -12,6 +12,8 @@ namespace Core
 
 		VkCommandPool& GetHandle() { return _commandPool; }
 
+		uint32_t GetQueueFamilyIndex() const { return _queueFamilyIndex; }
+
 		CommandBuffer& RequestCommandBuffer(VkCommandBufferLevel level);
 	private:
 		Device& _device;
