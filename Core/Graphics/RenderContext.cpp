@@ -139,17 +139,19 @@ void RenderContext::Submit()
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 
+	auto& submission = currentFrame.GetSubmission();
+
 	// Submit all queues with semaphore injection
 	_syncContext->SubmitToQueues(
-		currentFrame.GetSubmitOutput(),
-		currentFrame.GetSubmitInfos(),
-		currentFrame.GetImageAvailableSemaphore(),
-		currentFrame.GetRenderFinishedSemaphore());
+		submission.submitOutput,
+		submission.submitInfos,
+		submission.imageAvailableSemaphore,
+		submission.renderFinishedSemaphore);
 
 	// Record this frame's final timeline values
 	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
-	VkSemaphore renderFinished = currentFrame.GetRenderFinishedSemaphore();
+	VkSemaphore renderFinished = submission.renderFinishedSemaphore;
 
 	// Diagnostic: poll GPU timeline completion before present
 	{
@@ -208,7 +210,7 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	auto swapChainHandle = swapChain.GetSwapChain();
 	VkResult result = vkAcquireNextImageKHR(
 		device, swapChainHandle, UINT64_MAX,
-		currentFrame.GetImageAvailableSemaphore(),
+		currentFrame.GetSubmission().imageAvailableSemaphore,
 		VK_NULL_HANDLE, &_imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)

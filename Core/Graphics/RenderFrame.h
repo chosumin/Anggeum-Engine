@@ -44,6 +44,23 @@ namespace Core
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
+	// Everything needed to submit one frame's work: the SubmitInfos collected from
+	// the passes, the VkSubmitInfos built from them (grouped per queue), and the
+	// frame's swapchain semaphores.
+	struct FrameSubmission
+	{
+		// Collected from the passes as they record, submitted at end of frame.
+		deque<SubmitInfo> submitInfos;
+
+		// Built from submitInfos, grouped per queue — one vkQueueSubmit per queue.
+		// Must outlive the submit calls: the VkSubmitInfo structs point into the
+		// SubmitInfo objects held by submitInfos.
+		unordered_map<QueueType, vector<VkSubmitInfo>> submitOutput;
+
+		VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+		VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+	};
+
 	class RenderFrame
 	{
 	public:
@@ -55,17 +72,8 @@ namespace Core
 
 		// Submit info management
 		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext);
-		SubmitInfo& GetCurrentSubmitInfo() { return _submitInfos.back(); }
-		std::deque<SubmitInfo>& GetSubmitInfos() { return _submitInfos; }
-
-		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
-		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
-
-		unordered_map<QueueType, vector<VkSubmitInfo>>& GetSubmitOutput() 
-		{ 
-			_submitOutput.clear();
-			return _submitOutput; 
-		}
+		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
+		FrameSubmission& GetSubmission() { return _submission; }
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
@@ -120,13 +128,8 @@ namespace Core
 	private:
 		Device& _device;
 
-		// Submit infos collected from passes, submitted at end of frame
-		deque<SubmitInfo> _submitInfos;
-		unordered_map<QueueType, vector<VkSubmitInfo>> _submitOutput;
+		FrameSubmission _submission;
 
-		VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
-		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
-		
 		unique_ptr<DescriptorPool> _descriptorPool;
 
 		BindlessTextureManager* _bindlessTextureManager;
