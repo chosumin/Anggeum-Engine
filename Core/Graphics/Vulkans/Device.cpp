@@ -70,7 +70,7 @@ namespace Core
 
 	    vkDestroyDevice(_device, nullptr);
 
-	    if (_enableValidationLayers)
+	    if (_enableDebugUtils)
 	        DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
 
 	    vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -79,6 +79,11 @@ namespace Core
 
 	void Device::LoadDebugUtilsFunctions()
 	{
+		// Without the extension enabled these functions must not be called, so leave
+		// the pointers null — the debug marker/object name calls no-op on null.
+		if (_enableDebugUtils == false)
+			return;
+
 		// Load from instance, not device
 		_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdBeginDebugUtilsLabelEXT");
 		_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdEndDebugUtilsLabelEXT");
@@ -198,23 +203,46 @@ namespace Core
 	    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	    createInfo.ppEnabledExtensionNames = extensions.data();
 	    
-	    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-	    if (_enableValidationLayers) 
+	    if (_enableValidationLayers)
 	    {
 	        createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());
 	        createInfo.ppEnabledLayerNames = _validationLayers.data();
-
-	        PopulateDebugMessengerCreateInfo(debugCreateInfo);
-	        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 	    }
 	    else
-	    {
 	        createInfo.enabledLayerCount = 0;
-	        createInfo.pNext = nullptr;
+
+	    // Messenger covering instance creation/destruction. Belongs to debug utils,
+	    // not the validation layers — with validation off it simply stays quiet.
+	    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+	    if (_enableDebugUtils)
+	    {
+	        PopulateDebugMessengerCreateInfo(debugCreateInfo);
+	        createInfo.pNext = &debugCreateInfo;
 	    }
+	    else
+	        createInfo.pNext = nullptr;
 
 	    if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS)
 	        throw runtime_error("failed to create instance!");
+	}
+
+	bool Device::GetDebugFlag(const char* envName)
+	{
+#ifdef NDEBUG
+	    bool enabled = false;
+#else
+	    bool enabled = true;
+#endif
+
+	    if (const char* env = getenv(envName))
+	    {
+	        if (strcmp(env, "0") == 0)
+	            enabled = false;
+	        else if (strcmp(env, "1") == 0)
+	            enabled = true;
+	    }
+
+	    return enabled;
 	}
 
 	bool Device::CheckValidationLayerSupport()
@@ -254,7 +282,7 @@ namespace Core
 
 	    vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-	    if (_enableValidationLayers)
+	    if (_enableDebugUtils)
 	        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 	    return extensions;
@@ -262,7 +290,7 @@ namespace Core
 
 	void Device::SetupDebugMessenger()
 	{
-	    if (_enableValidationLayers == false)
+	    if (_enableDebugUtils == false)
 	        return;
 
 	    VkDebugUtilsMessengerCreateInfoEXT createInfo;
