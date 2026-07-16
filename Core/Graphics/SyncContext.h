@@ -42,10 +42,8 @@ namespace Core
         void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
 
         // Queue submission with automatic semaphore injection
-        // - First graphics submit waits on imageAvailable
-        // - Last graphics submit signals renderFinished + graphics timeline
-        // - Last compute submit signals compute timeline
-        void SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
+        void SubmitToQueues(unordered_map<QueueType, vector<VkSubmitInfo>>& submitOutput,
+                           deque<SubmitInfo>& submitInfos,
                            VkSemaphore imageAvailable,
                            VkSemaphore renderFinished);
 

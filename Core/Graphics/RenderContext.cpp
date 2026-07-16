@@ -141,6 +141,7 @@ void RenderContext::Submit()
 
 	// Submit all queues with semaphore injection
 	_syncContext->SubmitToQueues(
+		currentFrame.GetSubmitOutput(),
 		currentFrame.GetSubmitInfos(),
 		currentFrame.GetImageAvailableSemaphore(),
 		currentFrame.GetRenderFinishedSemaphore());

@@ -52,6 +52,9 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     sdfShadowDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     sdfShadowDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     sdfShadowDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
+    // GeometryPass (graphics) may sample this before the first compute
+    // production, so start it in the layout the consumer expects.
+    sdfShadowDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     _sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 

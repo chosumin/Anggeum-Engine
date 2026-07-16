@@ -204,6 +204,17 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
     auto texture = make_shared<Texture>(name, image, _defaultSampler);
 
+    // Move the target from UNDEFINED into its requested starting layout. This is a
+    // fenced single-time submit, so it fully completes before any frame work
+    // touches the target and cannot race with the per-frame transitions.
+    if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+    {
+        auto& commandBuffer = _device.BeginSingleTimeCommands();
+        commandBuffer.TransitionImageLayout(*image,
+            VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout);
+        _device.EndSingleTimeCommands(commandBuffer);
+    }
+
     _renderTargets[name] = texture;
     return texture;
 }

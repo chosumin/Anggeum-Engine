@@ -35,6 +35,13 @@ namespace Core
 		uint32_t mipLevels = 1;
 		uint32_t arrayLayers = 1;
 		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+
+		// NOT VkImageCreateInfo::initialLayout — the image is always created as
+		// UNDEFINED (the spec allows only UNDEFINED/PREINITIALIZED there).
+		// Use this for cross-queue targets that a graphics pass may sample before
+		// the producing compute pass has ever run, so the validation layer sees a
+		// valid layout on the first frame.
+		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
 	class RenderFrame
@@ -53,6 +60,12 @@ namespace Core
 
 		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
 		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
+
+		unordered_map<QueueType, vector<VkSubmitInfo>>& GetSubmitOutput() 
+		{ 
+			_submitOutput.clear();
+			return _submitOutput; 
+		}
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
@@ -108,8 +121,9 @@ namespace Core
 		Device& _device;
 
 		// Submit infos collected from passes, submitted at end of frame
-		std::deque<SubmitInfo> _submitInfos;
-		
+		deque<SubmitInfo> _submitInfos;
+		unordered_map<QueueType, vector<VkSubmitInfo>> _submitOutput;
+
 		VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
 		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
 		

@@ -16,7 +16,6 @@ namespace Core
         _dfaoPass = make_unique<DFAOPass>(device, workerThreadManager,
             scene, screenExtent, msaaSamples, sdfGenerator);
 
-        // Initial state: CACAO enabled, DFAO disabled
         SetMethod(AOMethod::CACAO);
     }
 

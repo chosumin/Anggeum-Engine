@@ -37,6 +37,6 @@ namespace Core
     private:
         unique_ptr<CACAOPass> _cacaoPass;
         unique_ptr<DFAOPass> _dfaoPass;
-        AOMethod _activeMethod = AOMethod::DFAO;
+        AOMethod _activeMethod;
     };
 }

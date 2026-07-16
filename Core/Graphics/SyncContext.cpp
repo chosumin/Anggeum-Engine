@@ -56,18 +56,16 @@ void SyncContext::RecordFrameSnapshot(FrameTimelineSnapshot& snapshot)
     snapshot.valid = true;
 }
 
-void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
+void SyncContext::SubmitToQueues(
+    unordered_map<QueueType, vector<VkSubmitInfo>>& submitOutput,
+    deque<SubmitInfo>& submitInfos,
     VkSemaphore imageAvailable,
     VkSemaphore renderFinished)
 {
     if (submitInfos.empty())
         return;
 
-    // Inject frame-level semaphores before building. The submission itself is
-    // done in the exact order the passes were recorded so that the validation
-    // layer (which tracks image/buffer queue ownership and layouts in
-    // vkQueueSubmit call order) observes producer releases before consumer
-    // acquires across the graphics/compute queues.
+    // Inject frame-level semaphores before building.
 
     // imageAvailable wait -> first graphics submit
     for (auto& info : submitInfos)
@@ -102,28 +100,30 @@ void SyncContext::SubmitToQueues(std::deque<SubmitInfo>& submitInfos,
         }
     }
 
-    // Submit consecutive runs of the same queue type in recorded order.
-    size_t i = 0;
-    while (i < submitInfos.size())
+    // One submit per queue: gather all graphics submits into a single
+    // vkQueueSubmit and all compute submits into another, preserving the
+    // recorded order within each queue. The per-pass timeline wait/signal values
+    // are baked at record time (see SubmitInfo), so cross-queue ordering is
+    // enforced by the semaphores regardless of how the submits are batched here.
+    for (auto& info : submitInfos)
     {
-        QueueType queueType = submitInfos[i].GetQueueType();
+        if (info.GetQueueType() == QueueType::Compute)
+            submitOutput[QueueType::Compute].push_back(info.Build());
+        else
+            submitOutput[QueueType::Graphics].push_back(info.Build());
+    }
 
-        std::vector<VkSubmitInfo> batch;
-        size_t j = i;
-        for (; j < submitInfos.size() && submitInfos[j].GetQueueType() == queueType; ++j)
-            batch.push_back(submitInfos[j].Build());
-
-        VkQueue queue = (queueType == QueueType::Compute)
-            ? _device.GetComputeQueue()
-            : _device.GetGraphicsQueue();
-
+    for (auto& [queueType, submits] : submitOutput)
+    {
+        if (submits.empty())
+            continue;
+        VkQueue queue = (queueType == QueueType::Compute) ?
+            _device.GetComputeQueue() : _device.GetGraphicsQueue();
         if (vkQueueSubmit(queue,
-            static_cast<uint32_t>(batch.size()),
-            batch.data(), VK_NULL_HANDLE) != VK_SUCCESS)
+            static_cast<uint32_t>(submits.size()),
+            submits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
         {
             throw runtime_error("failed to submit command buffers!");
         }
-
-        i = j;
-    }
+	}
 }
