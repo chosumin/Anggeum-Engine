@@ -50,7 +50,6 @@ namespace Core
         // Direct handle accessors (for RenderContext internal use)
         VkSemaphore GetGraphicsSemaphore() const { return _graphicsSemaphore; }
         VkSemaphore GetComputeSemaphore() const { return _computeSemaphore; }
-
     private:
         Device& _device;
 
@@ -59,6 +58,5 @@ namespace Core
 
         u64 _graphicsSemaphoreValue = 0;
         u64 _computeSemaphoreValue = 0;
-
     };
 }

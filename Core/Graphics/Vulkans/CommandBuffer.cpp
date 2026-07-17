@@ -18,7 +18,7 @@
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
-	_frame = -2;
+	_frame = -MAX_FRAMES_IN_FLIGHT;
 	_queueFamilyIndex = commandPool.GetQueueFamilyIndex();
 
 	VkCommandBufferAllocateInfo allocInfo{};
