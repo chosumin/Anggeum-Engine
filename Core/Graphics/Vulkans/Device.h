@@ -1,4 +1,5 @@
 #pragma once
+#include "DebugUtils.h"
 
 namespace Core
 {
@@ -72,20 +73,12 @@ namespace Core
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
 
-
-
-		// Debug utils function pointers
-		PFN_vkCmdBeginDebugUtilsLabelEXT GetCmdBeginDebugUtilsLabelFunc() const { return _vkCmdBeginDebugUtilsLabel; }
-		PFN_vkCmdEndDebugUtilsLabelEXT GetCmdEndDebugUtilsLabelFunc() const { return _vkCmdEndDebugUtilsLabel; }
-		PFN_vkCmdInsertDebugUtilsLabelEXT GetCmdInsertDebugUtilsLabelFunc() const { return _vkCmdInsertDebugUtilsLabel; }
-		PFN_vkSetDebugUtilsObjectNameEXT GetSetDebugUtilsObjectNameFunc() const { return _vkSetDebugUtilsObjectName; }
+		DebugUtils& GetDebugUtils() { return _debugUtils; }
+		const DebugUtils& GetDebugUtils() const { return _debugUtils; }
 
 	private:
 		void CreateInstance();
-		bool CheckValidationLayerSupport();
 		vector<const char*> GetRequiredExtensions();
-		void SetupDebugMessenger();
-		void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 		void PickPhysicalDevice();
 		QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 		bool IsDeviceSuitable(VkPhysicalDevice device);
@@ -94,24 +87,10 @@ namespace Core
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 
 		void CheckDescriptorIndexingSupport(VkPhysicalDevice device);
-		void LoadDebugUtilsFunctions();
 
-		// Reads a 0/1 override from the named environment variable, defaulting to on
-		// in Debug builds and off in Release.
-		static bool GetDebugFlag(const char* envName);
-
-		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-			VkDebugUtilsMessageTypeFlagsEXT messageType,
-			const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-			void* pUserData)
-		{
-			std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-			return VK_FALSE;
-		}
 	private:
 		VkInstance _instance;
-		VkDebugUtilsMessengerEXT _debugMessenger;
+		DebugUtils _debugUtils;
 		VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 		VkDevice _device;
 		
@@ -133,26 +112,7 @@ namespace Core
 		bool _supportsDescriptorIndexing = false;
 		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
 
-		// Debug utils function pointers
-		PFN_vkCmdBeginDebugUtilsLabelEXT _vkCmdBeginDebugUtilsLabel = nullptr;
-		PFN_vkCmdEndDebugUtilsLabelEXT _vkCmdEndDebugUtilsLabel = nullptr;
-		PFN_vkCmdInsertDebugUtilsLabelEXT _vkCmdInsertDebugUtilsLabel = nullptr;
-		PFN_vkSetDebugUtilsObjectNameEXT _vkSetDebugUtilsObjectName = nullptr;
-
-		const vector<const char*> _validationLayers = 
-		{
-			"VK_LAYER_KHRONOS_validation"
-		};
-
 		const vector<const char*> _deviceExtensions;
-
-		// VK_LAYER_KHRONOS_validation. Set DEBUG_VALIDATION=0 to turn this off when
-		// running under a tool that injects its own Vulkan layers.
-		const bool _enableValidationLayers = GetDebugFlag("DEBUG_VALIDATION");
-
-		// VK_EXT_debug_utils: pass labels and object names for graphics debuggers,
-		// plus the messenger that surfaces layer messages.
-		const bool _enableDebugUtils = GetDebugFlag("DEBUG_UTILS");
 	};
 }
 

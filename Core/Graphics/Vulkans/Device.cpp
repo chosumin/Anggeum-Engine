@@ -5,37 +5,10 @@
 #include "MemoryAllocator.h"
 #include "Graphics/ResourceCache.h"
 
-VkResult CreateDebugUtilsMessengerEXT(
-    VkInstance instance,
-    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDebugUtilsMessengerEXT* pDebugMessenger)
-{
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr
-    (instance, "vkCreateDebugUtilsMessengerEXT");
-
-    if (func != nullptr)
-        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-    else
-        return VK_ERROR_EXTENSION_NOT_PRESENT;
-}
-
-void DestroyDebugUtilsMessengerEXT(
-    VkInstance instance,
-    VkDebugUtilsMessengerEXT debugMessenger,
-    const VkAllocationCallbacks* pAllocator)
-{
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr
-    (instance, "vkDestroyDebugUtilsMessengerEXT");
-
-    if (func != nullptr)
-        func(instance, debugMessenger, pAllocator);
-}
-
 namespace Core
 {
 	Device::Device(Window& window)
-		:_device(), _debugMessenger(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(),
+		:_device(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(),
 		_deviceExtensions{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
@@ -43,23 +16,22 @@ namespace Core
 		}
 	{
 	    CreateInstance();
-	    SetupDebugMessenger();
+
 	    window.CreateSurface(_instance, &_surface);
 	    PickPhysicalDevice();
-	    
+
 		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
 
 		CreateLogicalDevice();
 
-	    _graphicsCommandPool = new CommandPool(*this, 
+		_debugUtils.Initialize(_instance, _device);
+
+	    _graphicsCommandPool = new CommandPool(*this,
 	        _queueFamilyIndices.GraphicsFamily.value());
 
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 
 	    _resourceCache = new ResourceCache(*this);
-
-		// Load debug utils functions
-		LoadDebugUtilsFunctions();
 	}
 
 	Device::~Device()
@@ -70,39 +42,10 @@ namespace Core
 
 	    vkDestroyDevice(_device, nullptr);
 
-	    if (_enableDebugUtils)
-	        DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
+	    _debugUtils.DestroyMessenger(_instance);
 
 	    vkDestroySurfaceKHR(_instance, _surface, nullptr);
 	    vkDestroyInstance(_instance, nullptr);
-	}
-
-	void Device::LoadDebugUtilsFunctions()
-	{
-		// Without the extension enabled these functions must not be called, so leave
-		// the pointers null — the debug marker/object name calls no-op on null.
-		if (_enableDebugUtils == false)
-			return;
-
-		// Load from instance, not device
-		_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdBeginDebugUtilsLabelEXT");
-		_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdEndDebugUtilsLabelEXT");
-		_vkCmdInsertDebugUtilsLabel = (PFN_vkCmdInsertDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdInsertDebugUtilsLabelEXT");
-		_vkSetDebugUtilsObjectName = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(_instance, "vkSetDebugUtilsObjectNameEXT");
-
-		bool supportsDebugUtils = (_vkCmdBeginDebugUtilsLabel != nullptr) &&
-			(_vkCmdEndDebugUtilsLabel != nullptr) &&
-			(_vkCmdInsertDebugUtilsLabel != nullptr) &&
-			(_vkSetDebugUtilsObjectName != nullptr);
-
-		if (supportsDebugUtils)
-		{
-			cout << "Debug Utils extension supported!" << endl;
-		}
-		else
-		{
-			cout << "Warning: Debug Utils extension not fully supported." << endl;
-		}
 	}
 
 	uint32_t Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
@@ -183,7 +126,8 @@ namespace Core
 
 	void Device::CreateInstance()
 	{
-	    if (_enableValidationLayers && CheckValidationLayerSupport() == false) 
+	    if (_debugUtils.IsValidationLayerEnabled() &&
+	        _debugUtils.CheckValidationLayerSupport() == false)
 	        throw runtime_error{ "validation layers requested, but not available!" };
 
 	    VkApplicationInfo appInfo{};
@@ -203,10 +147,11 @@ namespace Core
 	    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	    createInfo.ppEnabledExtensionNames = extensions.data();
 	    
-	    if (_enableValidationLayers)
+	    const auto& validationLayers = _debugUtils.GetValidationLayers();
+	    if (_debugUtils.IsValidationLayerEnabled())
 	    {
-	        createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());
-	        createInfo.ppEnabledLayerNames = _validationLayers.data();
+	        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+	        createInfo.ppEnabledLayerNames = validationLayers.data();
 	    }
 	    else
 	        createInfo.enabledLayerCount = 0;
@@ -214,9 +159,9 @@ namespace Core
 	    // Messenger covering instance creation/destruction. Belongs to debug utils,
 	    // not the validation layers — with validation off it simply stays quiet.
 	    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-	    if (_enableDebugUtils)
+	    if (_debugUtils.IsDebugUtilsEnabled())
 	    {
-	        PopulateDebugMessengerCreateInfo(debugCreateInfo);
+	        _debugUtils.PopulateMessengerCreateInfo(debugCreateInfo);
 	        createInfo.pNext = &debugCreateInfo;
 	    }
 	    else
@@ -224,53 +169,6 @@ namespace Core
 
 	    if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS)
 	        throw runtime_error("failed to create instance!");
-	}
-
-	bool Device::GetDebugFlag(const char* envName)
-	{
-#ifdef NDEBUG
-	    bool enabled = false;
-#else
-	    bool enabled = true;
-#endif
-
-	    if (const char* env = getenv(envName))
-	    {
-	        if (strcmp(env, "0") == 0)
-	            enabled = false;
-	        else if (strcmp(env, "1") == 0)
-	            enabled = true;
-	    }
-
-	    return enabled;
-	}
-
-	bool Device::CheckValidationLayerSupport()
-	{
-	    uint32_t layerCount;
-	    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-	    vector<VkLayerProperties> availableLayers(layerCount);
-	    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-	    for (const char* layerName : _validationLayers) 
-	    {
-	        bool layerFound = false;
-
-	        for (const auto& layerProperties : availableLayers) 
-	        {
-	            if (strcmp(layerName, layerProperties.layerName) == 0) 
-	            {
-	                layerFound = true;
-	                break;
-	            }
-	        }
-
-	        if (layerFound == false)
-	            return false;
-	    }
-
-	    return true;
 	}
 
 	vector<const char*> Device::GetRequiredExtensions()
@@ -282,32 +180,10 @@ namespace Core
 
 	    vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-	    if (_enableDebugUtils)
+	    if (_debugUtils.IsDebugUtilsEnabled())
 	        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 	    return extensions;
-	}
-
-	void Device::SetupDebugMessenger()
-	{
-	    if (_enableDebugUtils == false)
-	        return;
-
-	    VkDebugUtilsMessengerCreateInfoEXT createInfo;
-	    PopulateDebugMessengerCreateInfo(createInfo);
-
-		if (CreateDebugUtilsMessengerEXT(_instance, &createInfo, nullptr, &_debugMessenger) !=
-			VK_SUCCESS)
-			throw runtime_error("failed to set up debug messenger!");
-	}
-
-	void Device::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
-	{
-	    createInfo = {};
-	    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-	    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	    createInfo.pfnUserCallback = DebugCallback;
 	}
 
 	void Device::PickPhysicalDevice()
@@ -490,10 +366,11 @@ namespace Core
 	    createInfo.ppEnabledExtensionNames = _deviceExtensions.data();
 	    createInfo.pNext = &physicalFeatures2;
 
-	    if (_enableValidationLayers)
+	    const auto& validationLayers = _debugUtils.GetValidationLayers();
+	    if (_debugUtils.IsValidationLayerEnabled())
 	    {
-	        createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());
-	        createInfo.ppEnabledLayerNames = _validationLayers.data();
+	        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+	        createInfo.ppEnabledLayerNames = validationLayers.data();
 	    }
 	    else
 	        createInfo.enabledLayerCount = 0;

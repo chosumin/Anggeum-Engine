@@ -206,6 +206,14 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
     auto texture = make_shared<Texture>(name, image, _defaultSampler);
 
+    // Render targets are what validation errors point at most of the time, so give
+    // the layer a name to print instead of a bare handle.
+    auto& debugUtils = _device.GetDebugUtils();
+    debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE,
+        (uint64_t)image->GetImage(), name.c_str());
+    debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+        (uint64_t)image->GetOrCreateImageView(0), (name + " View").c_str());
+
     // Move the target from UNDEFINED into its requested starting layout. This is a
     // fenced single-time submit, so it fully completes before any frame work
     // touches the target and cannot race with the per-frame transitions.

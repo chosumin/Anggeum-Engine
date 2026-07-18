@@ -276,7 +276,6 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width, height, 1 };
 
-    //dstImageLayout >> 현재 사용 중인 레이아웃, 이 명령 이전에 이 레이아웃으로 트랜지션 되어야 함.
     vkCmdCopyBufferToImage(
         _commandBuffer,
         buffer.GetBuffer(),
@@ -289,7 +288,6 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32
 
 void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout, QueueType destQueue)
 {
-    //모든 밉맵 이미지에 같은 레이아웃을 적용.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
@@ -361,7 +359,7 @@ void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = image.GetLayer();
-    barrier.subresourceRange.levelCount = 1; //하나의 밉맵만 레이아웃 변경.
+    barrier.subresourceRange.levelCount = 1;
 
     auto extent = image.GetExtent();
 
@@ -638,43 +636,19 @@ void Core::CommandBuffer::BufferBarrier(
 
 void Core::CommandBuffer::BeginDebugMarker(const char* markerName, float r, float g, float b, float a)
 {
-	auto pfnCmdBeginLabel = _device.GetCmdBeginDebugUtilsLabelFunc();
-	if (!pfnCmdBeginLabel)
-		return;
-
-	VkDebugUtilsLabelEXT labelInfo{};
-	labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-	labelInfo.pLabelName = markerName;
-	labelInfo.color[0] = r;
-	labelInfo.color[1] = g;
-	labelInfo.color[2] = b;
-	labelInfo.color[3] = a;
-	pfnCmdBeginLabel(_commandBuffer, &labelInfo);
+	const float color[4] = { r, g, b, a };
+	_device.GetDebugUtils().BeginLabel(_commandBuffer, markerName, color);
 }
 
 void Core::CommandBuffer::EndDebugMarker()
 {
-	auto pfnCmdEndLabel = _device.GetCmdEndDebugUtilsLabelFunc();
-	if (!pfnCmdEndLabel)
-		return;
-
-	pfnCmdEndLabel(_commandBuffer);
+	_device.GetDebugUtils().EndLabel(_commandBuffer);
 }
 
 void Core::CommandBuffer::InsertDebugMarker(const char* markerName, float r, float g, float b, float a)
 {
-	auto pfnCmdInsertLabel = _device.GetCmdInsertDebugUtilsLabelFunc();
-	if (!pfnCmdInsertLabel)
-		return;
-
-	VkDebugUtilsLabelEXT labelInfo{};
-	labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-	labelInfo.pLabelName = markerName;
-	labelInfo.color[0] = r;
-	labelInfo.color[1] = g;
-	labelInfo.color[2] = b;
-	labelInfo.color[3] = a;
-	pfnCmdInsertLabel(_commandBuffer, &labelInfo);
+	const float color[4] = { r, g, b, a };
+	_device.GetDebugUtils().InsertLabel(_commandBuffer, markerName, color);
 }
 
 void Core::CommandBuffer::BindDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
