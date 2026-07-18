@@ -50,10 +50,13 @@ Toy 3D rendering engine for studying Vulkan API.
 
 ### Multithreading
 
-**Asynchronous Processing**
-   - Separated queues (Graphics, Compute, Transfer, Present)
-   - Secondary command buffer recording for resource loading
-   - Timeline semaphores for precise frame synchronization
+**Async Compute (GPU)**
+   - Dedicated compute queue alongside the graphics queue
+   - Cross-queue dependencies expressed with timeline semaphores
+
+**Worker Threads (CPU)**
+   - Thread pool recording secondary command buffers off the main thread
+   - Buffer and image uploads staged through a transfer context
 
 ### Shader System
 
