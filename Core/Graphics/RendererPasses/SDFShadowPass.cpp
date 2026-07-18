@@ -122,7 +122,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
     commandBuffer.BindPipeline(_volumeSlicePipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, *_volumeSliceShader,
         sliceResources);
-    commandBuffer.PushConstants(*_volumeSliceShader, 0, &pc);
+    commandBuffer.PushConstants(*_volumeSliceShader, 0, pc);
 
     float    aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);

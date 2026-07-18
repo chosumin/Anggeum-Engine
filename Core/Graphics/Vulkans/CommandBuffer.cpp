@@ -11,7 +11,6 @@
 #include "BindlessTextureManager.h"
 #include "DescriptorPool.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/Material.h"
 #include "Graphics/RenderFrame.h"
 #include "Foundation/Job.h"
 
@@ -140,27 +139,16 @@ void Core::CommandBuffer::BindDescriptorSets(VkPipelineBindPoint pipelineBindPoi
 	}
 }
 
-void Core::CommandBuffer::PushConstants(Material& material, uint32_t index)
-{
-    auto& shader = material.GetShader();
-
-    auto pushConstants = material.GetPushConstantsData();
-
-    if (pushConstants->empty())
-		return;
-
-	vkCmdPushConstants(_commandBuffer, shader.GetPipelineLayout(),
-        shader.GetPushConstantsShaderStage(index),
-		shader.GetPushConstantsOffset(index),
-		static_cast<uint32_t>(pushConstants->size()),
-		pushConstants->data());
-
-	material.ClearPushConstantsCache();
-}
-
-void Core::CommandBuffer::PushConstants(Shader& shader, uint index, const void* data)
+void Core::CommandBuffer::PushConstantsInternal(Shader& shader, uint32_t index, const void* data, uint32_t size)
 {
 	auto& pushConstantRanges = shader.GetPushConstantRanges();
+
+	assert(index < pushConstantRanges.size());
+
+	// sizeof(T) may exceed the range declared in the shader: C++ pads a struct up
+	// to its alignment, GLSL does not. Only require that the caller supplies at
+	// least the bytes the shader actually reads.
+	assert(size >= pushConstantRanges[index].size);
 
     vkCmdPushConstants(
         _commandBuffer,

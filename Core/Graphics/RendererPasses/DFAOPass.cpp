@@ -142,7 +142,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     commandBuffer.BindPipeline(_dfaoPipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
         *_dfaoShader, resources);
-    commandBuffer.PushConstants(*_dfaoShader, 0, &pc);
+    commandBuffer.PushConstants(*_dfaoShader, 0, pc);
 
     commandBuffer.Dispatch(
         (_screenExtent.width + 7) / 8,

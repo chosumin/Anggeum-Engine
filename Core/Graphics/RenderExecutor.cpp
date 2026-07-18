@@ -100,8 +100,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     CameraBuffer& camera,
     Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
     Framebuffer& framebuffer,
-    DescriptorSetBuilder& builder,
-    function<void(shared_ptr<Material>)> perDraw,
+    DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
     function<void()> postDraw)
 {
     auto* culler = GetOrCreateCuller(_rendererBatch.get(), camera, _transformBatch);
@@ -132,7 +131,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     commandBuffer.BeginDebugMarker(pass1Label);
     auto pass1BeginInfo = pass1RenderPass.CreateRenderPassBeginInfo(framebuffer);
     commandBuffer.BeginRenderPass(pass1BeginInfo);
-    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
+    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perShaderHook);
     commandBuffer.EndRenderPass();
     commandBuffer.EndDebugMarker();
 
@@ -162,7 +161,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     commandBuffer.BeginDebugMarker(pass2Label);
     auto pass2BeginInfo = pass2RenderPass.CreateRenderPassBeginInfo(framebuffer);
     commandBuffer.BeginRenderPass(pass2BeginInfo);
-    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), builder, perDraw);
+    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), builder, perShaderHook);
 
     if (postDraw)
     {
@@ -180,15 +179,13 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     }
 }
 
-void RenderExecutor::FrustumCullAndDraw(
-    CommandBuffer& commandBuffer,
+void RenderExecutor::FrustumCullAndDraw(CommandBuffer& commandBuffer,
     Core::RenderPass& renderPass,
     Framebuffer& framebuffer,
     Shader& shader,
     Pipeline& pipeline,
     DescriptorSetBuilder& builder,
-    const CameraBuffer& camera,
-    function<void(shared_ptr<Material>)> perDraw)
+    const CameraBuffer& camera, function<void(Shader&)> perShaderHook)
 {
     if (_rendererBatch->GetDrawCommandCount() == 0)
         return;
@@ -208,7 +205,7 @@ void RenderExecutor::FrustumCullAndDraw(
 
     commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
 
-    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perDraw);
+    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perShaderHook);
 
     commandBuffer.EndRenderPass();
 }
@@ -216,7 +213,7 @@ void RenderExecutor::FrustumCullAndDraw(
 void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
     Shader& shader, Pipeline& pipeline,
     Core::Buffer& indirectCommandBuffer,
-    DescriptorSetBuilder& builder, function<void(shared_ptr<Material>)> perDraw)
+    DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook)
 {
     if (_rendererBatch->GetDrawCommandCount() == 0)
         return;
@@ -235,6 +232,10 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
         const_cast<GPUMaterialData*>(_renderFrame.GetMaterialManager()->GetMaterialData()));
     builder.SetStorageBuffer(9, _rendererBatch->GetMaterialIndexBuffer());
 
+    // Runs before Build() so the hook can contribute its own descriptor resources.
+    if (perShaderHook)
+        perShaderHook(shader);
+
     auto& resources = builder.Build();
 
     vector<DescriptorSetResources*> resourcesList = { &resources };
@@ -246,9 +247,6 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
     }
 
     commandBuffer.BindDescriptorSets(pipeline.GetPipelineBindPoint(), shader, resourcesList);
-
-    auto material = _rendererBatch->GetFirstMaterial();
-    perDraw(material);
 
     commandBuffer.DrawIndexedIndirect(
         indirectCommandBuffer,

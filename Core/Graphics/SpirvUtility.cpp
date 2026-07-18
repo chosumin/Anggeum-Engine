@@ -204,9 +204,16 @@ void Core::SpirvUtility::SetResources(Shader& shader, VkShaderStageFlagBits shad
     {
         string name = compiler.get_name(resource.id);
         const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
-        uint32_t size = Utility::ToU32(compiler.get_declared_struct_size(type));
+        uint32_t declaredSize = Utility::ToU32(compiler.get_declared_struct_size(type));
 
-        shader.AddPushConstantsRange(shaderStage, size);
+        // A block may start at a non-zero offset (layout(offset = N)) so that
+        // stages can share the push constant space. get_declared_struct_size()
+        // counts that leading gap, so subtract it to get the range's own size.
+        uint32_t offset = type.member_types.empty()
+            ? 0u
+            : compiler.type_struct_member_offset(type, 0);
+
+        shader.AddPushConstantsRange(shaderStage, offset, declaredSize - offset);
     }
 
 	if (shaderStage == VK_SHADER_STAGE_VERTEX_BIT)

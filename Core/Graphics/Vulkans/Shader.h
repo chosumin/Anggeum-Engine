@@ -43,8 +43,6 @@ namespace Core
 		vector<VkPipelineShaderStageCreateInfo> GetShaderStageCreateInfo() const;
 		VkPipelineShaderStageCreateInfo GetComputeShaderStageCreateInfo() const;
 
-		VkShaderStageFlags GetPushConstantsShaderStage(uint32_t index) const;
-		uint32_t GetPushConstantsOffset(uint32_t index) const;
 		vector<VkPushConstantRange>& GetPushConstantRanges() { return _pushConstantRanges; }
 		
 		// Get descriptor set layouts as a map (set index -> DescriptorSetLayout*)
@@ -77,7 +75,7 @@ namespace Core
 		void AddTextureBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage,
 			VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		void AddStorageBufferLayoutBinding(uint32_t set, uint32_t binding, VkShaderStageFlags stage);
-		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size);
+		void AddPushConstantsRange(VkShaderStageFlags stage, uint32_t offset, uint32_t size);
 		
 	private:
 		void SetResources(const string vertPath, const vector<uint32_t>& vertSpirvBinary,

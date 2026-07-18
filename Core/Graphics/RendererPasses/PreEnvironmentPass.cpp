@@ -116,11 +116,9 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
             auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
             commandBuffer.BeginRenderPass(beginInfo);
 
-            _irradianceMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
-            commandBuffer.PushConstants(*_irradianceMaterial, 0);
-
-            _irradianceMaterial->SetPushConstants<IrradianceDelta>(_delta);
-            commandBuffer.PushConstants(*_irradianceMaterial, 1);
+            mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
+            commandBuffer.PushConstants(_irradianceMaterial->GetShader(), 0, viewProjection);
+            commandBuffer.PushConstants(_irradianceMaterial->GetShader(), 1, _delta);
 
             commandBuffer.BindPipeline(_irradiancePipeline);
 
@@ -182,12 +180,11 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
             commandBuffer.BeginRenderPass(beginInfo);
 
-            _prefilteredMaterial->SetPushConstants<mat4>(glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer]);
-            commandBuffer.PushConstants(*_prefilteredMaterial, 0);
+            mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
+            commandBuffer.PushConstants(_prefilteredMaterial->GetShader(), 0, viewProjection);
 
             _prefilterEnv.Roughness = (float)m / (float)(mipLevels - 1);
-            _prefilteredMaterial->SetPushConstants<PrefilterEnv>(_prefilterEnv);
-            commandBuffer.PushConstants(*_prefilteredMaterial, 1);
+            commandBuffer.PushConstants(_prefilteredMaterial->GetShader(), 1, _prefilterEnv);
 
             commandBuffer.BindPipeline(_prefilteredPipeline);
 

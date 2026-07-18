@@ -53,8 +53,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 		_computePipeline->GetPipelineBindPoint(),
 		_computeMaterial->GetShader(), resources);
 
-	_computeMaterial->SetPushConstants<TileInfo>(_tileInfo);
-	commandBuffer.PushConstants(*_computeMaterial, 0);
+	commandBuffer.PushConstants(_computeMaterial->GetShader(), 0, _tileInfo);
 
 	commandBuffer.Dispatch(_tileInfo.tileNums.x, _tileInfo.tileNums.y, 1);
 }

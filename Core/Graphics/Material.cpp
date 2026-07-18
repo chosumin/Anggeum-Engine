@@ -76,16 +76,6 @@ namespace Core
 		return nullptr;
 	}
 
-	vector<uint8_t>* Material::GetPushConstantsData()
-	{
-		return &_pushConstants;
-	}
-
-	void Material::ClearPushConstantsCache()
-	{
-		_pushConstants.clear();
-	}
-
 	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
 	{
 		auto& layouts = _shader->GetDescriptorSetLayouts();

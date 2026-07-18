@@ -58,20 +58,17 @@ namespace Core
             CameraBuffer& camera,
             Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
             Framebuffer& framebuffer,
-            DescriptorSetBuilder& builder,
-            function<void(shared_ptr<Material>)> perDraw,
+            DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
             function<void()> postDraw);
 
         // Frustum-only culling + draw (e.g. shadow passes)
-        void FrustumCullAndDraw(
-            CommandBuffer& commandBuffer,
+        void FrustumCullAndDraw(CommandBuffer& commandBuffer,
             Core::RenderPass& renderPass,
             Framebuffer& framebuffer,
             Shader& shader,
             Pipeline& pipeline,
             DescriptorSetBuilder& builder,
-            const CameraBuffer& camera,
-            function<void(shared_ptr<Material>)> perDraw);
+            const CameraBuffer& camera, function<void(Shader&)> perShaderHook);
 
         // Reset per-frame state (culler usage tracking)
         void ResetFrame();
@@ -79,12 +76,10 @@ namespace Core
     private:
         Culler* GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, TransformBatch& transformBatch);
 
-        void DrawIndirectInternal(
-            CommandBuffer& commandBuffer,
+        void DrawIndirectInternal(CommandBuffer& commandBuffer,
             Shader& shader, Pipeline& pipeline,
             Core::Buffer& indirectCommandBuffer,
-            DescriptorSetBuilder& builder,
-            function<void(shared_ptr<Material>)> perDraw);
+            DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook);
 
     private:
         Device& _device;

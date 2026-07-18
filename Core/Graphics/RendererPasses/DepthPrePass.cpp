@@ -107,10 +107,6 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 	auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthNormalShader, 0);
 	builder.SetUniformBuffer(0, &camera->Matrices);
 
-	auto perDraw = [&](shared_ptr<Material> sharedMaterial)
-	{
-	};
-
 	auto& executor = renderFrame.GetRenderExecutor();
 	executor.OcclusionCullAndDraw(
 		commandBuffer,
@@ -118,6 +114,6 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 		camera->Matrices,
 		*_renderPass, *_renderPassPass2,
 		*framebuffer,
-		builder, perDraw,
+		builder, nullptr,
 		nullptr);
 }

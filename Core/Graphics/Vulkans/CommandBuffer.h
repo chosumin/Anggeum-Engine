@@ -2,13 +2,11 @@
 #include "CommandPool.h"
 #include "Graphics/SyncContext.h"
 
-
 namespace Core
 {
 	class Device;
 	class RenderPass;
 	class Pipeline;
-	class Material;
 	class RenderFrame;
 	class Buffer;
 	class Shader;
@@ -42,8 +40,16 @@ namespace Core
 		void BindDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
 			Shader& shader,
 			DescriptorSetResources& resources);
-		void PushConstants(Material& material, uint32_t index = 0);
-		void PushConstants(Shader& shader, uint index, const void* data);
+		// Records the push constant range at `index` of the shader. `value` must be
+		// at least as large as the range the shader declares; asserted at record time.
+		template <typename T>
+		void PushConstants(Shader& shader, uint32_t index, const T& value)
+		{
+			static_assert(!std::is_pointer_v<T>,
+				"Pass the push constant value itself, not a pointer to it.");
+
+			PushConstantsInternal(shader, index, &value, sizeof(T));
+		}
 
 		void BindVertexBuffers(Buffer& buffer, uint32_t binding);
 		void BindVertexBuffers(vector<Buffer*> buffers, uint32_t binding);
@@ -98,6 +104,7 @@ namespace Core
 			vkCmdSetDepthBias(_commandBuffer, constantFactor, clamp, slopeFactor);
 		}
 	private:
+		void PushConstantsInternal(Shader& shader, uint32_t index, const void* data, uint32_t size);
 		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
 		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
 	private:

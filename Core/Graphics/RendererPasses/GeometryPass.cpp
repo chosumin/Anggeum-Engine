@@ -231,10 +231,9 @@ namespace Core
         if (aoTarget)
             builder.SetTextureBuffer(11, aoTarget);
 
-        auto perDraw = [&](shared_ptr<Material> sharedMaterial)
+        auto perShaderHook = [&](Shader& shader)
         {
-            sharedMaterial->SetPushConstants<TileInfo>(_tileInfo);
-            commandBuffer.PushConstants(*sharedMaterial, 0);
+            commandBuffer.PushConstants(shader, 0, _tileInfo);
         };
 
         auto& executor = renderFrame.GetRenderExecutor();
@@ -244,7 +243,7 @@ namespace Core
             camera->Matrices,
             *_renderPass, *_renderPassPass2,
             *framebuffer,
-            builder, perDraw,
+            builder, perShaderHook,
             [&]() { DrawSkybox(renderFrame, commandBuffer); });
     }
 

@@ -95,7 +95,7 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
     builder.SetStorageBuffer(2, _rejectedCountBuffer);
     auto& resources = builder.Build();
 
-    commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, &drawCount);
+    commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, drawCount);
     commandBuffer.BindDescriptorSet(_resetDrawCommandsPipeline->GetPipelineBindPoint(),
         *_resetDrawCommandsShader, resources);
 
@@ -327,7 +327,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
                 int32_t outputHeight;
             } hiZPc = { static_cast<int32_t>(mipWidth), static_cast<int32_t>(mipHeight) };
 
-            commandBuffer.PushConstants(*_hiZGenerateShader, 0, &hiZPc);
+            commandBuffer.PushConstants(*_hiZGenerateShader, 0, hiZPc);
 
             groupX = (mipWidth + 7) / 8;
             groupY = (mipHeight + 7) / 8;
@@ -361,7 +361,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	resetBuilder.SetStorageBuffer(0, _indirectCommandBuffer);
 	auto& resetResources = resetBuilder.Build();
 
-	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, &drawCount);
+	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, drawCount);
 	commandBuffer.BindDescriptorSet(_resetDrawCommandsSimplePipeline->GetPipelineBindPoint(),
 		*_resetDrawCommandsSimpleShader,
 		resetResources);

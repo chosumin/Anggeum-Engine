@@ -363,14 +363,12 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
 		auto& executor = renderFrame.GetRenderExecutor();
-		executor.FrustumCullAndDraw(commandBuffer, 
+		executor.FrustumCullAndDraw(commandBuffer,
 			*_renderPass, *framebuffer,
 			*_shadowShader, *_pipeline,
 			builder,
-		_cascadeViews[cascadeIndex],
-		[&](shared_ptr<Material> sharedMaterial) 
-		{
-		});
+			_cascadeViews[cascadeIndex],
+			nullptr);
 
 		commandBuffer.EndDebugMarker();
 	}

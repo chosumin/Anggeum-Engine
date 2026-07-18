@@ -63,6 +63,7 @@ using namespace rapidjson;
 #include <filesystem>
 #include <deque>
 #include <cstdio>
+#include <type_traits>
 using namespace std;
 
 #include "Graphics/Vulkans/Device.h"

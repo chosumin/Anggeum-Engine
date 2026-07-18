@@ -320,26 +320,6 @@ VkShaderModule Core::Shader::CreateShaderModule(VkDevice& device, const vector<u
 	return shaderModule;
 }
 
-VkShaderStageFlags Core::Shader::GetPushConstantsShaderStage(uint32_t index) const
-{
-	if (index >= _pushConstantRanges.size())
-	{
-		throw std::out_of_range("Push constant index out of range");
-	}
-
-	return _pushConstantRanges[index].stageFlags;
-}
-
-uint32_t Core::Shader::GetPushConstantsOffset(uint32_t index) const
-{
-	if (index >= _pushConstantRanges.size())
-	{
-		throw std::out_of_range("Push constant index out of range");
-	}
-
-	return _pushConstantRanges[index].offset;
-}
-
 void Core::Shader::SetResources(const string vertPath, const vector<uint32_t>& vertSpirvBinary, const string fragPath, const vector<uint32_t>& fragSpirvBinary)
 {
 	SpirvUtility::SetResources(*this, VK_SHADER_STAGE_VERTEX_BIT, 
@@ -348,14 +328,8 @@ void Core::Shader::SetResources(const string vertPath, const vector<uint32_t>& v
 		fragPath, fragSpirvBinary);
 }
 
-void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t size)
+void Core::Shader::AddPushConstantsRange(VkShaderStageFlags stage, uint32_t offset, uint32_t size)
 {
-	uint32_t offset = 0;
-	for (auto&& range : _pushConstantRanges)
-	{
-		offset += range.size;
-	}
-
 	VkPushConstantRange pushConstant{};
 	pushConstant.stageFlags = stage;
 	pushConstant.size = size;

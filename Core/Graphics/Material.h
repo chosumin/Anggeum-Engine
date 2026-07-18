@@ -98,18 +98,6 @@ namespace Core
 			_bindlessTextureHandles.clear();
 		}
 
-		template <typename T>
-		inline void SetPushConstants(const T& value)
-		{
-			vector<uint8_t> converted =
-				vector<uint8_t>{ reinterpret_cast<const uint8_t*>(&value),
-				reinterpret_cast<const uint8_t*>(&value) + sizeof(T) };
-
-			_pushConstants.insert(_pushConstants.end(), converted.begin(), converted.end());
-		}
-		vector<uint8_t>* GetPushConstantsData();
-		void ClearPushConstantsCache();
-
 		const unordered_map<uint32_t, void*>& GetBuffersMap() const { return _buffers; }
 		const unordered_map<uint32_t, shared_ptr<Texture>>& GetTexturesMap() const { return _textures; }
 
@@ -124,7 +112,6 @@ namespace Core
 	protected:
 		Device& _device;
 		shared_ptr<Shader> _shader;
-		vector<uint8_t> _pushConstants;
 
 	private:
 		string _name;
