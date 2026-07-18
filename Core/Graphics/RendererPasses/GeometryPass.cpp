@@ -145,8 +145,19 @@ namespace Core
         _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
-    void GeometryPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+    void GeometryPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
+        // Wait for compute queue (AmbientOcclusionPass) to finish producing the AO texture
+        renderFrame.GetCurrentSubmitInfo().AddWaitSemaphore(
+            QueueType::Compute,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+		commandBuffer.BufferBarrier(*_lightVisibilityBuffer,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT);
+
         // Lazy initialization
         EnsureIBLResources(renderFrame);
 
@@ -164,8 +175,6 @@ namespace Core
 
         if (!framebuffer)
             return;
-
-        auto& commandBuffer = renderFrame.GetCommandBuffer();
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
@@ -175,7 +184,6 @@ namespace Core
 
         auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
-
         auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
         UpdateLightBuffer();

@@ -10,7 +10,7 @@ namespace Core
 	public:
 		virtual ~IRenderPipeline() = default;
 
-		virtual void Draw(RenderFrame& renderFrame, uint32_t imageIndex) = 0;
+		virtual void Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex) = 0;
 		virtual void OnGUI(RenderFrame& renderFrame) = 0;
 		virtual VkSampleCountFlagBits GetMSAASamples() const = 0;
 	};

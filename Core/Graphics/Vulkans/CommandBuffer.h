@@ -1,5 +1,6 @@
 #pragma once
 #include "CommandPool.h"
+#include "Graphics/SyncContext.h"
 
 
 namespace Core
@@ -66,7 +67,8 @@ namespace Core
 			VkPipelineStageFlags srcStageMask,
 			VkPipelineStageFlags dstStageMask,
 			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask);
+			VkAccessFlags dstAccessMask,
+			QueueType destQueue = QueueType::None);
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 		void CopyImage(Image& srcImage, Image& dstImage, 
@@ -74,7 +76,8 @@ namespace Core
 			uint32_t dstMipLevel, uint32_t dstLayer);
 		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
 		void TransitionImageLayout(Image& image, 
-			VkImageLayout oldLayout, VkImageLayout newLayout);
+			VkImageLayout oldLayout, VkImageLayout newLayout,
+			QueueType destQueue = QueueType::None);
 		void GenerateMipmaps(Image& image, uint32_t mipLevels);
 		void EndRenderPass();
 		void EndCommandBuffer();
@@ -96,10 +99,16 @@ namespace Core
 		}
 	private:
 		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
+		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;
 		VkCommandBufferLevel _level;
+
+		// Queue family this command buffer is recorded for. Used to strip
+		// pipeline stages that the queue does not support (e.g. fragment shader
+		// stage on a dedicated compute queue).
+		uint32_t _queueFamilyIndex;
 
 		//hack : have to be managed in resource system or something
 		uint64_t _frame;

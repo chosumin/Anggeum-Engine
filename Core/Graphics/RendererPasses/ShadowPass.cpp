@@ -318,7 +318,7 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 	ImGui::Separator();
 }
 
-void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
@@ -337,8 +337,6 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 		if (!framebuffer)
 			continue;
-
-		auto& commandBuffer = renderFrame.GetCommandBuffer();
 
 		// Skip cascades beyond the SDF transition zone but still clear them
 		// so stale depth doesn't show up in the debug viewer.

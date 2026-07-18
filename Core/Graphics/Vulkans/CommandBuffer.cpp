@@ -18,9 +18,10 @@
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
-    _frame = -2;
+	_frame = -MAX_FRAMES_IN_FLIGHT;
+	_queueFamilyIndex = commandPool.GetQueueFamilyIndex();
 
-    VkCommandBufferAllocateInfo allocInfo{};
+	VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool.GetHandle();
     allocInfo.level = level;
@@ -40,10 +41,10 @@ void Core::CommandBuffer::ResetCommandBuffer()
 void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, const RenderPass* renderPass, const Framebuffer* framebuffer, uint32_t subpassIndex, uint32_t imageIndex)
 {
 	VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = flags;
 
-    VkCommandBufferInheritanceInfo inheritanceInfo = {};
+	VkCommandBufferInheritanceInfo inheritanceInfo = {};
 	if (_level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)
 	{
 		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -73,9 +74,9 @@ void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
 	if (isSingleTime)
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
-    if (result != VK_SUCCESS)
-        throw std::runtime_error("failed to begin recording command buffer!");
+	auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
+	if (result != VK_SUCCESS)
+		throw std::runtime_error("failed to begin recording command buffer!");
 }
 
 void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers)
@@ -286,15 +287,35 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32
     );
 }
 
-void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout)
+void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout, QueueType destQueue)
 {
     //모든 밉맵 이미지에 같은 레이아웃을 적용.
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    
+    if (destQueue == QueueType::None)
+    {
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    }
+    else
+    {
+        const auto& qfi = _device.GetQueueFamilyIndices();
+
+        if (destQueue == QueueType::Graphics)
+        {
+            barrier.srcQueueFamilyIndex = qfi.ComputeFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.GraphicsFamily.value();
+        }
+        else
+        {
+            barrier.srcQueueFamilyIndex = qfi.GraphicsFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.ComputeFamily.value();
+        }
+    }
+
     barrier.image = image.GetImage();
     barrier.subresourceRange.aspectMask = image.GetAspectFlags();
     barrier.subresourceRange.baseMipLevel = 0;
@@ -305,18 +326,21 @@ void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldL
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
-    //tranfer writes that don't need to wait on anything.
+	//tranfer writes that don't need to wait on anything.
 	GetAccessAndStageMask(oldLayout, barrier.srcAccessMask, sourceStage);
 	GetAccessAndStageMask(newLayout, barrier.dstAccessMask, destinationStage);
 
-    vkCmdPipelineBarrier(
-        _commandBuffer,
-        sourceStage, destinationStage,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+	sourceStage = SanitizeStageMask(sourceStage);
+	destinationStage = SanitizeStageMask(destinationStage);
+
+	vkCmdPipelineBarrier(
+		_commandBuffer,
+		sourceStage, destinationStage,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
 }
 
 void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
@@ -488,6 +512,42 @@ void Core::CommandBuffer::GetAccessAndStageMask(const VkImageLayout& inImageLayo
     }
 }
 
+VkPipelineStageFlags Core::CommandBuffer::SanitizeStageMask(VkPipelineStageFlags stageMask) const
+{
+    const auto& qfi = _device.GetQueueFamilyIndices();
+
+    // Only the dedicated compute queue needs stage sanitizing. Graphics queue
+    // supports all of the stages used here.
+    if (!qfi.ComputeFamily.has_value() ||
+        _queueFamilyIndex != qfi.ComputeFamily.value())
+        return stageMask;
+
+    // Graphics-only pipeline stages are invalid on a compute queue. Replace
+    // them with the closest compute-compatible equivalent so the queue
+    // ownership barriers stay spec-compliant.
+    const VkPipelineStageFlags graphicsOnly =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+        VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+        VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+        VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
+
+    if (stageMask & graphicsOnly)
+    {
+        stageMask &= ~graphicsOnly;
+        stageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    }
+
+    if (stageMask == 0)
+        stageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    return stageMask;
+}
+
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
 {
 	if (drawCount == 0)
@@ -533,22 +593,43 @@ void Core::CommandBuffer::BufferBarrier(
 	VkPipelineStageFlags srcStageMask,
 	VkPipelineStageFlags dstStageMask,
 	VkAccessFlags srcAccessMask,
-	VkAccessFlags dstAccessMask)
+	VkAccessFlags dstAccessMask,
+	QueueType destQueue)
 {
 	VkBufferMemoryBarrier barrier{};
 	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	barrier.srcAccessMask = srcAccessMask;
 	barrier.dstAccessMask = dstAccessMask;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	
+    if (destQueue == QueueType::None)
+	{
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	}
+	else
+	{
+		const auto& qfi = _device.GetQueueFamilyIndices();
+
+        if (destQueue == QueueType::Graphics)
+        {
+            barrier.srcQueueFamilyIndex = qfi.ComputeFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.GraphicsFamily.value();
+        }
+        else
+        {
+            barrier.srcQueueFamilyIndex = qfi.GraphicsFamily.value();
+            barrier.dstQueueFamilyIndex = qfi.ComputeFamily.value();
+        }
+	}
+
 	barrier.buffer = buffer.GetBuffer();
 	barrier.offset = 0;
 	barrier.size = VK_WHOLE_SIZE;
 
 	vkCmdPipelineBarrier(
 		_commandBuffer,
-		srcStageMask,
-		dstStageMask,
+        SanitizeStageMask(srcStageMask),
+        SanitizeStageMask(dstStageMask),
 		0,
 		0, nullptr,
 		1, &barrier,

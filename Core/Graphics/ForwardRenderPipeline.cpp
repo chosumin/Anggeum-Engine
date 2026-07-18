@@ -6,9 +6,11 @@
 #include "Components/Mesh.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/Vulkans/SubmitInfo.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
 #include "Graphics/RendererPasses/LightCullingPass.h"
 #include "Graphics/RendererPasses/GeometryPass.h"
@@ -97,12 +99,15 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
-void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
+	auto& queueTimer = renderContext.GetQueueTimer();
+	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
 
-	for (auto&& rendererPass : _rendererPasses)
+	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
 	{
+		auto&& rendererPass = _rendererPasses[passIndex];
+
 		// Get class name from typeid
 		const char* className = typeid(*rendererPass).name();
 
@@ -114,14 +119,29 @@ void ForwardRenderPipeline::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 			simpleName = className + strlen(prefix);
 		}
 
-		// Begin debug marker for this render pass
+		// Request command buffer based on queue type
+		QueueType queueType = rendererPass->GetQueueType();
+		CommandBuffer& commandBuffer = (queueType == QueueType::Compute)
+			? renderContext.RequestComputeCommandBuffer()
+			: renderContext.RequestCommandBuffer();
+
+		// Register SubmitInfo before Draw so the pass can inject wait/signal semaphores
+		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(),
+			renderContext.GetSyncContext());
+
+		commandBuffer.BeginCommandBuffer();
+		queueTimer.BeginPass(commandBuffer, frameIndex,
+			static_cast<uint32_t>(passIndex), queueType, simpleName);
+
 		commandBuffer.BeginDebugMarker(simpleName);
 
 		rendererPass->EnsureRenderTargets(renderFrame);
-		rendererPass->Draw(renderFrame, imageIndex);
+		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
 
-		// End debug marker
 		commandBuffer.EndDebugMarker();
+
+		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
+		commandBuffer.EndCommandBuffer();
 	}
 }
 

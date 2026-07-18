@@ -91,7 +91,7 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     }
 }
 
-void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
 		"DepthPrePass",
@@ -100,8 +100,6 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
 	if (!framebuffer)
 		return;
-
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 
 	commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());

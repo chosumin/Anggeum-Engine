@@ -38,6 +38,9 @@ void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     aoDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
+    // GeometryPass (graphics) may sample this before the first compute
+    // production, so start it in the layout the consumer expects.
+    aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
@@ -86,7 +89,7 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
@@ -97,8 +100,6 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         return;
 
     UpdateParams();
-
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
     commandBuffer.BeginDebugMarker("DFAO");
 
     auto depthForSampling = renderFrame.GetCurrentDepth();
@@ -108,7 +109,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     auto& aoImage = *_aoTexture->GetImage().lock();
     commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL);
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     glm::mat4 invProj = glm::inverse(camera->Matrices.Projection);
@@ -147,7 +149,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
         (_screenExtent.height + 7) / 8, 1);
 
     commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     commandBuffer.EndDebugMarker();
 }

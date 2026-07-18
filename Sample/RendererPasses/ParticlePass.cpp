@@ -113,7 +113,7 @@ void Sample::ParticlePass::Initialize()
     }
 }
 
-void Sample::ParticlePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
         "ParticlePass",
@@ -122,8 +122,6 @@ void Sample::ParticlePass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
 
     if (!framebuffer)
         return;
-
-    auto& commandBuffer = renderFrame.GetComputeCommandBuffer();
 
     // Compute pass
     _deltaTime.deltaTime += 0.01f;

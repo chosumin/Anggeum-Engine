@@ -22,8 +22,10 @@ namespace Core
 		~SDFShadowPass();
 
 		void EnsureRenderTargets(RenderFrame& renderFrame) override;
-		void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 		void OnGUI(RenderFrame& renderFrame) override;
+
+		QueueType GetQueueType() const override { return QueueType::Compute; }
 
 		SDFGenerator* GetSDFGenerator() const { return _sdfGenerator.get(); }
 

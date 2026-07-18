@@ -23,8 +23,10 @@ namespace Core
         ~AmbientOcclusionPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
-        void Draw(RenderFrame& renderFrame, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
         void OnGUI(RenderFrame& renderFrame) override;
+
+        QueueType GetQueueType() const override { return QueueType::Compute; }
 
         void SetMethod(AOMethod method);
         AOMethod GetMethod() const { return _activeMethod; }
@@ -35,6 +37,6 @@ namespace Core
     private:
         unique_ptr<CACAOPass> _cacaoPass;
         unique_ptr<DFAOPass> _dfaoPass;
-        AOMethod _activeMethod = AOMethod::CACAO;
+        AOMethod _activeMethod;
     };
 }

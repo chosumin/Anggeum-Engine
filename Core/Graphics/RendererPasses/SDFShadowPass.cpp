@@ -52,6 +52,9 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     sdfShadowDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     sdfShadowDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     sdfShadowDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
+    // GeometryPass (graphics) may sample this before the first compute
+    // production, so start it in the layout the consumer expects.
+    sdfShadowDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     _sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
@@ -211,15 +214,13 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
     ImGui::Separator();
 }
 
-void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
     if (!meshBufferManager)
         return;
 
-    auto& commandBuffer = renderFrame.GetCommandBuffer();
-
-    // Deferred save: the SDF was generated on a previous frame and its GPU work
+    // Deferred save: the SDF was generated on a previous frame
     // is now complete, so it's safe to read back the image/bounds and write to disk.
     if (_savePending)
     {
@@ -278,7 +279,6 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
 
-    // Transition to SHADER_READ_ONLY_OPTIMAL for GeometryPass sampling
     commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

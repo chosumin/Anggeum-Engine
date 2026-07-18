@@ -46,10 +46,11 @@ namespace Core
 	    SetupDebugMessenger();
 	    window.CreateSurface(_instance, &_surface);
 	    PickPhysicalDevice();
-	    CreateLogicalDevice();
-
-	    _queueFamilyIndices = FindQueueFamilies();
 	    
+		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
+
+		CreateLogicalDevice();
+
 	    _graphicsCommandPool = new CommandPool(*this, 
 	        _queueFamilyIndices.GraphicsFamily.value());
 
@@ -69,7 +70,7 @@ namespace Core
 
 	    vkDestroyDevice(_device, nullptr);
 
-	    if (_enableValidationLayers)
+	    if (_enableDebugUtils)
 	        DestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
 
 	    vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -78,6 +79,11 @@ namespace Core
 
 	void Device::LoadDebugUtilsFunctions()
 	{
+		// Without the extension enabled these functions must not be called, so leave
+		// the pointers null — the debug marker/object name calls no-op on null.
+		if (_enableDebugUtils == false)
+			return;
+
 		// Load from instance, not device
 		_vkCmdBeginDebugUtilsLabel = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdBeginDebugUtilsLabelEXT");
 		_vkCmdEndDebugUtilsLabel = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(_instance, "vkCmdEndDebugUtilsLabelEXT");
@@ -197,23 +203,46 @@ namespace Core
 	    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 	    createInfo.ppEnabledExtensionNames = extensions.data();
 	    
-	    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-	    if (_enableValidationLayers) 
+	    if (_enableValidationLayers)
 	    {
 	        createInfo.enabledLayerCount = static_cast<uint32_t>(_validationLayers.size());
 	        createInfo.ppEnabledLayerNames = _validationLayers.data();
-
-	        PopulateDebugMessengerCreateInfo(debugCreateInfo);
-	        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 	    }
 	    else
-	    {
 	        createInfo.enabledLayerCount = 0;
-	        createInfo.pNext = nullptr;
+
+	    // Messenger covering instance creation/destruction. Belongs to debug utils,
+	    // not the validation layers — with validation off it simply stays quiet.
+	    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+	    if (_enableDebugUtils)
+	    {
+	        PopulateDebugMessengerCreateInfo(debugCreateInfo);
+	        createInfo.pNext = &debugCreateInfo;
 	    }
+	    else
+	        createInfo.pNext = nullptr;
 
 	    if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS)
 	        throw runtime_error("failed to create instance!");
+	}
+
+	bool Device::GetDebugFlag(const char* envName)
+	{
+#ifdef NDEBUG
+	    bool enabled = false;
+#else
+	    bool enabled = true;
+#endif
+
+	    if (const char* env = getenv(envName))
+	    {
+	        if (strcmp(env, "0") == 0)
+	            enabled = false;
+	        else if (strcmp(env, "1") == 0)
+	            enabled = true;
+	    }
+
+	    return enabled;
 	}
 
 	bool Device::CheckValidationLayerSupport()
@@ -253,7 +282,7 @@ namespace Core
 
 	    vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-	    if (_enableValidationLayers)
+	    if (_enableDebugUtils)
 	        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 	    return extensions;
@@ -261,7 +290,7 @@ namespace Core
 
 	void Device::SetupDebugMessenger()
 	{
-	    if (_enableValidationLayers == false)
+	    if (_enableDebugUtils == false)
 	        return;
 
 	    VkDebugUtilsMessengerCreateInfoEXT createInfo;
@@ -318,34 +347,51 @@ namespace Core
 	    vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 	    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-	    int i = 0;
-	    for (const auto& queueFamily : queueFamilies) 
-	    {
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) 
+		{
 			if (indices.IsComplete())
 				break;
 
 			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
 				indices.GraphicsFamily = i;
-
-	        if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
-	            (queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT))
-	            indices.ComputeFamily = i;
-
-			if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-				(queueFamily.queueFlags & ~VK_QUEUE_GRAPHICS_BIT) &&
-	            (queueFamily.queueFlags & ~VK_QUEUE_COMPUTE_BIT))
 				indices.TransferFamily = i;
+			}
+
+			if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+				!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+				indices.ComputeFamily = i;
+
+			//if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+			//	!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+			//	!(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			//	indices.TransferFamily = i;
 
 	        VkBool32 presentSupport = false;
 	        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
 
 	        if (presentSupport)
-	            indices.PresentFamily = i;
+	        {
+	            const bool isGraphicsFamily = (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+	            const bool haveGraphicsPresent = indices.PresentFamily.has_value() &&
+	                indices.GraphicsFamily.has_value() &&
+	                indices.PresentFamily.value() == indices.GraphicsFamily.value();
 
-	        i++;
-	    }
+	            if (isGraphicsFamily || haveGraphicsPresent == false)
+	                indices.PresentFamily = i;
+	        }
 
-	    return indices;
+			i++;
+		}
+
+		printf("[QUEUE] GraphicsFamily=%d ComputeFamily=%d PresentFamily=%d TransferFamily=%d\n",
+			indices.GraphicsFamily.has_value() ? (int)indices.GraphicsFamily.value() : -1,
+			indices.ComputeFamily.has_value() ? (int)indices.ComputeFamily.value() : -1,
+			indices.PresentFamily.has_value() ? (int)indices.PresentFamily.value() : -1,
+			indices.TransferFamily.has_value() ? (int)indices.TransferFamily.value() : -1);
+
+		return indices;
 	}
 
 	bool Device::IsDeviceSuitable(VkPhysicalDevice device)
@@ -418,14 +464,12 @@ namespace Core
 
 		vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
 
-	    QueueFamilyIndices indices = FindQueueFamilies(_physicalDevice);
-
 	    vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	    set<uint32_t> uniqueQueueFamilies = {
-	        indices.GraphicsFamily.value(),
-	        indices.PresentFamily.value(),
-	        indices.TransferFamily.value(),
-	        indices.ComputeFamily.value() };
+			_queueFamilyIndices.GraphicsFamily.value(),
+			_queueFamilyIndices.PresentFamily.value(),
+			_queueFamilyIndices.TransferFamily.value(),
+			_queueFamilyIndices.ComputeFamily.value() };
 
 	    float queuePriority = 1.0f;
 	    for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -459,10 +503,10 @@ namespace Core
 	        throw runtime_error("failed to create logical device!");
 	    }
 
-	    vkGetDeviceQueue(_device, indices.GraphicsFamily.value(), 0, &_graphicsQueue);
-	    vkGetDeviceQueue(_device, indices.ComputeFamily.value(), 0, &_computeQueue);
-	    vkGetDeviceQueue(_device, indices.PresentFamily.value(), 0, &_presentQueue);
-	    vkGetDeviceQueue(_device, indices.TransferFamily.value(), 0, &_transferQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.GraphicsFamily.value(), 0, &_graphicsQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.ComputeFamily.value(), 0, &_computeQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.PresentFamily.value(), 0, &_presentQueue);
+	    vkGetDeviceQueue(_device, _queueFamilyIndices.TransferFamily.value(), 0, &_transferQueue);
 	}
 
 	SwapChainSupportDetails Device::QuerySwapChainSupport(VkPhysicalDevice device)

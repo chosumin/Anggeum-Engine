@@ -42,10 +42,6 @@ namespace Core
 			return QuerySwapChainSupport(_physicalDevice); 
 		}
 		VkSurfaceKHR GetSurface() { return _surface; }
-		QueueFamilyIndices FindQueueFamilies()
-		{
-			return FindQueueFamilies(_physicalDevice);
-		}
 
 		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
 		VkQueue GetComputeQueue() { return _computeQueue; }
@@ -100,6 +96,10 @@ namespace Core
 		void CheckDescriptorIndexingSupport(VkPhysicalDevice device);
 		void LoadDebugUtilsFunctions();
 
+		// Reads a 0/1 override from the named environment variable, defaulting to on
+		// in Debug builds and off in Release.
+		static bool GetDebugFlag(const char* envName);
+
 		static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 			VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -133,7 +133,6 @@ namespace Core
 		bool _supportsDescriptorIndexing = false;
 		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
 
-
 		// Debug utils function pointers
 		PFN_vkCmdBeginDebugUtilsLabelEXT _vkCmdBeginDebugUtilsLabel = nullptr;
 		PFN_vkCmdEndDebugUtilsLabelEXT _vkCmdEndDebugUtilsLabel = nullptr;
@@ -146,11 +145,14 @@ namespace Core
 		};
 
 		const vector<const char*> _deviceExtensions;
-#ifdef NDEBUG
-		const bool _enableValidationLayers = false;
-#else
-		const bool _enableValidationLayers = true;
-#endif
+
+		// VK_LAYER_KHRONOS_validation. Set DEBUG_VALIDATION=0 to turn this off when
+		// running under a tool that injects its own Vulkan layers.
+		const bool _enableValidationLayers = GetDebugFlag("DEBUG_VALIDATION");
+
+		// VK_EXT_debug_utils: pass labels and object names for graphics debuggers,
+		// plus the messenger that surfaces layer messages.
+		const bool _enableDebugUtils = GetDebugFlag("DEBUG_UTILS");
 	};
 }
 

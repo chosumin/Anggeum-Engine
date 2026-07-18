@@ -8,6 +8,8 @@
 #include "Vulkans/Framebuffer.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "Vulkans/CommandBuffer.h"
+#include "Vulkans/CommandPool.h"
+#include "Vulkans/SubmitInfo.h"
 #include "ResourceCache.h"
 #include "TransferJob.h"
 #include "Foundation/Scene.h"
@@ -30,13 +32,13 @@ RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager
 
 RenderFrame::~RenderFrame()
 {
-	if (_imageAvailableSemaphore != VK_NULL_HANDLE)
+	if (_submission.imageAvailableSemaphore != VK_NULL_HANDLE)
 	{
-		vkDestroySemaphore(_device.GetDevice(), _imageAvailableSemaphore, nullptr);
+		vkDestroySemaphore(_device.GetDevice(), _submission.imageAvailableSemaphore, nullptr);
 	}
-	if (_renderFinishedSemaphore != VK_NULL_HANDLE)
+	if (_submission.renderFinishedSemaphore != VK_NULL_HANDLE)
 	{
-		vkDestroySemaphore(_device.GetDevice(), _renderFinishedSemaphore, nullptr);
+		vkDestroySemaphore(_device.GetDevice(), _submission.renderFinishedSemaphore, nullptr);
 	}
 }
 
@@ -54,6 +56,10 @@ void RenderFrame::Reset()
 		resources.CleanupBuffers();
 	}
 	_builderResources.clear();
+
+	// submitScratch points into submitInfos, so both are cleared together here.
+	_submission.submitInfos.clear();
+	_submission.submitScratch.clear();
 
 	// Reset culler usage tracking for this frame
 	_renderExecutor->ResetFrame();
@@ -77,8 +83,8 @@ void RenderFrame::CreateSyncObjects()
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_renderFinishedSemaphore) != VK_SUCCESS)
+	if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_submission.imageAvailableSemaphore) != VK_SUCCESS ||
+		vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_submission.renderFinishedSemaphore) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create semaphores for a frame!");
 	}
@@ -153,7 +159,27 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     imageInfo.samples = desc.samples;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.usage = desc.usage;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // These render targets can be produced on the compute queue and consumed on
+    // the graphics queue. Using CONCURRENT sharing lets both queues access them
+    // without explicit queue-ownership-transfer barriers. When the graphics and
+    // compute queue families are identical, CONCURRENT is invalid, so fall back
+    // to EXCLUSIVE.
+    const auto& qfi = _device.GetQueueFamilyIndices();
+    uint32_t queueFamilies[2] = {
+        qfi.GraphicsFamily.value(),
+        qfi.ComputeFamily.value()
+    };
+    if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 2;
+        imageInfo.pQueueFamilyIndices = queueFamilies;
+    }
+    else
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     if (desc.isCubemap)
         imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -179,6 +205,17 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
 
     auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
     auto texture = make_shared<Texture>(name, image, _defaultSampler);
+
+    // Move the target from UNDEFINED into its requested starting layout. This is a
+    // fenced single-time submit, so it fully completes before any frame work
+    // touches the target and cannot race with the per-frame transitions.
+    if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+    {
+        auto& commandBuffer = _device.BeginSingleTimeCommands();
+        commandBuffer.TransitionImageLayout(*image,
+            VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout);
+        _device.EndSingleTimeCommands(commandBuffer);
+    }
 
     _renderTargets[name] = texture;
     return texture;
@@ -248,12 +285,13 @@ DescriptorSetBuilder RenderFrame::CreateDescriptorSetBuilder(Shader& shader, uin
 	return DescriptorSetBuilder(_device, *_descriptorPool, shader, setIndex);
 }
 
-RendererBatch* RenderFrame::GetRendererBatch() const
-{
-	return _renderExecutor->GetRendererBatch();
-}
-
 void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
 	_renderExecutor->InitializeBatches(scene, extents);
+}
+
+SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)
+{
+	_submission.submitInfos.emplace_back(queueType, commandBuffer, syncContext);
+	return _submission.submitInfos.back();
 }

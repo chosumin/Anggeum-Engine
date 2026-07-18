@@ -25,15 +25,18 @@ Core::LightCullingPass::~LightCullingPass()
 {
 }
 
-void Core::LightCullingPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto depthTarget = renderFrame.GetCurrentDepth();
 	if (!depthTarget)
 		return;
 
-	UpdateLightBuffer();
+	// Wait for graphics queue (ResolvePass) to finish producing the resolved depth
+	renderFrame.GetCurrentSubmitInfo().AddWaitSemaphore(
+		QueueType::Graphics,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-	auto& commandBuffer = renderFrame.GetCommandBuffer();
+	UpdateLightBuffer();
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 

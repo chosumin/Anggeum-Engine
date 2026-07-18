@@ -3,6 +3,7 @@
 
 int main()
 {
+	setvbuf(stdout, nullptr, _IONBF, 0);
 	Core::Window::Instance().Initialize(1920, 1080, "Anggeum Engine");
 
 	Core::EngineOptions options{ false, &Core::Window::Instance() };

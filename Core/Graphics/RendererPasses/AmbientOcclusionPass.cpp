@@ -16,7 +16,6 @@ namespace Core
         _dfaoPass = make_unique<DFAOPass>(device, workerThreadManager,
             scene, screenExtent, msaaSamples, sdfGenerator);
 
-        // Initial state: CACAO enabled, DFAO disabled
         SetMethod(AOMethod::CACAO);
     }
 
@@ -37,17 +36,20 @@ namespace Core
         }
     }
 
-    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, uint32_t imageIndex)
+    void AmbientOcclusionPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
         switch (_activeMethod)
         {
         case AOMethod::CACAO:
-            _cacaoPass->Draw(renderFrame, imageIndex);
+            _cacaoPass->Draw(renderFrame, commandBuffer, imageIndex);
             break;
         case AOMethod::DFAO:
-            _dfaoPass->Draw(renderFrame, imageIndex);
+            _dfaoPass->Draw(renderFrame, commandBuffer, imageIndex);
             break;
         }
+
+        // Signal compute timeline so graphics queue (GeometryPass) can consume AO output
+        renderFrame.GetCurrentSubmitInfo().AddSignalSemaphore(QueueType::Compute);
     }
 
     void AmbientOcclusionPass::SetMethod(AOMethod method)

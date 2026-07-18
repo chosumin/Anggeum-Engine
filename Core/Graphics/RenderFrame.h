@@ -4,10 +4,12 @@
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
 #include "RenderExecutor.h"
+#include "Vulkans/SubmitInfo.h"
 
 namespace Core
 {
 	class CommandBuffer;
+	class CommandPool;
 	class Material;
 	class Shader;
 	class Texture;
@@ -32,6 +34,13 @@ namespace Core
 		uint32_t mipLevels = 1;
 		uint32_t arrayLayers = 1;
 		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+
+		// NOT VkImageCreateInfo::initialLayout — the image is always created as
+		// UNDEFINED (the spec allows only UNDEFINED/PREINITIALIZED there).
+		// Use this for cross-queue targets that a graphics pass may sample before
+		// the producing compute pass has ever run, so the validation layer sees a
+		// valid layout on the first frame.
+		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
 	class RenderFrame
@@ -42,16 +51,11 @@ namespace Core
 		
 		// Reset frame resources
 		void Reset();
-		
-		// Set command buffers (allocated from RenderContext's CommandPool)
-		void SetCommandBuffer(CommandBuffer* commandBuffer) { _commandBuffer = commandBuffer; }
-		void SetComputeCommandBuffer(CommandBuffer* computeBuffer) { _computeCommandBuffer = computeBuffer; }
 
-		CommandBuffer& GetCommandBuffer() { return *_commandBuffer; }
-		CommandBuffer& GetComputeCommandBuffer() { return *_computeCommandBuffer; }
-
-		VkSemaphore GetImageAvailableSemaphore() const { return _imageAvailableSemaphore; }
-		VkSemaphore GetRenderFinishedSemaphore() const { return _renderFinishedSemaphore; }
+		// Submit info management
+		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext);
+		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
+		FrameSubmission& GetSubmission() { return _submission; }
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
 		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
@@ -97,9 +101,6 @@ namespace Core
 		// Culler management - per camera and RendererBatch, reused within a frame
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
-		// RendererBatch management - single batch for all meshes
-		RendererBatch* GetRendererBatch() const;
-
 		// Batch initialization - called once at the start of rendering
 		void InitializeBatches(Scene& scene, VkExtent2D extents);
 	private:
@@ -108,13 +109,9 @@ namespace Core
 
 	private:
 		Device& _device;
-		
-		CommandBuffer* _commandBuffer = nullptr;
-		CommandBuffer* _computeCommandBuffer = nullptr;
-		
-		VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
-		VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
-		
+
+		FrameSubmission _submission;
+
 		unique_ptr<DescriptorPool> _descriptorPool;
 
 		BindlessTextureManager* _bindlessTextureManager;

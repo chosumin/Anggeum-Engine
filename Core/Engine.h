@@ -1,4 +1,5 @@
 #pragma once
+#include "Status.h"
 
 namespace Core
 {
@@ -26,8 +27,7 @@ namespace Core
         void Draw();
         void WaitIdle();
     private:
-        //todo : stats
-
+        unique_ptr<Core::Status> _status;
         unique_ptr<Core::Timer> _timer;
         Device* _device;
         IRenderPipeline* _renderPipeline;

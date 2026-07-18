@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "RenderContext.h"
 #include "RenderFrame.h"
+#include "Vulkans/SubmitInfo.h"
 #include "Foundation/Scene.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandPool.h"
@@ -48,8 +49,10 @@ RenderContext::RenderContext(Device& device)
 	_commandPool = new CommandPool(device, queueFamilyIndices.GraphicsFamily.value());
 	_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
 
+	_syncContext = make_unique<SyncContext>(device);
+	_queueTimer = make_unique<GpuQueueTimer>(device);
+
 	CreateRenderFrames();
-	CreateSyncObjects();	
 
 	if (_bindlessTextureManager)
 	{
@@ -64,17 +67,12 @@ RenderContext::~RenderContext()
 	_meshBufferManager.reset();
 	_materialManager.reset();
 
-	auto device = _device.GetDevice();
-
-	// Clean up timeline semaphores
-	if (_graphicsSemaphore != VK_NULL_HANDLE)
-		vkDestroySemaphore(device, _graphicsSemaphore, nullptr);
-
-	if (_computeSemaphore != VK_NULL_HANDLE)
-		vkDestroySemaphore(device, _computeSemaphore, nullptr);
-
 	// Clean up frames
 	_frames.clear();
+
+	// Clean up sync primitives (must outlive frames only for wait; frames already destroyed)
+	_syncContext.reset();
+	_queueTimer.reset();
 
 	// Clean up command pools
 	delete _commandPool;
@@ -111,26 +109,20 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 	// Acquire swap chain image and wait
 	AcquireSwapChainAndResetFence(*_swapChain);
 
+	// The wait above guarantees this slot's previous frame finished on the GPU, so
+	// the timestamps it wrote are readable now.
+	auto timings = _queueTimer->Resolve(_currentFrame);
+	if (timings.valid)
+		_lastQueueTimings = timings;
+
 	auto& currentFrame = GetCurrentFrame();
 
 	uint32_t prevIndex = (_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
 	_previousFrameDepth = _frameDepthBuffers[prevIndex];
 	currentFrame.SetPreviousDepthBuffer(_previousFrameDepth);
 
-	// Allocate command buffers (from CommandPool)
-	auto& commandBuffer = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-	auto& computeBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-
-	// Set command buffers to RenderFrame
-	currentFrame.SetCommandBuffer(&commandBuffer);
-	currentFrame.SetComputeCommandBuffer(&computeBuffer);
-
-	// Reset current frame (Descriptor pool, Command buffers)
+	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
-
-	// Begin command buffers
-	commandBuffer.BeginCommandBuffer();
-	computeBuffer.BeginCommandBuffer();
 
 	if (_bindlessTextureManager)
 		_bindlessTextureManager->UpdateDescriptorSet();
@@ -155,119 +147,41 @@ void RenderContext::Submit()
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 
-	auto& commandBuffer = currentFrame.GetCommandBuffer();
-	auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+	auto& submission = currentFrame.GetSubmission();
 
-	// End command buffers
-	commandBuffer.EndCommandBuffer();
-	computeBuffer.EndCommandBuffer();
+	auto submitStart = std::chrono::steady_clock::now();
 
-	// Graphics queue submit
-	u32 waitSemaphoreCount = 1;
+	// Submit all queues with semaphore injection
+	_syncContext->SubmitToQueues(
+		submission.submitInfos,
+		submission.submitScratch,
+		submission.imageAvailableSemaphore,
+		submission.renderFinishedSemaphore);
 
-	bool waitForComputeSemaphore = _lastComputeSemaphoreValue > 0;
-	if (waitForComputeSemaphore)
-		waitSemaphoreCount++;
+	// Record this frame's final timeline values
+	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
-	bool waitForTimelineSemaphore = FrameCounter::GetFrameNumber() >= _maxFramesInFlight;
-	if (waitForTimelineSemaphore)
-		waitSemaphoreCount++;
+	auto presentStart = std::chrono::steady_clock::now();
 
-	VkSemaphore waitSemaphores[] =
-	{
-		currentFrame.GetImageAvailableSemaphore(),
-		_computeSemaphore,
-		_graphicsSemaphore
-	};
+	VkSemaphore renderFinished = submission.renderFinishedSemaphore;
+	EndFrame(&renderFinished);
 
-	VkPipelineStageFlags waitStages[] =
-	{
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-	};
+	auto presentEnd = std::chrono::steady_clock::now();
 
-	VkSemaphore signalSemaphores[] =
-	{
-		currentFrame.GetRenderFinishedSemaphore(),
-		_graphicsSemaphore
-	};
-
-	u64 signalValues[] = { 0, FrameCounter::GetFrameNumber() + 1 };
-
-	VkTimelineSemaphoreSubmitInfo semaphoreSubmitInfo{};
-	semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-	semaphoreSubmitInfo.signalSemaphoreValueCount = 2;
-	semaphoreSubmitInfo.pSignalSemaphoreValues = signalValues;
-
-	u64 waitValues[] =
-	{
-		0, _lastComputeSemaphoreValue,
-		FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1)
-	};
-
-	semaphoreSubmitInfo.waitSemaphoreValueCount = waitSemaphoreCount;
-	semaphoreSubmitInfo.pWaitSemaphoreValues = waitValues;
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = waitSemaphoreCount;
-	submitInfo.pWaitSemaphores = waitSemaphores;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
-	submitInfo.signalSemaphoreCount = 2;
-	submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.pNext = &semaphoreSubmitInfo;
-
-	if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-		throw runtime_error("failed to submit draw command buffer!");
-
-	// Compute queue submit
-	SubmitComputeBuffer();
-
-	// Present
-	EndFrame(signalSemaphores);
+	_lastQueueSubmitMs = std::chrono::duration<double, std::milli>(presentStart - submitStart).count();
+	_lastPresentMs = std::chrono::duration<double, std::milli>(presentEnd - presentStart).count();
 }
 
-void RenderContext::SubmitComputeBuffer()
+CommandBuffer& RenderContext::RequestCommandBuffer()
 {
-	auto& currentFrame = GetCurrentFrame();
-	auto& computeBuffer = currentFrame.GetComputeCommandBuffer();
+	auto& cmd = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	return cmd;
+}
 
-	bool has_wait_semaphore = _lastComputeSemaphoreValue > 0;
-
-	VkSemaphore waitSemaphores[] = { _computeSemaphore };
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
-
-	VkSemaphore signalSemaphores[] = { _computeSemaphore };
-
-	VkTimelineSemaphoreSubmitInfo semaphore_info{};
-	semaphore_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-
-	u64 waitValues[] = { _lastComputeSemaphoreValue };
-	semaphore_info.waitSemaphoreValueCount = has_wait_semaphore ? 1 : 0;
-	semaphore_info.pWaitSemaphoreValues = waitValues;
-
-	++_lastComputeSemaphoreValue;
-
-	u64 signalValues[] = { _lastComputeSemaphoreValue };
-	semaphore_info.signalSemaphoreValueCount = 1;
-	semaphore_info.pSignalSemaphoreValues = signalValues;
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.waitSemaphoreCount = has_wait_semaphore ? 1 : 0;
-	submitInfo.pWaitSemaphores = waitSemaphores;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &computeBuffer.GetHandle();
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.pNext = &semaphore_info;
-
-	if (vkQueueSubmit(_device.GetComputeQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-		throw runtime_error("failed to submit compute command buffer!");
+CommandBuffer& RenderContext::RequestComputeCommandBuffer()
+{
+	auto& cmd = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	return cmd;
 }
 
 SwapChain& RenderContext::GetSwapChain() const
@@ -280,39 +194,17 @@ VkExtent2D RenderContext::GetSurfaceExtent() const
 	return _swapChain->GetSwapChainExtent();
 }
 
-void RenderContext::CreateSyncObjects()
-{
-	auto device = _device.GetDevice();
-
-	// Create timeline semaphores
-	VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
-	semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-	semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-
-	VkSemaphoreCreateInfo semaphoreInfo{};
-	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semaphoreInfo.pNext = &semaphoreTypeInfo;
-
-	if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_graphicsSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(device, &semaphoreInfo, nullptr, &_computeSemaphore) != VK_SUCCESS)
-	{
-		throw runtime_error("Failed to create timeline semaphores!");
-	}
-}
-
 void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 {
 	auto device = _device.GetDevice();
 	auto& currentFrame = GetCurrentFrame();
 
-	// Wait for GPU work completion (Timeline semaphores)
-	if (FrameCounter::GetFrameNumber() >= _maxFramesInFlight)
+	// Wait for the previous use of this frame slot to complete on the GPU.
+	const auto& snapshot = _frameSnapshots[_currentFrame];
+	if (snapshot.valid)
 	{
-		u64 graphicsTimelineValue = FrameCounter::GetFrameNumber() - (_maxFramesInFlight - 1);
-		u64 computeTimelineValue = _lastComputeSemaphoreValue;
-
-		u64 waitValues[] = { graphicsTimelineValue, computeTimelineValue };
-		VkSemaphore waitSemaphores[] = { _graphicsSemaphore, _computeSemaphore };
+		u64 waitValues[] = { snapshot.graphicsValue, snapshot.computeValue };
+		VkSemaphore waitSemaphores[] = { _syncContext->GetGraphicsSemaphore(), _syncContext->GetComputeSemaphore() };
 
 		VkSemaphoreWaitInfo waitInfo{};
 		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
@@ -327,7 +219,7 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	auto swapChainHandle = swapChain.GetSwapChain();
 	VkResult result = vkAcquireNextImageKHR(
 		device, swapChainHandle, UINT64_MAX,
-		currentFrame.GetImageAvailableSemaphore(),
+		currentFrame.GetSubmission().imageAvailableSemaphore,
 		VK_NULL_HANDLE, &_imageIndex);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -352,7 +244,6 @@ void RenderContext::EndFrame(VkSemaphore* semaphore)
 	presentInfo.pImageIndices = &_imageIndex;
 
 	VkResult result = vkQueuePresentKHR(_device.GetPresentQueue(), &presentInfo);
-
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
 	{
 		Window::FramebufferResized = false;

@@ -156,11 +156,6 @@ void SampleScene::Update()
 {
 	ImGui::Begin("Scene Information");
 
-	// Status Section
-	ImGui::SeparatorText("Status");
-	ImGuiIO& io = ImGui::GetIO();
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
 	// GPU Driven Rendering Info Section
 	{
 		ImGui::SeparatorText("GPU Driven Rendering Info");
@@ -225,7 +220,7 @@ void SampleScene::Update()
 		ImGui::InputFloat3("Position", &position[0]);
 		transform.SetTranslation(position);
 
-		// DragFloat3: drag to rotate freely without clamping, enabling full 360¡Æ rotation
+		// DragFloat3: drag to rotate freely without clamping, enabling full 360ï¿½ï¿½ rotation
 		ImGui::DragFloat3("Rotation (Pitch / Yaw / Roll)", &_dirLightEuler[0], 1.0f);
 		transform.SetRotation(_dirLightEuler);
 
@@ -233,7 +228,7 @@ void SampleScene::Update()
 	}
 
 	// Animate Point Lights
-	float deltaTime = io.DeltaTime * 20.0f;
+	float deltaTime = ImGui::GetIO().DeltaTime * 20.0f;
 	for (size_t i = 0; i < 15; ++i)
 	{
 		size_t lightIndex = 1 + i; // Skip directional light
