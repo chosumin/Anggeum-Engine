@@ -26,6 +26,11 @@ namespace Core
 		double graphicsBusyMs = 0.0;
 		double computeBusyMs = 0.0;
 
+		// Wall-clock length of the whole GPU frame: earliest timestamp to latest.
+		// The gap between this and a queue's busy time is that queue idling mid
+		// frame — waiting on the other queue, or starved by the CPU.
+		double frameSpanMs = 0.0;
+
 		// Time both queues had work executing simultaneously — the real async
 		// compute win.
 		double overlapMs = 0.0;

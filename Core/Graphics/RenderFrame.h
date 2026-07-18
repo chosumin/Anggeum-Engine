@@ -5,7 +5,6 @@
 #include "IndirectDrawBuffer.h"
 #include "RenderExecutor.h"
 #include "Vulkans/SubmitInfo.h"
-#include <deque>
 
 namespace Core
 {
@@ -42,23 +41,6 @@ namespace Core
 		// the producing compute pass has ever run, so the validation layer sees a
 		// valid layout on the first frame.
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	};
-
-	// Everything needed to submit one frame's work: the SubmitInfos collected from
-	// the passes, the VkSubmitInfos built from them (grouped per queue), and the
-	// frame's swapchain semaphores.
-	struct FrameSubmission
-	{
-		// Collected from the passes as they record, submitted at end of frame.
-		deque<SubmitInfo> submitInfos;
-
-		// Built from submitInfos, grouped per queue — one vkQueueSubmit per queue.
-		// Must outlive the submit calls: the VkSubmitInfo structs point into the
-		// SubmitInfo objects held by submitInfos.
-		unordered_map<QueueType, vector<VkSubmitInfo>> submitOutput;
-
-		VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-		VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
 	};
 
 	class RenderFrame

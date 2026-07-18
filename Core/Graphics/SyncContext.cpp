@@ -57,8 +57,8 @@ void SyncContext::RecordFrameSnapshot(FrameTimelineSnapshot& snapshot)
 }
 
 void SyncContext::SubmitToQueues(
-    unordered_map<QueueType, vector<VkSubmitInfo>>& submitOutput,
     deque<SubmitInfo>& submitInfos,
+    vector<VkSubmitInfo>& scratch,
     VkSemaphore imageAvailable,
     VkSemaphore renderFinished)
 {
@@ -100,30 +100,29 @@ void SyncContext::SubmitToQueues(
         }
     }
 
-    // One submit per queue: gather all graphics submits into a single
-    // vkQueueSubmit and all compute submits into another, preserving the
-    // recorded order within each queue. The per-pass timeline wait/signal values
-    // are baked at record time (see SubmitInfo), so cross-queue ordering is
-    // enforced by the semaphores regardless of how the submits are batched here.
-    for (auto& info : submitInfos)
+    // Submit one run of consecutive same-queue passes at a time, in recorded
+    // order.
+    size_t index = 0;
+    while (index < submitInfos.size())
     {
-        if (info.GetQueueType() == QueueType::Compute)
-            submitOutput[QueueType::Compute].push_back(info.Build());
-        else
-            submitOutput[QueueType::Graphics].push_back(info.Build());
-    }
+        const QueueType queueType = submitInfos[index].GetQueueType();
 
-    for (auto& [queueType, submits] : submitOutput)
-    {
-        if (submits.empty())
-            continue;
-        VkQueue queue = (queueType == QueueType::Compute) ?
-            _device.GetComputeQueue() : _device.GetGraphicsQueue();
+        scratch.clear();
+        size_t runEnd = index;
+        for (; runEnd < submitInfos.size() && submitInfos[runEnd].GetQueueType() == queueType; ++runEnd)
+            scratch.push_back(submitInfos[runEnd].Build());
+
+        VkQueue queue = (queueType == QueueType::Compute)
+            ? _device.GetComputeQueue()
+            : _device.GetGraphicsQueue();
+
         if (vkQueueSubmit(queue,
-            static_cast<uint32_t>(submits.size()),
-            submits.data(), VK_NULL_HANDLE) != VK_SUCCESS)
+            static_cast<uint32_t>(scratch.size()),
+            scratch.data(), VK_NULL_HANDLE) != VK_SUCCESS)
         {
             throw runtime_error("failed to submit command buffers!");
         }
-	}
+
+        index = runEnd;
+    }
 }

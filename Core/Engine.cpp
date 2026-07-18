@@ -66,19 +66,36 @@ void Core::Engine::Update()
 
 void Core::Engine::Draw()
 {
-	_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
-	_transferContext->Wait();
+	auto& phases = _status->GetCpuPhases();
+
+	{
+		ScopedCpuTimer timer(phases.transferWaitMs);
+		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
+		_transferContext->Wait();
+	}
 
 	auto extents = _renderContext->GetSurfaceExtent();
-	_renderContext->Begin(*_scene, extents);
+	{
+		ScopedCpuTimer timer(phases.beginMs);
+		_renderContext->Begin(*_scene, extents);
+	}
 
-	_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
-	_status->OnGUI();
+	{
+		ScopedCpuTimer timer(phases.guiMs);
+		_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
+		_status->OnGUI();
+	}
 
 	uint32_t imageIndex = _renderContext->GetImageIndex();
-	_renderPipeline->Draw(*_renderContext, _renderContext->GetCurrentFrame(), imageIndex);
+	{
+		ScopedCpuTimer timer(phases.recordMs);
+		_renderPipeline->Draw(*_renderContext, _renderContext->GetCurrentFrame(), imageIndex);
+	}
 
-	_renderContext->Submit();
+	{
+		ScopedCpuTimer timer(phases.submitMs);
+		_renderContext->Submit();
+	}
 }
 
 void Core::Engine::WaitIdle()

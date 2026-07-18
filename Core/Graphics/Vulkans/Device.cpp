@@ -372,7 +372,15 @@ namespace Core
 	        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);
 
 	        if (presentSupport)
-	            indices.PresentFamily = i;
+	        {
+	            const bool isGraphicsFamily = (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+	            const bool haveGraphicsPresent = indices.PresentFamily.has_value() &&
+	                indices.GraphicsFamily.has_value() &&
+	                indices.PresentFamily.value() == indices.GraphicsFamily.value();
+
+	            if (isGraphicsFamily || haveGraphicsPresent == false)
+	                indices.PresentFamily = i;
+	        }
 
 			i++;
 		}

@@ -196,6 +196,11 @@ QueueTimings GpuQueueTimer::Resolve(uint32_t frameIndex)
 	for (const auto& interval : computeIntervals)
 		timings.computeBusyMs += interval.second - interval.first;
 
+	// Timestamps are rebased onto the earliest one, so the span is just the latest
+	// end.
+	for (const auto& pass : timings.passes)
+		timings.frameSpanMs = std::max(timings.frameSpanMs, pass.endMs);
+
 	timings.overlapMs = IntersectionMs(graphicsIntervals, computeIntervals);
 
 	const double shorter = std::min(timings.graphicsBusyMs, timings.computeBusyMs);

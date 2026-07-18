@@ -82,4 +82,20 @@ namespace Core
         VkTimelineSemaphoreSubmitInfo _timelineInfo{};
         VkSubmitInfo                  _submitInfo{};
     };
+
+	// Everything needed to submit one frame's work: the SubmitInfos collected from
+    // the passes, the VkSubmitInfos built from them (grouped per queue), and the
+    // frame's swapchain semaphores.
+	struct FrameSubmission
+	{
+        // Collected from the passes as they record, submitted at end of frame.
+        deque<SubmitInfo> submitInfos;
+
+        // Persistent VkSubmitInfo: the structs point into the SubmitInfo objects in 
+        // submitInfos, and this keeps their lifetime obvious at the call site.
+        vector<VkSubmitInfo> submitScratch;
+
+        VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+        VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+    };
 }

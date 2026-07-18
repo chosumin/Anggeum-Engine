@@ -9,36 +9,62 @@ void Status::OnGUI()
 	ImGui::Begin("Status");
 
 	ImGuiIO& io = ImGui::GetIO();
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-		1000.0f / io.Framerate, io.Framerate);
+	const float cpuFrameMs = 1000.0f / io.Framerate;
+	ImGui::Text("CPU frame:     %.2f ms (%.1f FPS)", cpuFrameMs, io.Framerate);
 
-	ImGui::SeparatorText("GPU Queue Timing");
+	const auto& timings = _renderContext.GetLastQueueTimings();
+	if (timings.valid == false)
+	{
+		ImGui::TextDisabled("Waiting for GPU timestamps...");
+		ImGui::End();
+		return;
+	}
+
+	ImGui::Text("GPU frame:     %.2f ms", timings.frameSpanMs);
+
+	DrawCpuPhases();
 	DrawQueueTimings();
 
 	ImGui::End();
 }
 
+void Status::DrawCpuPhases()
+{
+	ImGui::SeparatorText("CPU Frame Breakdown");
+
+	const auto& phases = _cpuPhases;
+	const double total = phases.transferWaitMs + phases.beginMs + phases.guiMs +
+		phases.recordMs + phases.submitMs;
+
+	ImGui::Text("Transfer wait: %.2f ms", phases.transferWaitMs);
+	ImGui::Text("Begin frame:   %.2f ms", phases.beginMs);
+	ImGui::Text("Build GUI:     %.2f ms", phases.guiMs);
+	ImGui::Text("Record passes: %.2f ms", phases.recordMs);
+	ImGui::Text("Submit:        %.2f ms", phases.submitMs);
+	ImGui::Text("  vkQueueSubmit: %.2f ms", _renderContext.GetLastQueueSubmitMs());
+	ImGui::Text("  present:       %.2f ms", _renderContext.GetLastPresentMs());
+	ImGui::Separator();
+	ImGui::Text("Measured total: %.2f ms", total);
+}
+
 void Status::DrawQueueTimings()
 {
-	const auto& timings = _renderContext.GetLastQueueTimings();
-	if (timings.valid == false)
-	{
-		ImGui::TextDisabled("Waiting for GPU timestamps...");
-		return;
-	}
+	ImGui::SeparatorText("GPU Queue Timing");
 
-	ImGui::Text("Graphics busy: %.2f ms", timings.graphicsBusyMs);
-	ImGui::Text("Compute busy:  %.2f ms", timings.computeBusyMs);
+	const auto& timings = _renderContext.GetLastQueueTimings();
+
+	ImGui::Text("Graphics busy: %.2f ms  (idle %.2f ms)",
+		timings.graphicsBusyMs, timings.frameSpanMs - timings.graphicsBusyMs);
+	ImGui::Text("Compute busy:  %.2f ms  (idle %.2f ms)",
+		timings.computeBusyMs, timings.frameSpanMs - timings.computeBusyMs);
 	ImGui::Text("Overlap:       %.2f ms  (%.1f%% of the shorter queue)",
 		timings.overlapMs, timings.overlapPercent);
 
 	ImGui::Spacing();
 
 	// Gantt chart: one lane per queue, sharing a time axis so overlapping bars line
-	// up vertically. The frame span is the latest end across all passes.
-	double frameSpanMs = 0.0;
-	for (const auto& pass : timings.passes)
-		frameSpanMs = std::max(frameSpanMs, pass.endMs);
+	// up vertically.
+	double frameSpanMs = timings.frameSpanMs;
 	if (frameSpanMs <= 0.0)
 		frameSpanMs = 1.0;
 

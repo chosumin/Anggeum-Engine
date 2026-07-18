@@ -57,10 +57,9 @@ void RenderFrame::Reset()
 	}
 	_builderResources.clear();
 
-	// submitOutput points into submitInfos, so both are cleared together here
-	// rather than as a side effect of handing them out.
+	// submitScratch points into submitInfos, so both are cleared together here.
 	_submission.submitInfos.clear();
-	_submission.submitOutput.clear();
+	_submission.submitScratch.clear();
 
 	// Reset culler usage tracking for this frame
 	_renderExecutor->ResetFrame();

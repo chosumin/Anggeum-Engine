@@ -149,18 +149,27 @@ void RenderContext::Submit()
 
 	auto& submission = currentFrame.GetSubmission();
 
+	auto submitStart = std::chrono::steady_clock::now();
+
 	// Submit all queues with semaphore injection
 	_syncContext->SubmitToQueues(
-		submission.submitOutput,
 		submission.submitInfos,
+		submission.submitScratch,
 		submission.imageAvailableSemaphore,
 		submission.renderFinishedSemaphore);
 
 	// Record this frame's final timeline values
 	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
+	auto presentStart = std::chrono::steady_clock::now();
+
 	VkSemaphore renderFinished = submission.renderFinishedSemaphore;
 	EndFrame(&renderFinished);
+
+	auto presentEnd = std::chrono::steady_clock::now();
+
+	_lastQueueSubmitMs = std::chrono::duration<double, std::milli>(presentStart - submitStart).count();
+	_lastPresentMs = std::chrono::duration<double, std::milli>(presentEnd - presentStart).count();
 }
 
 CommandBuffer& RenderContext::RequestCommandBuffer()

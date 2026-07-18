@@ -41,11 +41,11 @@ namespace Core
         // Frame slot snapshots (for reusing a frame slot safely)
         void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
 
-        // Queue submission with automatic semaphore injection
-        void SubmitToQueues(unordered_map<QueueType, vector<VkSubmitInfo>>& submitOutput,
-                           deque<SubmitInfo>& submitInfos,
-                           VkSemaphore imageAvailable,
-                           VkSemaphore renderFinished);
+        // Injects the frame-level semaphores and submits the frame
+        void SubmitToQueues(deque<SubmitInfo>& submitInfos,
+                            vector<VkSubmitInfo>& scratch,
+                            VkSemaphore imageAvailable,
+                            VkSemaphore renderFinished);
 
         // Direct handle accessors (for RenderContext internal use)
         VkSemaphore GetGraphicsSemaphore() const { return _graphicsSemaphore; }

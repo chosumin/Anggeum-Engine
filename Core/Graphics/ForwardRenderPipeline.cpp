@@ -126,7 +126,8 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 			: renderContext.RequestCommandBuffer();
 
 		// Register SubmitInfo before Draw so the pass can inject wait/signal semaphores
-		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(), renderContext.GetSyncContext());
+		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(),
+			renderContext.GetSyncContext());
 
 		commandBuffer.BeginCommandBuffer();
 		queueTimer.BeginPass(commandBuffer, frameIndex,

@@ -55,6 +55,11 @@ namespace Core
 		// Graphics/compute overlap measured on the GPU. Lags by MAX_FRAMES_IN_FLIGHT
 		// frames, since a slot's timestamps are only readable once its work is done.
 		const QueueTimings& GetLastQueueTimings() const { return _lastQueueTimings; }
+
+		// Submit() split into its two halves. Present usually dominates when it does,
+		// and that is the CPU blocking on frame pacing rather than doing work.
+		double GetLastQueueSubmitMs() const { return _lastQueueSubmitMs; }
+		double GetLastPresentMs() const { return _lastPresentMs; }
 		uint32_t GetImageIndex() const { return _imageIndex; }
 
 		// Command buffer allocation
@@ -103,6 +108,8 @@ namespace Core
 		// GPU-side measurement of how much the two queues actually overlap
 		unique_ptr<GpuQueueTimer> _queueTimer;
 		QueueTimings _lastQueueTimings;
+		double _lastQueueSubmitMs = 0.0;
+		double _lastPresentMs = 0.0;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
 
