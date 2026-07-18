@@ -50,6 +50,7 @@ RenderContext::RenderContext(Device& device)
 	_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
 
 	_syncContext = make_unique<SyncContext>(device);
+	_queueTimer = make_unique<GpuQueueTimer>(device);
 
 	CreateRenderFrames();
 
@@ -71,6 +72,7 @@ RenderContext::~RenderContext()
 
 	// Clean up sync primitives (must outlive frames only for wait; frames already destroyed)
 	_syncContext.reset();
+	_queueTimer.reset();
 
 	// Clean up command pools
 	delete _commandPool;
@@ -106,6 +108,12 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 {
 	// Acquire swap chain image and wait
 	AcquireSwapChainAndResetFence(*_swapChain);
+
+	// The wait above guarantees this slot's previous frame finished on the GPU, so
+	// the timestamps it wrote are readable now.
+	auto timings = _queueTimer->Resolve(_currentFrame);
+	if (timings.valid)
+		_lastQueueTimings = timings;
 
 	auto& currentFrame = GetCurrentFrame();
 
@@ -152,14 +160,6 @@ void RenderContext::Submit()
 	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
 	VkSemaphore renderFinished = submission.renderFinishedSemaphore;
-
-	// Diagnostic: poll GPU timeline completion before present
-	{
-		uint64_t gVal = 0, cVal = 0;
-		vkGetSemaphoreCounterValue(_device.GetDevice(), _syncContext->GetGraphicsSemaphore(), &gVal);
-		vkGetSemaphoreCounterValue(_device.GetDevice(), _syncContext->GetComputeSemaphore(), &cVal);
-	}
-
 	EndFrame(&renderFinished);
 }
 

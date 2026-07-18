@@ -101,8 +101,13 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 
 void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	for (auto&& rendererPass : _rendererPasses)
+	auto& queueTimer = renderContext.GetQueueTimer();
+	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
+
+	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
 	{
+		auto&& rendererPass = _rendererPasses[passIndex];
+
 		// Get class name from typeid
 		const char* className = typeid(*rendererPass).name();
 
@@ -124,12 +129,17 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(), renderContext.GetSyncContext());
 
 		commandBuffer.BeginCommandBuffer();
+		queueTimer.BeginPass(commandBuffer, frameIndex,
+			static_cast<uint32_t>(passIndex), queueType, simpleName);
+
 		commandBuffer.BeginDebugMarker(simpleName);
 
 		rendererPass->EnsureRenderTargets(renderFrame);
 		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
 
 		commandBuffer.EndDebugMarker();
+
+		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
 		commandBuffer.EndCommandBuffer();
 	}
 }

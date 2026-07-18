@@ -1,0 +1,40 @@
+{
+	"version": 3,
+	"configurePresets": [
+		{
+			"name": "windows-base",
+			"description": "Shared settings for 64-bit Windows builds. The MSVC environment must be supplied by the caller (an IDE, or a developer command prompt).",
+			"hidden": true,
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/out/build/${presetName}",
+			"installDir": "${sourceDir}/out/install/${presetName}",
+			"architecture": {
+				"value": "x64",
+				"strategy": "external"
+			},
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "cl.exe",
+				"CMAKE_CXX_COMPILER": "cl.exe"
+			},
+			"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		},
+		{
+			"name": "x64-debug",
+			"displayName": "x64 Debug",
+			"description": "Unoptimized build with full debug info.",
+			"inherits": "windows-base",
+			"cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+		},
+		{
+			"name": "x64-release",
+			"displayName": "x64 Release",
+			"description": "Optimized build.",
+			"inherits": "windows-base",
+			"cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+		}
+	]
+}

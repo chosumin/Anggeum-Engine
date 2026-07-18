@@ -19,6 +19,7 @@ Core::Engine::Engine(const EngineOptions& options)
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
     _renderContext = new Core::RenderContext(*_device);
+    _status = make_unique<Core::Status>(*_renderContext);
 
     auto& resourceCache = _device->GetResourceCache();
     resourceCache.Prepare(*_renderContext);
@@ -72,6 +73,7 @@ void Core::Engine::Draw()
 	_renderContext->Begin(*_scene, extents);
 
 	_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
+	_status->OnGUI();
 
 	uint32_t imageIndex = _renderContext->GetImageIndex();
 	_renderPipeline->Draw(*_renderContext, _renderContext->GetCurrentFrame(), imageIndex);

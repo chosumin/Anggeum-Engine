@@ -2,6 +2,7 @@
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
 #include "SyncContext.h"
+#include "GpuQueueTimer.h"
 
 namespace Core
 {
@@ -48,6 +49,12 @@ namespace Core
 		// Get current frame
 		RenderFrame& GetCurrentFrame() { return *_frames[_currentFrame]; }
 		uint32_t GetCurrentFrameIndex() const { return _currentFrame; }
+
+		GpuQueueTimer& GetQueueTimer() { return *_queueTimer; }
+
+		// Graphics/compute overlap measured on the GPU. Lags by MAX_FRAMES_IN_FLIGHT
+		// frames, since a slot's timestamps are only readable once its work is done.
+		const QueueTimings& GetLastQueueTimings() const { return _lastQueueTimings; }
 		uint32_t GetImageIndex() const { return _imageIndex; }
 
 		// Command buffer allocation
@@ -92,6 +99,10 @@ namespace Core
 		// Sync primitives (timeline semaphores, timeline values, frame snapshots)
 		unique_ptr<SyncContext> _syncContext;
 		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
+
+		// GPU-side measurement of how much the two queues actually overlap
+		unique_ptr<GpuQueueTimer> _queueTimer;
+		QueueTimings _lastQueueTimings;
 
 		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
 
