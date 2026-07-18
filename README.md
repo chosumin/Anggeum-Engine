@@ -11,7 +11,7 @@ Toy 3D rendering engine for studying Vulkan API.
 ## Screenshots
 
 ![PBR Rendering](https://github.com/user-attachments/assets/6c9db11f-4037-49a2-8971-c229a915bd65)
-<img width="1910" height="1071" alt="capture" src="https://github.com/user-attachments/assets/efeac7ec-f054-48e9-befa-4a870544b7ce" />
+<img width="1913" height="1077" alt="capture2" src="https://github.com/user-attachments/assets/5379fa9e-7022-4219-983c-737eec95580c" />
 
 ---
 
