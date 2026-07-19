@@ -162,9 +162,6 @@ namespace Core
 
 		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
 
-		// Builder-created resources, cleaned up on Reset()
-		vector<DescriptorSetResources> _builderResources;
-
 		// Per-camera/RendererBatch cullers, reused within a frame
 		unique_ptr<RenderExecutor> _renderExecutor;
 	};

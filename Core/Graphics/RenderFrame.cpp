@@ -50,14 +50,6 @@ void RenderFrame::Reset()
 		_descriptorPool->Reset();
 	}
 
-	// Drop references to builder-created resources. The descriptor sets they
-	// point at were freed by _descriptorPool->Reset() above.
-	for (auto& resources : _builderResources)
-	{
-		resources.Reset();
-	}
-	_builderResources.clear();
-
 	// submitScratch points into submitInfos, so both are cleared together here.
 	_submission.submitInfos.clear();
 	_submission.submitScratch.clear();
