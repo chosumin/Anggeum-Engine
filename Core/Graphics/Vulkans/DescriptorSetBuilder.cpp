@@ -30,6 +30,10 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
 			{
 				if (bindingInfo.Binding == binding)
 				{
+					// FIXME(buffer-lifetime): leaked. DescriptorSetResources is a
+					// non-owning view, and nothing else claims this allocation.
+					// It must outlive the frame's GPU work, so the builder cannot
+					// own it either — a per-frame transient buffer owner is needed.
 					auto buffer = new UniformBuffer(_device, bindingInfo.BufferSize);
 					_resources.uniformBuffers[binding] = buffer;
 					it = _resources.uniformBuffers.find(binding);
@@ -47,32 +51,11 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
 	return *this;
 }
 
-Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
-	uint32_t binding, UniformBuffer* buffer)
-{
-	// Caller owns this buffer — store pointer without ownership.
-	// NOTE: CleanupBuffers will delete it, so caller must not delete separately,
-	// or we need to track ownership. For now, treat as "builder owns all".
-	_resources.uniformBuffers[binding] = buffer;
-	return *this;
-}
-
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
 	uint32_t binding, Buffer* buffer)
 {
-	auto it = _resources.storageBuffers.find(binding);
-	if (it == _resources.storageBuffers.end())
-	{
-		auto storageBuffer = new StorageBuffer();
-		_resources.storageBuffers[binding] = storageBuffer;
-		it = _resources.storageBuffers.find(binding);
-	}
-
-	if (it != _resources.storageBuffers.end())
-	{
-		it->second->SetBuffer(buffer);
-	}
-
+	// StorageBuffer is a non-owning view; `buffer` stays owned by the caller.
+	_resources.storageBuffers[binding].SetBuffer(buffer);
 	return *this;
 }
 
@@ -138,7 +121,7 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 		if (validStorageBindings.find(binding) == validStorageBindings.end())
 			continue; // Skip bindings not in shader layout
 
-		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
+		VkWriteDescriptorSet write = buffer.CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}

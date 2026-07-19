@@ -3,15 +3,6 @@
 #include "Buffer.h"
 #include "MemoryAllocator.h"
 
-Core::StorageBuffer::StorageBuffer()
-	: _buffer(nullptr)
-{
-}
-
-Core::StorageBuffer::~StorageBuffer()
-{
-}
-
 void Core::StorageBuffer::SetBuffer(Buffer* data)
 {
 	_buffer = data;
