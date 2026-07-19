@@ -47,10 +47,10 @@ namespace Core
 	private:
 		void CreateSDFTexture(uint32_t resolution);
 		void ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			Buffer* objectDataBuffer, Buffer* transformBuffer,
+			Buffer& objectDataBuffer, Buffer& transformBuffer,
 			uint32_t instanceCount);
 		void BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+			Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 			uint32_t drawCommandCount, uint32_t totalTriangles);
 
 	private:

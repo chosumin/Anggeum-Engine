@@ -48,12 +48,12 @@ namespace Core
 		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
 		~RendererBatch();
 
-		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer.get(); }
-		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer.get(); }
-		Buffer* GetMaterialIndexBuffer() const { return _materialIndexBuffer.get(); }
+		Buffer& GetObjectDataBuffer() const { return *_objectDataBuffer; }
+		Buffer& GetIndirectCommandBuffer() const { return *_indirectCommandBuffer; }
+		Buffer& GetMaterialIndexBuffer() const { return *_materialIndexBuffer; }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
-		Buffer* GetInstanceBuffer() const { return _instanceBuffer.get(); }
+		Buffer& GetInstanceBuffer() const { return *_instanceBuffer; }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		TransformBatch& GetTransformBatch() const { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }

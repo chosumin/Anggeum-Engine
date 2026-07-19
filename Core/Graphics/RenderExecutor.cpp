@@ -75,14 +75,14 @@ void RenderExecutor::ResetFrame()
     }
 }
 
-Culler* RenderExecutor::GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, TransformBatch& transformBatch)
+Culler* RenderExecutor::GetOrCreateCuller(RendererBatch& batch, const CameraBuffer& camera)
 {
-    CullerKey key{ &camera, batch };
+    CullerKey key{ &camera, &batch };
     auto it = _cullers.find(key);
     if (it != _cullers.end())
         return it->second.get();
 
-    auto culler = make_unique<Culler>(_device, transformBatch);
+    auto culler = make_unique<Culler>(_device, batch);
     auto* result = culler.get();
     _cullers[key] = std::move(culler);
     return result;
@@ -96,14 +96,12 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
     function<void()> postDraw)
 {
-    auto* culler = GetOrCreateCuller(_rendererBatch.get(), camera, _transformBatch);
+    // Nothing to cull: with no draw commands the batch has no instance/object
+    // buffers for the Culler to read, so it must not be constructed either.
+    if (_rendererBatch->GetDrawCommandCount() == 0)
+        return;
 
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _rendererBatch->GetExtents(),
-            _rendererBatch->GetObjectDataBuffer(), _rendererBatch->GetInstanceBuffer(),
-            _rendererBatch->GetInstanceCount(), _rendererBatch->GetIndirectDrawBuffer());
-    }
+    auto* culler = GetOrCreateCuller(*_rendererBatch, camera);
 
     bool cullerAlreadyUsed = culler->IsUsedThisFrame();
 
@@ -183,14 +181,7 @@ void RenderExecutor::FrustumCullAndDraw(CommandBuffer& commandBuffer,
     if (_rendererBatch->GetDrawCommandCount() == 0)
         return;
 
-    auto* culler = GetOrCreateCuller(_rendererBatch.get(), camera, _transformBatch);
-
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _rendererBatch->GetExtents(),
-            _rendererBatch->GetObjectDataBuffer(), _rendererBatch->GetInstanceBuffer(),
-            _rendererBatch->GetInstanceCount(), _rendererBatch->GetIndirectDrawBuffer());
-    }
+    auto* culler = GetOrCreateCuller(*_rendererBatch, camera);
 
     // Frustum culling dispatch
     auto cullingBuilder = _renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
@@ -220,9 +211,9 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
     commandBuffer.BindPipeline(&pipeline);
 
     builder.SetStorageBuffer(1, *_transformBatch.TransformBuffer);
-    builder.SetStorageBuffer(2, *_rendererBatch->GetInstanceBuffer());
+    builder.SetStorageBuffer(2, _rendererBatch->GetInstanceBuffer());
     builder.SetUniformBuffer(8, _renderFrame.GetMaterialManager()->GetMaterialBuffer());
-    builder.SetStorageBuffer(9, *_rendererBatch->GetMaterialIndexBuffer());
+    builder.SetStorageBuffer(9, _rendererBatch->GetMaterialIndexBuffer());
 
     // Runs before Build() so the hook can contribute its own descriptor resources.
     if (perShaderHook)

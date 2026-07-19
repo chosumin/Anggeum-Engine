@@ -74,7 +74,7 @@ namespace Core
         void ResetFrame();
 
     private:
-        Culler* GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, TransformBatch& transformBatch);
+        Culler* GetOrCreateCuller(RendererBatch& batch, const CameraBuffer& camera);
 
         void DrawIndirectInternal(CommandBuffer& commandBuffer,
             Shader& shader, Pipeline& pipeline,

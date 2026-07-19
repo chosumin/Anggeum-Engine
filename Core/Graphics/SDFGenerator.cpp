@@ -206,7 +206,7 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 }
 
 void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	Buffer* objectDataBuffer, Buffer* transformBuffer,
+	Buffer& objectDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
 	commandBuffer.Barrier(
@@ -216,8 +216,8 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	auto builder = renderFrame.CreateDescriptorSetBuilder(*_boundsReduceShader, 0);
-	builder.SetStorageBuffer(0, *objectDataBuffer);
-	builder.SetStorageBuffer(1, *transformBuffer);
+	builder.SetStorageBuffer(0, objectDataBuffer);
+	builder.SetStorageBuffer(1, transformBuffer);
 	builder.SetStorageBuffer(2, *_boundsBuffer);
 	auto& resources = builder.Build();
 
@@ -238,7 +238,7 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 }
 
 void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+	Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
 	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex)
@@ -253,8 +253,8 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	}
 
 	auto builder = renderFrame.CreateDescriptorSetBuilder(*_triLookupShader, 0);
-	builder.SetStorageBuffer(0, *drawCommandBuffer);
-	builder.SetStorageBuffer(1, *objectDataBuffer);
+	builder.SetStorageBuffer(0, drawCommandBuffer);
+	builder.SetStorageBuffer(1, objectDataBuffer);
 	builder.SetStorageBuffer(2, *_triLookupBuffer);
 	auto& resources = builder.Build();
 
@@ -287,11 +287,11 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		CreateSDFTexture(resolution);
 
 	auto batch = renderFrame.GetRenderExecutor().GetRendererBatch();
-	auto objectDataBuffer = batch->GetObjectDataBuffer();
-	auto indirectCommandBuffer = batch->GetIndirectCommandBuffer();
+	auto& objectDataBuffer = batch->GetObjectDataBuffer();
+	auto& indirectCommandBuffer = batch->GetIndirectCommandBuffer();
 	auto drawCommandCount = batch->GetDrawCommandCount();
 	auto instanceCount = batch->GetInstanceCount();
-	auto* transformBuffer = batch->GetTransformBatch().TransformBuffer.get();
+	auto& transformBuffer = *batch->GetTransformBatch().TransformBuffer;
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 
@@ -322,7 +322,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
 	sdfBuilder.SetStorageBuffer(3, *_boundsBuffer);
 	sdfBuilder.SetStorageBuffer(4, *_triLookupBuffer);
-	sdfBuilder.SetStorageBuffer(5, *transformBuffer);
+	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
 	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());

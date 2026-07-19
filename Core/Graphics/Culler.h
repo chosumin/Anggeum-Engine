@@ -12,7 +12,7 @@ namespace Core
     class CommandBuffer;
     class RenderFrame;
     class DescriptorSetBuilder;
-    struct TransformBatch;
+    class RendererBatch;
 
     // GPU-driven culling helper.
     // Owns the compute resources used for frustum/occlusion culling (culling
@@ -23,19 +23,13 @@ namespace Core
     class Culler
     {
     public:
-        Culler(Device& device, TransformBatch& transformBatch);
+        // Builds every culling resource up front. The batch supplies the geometry
+        // being culled and must outlive this Culler.
+        Culler(Device& device, RendererBatch& rendererBatch);
         ~Culler();
 
         bool IsUsedThisFrame() const { return _markUsedThisFrame; }
 		void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
-
-        // Creates the culling compute resources. The object/instance buffers are
-        // owned by RendererBatch and only referenced by the Culler. The Pass 1
-        // indirect command buffer is owned by the Culler itself.
-        void Prepare(Device& device, VkExtent2D extents,
-            Buffer* objectDataBuffer, Buffer* instanceBuffer,
-            uint32_t instanceCount,
-            const IndirectDrawBuffer& indirectDrawBuffer);
 
         // Resets per-frame instance counts before the 2-pass culling runs.
         void ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
@@ -61,9 +55,6 @@ namespace Core
         // Shader used for frustum-only culling (needed to build its descriptor set).
         Shader& GetFrustumCullingShader() const { return *_frustumCullingShader; }
 
-        // Check if the culler has been prepared
-        bool IsPrepared() const { return _drawCount > 0; }
-
     private:
         void PrepareCullingResources(Device& device, const IndirectDrawBuffer& indirectDrawBuffer);
         void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
@@ -78,13 +69,13 @@ namespace Core
 
     private:
         Device& _device;
-        TransformBatch& _transformBatch;
 
-        // Object/instance buffers owned by RendererBatch (referenced, not owned).
-        Core::Buffer* _objectDataBuffer = nullptr;
-        Core::Buffer* _instanceBuffer = nullptr;
+        // The geometry being culled. 
+        // Owns the object/instance/transform buffers this Culler reads.
+        RendererBatch& _rendererBatch;
+
         // Pass 1 indirect command buffer owned by this Culler so multiple cullers
-        // (e.g. depth pre-pass and shadow cascades) don't overwrite each other.
+        // don't overwrite each other.
         unique_ptr<Core::Buffer> _indirectCommandBuffer;
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;

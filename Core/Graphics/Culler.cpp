@@ -11,27 +11,17 @@
 
 using namespace Core;
 
-Core::Culler::Culler(Device& device, TransformBatch& transformBatch)
+Core::Culler::Culler(Device& device, RendererBatch& rendererBatch)
     : _device(device)
-    , _transformBatch(transformBatch)
+    , _rendererBatch(rendererBatch)
+    , _instanceCount(rendererBatch.GetInstanceCount())
+    , _drawCount(rendererBatch.GetIndirectDrawBuffer().GetDrawCount())
 {
+    PrepareHiZResources(device, rendererBatch.GetExtents());
+    PrepareCullingResources(device, rendererBatch.GetIndirectDrawBuffer());
 }
 
 Core::Culler::~Culler() = default;
-
-void Core::Culler::Prepare(Device& device, VkExtent2D extents,
-    Buffer* objectDataBuffer, Buffer* instanceBuffer,
-    uint32_t instanceCount,
-    const IndirectDrawBuffer& indirectDrawBuffer)
-{
-    _objectDataBuffer = objectDataBuffer;
-    _instanceBuffer = instanceBuffer;
-    _instanceCount = instanceCount;
-    _drawCount = indirectDrawBuffer.GetDrawCount();
-
-    PrepareHiZResources(device, extents);
-    PrepareCullingResources(device, indirectDrawBuffer);
-}
 
 void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectDrawBuffer& indirectDrawBuffer)
 {
@@ -164,9 +154,9 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
-    builder.SetStorageBuffer(1, *_objectDataBuffer);
-    builder.SetStorageBuffer(2, *_transformBatch.TransformBuffer);
-    builder.SetStorageBuffer(3, *_instanceBuffer);
+    builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
+    builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
+    builder.SetStorageBuffer(3, _rendererBatch.GetInstanceBuffer());
     builder.SetStorageBuffer(4, indirectCommandBuffer);
     builder.SetTextureBuffer(5, _hiZTexture);
     builder.SetStorageBuffer(10, *_rejectedIndicesBuffer);
@@ -400,9 +390,9 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	// first culler's buffers, so their planes/buffers were never bound and
 	// nothing got culled.
 	builder.SetUniformBuffer(0, *_frustumCullDataBuffer);
-	builder.SetStorageBuffer(1, *_objectDataBuffer);
-	builder.SetStorageBuffer(2, *_transformBatch.TransformBuffer);
-	builder.SetStorageBuffer(3, *_instanceBuffer);
+	builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
+	builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
+	builder.SetStorageBuffer(3, _rendererBatch.GetInstanceBuffer());
 	builder.SetStorageBuffer(4, *_indirectCommandBuffer);
 
 	auto& resources = builder.Build();
