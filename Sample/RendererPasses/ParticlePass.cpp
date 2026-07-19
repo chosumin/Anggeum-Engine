@@ -42,14 +42,7 @@ Sample::ParticlePass::ParticlePass(Device& device, WorkerThreadManager& workerTh
         _graphicsMaterial->GetShader(), *_pipelineState);
 }
 
-Sample::ParticlePass::~ParticlePass()
-{
-    for (auto& buffer : _buffers)
-    {
-        delete buffer;
-    }
-    _buffers.clear();
-}
+Sample::ParticlePass::~ParticlePass() = default;
 
 void Sample::ParticlePass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
@@ -100,9 +93,9 @@ void Sample::ParticlePass::Initialize()
     vector<Job*> jobs;
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[0 + 3 * i], positionBytes, true));
-        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[1 + 3 * i], velocityBytes, true));
-        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, &_buffers[2 + 3 * i], colorBytes, true));
+        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, _buffers[0 + 3 * i], positionBytes, true));
+        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, _buffers[1 + 3 * i], velocityBytes, true));
+        jobs.push_back(new VkBufferJob(_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, _buffers[2 + 3 * i], colorBytes, true));
     }
 
     CommandBuffer::ImmediateSubmit(_device, jobs);
@@ -132,10 +125,10 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
     builder.SetUniformBuffer(0, deltaTimeBuffer);
-    builder.SetStorageBuffer(1, _buffers[0]);
-    builder.SetStorageBuffer(2, _buffers[1]);
-    builder.SetStorageBuffer(3, _buffers[3]);
-    builder.SetStorageBuffer(4, _buffers[4]);
+    builder.SetStorageBuffer(1, *_buffers[0]);
+    builder.SetStorageBuffer(2, *_buffers[1]);
+    builder.SetStorageBuffer(3, *_buffers[3]);
+    builder.SetStorageBuffer(4, *_buffers[4]);
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_computePipeline.get());
@@ -155,8 +148,8 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
     commandBuffer.BindPipeline(_graphicsPipeline.get());
 
     vector<Buffer*> vertexBuffers(2);
-    vertexBuffers[0] = _buffers[0];
-    vertexBuffers[1] = _buffers[2];
+    vertexBuffers[0] = _buffers[0].get();
+    vertexBuffers[1] = _buffers[2].get();
 
     commandBuffer.BindVertexBuffers(vertexBuffers, 0);
     commandBuffer.Draw(PARTICLE_COUNT, 1);

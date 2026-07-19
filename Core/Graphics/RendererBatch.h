@@ -23,7 +23,7 @@ namespace Core
 
 	struct TransformBatch
 	{
-		Buffer* TransformBuffer;
+		unique_ptr<Buffer> TransformBuffer;
 		vector<uint> EntityIds;
 	};
 
@@ -48,14 +48,14 @@ namespace Core
 		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
 		~RendererBatch();
 
-		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
-		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
-		Buffer* GetMaterialIndexBuffer() const { return _materialIndexBuffer; }
+		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer.get(); }
+		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer.get(); }
+		Buffer* GetMaterialIndexBuffer() const { return _materialIndexBuffer.get(); }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
-		Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
+		Buffer* GetInstanceBuffer() const { return _instanceBuffer.get(); }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
-		TransformBatch* GetTransformBatch() const { return _transformBatch; }
+		TransformBatch& GetTransformBatch() const { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
 		shared_ptr<Material> GetFirstMaterial() const;
 
@@ -66,20 +66,21 @@ namespace Core
 
 	private:
 		Device& _device;
-		TransformBatch* _transformBatch = nullptr;
+		// Owned by RenderExecutor, which outlives this batch.
+		TransformBatch& _transformBatch;
 
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		Core::Buffer* _instanceBuffer = nullptr;
+		unique_ptr<Core::Buffer> _instanceBuffer;
 		uint _instanceCount = 0;
 
 		IndirectDrawBuffer _indirectDrawBuffer;
-		Core::Buffer* _indirectCommandBuffer = nullptr;
-		Core::Buffer* _materialIndexBuffer = nullptr;
+		unique_ptr<Core::Buffer> _indirectCommandBuffer;
+		unique_ptr<Core::Buffer> _materialIndexBuffer;
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
-		Core::Buffer* _objectDataBuffer = nullptr;
+		unique_ptr<Core::Buffer> _objectDataBuffer;
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};

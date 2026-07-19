@@ -124,7 +124,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     auto& paramsBuffer = renderFrame.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params");
     paramsBuffer.Update(_params);
 
-    builder.SetStorageBuffer(4, boundsBuffer);
+    builder.SetStorageBuffer(4, *boundsBuffer);
     builder.SetUniformBuffer(5, paramsBuffer);
     auto& resources = builder.Build();
 

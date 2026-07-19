@@ -46,15 +46,15 @@ namespace Core
 
 	private:
 		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
-		Buffer* InsertBufferSpace(VkIndexType indexType);
+		Buffer& InsertBufferSpace(VkIndexType indexType);
 	private:
 		Device& _device;
 
 		//Key: Attribute name, Value: Attribute value
-		unordered_map<string, Buffer*> _vertexBuffers;
+		unordered_map<string, unique_ptr<Buffer>> _vertexBuffers;
 
 		VkIndexType _indexType;
-		Buffer* _indexBuffer;
+		unique_ptr<Buffer> _indexBuffer;
 
 		// Allocation tracking
 		uint32_t _maxVertices = 10'000'000;

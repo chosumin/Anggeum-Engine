@@ -12,7 +12,7 @@ namespace Core
 	public:
 		StorageBuffer() = default;
 
-		void SetBuffer(Buffer* data);
+		void SetBuffer(Buffer& data);
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:

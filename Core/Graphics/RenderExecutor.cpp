@@ -25,14 +25,7 @@ RenderExecutor::RenderExecutor(Device& device, RenderFrame& renderFrame)
 {
 }
 
-RenderExecutor::~RenderExecutor()
-{
-    if (_transformBatch.TransformBuffer)
-    {
-        delete _transformBatch.TransformBuffer;
-        _transformBatch.TransformBuffer = nullptr;
-    }
-}
+RenderExecutor::~RenderExecutor() = default;
 
 void RenderExecutor::InitializeBatches(Scene& scene, VkExtent2D extents)
 {
@@ -60,13 +53,13 @@ void RenderExecutor::InitializeBatches(Scene& scene, VkExtent2D extents)
         _transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
     }
 
-    _transformBatch.TransformBuffer = new Buffer(_device,
+    _transformBatch.TransformBuffer = make_unique<Buffer>(_device,
         bufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         MemoryType::DEVICE_LOCAL);
 
     VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        &_transformBatch.TransformBuffer, transforms, true);
+        _transformBatch.TransformBuffer, transforms, true);
     CommandBuffer::ImmediateSubmit(_device, job);
 
     _rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, extents);
@@ -226,11 +219,10 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
 
     commandBuffer.BindPipeline(&pipeline);
 
-    builder.SetStorageBuffer(1, _transformBatch.TransformBuffer);
-    builder.SetStorageBuffer(2, _rendererBatch->GetInstanceBuffer());
-    builder.SetUniformBuffer(8,
-        const_cast<GPUMaterialData*>(_renderFrame.GetMaterialManager()->GetMaterialData()));
-    builder.SetStorageBuffer(9, _rendererBatch->GetMaterialIndexBuffer());
+    builder.SetStorageBuffer(1, *_transformBatch.TransformBuffer);
+    builder.SetStorageBuffer(2, *_rendererBatch->GetInstanceBuffer());
+    builder.SetUniformBuffer(8, _renderFrame.GetMaterialManager()->GetMaterialBuffer());
+    builder.SetStorageBuffer(9, *_rendererBatch->GetMaterialIndexBuffer());
 
     // Runs before Build() so the hook can contribute its own descriptor resources.
     if (perShaderHook)

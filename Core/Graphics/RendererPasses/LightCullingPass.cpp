@@ -44,7 +44,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 
 	auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
 	builder.SetUniformBuffer(0, cameraBuffer);
-	builder.SetStorageBuffer(1, &lightVisibilityBuffer);
+	builder.SetStorageBuffer(1, lightVisibilityBuffer);
 	builder.SetTextureBuffer(2, depthTarget);
 	builder.SetUniformBuffer(3, lightBuffer);
 	auto& resources = builder.Build();

@@ -23,7 +23,7 @@ using namespace Core;
 
 Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents)
     : _device(device)
-    , _transformBatch(&transformBatch)
+    , _transformBatch(transformBatch)
 {
     auto meshes = scene.GetComponents<Mesh>();
 
@@ -55,13 +55,7 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
     PrepareGPUDrivenRendering(extents);
 }
 
-Core::RendererBatch::~RendererBatch()
-{
-    if (_materialIndexBuffer != nullptr) delete(_materialIndexBuffer);
-    if (_indirectCommandBuffer != nullptr) delete(_indirectCommandBuffer);
-    if (_instanceBuffer != nullptr) delete(_instanceBuffer);
-    if (_objectDataBuffer != nullptr) delete(_objectDataBuffer);
-}
+Core::RendererBatch::~RendererBatch() = default;
 
 void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh)
 {
@@ -152,19 +146,19 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
 
     Core::VkBufferJob<DrawIndexedIndirectCommand> job(_device,
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        &_indirectCommandBuffer,
+        _indirectCommandBuffer,
         _indirectDrawBuffer.GetDrawCommands(), 0);
     jobs.push_back(&job);
 
     Core::VkBufferJob<uint32_t> job2(_device,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        &_materialIndexBuffer,
+        _materialIndexBuffer,
         _indirectDrawBuffer.GetMaterialIndices(), 0);
     jobs.push_back(&job2);
 
     Core::VkBufferJob<GPUObjectData> job3(_device,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        &_objectDataBuffer,
+        _objectDataBuffer,
         objectData, 0);
     jobs.push_back(&job3);
 
@@ -199,10 +193,10 @@ void Core::RendererBatch::CreateInstanceBuffer(Device& device)
         }
     }
 
-    _instanceBuffer = new Core::Buffer(device, _instanceCount * sizeof(uint),
+    _instanceBuffer = make_unique<Core::Buffer>(device, _instanceCount * sizeof(uint),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL);
 
-    Core::VkBufferJob<uint> job(device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &_instanceBuffer, instanceData, true);
+    Core::VkBufferJob<uint> job(device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, _instanceBuffer, instanceData, true);
     Core::CommandBuffer::ImmediateSubmit(device, job);
 }
 

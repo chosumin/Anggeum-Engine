@@ -17,13 +17,7 @@ Core::Culler::Culler(Device& device, TransformBatch& transformBatch)
 {
 }
 
-Core::Culler::~Culler()
-{
-    if (_rejectedIndicesBuffer != nullptr) delete(_rejectedIndicesBuffer);
-    if (_rejectedCountBuffer != nullptr) delete(_rejectedCountBuffer);
-    if (_indirectCommandBuffer != nullptr) delete(_indirectCommandBuffer);
-    if (_pass2IndirectCommandBuffer != nullptr) delete(_pass2IndirectCommandBuffer);
-}
+Core::Culler::~Culler() = default;
 
 void Core::Culler::Prepare(Device& device, VkExtent2D extents,
     Buffer* objectDataBuffer, Buffer* instanceBuffer,
@@ -51,12 +45,12 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectD
     _frustumCullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUFrustumCullData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
 
-    _rejectedIndicesBuffer = new Core::Buffer(device,
+    _rejectedIndicesBuffer = make_unique<Core::Buffer>(device,
         _instanceCount * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         MemoryType::DEVICE_LOCAL);
 
-    _rejectedCountBuffer = new Core::Buffer(device,
+    _rejectedCountBuffer = make_unique<Core::Buffer>(device,
         sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         MemoryType::DEVICE_LOCAL);
@@ -64,14 +58,14 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectD
     // Pass 1 Indirect Command Buffer (owned by this Culler)
     Core::VkBufferJob<DrawIndexedIndirectCommand> pass1Job(device,
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        &_indirectCommandBuffer,
+        _indirectCommandBuffer,
         indirectDrawBuffer.GetDrawCommands(), 0);
     Core::CommandBuffer::ImmediateSubmit(device, pass1Job);
 
     // Pass 2 Indirect Command Buffer
     Core::VkBufferJob<DrawIndexedIndirectCommand> pass2Job(device,
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        &_pass2IndirectCommandBuffer,
+        _pass2IndirectCommandBuffer,
         indirectDrawBuffer.GetDrawCommands(), 0);
     Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
 
@@ -97,9 +91,9 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
     commandBuffer.BindPipeline(_resetDrawCommandsPipeline.get());
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsShader, 0);
-    builder.SetStorageBuffer(0, _indirectCommandBuffer);
-    builder.SetStorageBuffer(1, _pass2IndirectCommandBuffer);
-    builder.SetStorageBuffer(2, _rejectedCountBuffer);
+    builder.SetStorageBuffer(0, *_indirectCommandBuffer);
+    builder.SetStorageBuffer(1, *_pass2IndirectCommandBuffer);
+    builder.SetStorageBuffer(2, *_rejectedCountBuffer);
     auto& resources = builder.Build();
 
     commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, drawCount);
@@ -120,7 +114,7 @@ void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer&
     const CameraBuffer& camera, shared_ptr<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        _indirectCommandBuffer, *_pass1CullDataBuffer,
+        *_indirectCommandBuffer, *_pass1CullDataBuffer,
         _cullingShader, _cullingPipeline.get());
 }
 
@@ -128,13 +122,13 @@ void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer&
     const CameraBuffer& camera, shared_ptr<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        _pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
+        *_pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
         _pass2CullingShader, _pass2CullingPipeline.get());
 }
 
 void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     const CameraBuffer& camera, shared_ptr<Texture> depth,
-    Core::Buffer* indirectCommandBuffer, Core::Buffer& cullDataBuffer,
+    Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
     shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline)
 {
     // Generate Hi-Z from depth
@@ -170,13 +164,13 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
-    builder.SetStorageBuffer(1, _objectDataBuffer);
-    builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
-    builder.SetStorageBuffer(3, _instanceBuffer);
+    builder.SetStorageBuffer(1, *_objectDataBuffer);
+    builder.SetStorageBuffer(2, *_transformBatch.TransformBuffer);
+    builder.SetStorageBuffer(3, *_instanceBuffer);
     builder.SetStorageBuffer(4, indirectCommandBuffer);
     builder.SetTextureBuffer(5, _hiZTexture);
-    builder.SetStorageBuffer(10, _rejectedIndicesBuffer);
-    builder.SetStorageBuffer(11, _rejectedCountBuffer);
+    builder.SetStorageBuffer(10, *_rejectedIndicesBuffer);
+    builder.SetStorageBuffer(11, *_rejectedCountBuffer);
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(cullingPipeline->GetPipelineBindPoint(),
@@ -370,7 +364,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
 
 	auto resetBuilder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsSimpleShader);
-	resetBuilder.SetStorageBuffer(0, _indirectCommandBuffer);
+	resetBuilder.SetStorageBuffer(0, *_indirectCommandBuffer);
 	auto& resetResources = resetBuilder.Build();
 
 	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, drawCount);
@@ -406,10 +400,10 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	// first culler's buffers, so their planes/buffers were never bound and
 	// nothing got culled.
 	builder.SetUniformBuffer(0, *_frustumCullDataBuffer);
-	builder.SetStorageBuffer(1, _objectDataBuffer);
-	builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
-	builder.SetStorageBuffer(3, _instanceBuffer);
-	builder.SetStorageBuffer(4, _indirectCommandBuffer);
+	builder.SetStorageBuffer(1, *_objectDataBuffer);
+	builder.SetStorageBuffer(2, *_transformBatch.TransformBuffer);
+	builder.SetStorageBuffer(3, *_instanceBuffer);
+	builder.SetStorageBuffer(4, *_indirectCommandBuffer);
 
 	auto& resources = builder.Build();
 

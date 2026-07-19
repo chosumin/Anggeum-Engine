@@ -23,8 +23,9 @@ namespace Core
 
 		bool HasVertexAttribute(string attributeName) const;
 
-		Buffer** InsertBufferSpace(string name);
-		Buffer** InsertBufferSpace(VkIndexType indexType);
+		// Returns the owning slot for a transfer job to fill in.
+		unique_ptr<Buffer>& InsertBufferSpace(string name);
+		unique_ptr<Buffer>& InsertBufferSpace(VkIndexType indexType);
 
 		void SetAllocation(const MeshAllocation& allocation) 
 		{ 
@@ -43,8 +44,8 @@ namespace Core
 
 		//Legacy Buffers
 		//Key: Attribute name, Value: Attribute value
-		unordered_map<string, Buffer*> _vertexBuffers;
-		Buffer* _indexBuffer;
+		unordered_map<string, unique_ptr<Buffer>> _vertexBuffers;
+		unique_ptr<Buffer> _indexBuffer;
 		
 		//Global Buffer Allocation Info
 		MeshAllocation _globalAllocation;

@@ -41,7 +41,7 @@ RenderContext::RenderContext(Device& device)
 	}
 
 	_meshBufferManager = make_unique<MeshBufferManager>(_device);
-	_materialManager = make_unique<MaterialManager>();
+	_materialManager = make_unique<MaterialManager>(_device);
 
 	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 

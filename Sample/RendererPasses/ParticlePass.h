@@ -46,7 +46,7 @@ namespace Sample
 		VkFormat _swapChainFormat;
 		VkSampleCountFlagBits _msaaSamples;
 
-		vector<Core::Buffer*> _buffers;
+		vector<unique_ptr<Core::Buffer>> _buffers;
 
 		DeltaTime _deltaTime;
 		shared_ptr<Core::Material> _computeMaterial;

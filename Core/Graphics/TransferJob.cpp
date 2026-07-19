@@ -6,11 +6,7 @@ Core::VkImageJob::VkImageJob(Device& device, weak_ptr<Image> dstImage, string fi
 {
 }
 
-Core::VkImageJob::~VkImageJob()
-{
-	if (_stagingBuffer != nullptr)
-		delete(_stagingBuffer);
-}
+Core::VkImageJob::~VkImageJob() = default;
 
 void Core::VkImageJob::Execute()
 {
@@ -27,7 +23,7 @@ void Core::VkImageJob::Execute()
 
 	VkDeviceSize bufferSize = imageData.size();
 
-	_stagingBuffer = new Core::Buffer(_device,
+	_stagingBuffer = make_unique<Core::Buffer>(_device,
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		MemoryType::STAGE);

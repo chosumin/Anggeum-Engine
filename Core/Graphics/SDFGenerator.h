@@ -41,7 +41,7 @@ namespace Core
 		const std::string& GetCachePath() const { return _sdfCachePath; }
 
 		shared_ptr<Texture> GetSDFTexture() const { return _sdfTexture; }
-		Buffer* GetBoundsBuffer() const { return _boundsBuffer; }
+		Buffer* GetBoundsBuffer() const { return _boundsBuffer.get(); }
 		bool IsGenerated() const { return _generated; }
 
 	private:
@@ -62,12 +62,12 @@ namespace Core
 
 		shared_ptr<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;
-		Buffer* _boundsBuffer = nullptr;
+		unique_ptr<Buffer> _boundsBuffer;
 
 		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
 		shared_ptr<Shader> _triLookupShader;
 		unique_ptr<Pipeline> _triLookupPipeline;
-		Buffer* _triLookupBuffer = nullptr;
+		unique_ptr<Buffer> _triLookupBuffer;
 
 		std::string _sdfCachePath = "Assets/Cache/sdf_volume.sdfvol";
 		float _paddingFactor = 0.1f;

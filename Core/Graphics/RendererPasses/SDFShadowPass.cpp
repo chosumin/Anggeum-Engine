@@ -116,7 +116,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
     auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(*_volumeSliceShader, 0);
     sliceBuilder.SetTextureBuffer(0, sdfTexture);
     sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    sliceBuilder.SetStorageBuffer(2, boundsBuffer);
+    sliceBuilder.SetStorageBuffer(2, *boundsBuffer);
     auto& sliceResources = sliceBuilder.Build();
 
     commandBuffer.BindPipeline(_volumeSlicePipeline.get());
@@ -274,7 +274,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     builder.SetUniformBuffer(2, sdfParamsBuffer);
     builder.SetTextureBuffer(3, depthTarget);
     builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    builder.SetStorageBuffer(5, _sdfGenerator->GetBoundsBuffer());
+    builder.SetStorageBuffer(5, *_sdfGenerator->GetBoundsBuffer());
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_sdfShadowPipeline.get());

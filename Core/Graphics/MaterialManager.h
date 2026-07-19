@@ -4,24 +4,33 @@
 namespace Core
 {
 	class Material;
+	class Device;
+	class Buffer;
 
+	// GPU-driven rendering resource, alongside MeshBufferManager and
+	// BindlessTextureManager: owns the material table and its GPU mirror for the
+	// whole application, and hands the buffer out for passes to bind.
 	class MaterialManager
 	{
 	public:
 		static constexpr uint32_t MAX_MATERIALS = 256;
 
-		MaterialManager();
-		~MaterialManager() = default;
+		// The GPU-side material table, uploaded as a single uniform block.
+		using MaterialTable = array<GPUMaterialData, MAX_MATERIALS>;
+
+		MaterialManager(Device& device);
+		~MaterialManager();
 
 		uint32_t RegisterMaterial(shared_ptr<Material> material);
 		void UnregisterMaterial(uint32_t materialIndex);
 
-		// Update dirty materials (only CPU data)
+		// Refreshes dirty entries and re-uploads the table if anything changed.
 		void RefreshDirtyMaterials();
 
-		// RenderFrame copies this data
-		const GPUMaterialData* GetMaterialData() const { return _materialData.data(); }
-		static constexpr size_t GetMaterialDataSize() { return sizeof(GPUMaterialData) * MAX_MATERIALS; }
+		const MaterialTable& GetMaterialData() const { return _materialData; }
+
+		// The GPU mirror of the table, bound by the passes that draw.
+		Buffer& GetMaterialBuffer() const { return *_materialDataBuffer; }
 
 		uint32_t GetMaterialCount() const { return _materialCount; }
 
@@ -31,7 +40,10 @@ namespace Core
 		void UpdateMaterialData(uint32_t materialIndex);
 
 	private:
-		array<GPUMaterialData, MAX_MATERIALS> _materialData;
+		Device& _device;
+
+		MaterialTable _materialData;
+		unique_ptr<Buffer> _materialDataBuffer;
 		array<weak_ptr<Material>, MAX_MATERIALS> _materials;
 
 		bitset<MAX_MATERIALS> _dirtyMaterials;

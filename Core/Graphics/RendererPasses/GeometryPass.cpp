@@ -230,7 +230,7 @@ namespace Core
         builder.SetUniformBuffer(3, giBuffer);
         builder.SetUniformBuffer(4, shadowBuffer);
         builder.SetUniformBuffer(5, lightBuffer);
-        builder.SetStorageBuffer(6, &lightVisibilityBuffer);
+        builder.SetStorageBuffer(6, lightVisibilityBuffer);
         builder.SetTextureBuffer(7, shadowTarget);
 
         if (sdfShadowTarget)

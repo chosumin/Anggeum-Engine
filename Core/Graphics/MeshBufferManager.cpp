@@ -7,21 +7,11 @@
 using namespace Core;
 
 MeshBufferManager::MeshBufferManager(Device& device)
-	: _device(device), _indexBuffer(nullptr)
+	: _device(device)
 {
 }
 
-MeshBufferManager::~MeshBufferManager()
-{
-	for (auto&& vertexBuffer : _vertexBuffers)
-	{
-		delete(vertexBuffer.second);
-	}
-	_vertexBuffers.clear();
-
-	if (_indexBuffer)
-		delete(_indexBuffer);
-}
+MeshBufferManager::~MeshBufferManager() = default;
 
 glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& positions)
 {
@@ -69,7 +59,7 @@ void MeshBufferManager::Defragment()
 	// TODO: Implement buffer defragmentation
 }
 
-Buffer* MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
+Buffer& MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 {
 	VkDeviceSize size = 0;
 
@@ -85,13 +75,13 @@ Buffer* MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 			throw runtime_error("Unsupported index type");
 	}
 
-	_indexBuffer = new Core::Buffer(_device,
+	_indexBuffer = make_unique<Core::Buffer>(_device,
 		_maxIndices * size,
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		MemoryType::DEVICE_LOCAL);
 
 	_indexType = indexType;
-	return _indexBuffer;
+	return *_indexBuffer;
 }
 
 const MeshAllocation* MeshBufferManager::GetAllocation(uint32_t meshID) const
@@ -106,7 +96,7 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 {
 	if (_vertexBuffers.find(name) == _vertexBuffers.end())
 	{
-		_vertexBuffers[name] = new Buffer(_device,
+		_vertexBuffers[name] = make_unique<Buffer>(_device,
 			_maxVertices * stride,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			MemoryType::DEVICE_LOCAL
@@ -137,7 +127,7 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 	VkDeviceSize offset = _currentVertexOffset * stride;
 
 	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
-		_vertexBuffers[name], move(data), offset), subMeshName + name);
+		*_vertexBuffers[name], move(data), offset), subMeshName + name);
 }
 
 void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndexType indexType, std::vector<uint8_t>&& indexData, string subMeshName)
@@ -169,7 +159,7 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndex
 	VkDeviceSize offset = _currentIndexOffset * indexStride;
 
 	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
-		_indexBuffer, move(indexData), offset), subMeshName);
+		*_indexBuffer, move(indexData), offset), subMeshName);
 }
 
 MeshAllocation MeshBufferManager::Build()
@@ -207,7 +197,7 @@ vector<Core::Buffer*> MeshBufferManager::GetVertexBuffers(vector<string> names) 
 		auto vertexBuffer = _vertexBuffers.find(name);
 		assert(vertexBuffer != _vertexBuffers.end());
 
-		buffers.push_back(vertexBuffer->second);
+		buffers.push_back(vertexBuffer->second.get());
 	}
 
 	return buffers;

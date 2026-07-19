@@ -1,16 +1,30 @@
 #include "stdafx.h"
 #include "MaterialManager.h"
 #include "Material.h"
+#include "Vulkans/Buffer.h"
+#include "Vulkans/MemoryAllocator.h"
 
 using namespace Core;
 
-MaterialManager::MaterialManager()
+MaterialManager::MaterialManager(Device& device)
+	: _device(device)
 {
 	for (auto& data : _materialData)
 	{
 		data = GPUMaterialData{};
 	}
+
+	_materialDataBuffer = make_unique<Buffer>(_device,
+		sizeof(MaterialTable),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		MemoryType::UNIFORM);
+
+	// Seed the GPU copy so a frame that draws before any material is registered
+	// still reads defined data.
+	_materialDataBuffer->Update(_materialData);
 }
+
+MaterialManager::~MaterialManager() = default;
 
 void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 {
@@ -107,4 +121,6 @@ void MaterialManager::RefreshDirtyMaterials()
 
 	_dirtyMaterials.reset();
 	_anyDirty = false;
+
+	_materialDataBuffer->Update(_materialData);
 }

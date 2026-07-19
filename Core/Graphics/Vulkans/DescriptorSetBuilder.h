@@ -29,7 +29,7 @@ namespace Core
 		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, Buffer& buffer);
 
 		// --- Storage buffer: references an existing buffer, ownership unchanged ---
-		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer* buffer);
+		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer& buffer);
 
 		// --- Texture: combined image sampler ---
 		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding, 

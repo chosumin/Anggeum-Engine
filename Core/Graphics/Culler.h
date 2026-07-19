@@ -55,8 +55,8 @@ namespace Core
             CommandBuffer& commandBuffer, DescriptorSetBuilder& builder,
             const CameraBuffer& camera);
 
-        Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
-        Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer; }
+        Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer.get(); }
+        Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer.get(); }
 
         // Shader used for frustum-only culling (needed to build its descriptor set).
         Shader& GetFrustumCullingShader() const { return *_frustumCullingShader; }
@@ -73,7 +73,7 @@ namespace Core
 
         void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             const CameraBuffer& camera, shared_ptr<Texture> depth,
-            Core::Buffer* indirectCommandBuffer, Core::Buffer& cullDataBuffer,
+            Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
             shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline);
 
     private:
@@ -85,7 +85,7 @@ namespace Core
         Core::Buffer* _instanceBuffer = nullptr;
         // Pass 1 indirect command buffer owned by this Culler so multiple cullers
         // (e.g. depth pre-pass and shadow cascades) don't overwrite each other.
-        Core::Buffer* _indirectCommandBuffer = nullptr;
+        unique_ptr<Core::Buffer> _indirectCommandBuffer;
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;
 
@@ -110,9 +110,9 @@ namespace Core
         unique_ptr<Core::Buffer> _frustumCullDataBuffer;
 
         // 2-Pass Resources
-        Core::Buffer* _rejectedIndicesBuffer = nullptr;
-        Core::Buffer* _rejectedCountBuffer = nullptr;
-        Core::Buffer* _pass2IndirectCommandBuffer = nullptr;
+        unique_ptr<Core::Buffer> _rejectedIndicesBuffer;
+        unique_ptr<Core::Buffer> _rejectedCountBuffer;
+        unique_ptr<Core::Buffer> _pass2IndirectCommandBuffer;
 
         shared_ptr<Shader> _pass2CullingShader;
         unique_ptr<Pipeline> _pass2CullingPipeline;

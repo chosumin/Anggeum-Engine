@@ -23,7 +23,7 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
-	uint32_t binding, Buffer* buffer)
+	uint32_t binding, Buffer& buffer)
 {
 	// StorageBuffer is a non-owning view; `buffer` stays owned by the caller.
 	_resources.storageBuffers[binding].SetBuffer(buffer);
