@@ -34,7 +34,7 @@ namespace Core
 		uint32_t setIndex = 0;
 		bool isDescriptorSetUpdated = false;
 
-		unordered_map<uint32_t, UniformBuffer*> uniformBuffers;
+		unordered_map<uint32_t, UniformBuffer> uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer> textureBuffers;
 		unordered_map<uint32_t, StorageBuffer> storageBuffers;
 

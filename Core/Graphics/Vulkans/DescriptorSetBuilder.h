@@ -22,11 +22,11 @@ namespace Core
 	class DescriptorSetBuilder
 	{
 	public:
-		DescriptorSetBuilder(Device& device, DescriptorPool& pool, 
+		DescriptorSetBuilder(Device& device, DescriptorPool& pool,
 			Shader& shader, uint32_t setIndex = 0);
 
-		// --- Uniform buffer: creates a transient UBO from layout size, copies data ---
-		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, void* data);
+		// --- Uniform buffer: references an existing buffer, ownership unchanged ---
+		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, Buffer& buffer);
 
 		// --- Storage buffer: references an existing buffer, ownership unchanged ---
 		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer* buffer);

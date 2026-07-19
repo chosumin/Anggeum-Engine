@@ -15,39 +15,10 @@ Core::DescriptorSetBuilder::DescriptorSetBuilder(
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
-	uint32_t binding, void* data)
+	uint32_t binding, Buffer& buffer)
 {
-	auto it = _resources.uniformBuffers.find(binding);
-	if (it == _resources.uniformBuffers.end())
-	{
-		// Find buffer size from shader layout
-		auto& layouts = _shader.GetDescriptorSetLayouts();
-		auto layoutIt = layouts.find(_setIndex);
-		if (layoutIt != layouts.end())
-		{
-			auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
-			for (auto& bindingInfo : uniformBindings)
-			{
-				if (bindingInfo.Binding == binding)
-				{
-					// FIXME(buffer-lifetime): leaked. DescriptorSetResources is a
-					// non-owning view, and nothing else claims this allocation.
-					// It must outlive the frame's GPU work, so the builder cannot
-					// own it either — a per-frame transient buffer owner is needed.
-					auto buffer = new UniformBuffer(_device, bindingInfo.BufferSize);
-					_resources.uniformBuffers[binding] = buffer;
-					it = _resources.uniformBuffers.find(binding);
-					break;
-				}
-			}
-		}
-	}
-
-	if (it != _resources.uniformBuffers.end())
-	{
-		it->second->Update(data);
-	}
-
+	// UniformBuffer is a non-owning view; `buffer` stays owned by the caller.
+	_resources.uniformBuffers[binding].SetBuffer(&buffer);
 	return *this;
 }
 
@@ -110,7 +81,7 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 		if (validUniformBindings.find(binding) == validUniformBindings.end())
 			continue; // Skip bindings not in shader layout
 
-		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
+		VkWriteDescriptorSet write = buffer.CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}
