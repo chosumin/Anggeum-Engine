@@ -24,7 +24,7 @@ namespace Core
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
             VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-            Buffer* lightVisibilityBuffer, ivec2 tileNums);
+            ivec2 tileNums);
         ~GeometryPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -53,7 +53,6 @@ namespace Core
         GI _giBuffer;
         ShadowUniform& _shadowBuffer;
         LightBuffer _lightBuffer;
-        Buffer* _lightVisibilityBuffer;
         TileInfo _tileInfo;
 
         bool _iblGenerated = false;

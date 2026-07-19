@@ -9,10 +9,8 @@
 #include "Components/Light.h"
 #include "Foundation/Scene.h"
 
-Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums, 
-	Buffer* lightVisibilityBuffer)
-	:RendererPass(device, workerThreadManager), _scene(scene),
-	_lightVisibilityBuffer(lightVisibilityBuffer)
+Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums)
+	:RendererPass(device, workerThreadManager), _scene(scene)
 {
 	_computeMaterial = device.GetResourceCache().RequestMaterial("lightCulling", "shaders/lightCulling.comp.spv");
 	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial->GetShader());
@@ -40,9 +38,14 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 
+	StorageBufferDesc desc{};
+	desc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
+	auto& lightVisibilityBuffer =
+		renderFrame.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc);
+
 	auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
 	builder.SetUniformBuffer(0, &camera->Matrices);
-	builder.SetStorageBuffer(1, _lightVisibilityBuffer);
+	builder.SetStorageBuffer(1, &lightVisibilityBuffer);
 	builder.SetTextureBuffer(2, depthTarget);
 	builder.SetUniformBuffer(3, &_lightBuffer);
 	auto& resources = builder.Build();

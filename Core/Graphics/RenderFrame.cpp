@@ -230,7 +230,24 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     return texture;
 }
 
-Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name, 
+Buffer& Core::RenderFrame::GetOrCreateStorageBuffer(const string& name,
+    const StorageBufferDesc& desc)
+{
+    auto it = _storageBuffers.find(name);
+    if (it != _storageBuffers.end())
+        return *it->second;
+
+    auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+
+    _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
+        (uint64_t)buffer->GetBuffer(), name.c_str());
+
+    auto& created = *buffer;
+    _storageBuffers[name] = std::move(buffer);
+    return created;
+}
+
+Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name,
     RenderPass& renderPass, const vector<string>& attachmentNames, int32_t layerIndex)
 {
     auto it = _framebuffers.find(name);

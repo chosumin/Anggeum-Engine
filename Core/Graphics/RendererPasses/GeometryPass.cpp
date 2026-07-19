@@ -25,12 +25,11 @@ namespace Core
 	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 		Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
 		VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-		Buffer* lightVisibilityBuffer, ivec2 tileNums)
+		ivec2 tileNums)
 		: RendererPass(device, workerThreadManager)
 		, _scene(scene)
 		, _msaaSamples(msaaSamples)
 		, _swapChainFormat(swapChain.GetImageFormat())
-		, _lightVisibilityBuffer(lightVisibilityBuffer)
 		, _shadowBuffer(shadowBuffer)
 	{
 		auto swapChainExtents = swapChain.GetSwapChainExtent();
@@ -152,7 +151,13 @@ namespace Core
             QueueType::Compute,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
-		commandBuffer.BufferBarrier(*_lightVisibilityBuffer,
+        // Produced by LightCullingPass into this frame's own buffer.
+        StorageBufferDesc lightVisibilityDesc{};
+        lightVisibilityDesc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
+        auto& lightVisibilityBuffer =
+            renderFrame.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc);
+
+		commandBuffer.BufferBarrier(lightVisibilityBuffer,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
@@ -222,7 +227,7 @@ namespace Core
         builder.SetUniformBuffer(3, &_giBuffer);
         builder.SetUniformBuffer(4, &_shadowBuffer);
         builder.SetUniformBuffer(5, &_lightBuffer);
-        builder.SetStorageBuffer(6, _lightVisibilityBuffer);
+        builder.SetStorageBuffer(6, &lightVisibilityBuffer);
         builder.SetTextureBuffer(7, shadowTarget);
 
         if (sdfShadowTarget)

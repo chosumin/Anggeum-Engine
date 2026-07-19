@@ -1,5 +1,6 @@
 #pragma once
 #include "Vulkans/DescriptorPool.h"
+#include "Vulkans/MemoryAllocator.h"
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
@@ -43,6 +44,13 @@ namespace Core
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
+	struct StorageBufferDesc
+	{
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		MemoryType memoryType = MemoryType::DEVICE_LOCAL;
+	};
+
 	class RenderFrame
 	{
 	public:
@@ -72,6 +80,10 @@ namespace Core
 			const RenderTargetDesc& desc);
 
 		shared_ptr<Texture> GetRenderTarget(const string& name) const;
+
+		// Storage buffers that one pass produces and another consumes within the
+		// same frame. Created on first request and reused for the frame's lifetime.
+		Buffer& GetOrCreateStorageBuffer(const string& name, const StorageBufferDesc& desc);
 
 		// Explicit creation (for cases where you want to control the timing of resource creation)
 		shared_ptr<Texture> CreateRenderTarget(const string& name,
@@ -122,6 +134,8 @@ namespace Core
 		MaterialManager* _materialManager = nullptr;
 
 		unordered_map<string, shared_ptr<Texture>> _renderTargets;
+		unordered_map<string, unique_ptr<Buffer>> _storageBuffers;
+
 		shared_ptr<Texture> _previousDepthBuffer;
 		shared_ptr<Texture> _currentDepth;
 		shared_ptr<Texture> _currentNormal;

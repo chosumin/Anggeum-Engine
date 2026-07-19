@@ -41,7 +41,6 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	ivec2 tileNums = ivec2(
 		(extent.width - 1) / TILE_SIZE + 1,
 		(extent.height - 1) / TILE_SIZE + 1);
-	CreateLightCullingBuffer(extent, tileNums);
 
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -57,7 +56,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		AddRendererPass(resolvePass);
 	}
 
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
+	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums);
 	AddRendererPass(lightCullingPass);
 
 	auto shadowPass = new ShadowPass(
@@ -76,8 +75,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
-		_shadowBuffer,
-		_lightBuffer, tileNums);
+		_shadowBuffer, tileNums);
 	AddRendererPass(geometryPass);
 
 	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
@@ -93,9 +91,7 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 		delete(rendererPass);
 	}
 
-	delete(_lightBuffer);
-
-		auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
+	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
@@ -193,16 +189,4 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 	if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
 
 	return VK_SAMPLE_COUNT_1_BIT;
-}
-
-void Core::ForwardRenderPipeline::CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums)
-{
-	u32 lightVisiblityBufferSize = sizeof(VisibleLightsForTile) * tileNums.x * tileNums.y;
-
-	auto lightVisibilityBuffer = new Core::Buffer(_device,
-		lightVisiblityBufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
-	_lightBuffer = lightVisibilityBuffer;
 }

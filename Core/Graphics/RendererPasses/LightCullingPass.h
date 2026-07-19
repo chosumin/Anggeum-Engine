@@ -12,8 +12,7 @@ namespace Core
 	{
 	public:
 		LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums,
-			Buffer* lightVisibilityBuffer);
+			Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums);
 		virtual ~LightCullingPass() override;
 
 		virtual void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
@@ -24,8 +23,6 @@ namespace Core
 	private:
 		Scene& _scene;
 
-		Core::Buffer* _lightVisibilityBuffer;
-		
 		LightBuffer _lightBuffer;
 		TileInfo _tileInfo;
 

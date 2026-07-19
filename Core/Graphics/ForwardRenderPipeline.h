@@ -39,14 +39,12 @@ namespace Core
 			_rendererPasses.push_back(renderPass);
 		}
 
-		void CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums);
 	private:
 		Device& _device;
 		Scene& _scene;
 		VkExtent2D _swapChainExtents;
 		vector<RendererPass*> _rendererPasses;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-		Buffer* _lightBuffer;
 		ShadowUniform _shadowBuffer;
 	};
 }
