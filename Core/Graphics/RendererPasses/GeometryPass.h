@@ -23,8 +23,7 @@ namespace Core
 
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-            VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-            ivec2 tileNums);
+            VkSampleCountFlagBits msaaSamples, ivec2 tileNums);
         ~GeometryPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -36,7 +35,6 @@ namespace Core
 
         void PreparePregenerationSkybox(RenderFrame& renderFrame);
         void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-        void UpdateLightBuffer();
 
         Pipeline* GetOrCreatePipeline(Shader& shader);
 
@@ -51,8 +49,6 @@ namespace Core
         unordered_map<Shader*, Pipeline*> _pipelineCache;
 
         GI _giBuffer;
-        ShadowUniform& _shadowBuffer;
-        LightBuffer _lightBuffer;
         TileInfo _tileInfo;
 
         bool _iblGenerated = false;

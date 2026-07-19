@@ -73,7 +73,7 @@ namespace Core
 
         void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             const CameraBuffer& camera, shared_ptr<Texture> depth,
-            Core::Buffer* indirectCommandBuffer,
+            Core::Buffer* indirectCommandBuffer, Core::Buffer& cullDataBuffer,
             shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline);
 
     private:
@@ -101,6 +101,13 @@ namespace Core
         VkExtent2D _screenExtent = {};
 
         bool _hiZInitialized = false;
+
+        // Culling parameters, one buffer per dispatch site. 
+        // Owned here because a Culler already lives per
+        // frame-in-flight (RenderFrame -> RenderExecutor -> Culler).
+        unique_ptr<Core::Buffer> _pass1CullDataBuffer;
+        unique_ptr<Core::Buffer> _pass2CullDataBuffer;
+        unique_ptr<Core::Buffer> _frustumCullDataBuffer;
 
         // 2-Pass Resources
         Core::Buffer* _rejectedIndicesBuffer = nullptr;

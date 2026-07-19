@@ -44,6 +44,13 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectD
     _cullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCulling.comp.spv");
     _cullingPipeline = make_unique<Pipeline>(device, *_cullingShader);
 
+    _pass1CullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUCullData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
+    _pass2CullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUCullData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
+    _frustumCullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUFrustumCullData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
+
     _rejectedIndicesBuffer = new Core::Buffer(device,
         _instanceCount * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -113,19 +120,21 @@ void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer&
     const CameraBuffer& camera, shared_ptr<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        _indirectCommandBuffer, _cullingShader, _cullingPipeline.get());
+        _indirectCommandBuffer, *_pass1CullDataBuffer,
+        _cullingShader, _cullingPipeline.get());
 }
 
 void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     const CameraBuffer& camera, shared_ptr<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        _pass2IndirectCommandBuffer, _pass2CullingShader, _pass2CullingPipeline.get());
+        _pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
+        _pass2CullingShader, _pass2CullingPipeline.get());
 }
 
 void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     const CameraBuffer& camera, shared_ptr<Texture> depth,
-    Core::Buffer* indirectCommandBuffer,
+    Core::Buffer* indirectCommandBuffer, Core::Buffer& cullDataBuffer,
     shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline)
 {
     // Generate Hi-Z from depth
@@ -142,7 +151,8 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
         GenerateHiZBuffer(renderFrame, commandBuffer, depth);
     }
 
-    // Culling dispatch
+    // Culling dispatch. Built CPU-side and assigned once: the mapping is
+    // uncached, so field-by-field writes into it would be slow.
     GPUCullData cullData{};
     cullData.view = camera.View;
     cullData.proj = camera.Projection;
@@ -154,10 +164,12 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     glm::mat4 viewProj = camera.Projection * camera.View;
     ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
+    cullDataBuffer.Update(cullData);
+
     commandBuffer.BindPipeline(cullingPipeline);
 
     auto builder = renderFrame.CreateDescriptorSetBuilder(*cullingShader, 0);
-    builder.SetUniformBuffer(0, &cullData);
+    builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, _objectDataBuffer);
     builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
     builder.SetStorageBuffer(3, _instanceBuffer);
@@ -377,14 +389,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	// Dispatch frustum-only culling
-	struct FrustumCullData
-	{
-		glm::mat4 view;
-		glm::mat4 proj;
-		glm::vec4 frustumPlanes[6];
-		uint32_t drawCount;
-	} cullData{};
-
+	GPUFrustumCullData cullData{};
 	cullData.view = camera.View;
 	cullData.proj = camera.Projection;
 	cullData.drawCount = _instanceCount;
@@ -392,13 +397,15 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	glm::mat4 viewProj = camera.Projection * camera.View;
 	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
+	_frustumCullDataBuffer->Update(cullData);
+
 	commandBuffer.BindPipeline(_frustumCullingPipeline.get());
 
 	// Use the builder so each dispatch gets a fresh descriptor set. Sharing the
 	// per-shader-hash cache made multiple cullers (shadow cascades) reuse the
 	// first culler's buffers, so their planes/buffers were never bound and
 	// nothing got culled.
-	builder.SetUniformBuffer(0, &cullData);
+	builder.SetUniformBuffer(0, *_frustumCullDataBuffer);
 	builder.SetStorageBuffer(1, _objectDataBuffer);
 	builder.SetStorageBuffer(2, _transformBatch.TransformBuffer);
 	builder.SetStorageBuffer(3, _instanceBuffer);

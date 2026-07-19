@@ -85,6 +85,19 @@ namespace Core
 		// same frame. Created on first request and reused for the frame's lifetime.
 		Buffer& GetOrCreateStorageBuffer(const string& name, const StorageBufferDesc& desc);
 
+		// Uniform data for this frame. Each frame-in-flight owns its own buffer per
+		// name. A name identifies one value within a frame and may be shared by any
+		// number of passes; T fixes the size, so the producer and every consumer
+		// naming the same block necessarily agree on its layout.
+		template<typename T>
+		Buffer& GetOrCreateUniformBuffer(const string& name)
+		{
+			static_assert(std::is_trivially_copyable<T>::value,
+				"Uniform data must be trivially copyable");
+
+			return GetOrCreateUniformBuffer(name, sizeof(T));
+		}
+
 		// Explicit creation (for cases where you want to control the timing of resource creation)
 		shared_ptr<Texture> CreateRenderTarget(const string& name,
 			const RenderTargetDesc& desc);
@@ -116,6 +129,10 @@ namespace Core
 		// Batch initialization - called once at the start of rendering
 		void InitializeBatches(Scene& scene, VkExtent2D extents);
 	private:
+		// Only reachable through the typed overload, so a block's size always comes
+		// from a real C++ type rather than a hand-written byte count.
+		Buffer& GetOrCreateUniformBuffer(const string& name, VkDeviceSize size);
+
 		void CreateSyncObjects();
 		void CreateDescriptorPool();
 
@@ -135,6 +152,7 @@ namespace Core
 
 		unordered_map<string, shared_ptr<Texture>> _renderTargets;
 		unordered_map<string, unique_ptr<Buffer>> _storageBuffers;
+		unordered_map<string, unique_ptr<Buffer>> _uniformBuffers;
 
 		shared_ptr<Texture> _previousDepthBuffer;
 		shared_ptr<Texture> _currentDepth;

@@ -39,13 +39,15 @@ namespace Core
 			_rendererPasses.push_back(renderPass);
 		}
 
+		// Fills the uniform blocks every pass in this frame shares.
+		void UploadSharedUniforms(RenderFrame& renderFrame);
+
 	private:
 		Device& _device;
 		Scene& _scene;
 		VkExtent2D _swapChainExtents;
 		vector<RendererPass*> _rendererPasses;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-		ShadowUniform _shadowBuffer;
 	};
 }
 

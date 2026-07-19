@@ -104,8 +104,10 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 
 	commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
+	auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+
 	auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthNormalShader, 0);
-	builder.SetUniformBuffer(0, &camera->Matrices);
+	builder.SetUniformBuffer(0, cameraBuffer);
 
 	auto& executor = renderFrame.GetRenderExecutor();
 	executor.OcclusionCullAndDraw(

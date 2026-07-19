@@ -126,8 +126,12 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
     // Compute pass
     _deltaTime.deltaTime += 0.01f;
 
+    auto& deltaTimeBuffer =
+        renderFrame.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime");
+    deltaTimeBuffer.Update(_deltaTime);
+
     auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
-    builder.SetUniformBuffer(0, &_deltaTime.deltaTime);
+    builder.SetUniformBuffer(0, deltaTimeBuffer);
     builder.SetStorageBuffer(1, _buffers[0]);
     builder.SetStorageBuffer(2, _buffers[1]);
     builder.SetStorageBuffer(3, _buffers[3]);

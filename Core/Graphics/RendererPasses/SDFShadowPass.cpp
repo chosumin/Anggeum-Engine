@@ -259,12 +259,19 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
+    PerspectiveCamera* camera = _scene.GetMainCamera();
+
+    auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+
+    auto& sdfParamsBuffer =
+        renderFrame.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
+    sdfParamsBuffer.Update(_sdfParams);
+
     auto builder = renderFrame.CreateDescriptorSetBuilder(*_sdfShadowShader, 0);
 
-    PerspectiveCamera* camera = _scene.GetMainCamera();
-    builder.SetUniformBuffer(0, &camera->Matrices);
+    builder.SetUniformBuffer(0, cameraBuffer);
     builder.SetTextureBuffer(1, sdfTexture);
-    builder.SetUniformBuffer(2, &_sdfParams);
+    builder.SetUniformBuffer(2, sdfParamsBuffer);
     builder.SetTextureBuffer(3, depthTarget);
     builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     builder.SetStorageBuffer(5, _sdfGenerator->GetBoundsBuffer());

@@ -14,10 +14,9 @@
 using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-	Scene& scene, VkFormat depthFormat, 
-	ShadowUniform& shadowBuffer)
+	Scene& scene, VkFormat depthFormat)
 	: RendererPass(device, workerThreadManager)
-	, _scene(scene), _msaaSamples(VK_SAMPLE_COUNT_1_BIT), _shadowBuffer(shadowBuffer)
+	, _scene(scene), _msaaSamples(VK_SAMPLE_COUNT_1_BIT)
 {
 	_shadowExtent = { SHADOW_MAP_DIM, SHADOW_MAP_DIM };
 
@@ -326,6 +325,11 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 	UpdateCascades(camera);
 
+	// ShadowPass produces the shared shadow block; GeometryPass runs later in the
+	// pass order and only reads it.
+	auto& shadowBuffer = renderFrame.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+	shadowBuffer.Update(_shadowBuffer);
+
 	auto shader = _shadowMaterial->GetShaderPtr().lock();
 
 	for (uint32_t cascadeIndex = 0; cascadeIndex < SHADOW_MAP_CASCADE_COUNT; ++cascadeIndex)
@@ -352,8 +356,14 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 			continue;
 		}
 
+		// Each cascade binds binding 0 with a different view, and all four
+		// descriptor sets are consumed after submit, so they need separate buffers.
+		auto& cascadeBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(
+			"ShadowPass.Cascade" + std::to_string(cascadeIndex));
+		cascadeBuffer.Update(_cascadeViews[cascadeIndex]);
+
 		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
-		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);
+		builder.SetUniformBuffer(0, cascadeBuffer);
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
 		commandBuffer.BeginDebugMarker(passName.c_str());

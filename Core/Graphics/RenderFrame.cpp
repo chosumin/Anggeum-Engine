@@ -247,6 +247,31 @@ Buffer& Core::RenderFrame::GetOrCreateStorageBuffer(const string& name,
     return created;
 }
 
+Buffer& Core::RenderFrame::GetOrCreateUniformBuffer(const string& name, VkDeviceSize size)
+{
+    auto it = _uniformBuffers.find(name);
+    if (it != _uniformBuffers.end())
+    {
+        if (it->second->GetSize() < size)
+        {
+            throw runtime_error(
+                "RenderFrame: uniform buffer '" + name + "' already exists at a smaller size.");
+        }
+
+        return *it->second;
+    }
+
+    auto buffer = make_unique<Buffer>(_device, size,
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
+
+    _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
+        (uint64_t)buffer->GetBuffer(), name.c_str());
+
+    auto& created = *buffer;
+    _uniformBuffers[name] = std::move(buffer);
+    return created;
+}
+
 Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name,
     RenderPass& renderPass, const vector<string>& attachmentNames, int32_t layerIndex)
 {

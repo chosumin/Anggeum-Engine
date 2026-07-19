@@ -16,8 +16,7 @@ namespace Core
 		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
 		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, VkFormat depthFormat,
-			ShadowUniform& shadowBuffer);
+			Scene& scene, VkFormat depthFormat);
 		~ShadowPass();
 
 		void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -39,7 +38,7 @@ namespace Core
 		shared_ptr<Shader> _shadowShader;
 		Pipeline* _pipeline = nullptr;
 
-		ShadowUniform& _shadowBuffer;
+		ShadowUniform _shadowBuffer;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeViews{};
 		shared_ptr<Material> _shadowMaterial;
 

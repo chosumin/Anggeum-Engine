@@ -4,6 +4,9 @@
 #include "Foundation/WorkerThread.h"
 #include "Foundation/Entity.h"
 #include "Components/Mesh.h"
+#include "Components/Light.h"
+#include "Components/PerspectiveCamera.h"
+#include "Graphics/RenderFrame.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -60,7 +63,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	AddRendererPass(lightCullingPass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, depthFormat, _shadowBuffer);
+		device, workerThreadManager, scene, depthFormat);
 	AddRendererPass(shadowPass);
 
 	auto sdfShadowPass = new SDFShadowPass(
@@ -75,7 +78,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
-		_shadowBuffer, tileNums);
+		tileNums);
 	AddRendererPass(geometryPass);
 
 	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
@@ -99,6 +102,8 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 {
 	auto& queueTimer = renderContext.GetQueueTimer();
 	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
+
+	UploadSharedUniforms(renderFrame);
 
 	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
 	{
@@ -139,6 +144,44 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
 		commandBuffer.EndCommandBuffer();
 	}
+}
+
+void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
+{
+	if (auto* camera = _scene.GetMainCamera())
+	{
+		auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+		cameraBuffer.Update(camera->Matrices);
+	}
+
+	// Built CPU-side and assigned once: the mapping is uncached, so writing the
+	// light array field by field into it would be slow.
+	LightBuffer lights{};
+
+	auto sceneLights = _scene.GetComponents<Light>();
+	uint32_t count = std::min((uint32_t)sceneLights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		auto* light = sceneLights[i];
+
+		auto& properties = light->GetProperties();
+		auto& transform = light->GetEntity().GetTransform();
+
+		LightInfo lightInfo{};
+		lightInfo.Position = vec4(transform.GetTranslation(),
+			static_cast<float>(light->GetLightType()));
+		lightInfo.Color = vec4(properties.Color, properties.Intensity);
+
+		auto direction = transform.GetRotation() * properties.Direction;
+		lightInfo.Direction = vec4(direction, properties.Range);
+		lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
+
+		lights.Light[i] = lightInfo;
+	}
+	lights.Count = count;
+
+	auto& lightBuffer = renderFrame.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+	lightBuffer.Update(lights);
 }
 
 void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)

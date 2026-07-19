@@ -24,13 +24,11 @@ namespace Core
 {
 	GeometryPass::GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
 		Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-		VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-		ivec2 tileNums)
+		VkSampleCountFlagBits msaaSamples, ivec2 tileNums)
 		: RendererPass(device, workerThreadManager)
 		, _scene(scene)
 		, _msaaSamples(msaaSamples)
 		, _swapChainFormat(swapChain.GetImageFormat())
-		, _shadowBuffer(shadowBuffer)
 	{
 		auto swapChainExtents = swapChain.GetSwapChainExtent();
 		_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
@@ -191,8 +189,6 @@ namespace Core
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
         auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
-        UpdateLightBuffer();
-
         if (shadowTarget)
         {
             commandBuffer.TransitionImageLayout(*shadowTarget->GetImage().lock(),
@@ -222,11 +218,18 @@ namespace Core
 
         Pipeline* pipeline = GetOrCreatePipeline(*shader);
 
+        auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+        auto& lightBuffer = renderFrame.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+        auto& shadowBuffer = renderFrame.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+
+        auto& giBuffer = renderFrame.GetOrCreateUniformBuffer<GI>("GeometryPass.GI");
+        giBuffer.Update(_giBuffer);
+
         auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
-        builder.SetUniformBuffer(0, &camera->Matrices);
-        builder.SetUniformBuffer(3, &_giBuffer);
-        builder.SetUniformBuffer(4, &_shadowBuffer);
-        builder.SetUniformBuffer(5, &_lightBuffer);
+        builder.SetUniformBuffer(0, cameraBuffer);
+        builder.SetUniformBuffer(3, giBuffer);
+        builder.SetUniformBuffer(4, shadowBuffer);
+        builder.SetUniformBuffer(5, lightBuffer);
         builder.SetStorageBuffer(6, &lightVisibilityBuffer);
         builder.SetTextureBuffer(7, shadowTarget);
 
@@ -369,8 +372,11 @@ namespace Core
                 _skyboxPipeline = new Pipeline(_device, *_renderPass, shader, pipelineState);
             }
 
+            auto& skyCameraBuffer =
+                renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+
             auto skyBuilder0 = renderFrame.CreateDescriptorSetBuilder(shader, 0);
-            skyBuilder0.SetUniformBuffer(0, &camera->Matrices);
+            skyBuilder0.SetUniformBuffer(0, skyCameraBuffer);
             auto& skyResources0 = skyBuilder0.Build();
 
             auto skyBuilder1 = renderFrame.CreateDescriptorSetBuilder(shader, 1);
@@ -395,31 +401,4 @@ namespace Core
         }
     }
 
-    void GeometryPass::UpdateLightBuffer()
-    {
-        auto lights = _scene.GetComponents<Light>();
-
-        uint32_t size = std::min((uint32_t)lights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
-        for (uint32_t i = 0; i < size; ++i)
-        {
-            auto light = lights[i];
-
-            auto& properties = light->GetProperties();
-            auto& transform = light->GetEntity().GetTransform();
-
-            LightInfo lightInfo{};
-            lightInfo.Position = vec4(transform.GetTranslation(),
-                static_cast<float>(light->GetLightType()));
-            lightInfo.Color = vec4(properties.Color, properties.Intensity);
-
-            auto direction = transform.GetRotation() * properties.Direction;
-            lightInfo.Direction =
-                vec4(direction, properties.Range);
-            lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
-
-            _lightBuffer.Light[i] = lightInfo;
-        }
-
-        _lightBuffer.Count = size;
-    }
 }

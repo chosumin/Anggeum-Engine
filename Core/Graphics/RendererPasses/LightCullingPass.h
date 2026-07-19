@@ -19,11 +19,8 @@ namespace Core
 
 		virtual QueueType GetQueueType() const override { return QueueType::Compute; }
 	private:
-		void UpdateLightBuffer();
-	private:
 		Scene& _scene;
 
-		LightBuffer _lightBuffer;
 		TileInfo _tileInfo;
 
 		shared_ptr<Core::Material> _computeMaterial;
