@@ -10,10 +10,12 @@ namespace Core
 	class Texture
 	{
 	public:
-		Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler);
+		// Texture owns its Image 1:1. The image is built by the creator (cache,
+		// render target, pass) and moved in.
+		Texture(string name, unique_ptr<Image> image, shared_ptr<Sampler> sampler);
 		~Texture();
 
-		weak_ptr<Image> GetImage() { return _image; }
+		Image& GetImage() { return *_image; }
 
 		uint32_t GetMipLevels() const;
 		uint32_t GetLayers() const;
@@ -48,7 +50,7 @@ namespace Core
 		string& GetName() { return _name; }
 	private:
 		string _name;
-		shared_ptr<Image> _image;
+		unique_ptr<Image> _image;
 		shared_ptr<Sampler> _sampler;
 	};
 

@@ -93,7 +93,7 @@ void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uin
     if (!depthForSampling || !normalForSampling)
         return;
 
-    auto& aoImage = *_aoTexture->GetImage().lock();
+    auto& aoImage = _aoTexture->GetImage();
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
         &renderFrame,

@@ -61,7 +61,7 @@ void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, u
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
-    commandBuffer.TransitionImageLayout(*depthTexture->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(depthTexture->GetImage(),
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -84,7 +84,7 @@ shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandB
 {
     auto resolvedDepth = GetResolvedDepthTarget(renderFrame);
 
-    auto& resolvedImage = *resolvedDepth->GetImage().lock();
+    auto& resolvedImage = resolvedDepth->GetImage();
     commandBuffer.TransitionImageLayout(resolvedImage,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -127,7 +127,7 @@ shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandB
 void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     shared_ptr<Texture> msaaNormal)
 {
-    auto& resolvedImage = *_resolvedNormalTexture->GetImage().lock();
+    auto& resolvedImage = _resolvedNormalTexture->GetImage();
     commandBuffer.TransitionImageLayout(resolvedImage,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 

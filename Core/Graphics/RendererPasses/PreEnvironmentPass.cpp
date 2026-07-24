@@ -93,7 +93,7 @@ void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, CommandBuffer& com
 
 void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_irradianceCubemap->GetImage(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -137,27 +137,27 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+            commandBuffer.TransitionImageLayout(_colorRenderTarget->GetImage(),
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
-                *_irradianceCubemap->GetImage().lock(), 0, 0, m, layer);
+            commandBuffer.CopyImage(_colorRenderTarget->GetImage(), 
+                _irradianceCubemap->GetImage(), 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+            commandBuffer.TransitionImageLayout(_colorRenderTarget->GetImage(),
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_irradianceCubemap->GetImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_prefilteredCubemap->GetImage(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -203,20 +203,20 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+            commandBuffer.TransitionImageLayout(_colorRenderTarget->GetImage(),
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
-                *_prefilteredCubemap->GetImage().lock(), 0, 0, m, layer);
+            commandBuffer.CopyImage(_colorRenderTarget->GetImage(), 
+                _prefilteredCubemap->GetImage(), 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
+            commandBuffer.TransitionImageLayout(_colorRenderTarget->GetImage(),
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_prefilteredCubemap->GetImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

@@ -58,7 +58,7 @@ namespace Core
 	class VkImageJob : public Job
 	{
 	public:
-		VkImageJob(Device& device, weak_ptr<Image> dstImage, string filePath);
+		VkImageJob(Device& device, Image& dstImage, string filePath);
 		~VkImageJob();
 
 		void Execute() override;
@@ -66,7 +66,7 @@ namespace Core
 		Device& _device;
 		string _filePath;
 
-		weak_ptr<Image> _dstImage;
+		Image& _dstImage;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 

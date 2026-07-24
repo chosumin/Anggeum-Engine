@@ -107,7 +107,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     if (!depthForSampling || !normalForSampling)
         return;
 
-    auto& aoImage = *_aoTexture->GetImage().lock();
+    auto& aoImage = _aoTexture->GetImage();
     commandBuffer.TransitionImageLayout(aoImage,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);

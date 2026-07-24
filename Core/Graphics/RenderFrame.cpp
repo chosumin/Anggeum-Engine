@@ -196,16 +196,17 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
         viewType = VK_IMAGE_VIEW_TYPE_2D;
     }
 
-    auto image = make_shared<Image>(_device, imageInfo, desc.aspect, viewType);
-    auto texture = make_shared<Texture>(name, image, _defaultSampler);
+    auto image = make_unique<Image>(_device, imageInfo, desc.aspect, viewType);
+    auto* imagePtr = image.get();
+    auto texture = make_shared<Texture>(name, std::move(image), _defaultSampler);
 
     // Render targets are what validation errors point at most of the time, so give
     // the layer a name to print instead of a bare handle.
     auto& debugUtils = _device.GetDebugUtils();
     debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE,
-        (uint64_t)image->GetImage(), name.c_str());
+        (uint64_t)imagePtr->GetImage(), name.c_str());
     debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
-        (uint64_t)image->GetOrCreateImageView(0), (name + " View").c_str());
+        (uint64_t)imagePtr->GetOrCreateImageView(0), (name + " View").c_str());
 
     // Move the target from UNDEFINED into its requested starting layout. This is a
     // fenced single-time submit, so it fully completes before any frame work
@@ -213,7 +214,7 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
     {
         auto& commandBuffer = _device.BeginSingleTimeCommands();
-        commandBuffer.TransitionImageLayout(*image,
+        commandBuffer.TransitionImageLayout(*imagePtr,
             VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout);
         _device.EndSingleTimeCommands(commandBuffer);
     }

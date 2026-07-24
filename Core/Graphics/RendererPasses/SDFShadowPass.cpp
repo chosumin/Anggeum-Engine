@@ -79,7 +79,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
     if (!sdfTexture || !_volumeSliceTexture || !boundsBuffer)
         return;
 
-    auto& sliceImage = *_volumeSliceTexture->GetImage().lock();
+    auto& sliceImage = _volumeSliceTexture->GetImage();
     commandBuffer.TransitionImageLayout(sliceImage,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -256,7 +256,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     if (!depthTarget)
         return;
 
-    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture->GetImage(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
@@ -288,7 +288,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
 
-    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture->GetImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

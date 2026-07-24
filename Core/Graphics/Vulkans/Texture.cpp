@@ -2,8 +2,8 @@
 #include "Texture.h"
 #include "Graphics/ResourceCache.h"
 
-Core::Texture::Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler)
-	:_name(name), _image(image), _sampler(sampler)
+Core::Texture::Texture(string name, unique_ptr<Image> image, shared_ptr<Sampler> sampler)
+	:_name(name), _image(std::move(image)), _sampler(sampler)
 {
 }
 
@@ -24,7 +24,7 @@ uint32_t Core::Texture::GetLayers() const
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t binding, VkDescriptorType descriptorType)
 {
 	imageInfo.imageLayout = imageLayout;
-	imageInfo.imageView = texture->GetImage().lock()->GetOrCreateImageView(mipLevel);
+	imageInfo.imageView = texture->GetImage().GetOrCreateImageView(mipLevel);
 
 	switch (descriptorType)
 	{

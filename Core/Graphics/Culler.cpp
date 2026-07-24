@@ -130,7 +130,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     // Generate Hi-Z from depth
     if (!_hiZInitialized)
     {
-        auto& hiZImage = *_hiZTexture->GetImage().lock();
+        auto& hiZImage = _hiZTexture->GetImage();
         commandBuffer.TransitionImageLayout(hiZImage,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -257,7 +257,7 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    shared_ptr<Image> image = make_shared<Image>(_device, imageCreateInfo, VK_IMAGE_ASPECT_COLOR_BIT);
+    auto image = make_unique<Image>(_device, imageCreateInfo, VK_IMAGE_ASPECT_COLOR_BIT);
 
     auto samplerDesc = DEFAULT_SAMPLER;
     samplerDesc.minFilter = VK_FILTER_NEAREST;
@@ -265,7 +265,7 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     samplerDesc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
     shared_ptr<Sampler> sampler = device.GetResourceCache().RequestSampler(samplerDesc);
-    _hiZTexture = make_shared<Texture>("HiZ", image, sampler);
+    _hiZTexture = make_shared<Texture>("HiZ", std::move(image), sampler);
 
     // Load shaders
     _hiZGenerateShader = device.GetResourceCache().LoadShader("Shaders/hiZGenerate.comp.spv");
@@ -274,8 +274,8 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
 
 void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth)
 {
-    auto& hiZTextureImage = *_hiZTexture->GetImage().lock();
-    auto& depthBufferImage = *depth->GetImage().lock();
+    auto& hiZTextureImage = _hiZTexture->GetImage();
+    auto& depthBufferImage = depth->GetImage();
 
     // Transition resolved depth: SHADER_READ_ONLY > TRANSFER_SRC
     commandBuffer.TransitionImageLayout(depthBufferImage,

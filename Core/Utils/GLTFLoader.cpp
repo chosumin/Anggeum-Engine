@@ -355,9 +355,7 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 
 	auto samplers = LoadSamplers();
 
-	auto images = LoadImages(modelPath);
-
-	auto textures = LoadTextures(samplers, images);
+	auto textures = LoadTextures(samplers, modelPath);
 
 	auto materials = LoadMaterials(textures);
 	
@@ -515,29 +513,8 @@ shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	return sampler;
 }
 
-vector<shared_ptr<Core::Image>> Core::GLTFLoader::LoadImages(const string& modelPath)
-{
-	auto size = _model->images.size();
-
-	vector<shared_ptr<Core::Image>> images(size);
-
-	for (size_t i = 0; i < size; ++i)
-	{
-		auto image = _model->images[i];
-
-		// From URI
-		ImageCreateInfo imageCreateInfo{};
-		imageCreateInfo.filePath = modelPath + "/" + image.uri;
-
-		auto vkImage = _resourceCache.RequestImage(imageCreateInfo);
-		images[i] = vkImage;
-	}
-
-	return images;
-}
-
 vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
-	vector<shared_ptr<Core::Sampler>>& samplers, vector<shared_ptr<Core::Image>>& images)
+	vector<shared_ptr<Core::Sampler>>& samplers, const string& modelPath)
 {
 	size_t size = _model->textures.size();
 
@@ -548,9 +525,13 @@ vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		int imageIndex = _model->textures[i].source;
 		int samplerIndex = _model->textures[i].sampler;
 
-		auto texture = 
+		// Texture owns its Image 1:1; build it from the glTF image URI.
+		ImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
+
+		auto texture =
 			_resourceCache.RequestTexture(_model->textures[i].name,
-			images[imageIndex], samplers[samplerIndex]);
+				imageCreateInfo, samplers[samplerIndex]);
 
 		textures[i] = texture;
 	}

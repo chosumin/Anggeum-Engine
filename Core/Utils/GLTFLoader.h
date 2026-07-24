@@ -55,10 +55,11 @@ namespace Core
 		void CheckExtensions();
 		void LoadLights();
 		vector<shared_ptr<Core::Sampler>> LoadSamplers();
-		vector<shared_ptr<Core::Image>> LoadImages(const string& modelPath);
+		// Each Texture owns its own Image (built from the glTF image URI), so there
+		// is no shared image list — textures are created directly from image paths.
 		vector<shared_ptr<Core::Texture>> LoadTextures(
 			vector<shared_ptr<Core::Sampler>>& samplers,
-			vector<shared_ptr<Core::Image>>& images);
+			const string& modelPath);
 		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
 		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
 		void LoadCameras();

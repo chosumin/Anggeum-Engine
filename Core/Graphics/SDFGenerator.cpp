@@ -198,11 +198,11 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = make_shared<Image>(_device, imageInfo,
+	auto image = make_unique<Image>(_device, imageInfo,
 		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
 
 	auto sampler = _device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
-	_sdfTexture = make_shared<Texture>("SDFVolume", image, sampler);
+	_sdfTexture = make_shared<Texture>("SDFVolume", std::move(image), sampler);
 }
 
 void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -307,7 +307,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
-	auto& sdfImage = *_sdfTexture->GetImage().lock();
+	auto& sdfImage = _sdfTexture->GetImage();
 	commandBuffer.TransitionImageLayout(sdfImage,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL);
@@ -349,9 +349,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	if (!_sdfTexture || !_boundsBuffer)
 		return false;
 
-	auto image = _sdfTexture->GetImage().lock();
-	if (!image)
-		return false;
+	auto& image = _sdfTexture->GetImage();
 
 	// The SDF generation commands were recorded into a frame command buffer that
 	// may still be executing (or not yet started) on the GPU. The download job
@@ -363,7 +361,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	Buffer* imageStaging = nullptr;
 	Buffer* boundsStaging = nullptr;
 
-	SDFDownloadJob job(_device, *image, *_boundsBuffer, resolution,
+	SDFDownloadJob job(_device, image, *_boundsBuffer, resolution,
 		&imageStaging, &boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 
@@ -460,15 +458,9 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	if (!_sdfTexture)
 		CreateSDFTexture(header.resolution);
 
-	auto image = _sdfTexture->GetImage().lock();
-	if (!image)
-	{
-		delete imageStaging;
-		delete boundsStaging;
-		return false;
-	}
+	auto& image = _sdfTexture->GetImage();
 
-	SDFUploadJob job(_device, *image, *_boundsBuffer, header.resolution,
+	SDFUploadJob job(_device, image, *_boundsBuffer, header.resolution,
 		imageStaging, boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 

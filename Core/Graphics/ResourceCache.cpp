@@ -22,7 +22,6 @@ namespace Core
 	ResourceCache::~ResourceCache()
 	{
 		_materials.clear();
-		_images.clear();
 		_samplers.clear();
 		_textures.clear();
 		
@@ -144,24 +143,6 @@ namespace Core
 		return handle;
 	}
 
-	shared_ptr<Core::Image> ResourceCache::RequestImage(const ImageCreateInfo imageCreateInfo)
-	{
-		lock_guard<mutex> guard(_imageMutex);
-
-		auto it = _images.find(imageCreateInfo.filePath);
-		if (it != _images.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
-		auto image =
-			make_shared<Core::Image>(_device, imageCreateInfo);
-		_images[imageCreateInfo.filePath] = image;
-
-		return image;
-	}
-
 	shared_ptr<Core::Sampler> ResourceCache::RequestSampler(const SamplerCreateInfo info)
 	{
 		lock_guard<mutex> guard(_samplerMutex);
@@ -196,11 +177,11 @@ namespace Core
 				return shared;
 		}
 
-		auto image = RequestImage(imageCreateInfo);
+		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
 		auto sampler = RequestSampler(samplerCreateInfo);
 
 		auto texture =
-			make_shared<Core::Texture>(newName, image, sampler);
+			make_shared<Core::Texture>(newName, std::move(image), sampler);
 		_textures[newName] = texture;
 
 		return texture;
@@ -221,22 +202,22 @@ namespace Core
 				return shared;
 		}
 
-		auto image = RequestImage(imageCreateInfo);
+		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
 
 		auto texture =
-			make_shared<Core::Texture>(newName, image, nullptr);
+			make_shared<Core::Texture>(newName, std::move(image), nullptr);
 		_textures[newName] = texture;
 
 		return texture;
 	}
 
-	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const shared_ptr<Core::Image> image, const shared_ptr<Core::Sampler> sampler)
+	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const shared_ptr<Core::Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 
 		string newName = textureName;
 		if (newName.empty())
-			newName = image->GetFilePath();
+			newName = imageCreateInfo.filePath;
 
 		auto it = _textures.find(newName);
 		if (it != _textures.end())
@@ -245,8 +226,10 @@ namespace Core
 				return shared;
 		}
 
+		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
+
 		auto texture =
-			make_shared<Core::Texture>(newName, image, sampler);
+			make_shared<Core::Texture>(newName, std::move(image), sampler);
 		_textures[newName] = texture;
 
 		return texture;
