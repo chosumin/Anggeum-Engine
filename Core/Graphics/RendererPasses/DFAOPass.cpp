@@ -78,7 +78,7 @@ void DFAOPass::UpdateGUI()
         if (_aoImGuiDS == VK_NULL_HANDLE)
         {
             _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _aoTexture->GetSampler()->GetSampler(),
+                _aoTexture->GetVkSampler(),
                 _aoTexture->GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }

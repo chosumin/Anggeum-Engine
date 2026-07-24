@@ -482,11 +482,11 @@ void Core::GLTFLoader::LoadLights()
 	}
 }
 
-vector<shared_ptr<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
+vector<Core::Handle<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
 {
 	size_t size = _model->samplers.size();
 
-	vector<shared_ptr<Core::Sampler>> samplers(size);
+	vector<Core::Handle<Core::Sampler>> samplers(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -498,7 +498,7 @@ vector<shared_ptr<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
 	return samplers;
 }
 
-shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
+Core::Handle<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	Device& device, tinygltf::Sampler& gltfSampler)
 {
 	SamplerCreateInfo samplerCreateInfo{};
@@ -508,13 +508,11 @@ shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	samplerCreateInfo.wrapT = FindWrapMode(gltfSampler.wrapT);
 	samplerCreateInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
 
-	auto sampler = _resourceCache.RequestSampler(samplerCreateInfo);
-
-	return sampler;
+	return _resourceCache.LoadSampler(samplerCreateInfo);
 }
 
 vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
-	vector<shared_ptr<Core::Sampler>>& samplers, const string& modelPath)
+	vector<Core::Handle<Core::Sampler>>& samplers, const string& modelPath)
 {
 	size_t size = _model->textures.size();
 

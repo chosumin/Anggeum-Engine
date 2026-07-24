@@ -1,6 +1,7 @@
 #pragma once
 #include "Image.h"
 #include "Sampler.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -11,8 +12,8 @@ namespace Core
 	{
 	public:
 		// Texture owns its Image 1:1. The image is built by the creator (cache,
-		// render target, pass) and moved in.
-		Texture(string name, unique_ptr<Image> image, shared_ptr<Sampler> sampler);
+		// render target, pass) and moved in. The sampler is a cache handle.
+		Texture(string name, unique_ptr<Image> image, Handle<Sampler> sampler);
 		~Texture();
 
 		Image& GetImage() { return *_image; }
@@ -45,13 +46,15 @@ namespace Core
 			return _image->GetExtent();
 		}
 
-		shared_ptr<Sampler> GetSampler() { return _sampler; }
+		// Delegates to the owned sampler, mirroring GetImageView(). Callers only
+		// need the VkSampler, so the Core::Sampler wrapper is not exposed.
+		VkSampler GetVkSampler();
 
 		string& GetName() { return _name; }
 	private:
 		string _name;
 		unique_ptr<Image> _image;
-		shared_ptr<Sampler> _sampler;
+		Handle<Sampler> _sampler;
 	};
 
 	struct TextureBuffer

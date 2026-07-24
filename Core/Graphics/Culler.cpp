@@ -264,7 +264,7 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     samplerDesc.magFilter = VK_FILTER_NEAREST;
     samplerDesc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
-    shared_ptr<Sampler> sampler = device.GetResourceCache().RequestSampler(samplerDesc);
+    auto sampler = device.GetResourceCache().LoadSampler(samplerDesc);
     _hiZTexture = make_shared<Texture>("HiZ", std::move(image), sampler);
 
     // Load shaders

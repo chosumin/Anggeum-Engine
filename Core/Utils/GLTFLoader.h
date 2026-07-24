@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/ResourceHandle.h"
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
 
@@ -54,18 +55,18 @@ namespace Core
 		void LoadAssets(const string& modelPath);
 		void CheckExtensions();
 		void LoadLights();
-		vector<shared_ptr<Core::Sampler>> LoadSamplers();
+		vector<Handle<Core::Sampler>> LoadSamplers();
 		// Each Texture owns its own Image (built from the glTF image URI), so there
 		// is no shared image list — textures are created directly from image paths.
 		vector<shared_ptr<Core::Texture>> LoadTextures(
-			vector<shared_ptr<Core::Sampler>>& samplers,
+			vector<Handle<Core::Sampler>>& samplers,
 			const string& modelPath);
 		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
 		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();
-		shared_ptr<Core::Sampler> LoadSampler(Device& device, tinygltf::Sampler& sampler);
+		Handle<Core::Sampler> LoadSampler(Device& device, tinygltf::Sampler& sampler);
 	private:
 		Device& _device;
 		Scene& _scene;

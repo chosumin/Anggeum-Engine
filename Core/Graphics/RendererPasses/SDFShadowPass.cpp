@@ -189,7 +189,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
         if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
         {
             _sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _sdfShadowTexture->GetSampler()->GetSampler(),
+                _sdfShadowTexture->GetVkSampler(),
                 _sdfShadowTexture->GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
@@ -202,7 +202,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
         if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
         {
             _volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _volumeSliceTexture->GetSampler()->GetSampler(),
+                _volumeSliceTexture->GetVkSampler(),
                 _volumeSliceTexture->GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }

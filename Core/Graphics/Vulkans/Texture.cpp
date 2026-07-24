@@ -2,13 +2,18 @@
 #include "Texture.h"
 #include "Graphics/ResourceCache.h"
 
-Core::Texture::Texture(string name, unique_ptr<Image> image, shared_ptr<Sampler> sampler)
+Core::Texture::Texture(string name, unique_ptr<Image> image, Handle<Sampler> sampler)
 	:_name(name), _image(std::move(image)), _sampler(sampler)
 {
 }
 
 Core::Texture::~Texture()
 {
+}
+
+VkSampler Core::Texture::GetVkSampler()
+{
+	return _sampler.Get().GetSampler();
 }
 
 uint32_t Core::Texture::GetMipLevels() const
@@ -33,7 +38,7 @@ VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t bind
 			break;
 		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
 		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-			imageInfo.sampler = texture->GetSampler()->GetSampler();
+			imageInfo.sampler = texture->GetVkSampler();
 			break;
 		default:
 			imageInfo.sampler = VK_NULL_HANDLE;

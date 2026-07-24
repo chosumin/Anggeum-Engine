@@ -201,7 +201,7 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 	auto image = make_unique<Image>(_device, imageInfo,
 		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
 
-	auto sampler = _device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
+	auto sampler = _device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
 	_sdfTexture = make_shared<Texture>("SDFVolume", std::move(image), sampler);
 }
 

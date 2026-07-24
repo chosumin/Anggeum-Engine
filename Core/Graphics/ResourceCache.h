@@ -29,14 +29,15 @@ namespace Core
 
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
-		shared_ptr<Sampler> RequestSampler(const SamplerCreateInfo info);
+		// Samplers are pool-owned; resolve the handle with handle.Get().
+		Handle<Sampler> LoadSampler(const SamplerCreateInfo info);
 		shared_ptr<Texture> RequestTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo,
 			const SamplerCreateInfo samplerCreateInfo);
 		shared_ptr<Texture> RequestTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo);
 		shared_ptr<Texture> RequestTexture(const string& textureName,
-			const ImageCreateInfo imageCreateInfo, const shared_ptr<Sampler> sampler);
+			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler);
 		shared_ptr<SubMesh> RequestSubMesh(const string& name);
 
 		shared_ptr<Texture> GetDefaultTexture() { return _defaultTexture; }
@@ -62,7 +63,10 @@ namespace Core
 		// Shaders: pool-owned, looked up by name for dedup.
 		ResourcePool<Shader> _shaderPool;
 		unordered_map<string, Handle<Shader>> _shaderHandles;
-		unordered_map<SamplerCreateInfo, weak_ptr<Sampler>, SamplerCreateInfoHasher> _samplers;
+
+		// Samplers: pool-owned, looked up by create-info for dedup.
+		ResourcePool<Sampler> _samplerPool;
+		unordered_map<SamplerCreateInfo, Handle<Sampler>, SamplerCreateInfoHasher> _samplerHandles;
 		unordered_map<string, weak_ptr<Texture>> _textures;
 		unordered_map<string, weak_ptr<SubMesh>> _subMeshes;
 	};

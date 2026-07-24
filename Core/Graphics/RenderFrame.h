@@ -158,7 +158,7 @@ namespace Core
 		shared_ptr<Texture> _currentDepth;
 		shared_ptr<Texture> _currentNormal;
 
-		shared_ptr<Sampler> _defaultSampler;
+		Handle<Sampler> _defaultSampler;
 
 		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
 

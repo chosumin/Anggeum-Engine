@@ -22,7 +22,6 @@ namespace Core
 	ResourceCache::~ResourceCache()
 	{
 		_materials.clear();
-		_samplers.clear();
 		_textures.clear();
 		
 		_defaultTexture = nullptr;
@@ -143,22 +142,17 @@ namespace Core
 		return handle;
 	}
 
-	shared_ptr<Core::Sampler> ResourceCache::RequestSampler(const SamplerCreateInfo info)
+	Handle<Sampler> ResourceCache::LoadSampler(const SamplerCreateInfo info)
 	{
 		lock_guard<mutex> guard(_samplerMutex);
 
-		auto it = _samplers.find(info);
-		if (it != _samplers.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
+		auto it = _samplerHandles.find(info);
+		if (it != _samplerHandles.end() && _samplerPool.IsAlive(it->second))
+			return it->second;
 
-		auto sampler =
-			make_shared<Core::Sampler>(_device, info);
-		_samplers[info] = sampler;
-
-		return sampler;
+		Handle<Sampler> handle = _samplerPool.Add(make_shared<Core::Sampler>(_device, info));
+		_samplerHandles[info] = handle;
+		return handle;
 	}
 
 	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName,
@@ -178,7 +172,7 @@ namespace Core
 		}
 
 		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
-		auto sampler = RequestSampler(samplerCreateInfo);
+		auto sampler = LoadSampler(samplerCreateInfo);
 
 		auto texture =
 			make_shared<Core::Texture>(newName, std::move(image), sampler);
@@ -205,13 +199,13 @@ namespace Core
 		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
 
 		auto texture =
-			make_shared<Core::Texture>(newName, std::move(image), nullptr);
+			make_shared<Core::Texture>(newName, std::move(image), Handle<Sampler>{});
 		_textures[newName] = texture;
 
 		return texture;
 	}
 
-	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const shared_ptr<Core::Sampler> sampler)
+	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 

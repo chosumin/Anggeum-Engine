@@ -284,12 +284,12 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 		{
 			if (!_csmDescriptorsCreated)
 			{
-				auto sampler = shadowTexture->GetSampler();
+				auto vkSampler = shadowTexture->GetVkSampler();
 				for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 				{
 					VkImageView layerView = shadowTexture->GetLayerImageView(i);
 					_csmDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
-						sampler->GetSampler(),
+						vkSampler,
 						layerView,
 						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				}

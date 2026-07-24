@@ -26,7 +26,7 @@ RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager
 	CreateSyncObjects();
 	CreateDescriptorPool();
 
-	_defaultSampler = device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
+	_defaultSampler = device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
 	_renderExecutor = make_unique<RenderExecutor>(device, *this);
 }
 
