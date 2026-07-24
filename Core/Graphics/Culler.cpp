@@ -23,10 +23,15 @@ Core::Culler::Culler(Device& device, RendererBatch& rendererBatch)
 
 Core::Culler::~Culler() = default;
 
+Shader& Core::Culler::GetFrustumCullingShader() const
+{
+    return _frustumCullingShader.Get();
+}
+
 void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectDrawBuffer& indirectDrawBuffer)
 {
-    _cullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCulling.comp.spv");
-    _cullingPipeline = make_unique<Pipeline>(device, *_cullingShader);
+    _cullingShader = device.GetResourceCache().LoadShader("Shaders/gpuCulling.comp.spv");
+    _cullingPipeline = make_unique<Pipeline>(device, _cullingShader.Get());
 
     _pass1CullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUCullData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
@@ -59,19 +64,19 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectD
         indirectDrawBuffer.GetDrawCommands(), 0);
     Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
 
-    _pass2CullingShader = device.GetResourceCache().RequestShader("Shaders/gpuCullingPass2.comp.spv");
-    _pass2CullingPipeline = make_unique<Pipeline>(device, *_pass2CullingShader);
+    _pass2CullingShader = device.GetResourceCache().LoadShader("Shaders/gpuCullingPass2.comp.spv");
+    _pass2CullingPipeline = make_unique<Pipeline>(device, _pass2CullingShader.Get());
 
     // Reset draw commands shader (2-pass)
-    _resetDrawCommandsShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommands.comp.spv");
-    _resetDrawCommandsPipeline = make_unique<Pipeline>(device, *_resetDrawCommandsShader);
+    _resetDrawCommandsShader = device.GetResourceCache().LoadShader("Shaders/resetDrawCommands.comp.spv");
+    _resetDrawCommandsPipeline = make_unique<Pipeline>(device, _resetDrawCommandsShader.Get());
 
     // Frustum-only culling resources
-    _frustumCullingShader = device.GetResourceCache().RequestShader("Shaders/frustumCulling.comp.spv");
-    _frustumCullingPipeline = make_unique<Pipeline>(device, *_frustumCullingShader);
+    _frustumCullingShader = device.GetResourceCache().LoadShader("Shaders/frustumCulling.comp.spv");
+    _frustumCullingPipeline = make_unique<Pipeline>(device, _frustumCullingShader.Get());
 
-    _resetDrawCommandsSimpleShader = device.GetResourceCache().RequestShader("Shaders/resetDrawCommandsSimple.comp.spv");
-    _resetDrawCommandsSimplePipeline = make_unique<Pipeline>(device, *_resetDrawCommandsSimpleShader);
+    _resetDrawCommandsSimpleShader = device.GetResourceCache().LoadShader("Shaders/resetDrawCommandsSimple.comp.spv");
+    _resetDrawCommandsSimplePipeline = make_unique<Pipeline>(device, _resetDrawCommandsSimpleShader.Get());
 }
 
 void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
@@ -80,15 +85,16 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
 
     commandBuffer.BindPipeline(_resetDrawCommandsPipeline.get());
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsShader, 0);
+    auto& resetShader = _resetDrawCommandsShader.Get();
+    auto builder = renderFrame.CreateDescriptorSetBuilder(resetShader, 0);
     builder.SetStorageBuffer(0, *_indirectCommandBuffer);
     builder.SetStorageBuffer(1, *_pass2IndirectCommandBuffer);
     builder.SetStorageBuffer(2, *_rejectedCountBuffer);
     auto& resources = builder.Build();
 
-    commandBuffer.PushConstants(*_resetDrawCommandsShader, 0, drawCount);
+    commandBuffer.PushConstants(resetShader, 0, drawCount);
     commandBuffer.BindDescriptorSet(_resetDrawCommandsPipeline->GetPipelineBindPoint(),
-        *_resetDrawCommandsShader, resources);
+        resetShader, resources);
 
     uint32_t groupCount = (drawCount + 63) / 64;
     commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
@@ -105,7 +111,7 @@ void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer&
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
         *_indirectCommandBuffer, *_pass1CullDataBuffer,
-        _cullingShader, _cullingPipeline.get());
+        _cullingShader.Get(), _cullingPipeline.get());
 }
 
 void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -113,13 +119,13 @@ void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer&
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
         *_pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
-        _pass2CullingShader, _pass2CullingPipeline.get());
+        _pass2CullingShader.Get(), _pass2CullingPipeline.get());
 }
 
 void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     const CameraBuffer& camera, shared_ptr<Texture> depth,
     Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
-    shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline)
+    Shader& cullingShader, Pipeline* cullingPipeline)
 {
     // Generate Hi-Z from depth
     if (!_hiZInitialized)
@@ -152,7 +158,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
 
     commandBuffer.BindPipeline(cullingPipeline);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*cullingShader, 0);
+    auto builder = renderFrame.CreateDescriptorSetBuilder(cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
     builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
@@ -164,7 +170,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(cullingPipeline->GetPipelineBindPoint(),
-        *cullingShader, resources);
+        cullingShader, resources);
 
     uint32_t groupCount = (_instanceCount + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);
@@ -262,8 +268,8 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     _hiZTexture = make_shared<Texture>("HiZ", image, sampler);
 
     // Load shaders
-    _hiZGenerateShader = device.GetResourceCache().RequestShader("Shaders/hiZGenerate.comp.spv");
-    _hiZPipeline = make_unique<Pipeline>(device, *_hiZGenerateShader);
+    _hiZGenerateShader = device.GetResourceCache().LoadShader("Shaders/hiZGenerate.comp.spv");
+    _hiZPipeline = make_unique<Pipeline>(device, _hiZGenerateShader.Get());
 }
 
 void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth)
@@ -310,12 +316,13 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             mipWidth = std::max(1u, mipWidth / 2);
             mipHeight = std::max(1u, mipHeight / 2);
 
-            auto builder = renderFrame.CreateDescriptorSetBuilder(*_hiZGenerateShader, 0);
+            auto& hiZShader = _hiZGenerateShader.Get();
+            auto builder = renderFrame.CreateDescriptorSetBuilder(hiZShader, 0);
             builder.SetTextureBuffer(0, _hiZTexture, mip - 1, VK_IMAGE_LAYOUT_GENERAL);
             builder.SetTextureBuffer(1, _hiZTexture, mip, VK_IMAGE_LAYOUT_GENERAL);
             auto& resources = builder.Build();
 
-            commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, *_hiZGenerateShader,
+            commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, hiZShader,
                 resources);
 
             struct HiZPushConstants {
@@ -323,7 +330,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
                 int32_t outputHeight;
             } hiZPc = { static_cast<int32_t>(mipWidth), static_cast<int32_t>(mipHeight) };
 
-            commandBuffer.PushConstants(*_hiZGenerateShader, 0, hiZPc);
+            commandBuffer.PushConstants(hiZShader, 0, hiZPc);
 
             groupX = (mipWidth + 7) / 8;
             groupY = (mipHeight + 7) / 8;
@@ -353,13 +360,14 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	// or with other cullers (e.g. shadow cascades) that share the same shader.
 	commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
 
-	auto resetBuilder = renderFrame.CreateDescriptorSetBuilder(*_resetDrawCommandsSimpleShader);
+	auto& resetSimpleShader = _resetDrawCommandsSimpleShader.Get();
+	auto resetBuilder = renderFrame.CreateDescriptorSetBuilder(resetSimpleShader);
 	resetBuilder.SetStorageBuffer(0, *_indirectCommandBuffer);
 	auto& resetResources = resetBuilder.Build();
 
-	commandBuffer.PushConstants(*_resetDrawCommandsSimpleShader, 0, drawCount);
+	commandBuffer.PushConstants(resetSimpleShader, 0, drawCount);
 	commandBuffer.BindDescriptorSet(_resetDrawCommandsSimplePipeline->GetPipelineBindPoint(),
-		*_resetDrawCommandsSimpleShader,
+		resetSimpleShader,
 		resetResources);
 
 	uint32_t groupCount = (drawCount + 63) / 64;
@@ -398,7 +406,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(_frustumCullingPipeline->GetPipelineBindPoint(),
-		*_frustumCullingShader,
+		_frustumCullingShader.Get(),
 		resources);
 
 	groupCount = (_instanceCount + 63) / 64;

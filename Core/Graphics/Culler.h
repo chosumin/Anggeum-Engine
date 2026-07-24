@@ -1,6 +1,7 @@
 #pragma once
 #include "IndirectDrawBuffer.h"
 #include "BufferObjects.h"
+#include "ResourceHandle.h"
 
 namespace Core
 {
@@ -53,7 +54,7 @@ namespace Core
         Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer.get(); }
 
         // Shader used for frustum-only culling (needed to build its descriptor set).
-        Shader& GetFrustumCullingShader() const { return *_frustumCullingShader; }
+        Shader& GetFrustumCullingShader() const;
 
     private:
         void PrepareCullingResources(Device& device, const IndirectDrawBuffer& indirectDrawBuffer);
@@ -65,7 +66,7 @@ namespace Core
         void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
             const CameraBuffer& camera, shared_ptr<Texture> depth,
             Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
-            shared_ptr<Shader> cullingShader, Pipeline* cullingPipeline);
+            Shader& cullingShader, Pipeline* cullingPipeline);
 
     private:
         Device& _device;
@@ -81,12 +82,12 @@ namespace Core
         uint32_t _drawCount = 0;
 
         // Culling pipeline (Pass 1)
-        shared_ptr<Shader> _cullingShader;
+        Handle<Shader> _cullingShader;
         unique_ptr<Pipeline> _cullingPipeline;
 
         // Hi-Z Resources
         shared_ptr<Texture> _hiZTexture;
-        shared_ptr<Shader> _hiZGenerateShader = nullptr;
+        Handle<Shader> _hiZGenerateShader;
         unique_ptr<Pipeline> _hiZPipeline;
         uint32_t _hiZMipLevels = 0;
         VkExtent2D _screenExtent = {};
@@ -105,15 +106,15 @@ namespace Core
         unique_ptr<Core::Buffer> _rejectedCountBuffer;
         unique_ptr<Core::Buffer> _pass2IndirectCommandBuffer;
 
-        shared_ptr<Shader> _pass2CullingShader;
+        Handle<Shader> _pass2CullingShader;
         unique_ptr<Pipeline> _pass2CullingPipeline;
-        shared_ptr<Shader> _resetDrawCommandsShader;
+        Handle<Shader> _resetDrawCommandsShader;
         unique_ptr<Pipeline> _resetDrawCommandsPipeline;
 
         // Frustum-only culling resources
-        shared_ptr<Shader> _frustumCullingShader;
+        Handle<Shader> _frustumCullingShader;
         unique_ptr<Pipeline> _frustumCullingPipeline;
-        shared_ptr<Shader> _resetDrawCommandsSimpleShader;
+        Handle<Shader> _resetDrawCommandsSimpleShader;
         unique_ptr<Pipeline> _resetDrawCommandsSimplePipeline;
 
 		bool _markUsedThisFrame = false;
