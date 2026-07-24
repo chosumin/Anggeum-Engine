@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -31,11 +32,11 @@ namespace Core
         shared_ptr<Texture> _resolvedDepthTexture;
         shared_ptr<Texture> _resolvedNormalTexture;
 
-        shared_ptr<Shader> _normalResolveShader;
+        Handle<Shader> _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
         static VkExtent2D _screenExtent;
-        static shared_ptr<Shader> _depthResolveShader;
+        static Handle<Shader> _depthResolveShader;
         static unique_ptr<Pipeline> _depthResolvePipeline;
     };
 }

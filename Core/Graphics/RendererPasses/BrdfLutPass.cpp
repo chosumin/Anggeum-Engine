@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Material.h"
+#include "Graphics/ResourceCache.h"
 
 using namespace Core;
 
@@ -25,7 +26,8 @@ Core::BrdfLutPass::~BrdfLutPass()
 
 void Core::BrdfLutPass::Initialize()
 {
-    _brdfMaterial = new Material(_device, "BRDF", "brdf lut");
+    auto shaderHandle = _device.GetResourceCache().LoadShader("BRDF");
+    _brdfMaterial = new Material(_device, shaderHandle, "brdf lut");
 
     auto pipelineState = *_pipelineState;
 

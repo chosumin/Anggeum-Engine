@@ -26,13 +26,7 @@ namespace Core
 
 		shared_ptr<Material> RequestMaterial(const string materialName, const string& shaderName);
 		shared_ptr<Material> RequestOverrideMaterial(const shared_ptr<Material>& source, const string& overrideShaderName);
-		shared_ptr<Shader> RequestShader(const string& shaderName);
-		shared_ptr<Shader> RequestShader(const string& vertPath, const string& fragPath);
 
-		// Handle-based shader access. During migration these share the same
-		// underlying shaders as RequestShader (same name dedup); once every holder
-		// uses handles, RequestShader is removed and the pool becomes sole owner.
-		// Resolve a handle with handle.Get(), not through the cache.
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
 		shared_ptr<Image> RequestImage(const ImageCreateInfo imageCreateInfo);
@@ -50,7 +44,7 @@ namespace Core
 
 	private:
 		void GetShaderFiles(const uint32_t hash, string& pass, string& vert, string& frag);
-		Handle<Shader> LoadShaderInternal(const string& name, shared_ptr<Shader> shader);
+		Handle<Shader> StoreShader(const string& name, shared_ptr<Shader> shader);
 
 	private:
 		Device& _device;
@@ -60,16 +54,14 @@ namespace Core
 
 		mutex _materialMutex;
 		mutex _shaderMutex;
-		mutex _shaderHandleMutex;
 		mutex _imageMutex;
 		mutex _samplerMutex;
 		mutex _textureMutex;
 		mutex _subMeshMutex;
 
 		unordered_map<string, weak_ptr<Material>> _materials;
-		unordered_map<string, weak_ptr<Shader>> _shaders;
 
-		// Handle-based shader storage (migration in progress).
+		// Shaders: pool-owned, looked up by name for dedup.
 		ResourcePool<Shader> _shaderPool;
 		unordered_map<string, Handle<Shader>> _shaderHandles;
 		unordered_map<string, weak_ptr<Image>> _images;

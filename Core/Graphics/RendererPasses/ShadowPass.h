@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -35,7 +36,7 @@ namespace Core
 		Scene& _scene;
 		VkExtent2D _shadowExtent;
 
-		shared_ptr<Shader> _shadowShader;
+		Handle<Shader> _shadowShader;
 		Pipeline* _pipeline = nullptr;
 
 		ShadowUniform _shadowBuffer;

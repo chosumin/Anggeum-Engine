@@ -26,11 +26,11 @@ SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 {
     _sdfGenerator = make_unique<SDFGenerator>(device);
 
-    _sdfShadowShader = _device.GetResourceCache().RequestShader("Shaders/sdfShadow.comp.spv");
-    _sdfShadowPipeline = make_unique<Pipeline>(_device, *_sdfShadowShader);
+    _sdfShadowShader = _device.GetResourceCache().LoadShader("Shaders/sdfShadow.comp.spv");
+    _sdfShadowPipeline = make_unique<Pipeline>(_device, _sdfShadowShader.Get());
 
-    _volumeSliceShader = _device.GetResourceCache().RequestShader("Shaders/sdfVolumeSlice.comp.spv");
-    _volumeSlicePipeline = make_unique<Pipeline>(_device, *_volumeSliceShader);
+    _volumeSliceShader = _device.GetResourceCache().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
+    _volumeSlicePipeline = make_unique<Pipeline>(_device, _volumeSliceShader.Get());
 }
 
 SDFShadowPass::~SDFShadowPass()
@@ -113,16 +113,17 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
         0.1f
     };
 
-    auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(*_volumeSliceShader, 0);
+    auto& volumeSliceShader = _volumeSliceShader.Get();
+    auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(volumeSliceShader, 0);
     sliceBuilder.SetTextureBuffer(0, sdfTexture);
     sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     sliceBuilder.SetStorageBuffer(2, *boundsBuffer);
     auto& sliceResources = sliceBuilder.Build();
 
     commandBuffer.BindPipeline(_volumeSlicePipeline.get());
-    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, *_volumeSliceShader,
+    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, volumeSliceShader,
         sliceResources);
-    commandBuffer.PushConstants(*_volumeSliceShader, 0, pc);
+    commandBuffer.PushConstants(volumeSliceShader, 0, pc);
 
     float    aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);
@@ -267,7 +268,8 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         renderFrame.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
     sdfParamsBuffer.Update(_sdfParams);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_sdfShadowShader, 0);
+    auto& sdfShadowShader = _sdfShadowShader.Get();
+    auto builder = renderFrame.CreateDescriptorSetBuilder(sdfShadowShader, 0);
 
     builder.SetUniformBuffer(0, cameraBuffer);
     builder.SetTextureBuffer(1, sdfTexture);
@@ -279,7 +281,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 
     commandBuffer.BindPipeline(_sdfShadowPipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_sdfShadowShader,
+        sdfShadowShader,
         resources);
 
     uint32_t dispatchX = (_screenExtent.width / 2 + 7) / 8;

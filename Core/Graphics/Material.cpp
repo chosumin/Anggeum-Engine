@@ -7,20 +7,9 @@
 
 namespace Core
 {
-	Material::Material(Device& device, string shaderName, string materialName)
-		:_device(device), _name(materialName)
+	Material::Material(Device& device, Handle<Shader> shader, string materialName)
+		:_device(device), _shader(shader), _name(materialName)
 	{
-		_shader = device.GetResourceCache().RequestShader(shaderName);
-
-		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().GetDefaultTexture());
-	}
-
-	Material::Material(Device& device, string materialName, string vertPath, string fragPath)
-		:_device(device), _name(materialName)
-	{
-		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
-
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
 		SetDefault(device.GetResourceCache().GetDefaultTexture());
 	}
@@ -63,7 +52,7 @@ namespace Core
 
 	Shader& Core::Material::GetShader() const
 	{
-		return *_shader;
+		return _shader.Get();
 	}
 
 	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
@@ -78,7 +67,7 @@ namespace Core
 
 	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
 	{
-		auto& layouts = _shader->GetDescriptorSetLayouts();
+		auto& layouts = _shader.Get().GetDescriptorSetLayouts();
 		
 		// Iterate through all descriptor set layouts
 		for (auto& [setIndex, descriptorLayout] : layouts)

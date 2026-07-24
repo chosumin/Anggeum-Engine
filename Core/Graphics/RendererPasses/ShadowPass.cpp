@@ -29,10 +29,10 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	rasterization.depthBiasEnable = VK_TRUE;
 
 	_shadowMaterial = _device.GetResourceCache().RequestMaterial("shadow", "Shadow");
-	_shadowShader = _shadowMaterial->GetShaderPtr().lock();
+	_shadowShader = _shadowMaterial->GetShaderHandle();
 
 	// Create Pipeline for this pass
-	_pipeline = new Pipeline(device, *_renderPass, *_shadowShader, *_pipelineState);
+	_pipeline = new Pipeline(device, *_renderPass, _shadowShader.Get(), *_pipelineState);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -330,7 +330,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	auto& shadowBuffer = renderFrame.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
 	shadowBuffer.Update(_shadowBuffer);
 
-	auto shader = _shadowMaterial->GetShaderPtr().lock();
+	auto& shader = _shadowShader.Get();
 
 	for (uint32_t cascadeIndex = 0; cascadeIndex < SHADOW_MAP_CASCADE_COUNT; ++cascadeIndex)
 	{
@@ -362,7 +362,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 			"ShadowPass.Cascade" + std::to_string(cascadeIndex));
 		cascadeBuffer.Update(_cascadeViews[cascadeIndex]);
 
-		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
+		auto builder = renderFrame.CreateDescriptorSetBuilder(shader, 0);
 		builder.SetUniformBuffer(0, cascadeBuffer);
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
@@ -375,7 +375,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		auto& executor = renderFrame.GetRenderExecutor();
 		executor.FrustumCullAndDraw(commandBuffer,
 			*_renderPass, *framebuffer,
-			*_shadowShader, *_pipeline,
+			_shadowShader.Get(), *_pipeline,
 			builder,
 			_cascadeViews[cascadeIndex],
 			nullptr);

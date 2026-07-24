@@ -25,8 +25,9 @@ Sample::ParticlePass::ParticlePass(Device& device, WorkerThreadManager& workerTh
     _computeMaterial = device.GetResourceCache().RequestMaterial("particle", "shaders/particle.comp.spv");
     _computePipeline = make_unique<Pipeline>(device, _computeMaterial->GetShader());
 
+    auto graphicsShader = device.GetResourceCache().LoadShader("shaders/particle.vert", "shaders/particle.frag");
     _graphicsMaterial =
-        make_shared<Material>(_device, "particleGraphics", "shaders/particle.vert", "shaders/particle.frag");
+        make_shared<Material>(_device, graphicsShader, "particleGraphics");
 
     auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
     multiSampling.rasterizationSamples = msaaSamples;

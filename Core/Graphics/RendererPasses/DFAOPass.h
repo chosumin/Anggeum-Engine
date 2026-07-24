@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/ResourceHandle.h"
 #include "ResolvePass.h"
 
 namespace Core
@@ -33,7 +34,7 @@ namespace Core
 
         shared_ptr<Texture> _aoTexture;
 
-        shared_ptr<Shader>   _dfaoShader;
+        Handle<Shader>       _dfaoShader;
         unique_ptr<Pipeline> _dfaoPipeline;
 
         DFAOUniform _params{};

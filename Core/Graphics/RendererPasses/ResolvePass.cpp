@@ -10,7 +10,7 @@ using namespace Core;
 
 // Static member definitions
 VkExtent2D ResolvePass::_screenExtent = {};
-shared_ptr<Shader> ResolvePass::_depthResolveShader = nullptr;
+Handle<Shader> ResolvePass::_depthResolveShader;
 unique_ptr<Pipeline> ResolvePass::_depthResolvePipeline = nullptr;
 
 ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManager,
@@ -20,11 +20,11 @@ ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManage
 {
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        _depthResolveShader = _device.GetResourceCache().RequestShader("Shaders/depthResolve.comp.spv");
-        _depthResolvePipeline = make_unique<Pipeline>(_device, *_depthResolveShader);
+        _depthResolveShader = _device.GetResourceCache().LoadShader("Shaders/depthResolve.comp.spv");
+        _depthResolvePipeline = make_unique<Pipeline>(_device, _depthResolveShader.Get());
 
-        _normalResolveShader = _device.GetResourceCache().RequestShader("Shaders/normalResolve.comp.spv");
-        _normalResolvePipeline = make_unique<Pipeline>(_device, *_normalResolveShader);
+        _normalResolveShader = _device.GetResourceCache().LoadShader("Shaders/normalResolve.comp.spv");
+        _normalResolvePipeline = make_unique<Pipeline>(_device, _normalResolveShader.Get());
 
         _screenExtent = screenExtent;
     }
@@ -102,16 +102,17 @@ shared_ptr<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandB
         0
     };
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthResolveShader, 0);
+    auto& depthResolveShader = _depthResolveShader.Get();
+    auto builder = renderFrame.CreateDescriptorSetBuilder(depthResolveShader, 0);
     builder.SetTextureBuffer(0, msaaDepth);
     builder.SetTextureBuffer(1, resolvedDepth, 0, VK_IMAGE_LAYOUT_GENERAL);
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_depthResolvePipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_depthResolveShader,
+        depthResolveShader,
         resources);
-    commandBuffer.PushConstants(*_depthResolveShader, 0, resolvePc);
+    commandBuffer.PushConstants(depthResolveShader, 0, resolvePc);
 
     uint32_t groupX = (extent.width + 7) / 8;
     uint32_t groupY = (extent.height + 7) / 8;
@@ -142,15 +143,16 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
         0
     };
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_normalResolveShader, 0);
+    auto& normalResolveShader = _normalResolveShader.Get();
+    auto builder = renderFrame.CreateDescriptorSetBuilder(normalResolveShader, 0);
     builder.SetTextureBuffer(0, msaaNormal);
     builder.SetTextureBuffer(1, _resolvedNormalTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_normalResolvePipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_normalResolveShader, resources);
-    commandBuffer.PushConstants(*_normalResolveShader, 0, pc);
+        normalResolveShader, resources);
+    commandBuffer.PushConstants(normalResolveShader, 0, pc);
 
     commandBuffer.Dispatch(
         (_screenExtent.width + 7) / 8,

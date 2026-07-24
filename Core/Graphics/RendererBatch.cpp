@@ -38,12 +38,12 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
             if (i >= subMeshes.size())
                 break;
 
-            auto shaderPtr = materials[i]->GetShaderPtr().lock();
-            if (!shaderPtr)
+            auto shaderHandle = materials[i]->GetShaderHandle();
+            if (!shaderHandle.IsValid())
                 continue;
 
             // Skip non-geometry passes (Skybox, etc.)
-            const string& pass = shaderPtr->GetPass();
+            const string& pass = shaderHandle.Get().GetPass();
             if (pass != "Geometry")
                 continue;
 

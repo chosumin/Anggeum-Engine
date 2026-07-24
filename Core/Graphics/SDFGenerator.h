@@ -1,5 +1,6 @@
 #pragma once
 #include "BufferObjects.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -57,15 +58,15 @@ namespace Core
 		Device& _device;
 
 		shared_ptr<Texture> _sdfTexture;
-		shared_ptr<Shader> _sdfGenerateShader;
+		Handle<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 
-		shared_ptr<Shader> _boundsReduceShader;
+		Handle<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;
 		unique_ptr<Buffer> _boundsBuffer;
 
 		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
-		shared_ptr<Shader> _triLookupShader;
+		Handle<Shader> _triLookupShader;
 		unique_ptr<Pipeline> _triLookupPipeline;
 		unique_ptr<Buffer> _triLookupBuffer;
 

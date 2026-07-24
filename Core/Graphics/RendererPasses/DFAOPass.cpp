@@ -20,8 +20,8 @@ DFAOPass::DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     , _msaaSamples(msaaSamples)
     , _sdfGenerator(sdfGenerator)
 {
-    _dfaoShader   = _device.GetResourceCache().RequestShader("Shaders/dfao.comp.spv");
-    _dfaoPipeline = make_unique<Pipeline>(_device, *_dfaoShader);
+    _dfaoShader   = _device.GetResourceCache().LoadShader("Shaders/dfao.comp.spv");
+    _dfaoPipeline = make_unique<Pipeline>(_device, _dfaoShader.Get());
 }
 
 DFAOPass::~DFAOPass()
@@ -116,7 +116,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     glm::mat4 invProj = glm::inverse(camera->Matrices.Projection);
     glm::mat4 invView = glm::inverse(camera->Matrices.View);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_dfaoShader, 0);
+    auto& dfaoShader = _dfaoShader.Get();
+    auto builder = renderFrame.CreateDescriptorSetBuilder(dfaoShader, 0);
     builder.SetTextureBuffer(0, depthForSampling);
     builder.SetTextureBuffer(1, normalForSampling);
     builder.SetTextureBuffer(2, sdfTexture);
@@ -144,8 +145,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
 
     commandBuffer.BindPipeline(_dfaoPipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_dfaoShader, resources);
-    commandBuffer.PushConstants(*_dfaoShader, 0, pc);
+        dfaoShader, resources);
+    commandBuffer.PushConstants(dfaoShader, 0, pc);
 
     commandBuffer.Dispatch(
         (_screenExtent.width + 7) / 8,

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -17,9 +18,10 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, string shaderName, string materialName);
-		Material(Device& device, string materialName, string vertPath, string fragPath);
-		Material(const Material& other); 
+		// The shader is loaded by ResourceCache (or the owner) and passed in, so
+		// Material does not reach the cache to resolve it.
+		Material(Device& device, Handle<Shader> shader, string materialName);
+		Material(const Material& other);
 
 		Material& operator=(const Material& other);
 
@@ -28,7 +30,7 @@ namespace Core
 		const string GetName() const { return _name; }
 
 		Shader& GetShader() const;
-		weak_ptr<Shader> GetShaderPtr() const { return _shader; }
+		Handle<Shader> GetShaderHandle() const { return _shader; }
 
 		void* GetBuffer(uint32_t binding)
 		{
@@ -106,12 +108,12 @@ namespace Core
 		uint32_t GetMaterialIndex() const { return _materialIndex; }
 		bool HasMaterialIndex() const { return _materialIndex != UINT32_MAX; }
 
-		void SetShader(shared_ptr<Shader> shader) { _shader = shader; }
+		void SetShader(Handle<Shader> shader) { _shader = shader; }
 	private:
 		void SetDefault(shared_ptr<Texture> defaultTexture);
 	protected:
 		Device& _device;
-		shared_ptr<Shader> _shader;
+		Handle<Shader> _shader;
 
 	private:
 		string _name;

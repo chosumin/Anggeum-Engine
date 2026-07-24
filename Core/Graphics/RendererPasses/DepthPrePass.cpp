@@ -51,10 +51,10 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
     _renderPassPass2->CreateRenderPass();
 
     // Get the DepthNormal shader
-    _depthNormalShader = _device.GetResourceCache().RequestShader("DepthNormal");
+    _depthNormalShader = _device.GetResourceCache().LoadShader("DepthNormal");
 
     // Create Pipeline for this pass
-    _pipeline = new Pipeline(device, *_renderPass, *_depthNormalShader, *_pipelineState);
+    _pipeline = new Pipeline(device, *_renderPass, _depthNormalShader.Get(), *_pipelineState);
 }
 
 Core::DepthPrePass::~DepthPrePass()
@@ -106,13 +106,14 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 
 	auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(*_depthNormalShader, 0);
+	auto& depthNormalShader = _depthNormalShader.Get();
+	auto builder = renderFrame.CreateDescriptorSetBuilder(depthNormalShader, 0);
 	builder.SetUniformBuffer(0, cameraBuffer);
 
 	auto& executor = renderFrame.GetRenderExecutor();
 	executor.OcclusionCullAndDraw(
 		commandBuffer,
-		*_depthNormalShader, *_pipeline,
+		depthNormalShader, *_pipeline,
 		camera->Matrices,
 		*_renderPass, *_renderPassPass2,
 		*framebuffer,

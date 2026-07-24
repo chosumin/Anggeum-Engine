@@ -160,14 +160,14 @@ static uint32_t FloatToSortableUint(float f)
 SDFGenerator::SDFGenerator(Device& device)
 	: _device(device)
 {
-	_sdfGenerateShader = _device.GetResourceCache().RequestShader("Shaders/sdfGenerate.comp.spv");
-	_sdfGeneratePipeline = make_unique<Pipeline>(_device, *_sdfGenerateShader);
+	_sdfGenerateShader = _device.GetResourceCache().LoadShader("Shaders/sdfGenerate.comp.spv");
+	_sdfGeneratePipeline = make_unique<Pipeline>(_device, _sdfGenerateShader.Get());
 
-	_boundsReduceShader = _device.GetResourceCache().RequestShader("Shaders/sdfBoundsReduce.comp.spv");
-	_boundsReducePipeline = make_unique<Pipeline>(_device, *_boundsReduceShader);
+	_boundsReduceShader = _device.GetResourceCache().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
+	_boundsReducePipeline = make_unique<Pipeline>(_device, _boundsReduceShader.Get());
 
-	_triLookupShader = _device.GetResourceCache().RequestShader("Shaders/sdfTriLookup.comp.spv");
-	_triLookupPipeline = make_unique<Pipeline>(_device, *_triLookupShader);
+	_triLookupShader = _device.GetResourceCache().LoadShader("Shaders/sdfTriLookup.comp.spv");
+	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
 
 	// Initialize bounds buffer
 	uint32_t posInf = FloatToSortableUint(1e20f);
@@ -215,7 +215,8 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 		VK_ACCESS_TRANSFER_WRITE_BIT,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(*_boundsReduceShader, 0);
+	auto& boundsReduceShader = _boundsReduceShader.Get();
+	auto builder = renderFrame.CreateDescriptorSetBuilder(boundsReduceShader, 0);
 	builder.SetStorageBuffer(0, objectDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
 	builder.SetStorageBuffer(2, *_boundsBuffer);
@@ -223,9 +224,9 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 
 	commandBuffer.BindPipeline(_boundsReducePipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_boundsReduceShader,
+		boundsReduceShader,
 		resources);
-	commandBuffer.PushConstants(*_boundsReduceShader, 0, instanceCount);
+	commandBuffer.PushConstants(boundsReduceShader, 0, instanceCount);
 
 	uint32_t groupCount = (instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
@@ -252,7 +253,8 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 			MemoryType::DEVICE_LOCAL);
 	}
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(*_triLookupShader, 0);
+	auto& triLookupShader = _triLookupShader.Get();
+	auto builder = renderFrame.CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
 	builder.SetStorageBuffer(1, objectDataBuffer);
 	builder.SetStorageBuffer(2, *_triLookupBuffer);
@@ -265,9 +267,9 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 
 	commandBuffer.BindPipeline(_triLookupPipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_triLookupShader,
+		triLookupShader,
 		resources);
-	commandBuffer.PushConstants(*_triLookupShader, 0, pc);
+	commandBuffer.PushConstants(triLookupShader, 0, pc);
 
 	uint32_t groupCount = (totalTriangles + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
@@ -316,7 +318,8 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	pc.paddingFactor = _paddingFactor;
 	pc.useUint16Indices = (meshBufferManager.GetIndexType() == VK_INDEX_TYPE_UINT16) ? 1 : 0;
 
-	auto sdfBuilder = renderFrame.CreateDescriptorSetBuilder(*_sdfGenerateShader, 0);
+	auto& sdfGenerateShader = _sdfGenerateShader.Get();
+	auto sdfBuilder = renderFrame.CreateDescriptorSetBuilder(sdfGenerateShader, 0);
 	sdfBuilder.SetStorageBuffer(0, *meshBufferManager.GetVertexBuffers({ "POSITION" })[0]);
 	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
@@ -327,9 +330,9 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	auto& sdfResources = sdfBuilder.Build();
 	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_sdfGenerateShader,
+		sdfGenerateShader,
 		sdfResources);
-	commandBuffer.PushConstants(*_sdfGenerateShader, 0, pc);
+	commandBuffer.PushConstants(sdfGenerateShader, 0, pc);
 
 	uint32_t groups = (resolution + 3) / 4;
 	commandBuffer.Dispatch(groups, groups, groups);

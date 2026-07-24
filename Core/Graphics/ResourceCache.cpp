@@ -22,7 +22,6 @@ namespace Core
 	ResourceCache::~ResourceCache()
 	{
 		_materials.clear();
-		_shaders.clear();
 		_images.clear();
 		_samplers.clear();
 		_textures.clear();
@@ -53,7 +52,7 @@ namespace Core
 		}
 
 		auto material =
-			make_shared<Core::Material>(_device, shaderName, materialName);
+			make_shared<Core::Material>(_device, LoadShader(shaderName), materialName);
 		_materials[materialName] = material;
 
 		MaterialManager* materialManager = _renderContext->GetMaterialManager();
@@ -78,7 +77,7 @@ namespace Core
 
 		// Copy original material (preserves PBR data, bindless handles, etc.)
 		auto overrideMaterial = make_shared<Material>(*source);
-		overrideMaterial->SetShader(RequestShader(overrideShaderName));
+		overrideMaterial->SetShader(LoadShader(overrideShaderName));
 
 		_materials[overrideName] = overrideMaterial;
 
@@ -89,9 +88,13 @@ namespace Core
 		return overrideMaterial;
 	}
 
-	shared_ptr<Shader> ResourceCache::RequestShader(const string& shaderName)
+	Handle<Shader> ResourceCache::LoadShader(const string& shaderName)
 	{
 		lock_guard<mutex> guard(_shaderMutex);
+
+		auto it = _shaderHandles.find(shaderName);
+		if (it != _shaderHandles.end() && _shaderPool.IsAlive(it->second))
+			return it->second;
 
 		string pass;
 		string vertShaderPath, fragShaderPath;
@@ -99,91 +102,43 @@ namespace Core
 		uint32_t hash = Utility::HashCode(shaderName.c_str());
 		GetShaderFiles(hash, pass, vertShaderPath, fragShaderPath);
 
-		auto it = _shaders.find(shaderName);
-		if (it != _shaders.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
 		shared_ptr<Core::Shader> shader;
 		if (vertShaderPath.empty() || fragShaderPath.empty())
-			shader = make_shared<Shader>(_device, pass,
-				shaderName);
+			shader = make_shared<Shader>(_device, pass, shaderName);
 		else
-			shader = make_shared<Shader>(_device, pass,
-				vertShaderPath, fragShaderPath);
+			shader = make_shared<Shader>(_device, pass, vertShaderPath, fragShaderPath);
 
-		// Set bindless descriptor set layout BEFORE CreatePipelineLayout
-		if (_renderContext && _renderContext->HasBindlessSupport() && shader->UsesBindlessTextures())
-		{
-			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-			shader->SetBindlessDescriptorSetLayout(bindlessManager->GetDescriptorSetLayout());
-			
-			cout << "Shader '" << shaderName << "' configured with bindless texture support" << endl;
-		}
-
-		shader->CreatePipelineLayout();
-		_shaders[shaderName] = shader;
-
-		return shader;
-	}
-
-	shared_ptr<Shader> ResourceCache::RequestShader(const string& vertPath, const string& fragPath)
-	{
-		lock_guard<mutex> guard(_shaderMutex);
-
-		string pass = "Geometry";
-
-		string shaderName = vertPath + fragPath; // Create a unique name based on paths
-
-		auto it = _shaders.find(shaderName);
-		if (it != _shaders.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
-		shared_ptr<Core::Shader> shader = make_shared<Shader>(_device, pass,
-			vertPath, fragPath);
-
-		// Set bindless descriptor set layout BEFORE CreatePipelineLayout
-		if (_renderContext && _renderContext->HasBindlessSupport() && shader->UsesBindlessTextures())
-		{
-			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-			shader->SetBindlessDescriptorSetLayout(bindlessManager->GetDescriptorSetLayout());
-			
-			cout << "Shader '" << shaderName << "' configured with bindless texture support" << endl;
-		}
-
-		shader->CreatePipelineLayout();
-		_shaders[shaderName] = shader;
-
-		return shader;
-	}
-
-	Handle<Shader> ResourceCache::LoadShader(const string& shaderName)
-	{
-		// RequestShader locks _shaderMutex itself, so it must run outside the
-		// handle-map critical section below.
-		return LoadShaderInternal(shaderName, RequestShader(shaderName));
+		return StoreShader(shaderName, std::move(shader));
 	}
 
 	Handle<Shader> ResourceCache::LoadShader(const string& vertPath, const string& fragPath)
 	{
-		return LoadShaderInternal(vertPath + fragPath, RequestShader(vertPath, fragPath));
-	}
+		lock_guard<mutex> guard(_shaderMutex);
 
-	Handle<Shader> ResourceCache::LoadShaderInternal(const string& name, shared_ptr<Shader> shader)
-	{
-		lock_guard<mutex> guard(_shaderHandleMutex);
+		string name = vertPath + fragPath;
 
 		auto it = _shaderHandles.find(name);
 		if (it != _shaderHandles.end() && _shaderPool.IsAlive(it->second))
 			return it->second;
 
-		// RequestShader dedups by name, so equal names already share one Shader;
-		// the pool just wraps it in a handle slot.
+		auto shader = make_shared<Shader>(_device, "Geometry", vertPath, fragPath);
+
+		return StoreShader(name, std::move(shader));
+	}
+
+	Handle<Shader> ResourceCache::StoreShader(const string& name, shared_ptr<Shader> shader)
+	{
+		// Set bindless descriptor set layout BEFORE CreatePipelineLayout
+		if (_renderContext && _renderContext->HasBindlessSupport() && shader->UsesBindlessTextures())
+		{
+			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+			shader->SetBindlessDescriptorSetLayout(bindlessManager->GetDescriptorSetLayout());
+
+			cout << "Shader '" << name << "' configured with bindless texture support" << endl;
+		}
+
+		shader->CreatePipelineLayout();
+
 		Handle<Shader> handle = _shaderPool.Add(std::move(shader));
 		_shaderHandles[name] = handle;
 		return handle;
