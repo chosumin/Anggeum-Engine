@@ -162,6 +162,33 @@ namespace Core
 		return shader;
 	}
 
+	Handle<Shader> ResourceCache::LoadShader(const string& shaderName)
+	{
+		// RequestShader locks _shaderMutex itself, so it must run outside the
+		// handle-map critical section below.
+		return LoadShaderInternal(shaderName, RequestShader(shaderName));
+	}
+
+	Handle<Shader> ResourceCache::LoadShader(const string& vertPath, const string& fragPath)
+	{
+		return LoadShaderInternal(vertPath + fragPath, RequestShader(vertPath, fragPath));
+	}
+
+	Handle<Shader> ResourceCache::LoadShaderInternal(const string& name, shared_ptr<Shader> shader)
+	{
+		lock_guard<mutex> guard(_shaderHandleMutex);
+
+		auto it = _shaderHandles.find(name);
+		if (it != _shaderHandles.end() && _shaderPool.IsAlive(it->second))
+			return it->second;
+
+		// RequestShader dedups by name, so equal names already share one Shader;
+		// the pool just wraps it in a handle slot.
+		Handle<Shader> handle = _shaderPool.Add(std::move(shader));
+		_shaderHandles[name] = handle;
+		return handle;
+	}
+
 	shared_ptr<Core::Image> ResourceCache::RequestImage(const ImageCreateInfo imageCreateInfo)
 	{
 		lock_guard<mutex> guard(_imageMutex);
