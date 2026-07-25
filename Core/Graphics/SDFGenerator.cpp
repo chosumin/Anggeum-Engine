@@ -216,7 +216,7 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 
 	auto& boundsReduceShader = _boundsReduceShader.Get();
-	auto builder = renderFrame.CreateDescriptorSetBuilder(boundsReduceShader, 0);
+	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(boundsReduceShader, 0);
 	builder.SetStorageBuffer(0, objectDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
 	builder.SetStorageBuffer(2, *_boundsBuffer);
@@ -254,7 +254,7 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	}
 
 	auto& triLookupShader = _triLookupShader.Get();
-	auto builder = renderFrame.CreateDescriptorSetBuilder(triLookupShader, 0);
+	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
 	builder.SetStorageBuffer(1, objectDataBuffer);
 	builder.SetStorageBuffer(2, *_triLookupBuffer);
@@ -318,7 +318,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	pc.useUint16Indices = (meshBufferManager.GetIndexType() == VK_INDEX_TYPE_UINT16) ? 1 : 0;
 
 	auto& sdfGenerateShader = _sdfGenerateShader.Get();
-	auto sdfBuilder = renderFrame.CreateDescriptorSetBuilder(sdfGenerateShader, 0);
+	auto sdfBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(sdfGenerateShader, 0);
 	sdfBuilder.SetStorageBuffer(0, *meshBufferManager.GetVertexBuffers({ "POSITION" })[0]);
 	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);

@@ -96,6 +96,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
     function<void()> postDraw)
 {
+    auto& frameResources = _renderFrame.GetResources();
     // Nothing to cull: with no draw commands the batch has no instance/object
     // buffers for the Culler to read, so it must not be constructed either.
     if (_rendererBatch->GetDrawCommandCount() == 0)
@@ -107,7 +108,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
 
     if (!cullerAlreadyUsed)
     {
-        auto prevDepth = _renderFrame.GetPreviousDepthBuffer();
+        auto prevDepth = frameResources.GetPreviousDepthBuffer();
 
         commandBuffer.BeginDebugMarker("Reset Draw Commands");
         culler->ResetDrawCommands(_renderFrame, commandBuffer);
@@ -129,7 +130,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     if (!cullerAlreadyUsed)
     {
         commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
-        auto msaaDepth = _renderFrame.GetRenderTarget("MainDepth");
+        auto msaaDepth = frameResources.GetRenderTarget("MainDepth");
 
         commandBuffer.TransitionImageLayout(msaaDepth.Get(),
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -184,7 +185,7 @@ void RenderExecutor::FrustumCullAndDraw(CommandBuffer& commandBuffer,
     auto* culler = GetOrCreateCuller(*_rendererBatch, camera);
 
     // Frustum culling dispatch
-    auto cullingBuilder = _renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
+    auto cullingBuilder = _renderFrame.GetResources().CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
     culler->DispatchFrustumOnlyCulling(_renderFrame, commandBuffer, cullingBuilder, camera);
 
     commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));

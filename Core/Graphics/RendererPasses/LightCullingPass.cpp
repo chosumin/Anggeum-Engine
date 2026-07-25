@@ -25,7 +25,8 @@ Core::LightCullingPass::~LightCullingPass()
 
 void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-	auto depthTarget = renderFrame.GetCurrentDepth();
+	auto& frameResources = renderFrame.GetResources();
+	auto depthTarget = frameResources.GetCurrentDepth();
 	if (!depthTarget.IsValid())
 		return;
 
@@ -37,12 +38,12 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 	StorageBufferDesc desc{};
 	desc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
 	auto& lightVisibilityBuffer =
-		renderFrame.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc);
+		frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc);
 
-	auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
-	auto& lightBuffer = renderFrame.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+	auto builder = frameResources.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
 	builder.SetUniformBuffer(0, cameraBuffer);
 	builder.SetStorageBuffer(1, lightVisibilityBuffer);
 	builder.SetTextureBuffer(2, depthTarget);

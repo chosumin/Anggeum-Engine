@@ -43,6 +43,7 @@ SDFShadowPass::~SDFShadowPass()
 
 void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
+    auto& frameResources = renderFrame.GetResources();
     RenderTargetDesc sdfShadowDesc{};
     sdfShadowDesc.extent = {
         _screenExtent.width / 2,
@@ -56,7 +57,7 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // production, so start it in the layout the consumer expects.
     sdfShadowDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    _sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
+    _sdfShadowTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
     // Volume raytrace debug texture - match screen aspect ratio
     float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -69,7 +70,7 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     sliceDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     sliceDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    _volumeSliceTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
+    _volumeSliceTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
 }
 
 void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
@@ -113,7 +114,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
     };
 
     auto& volumeSliceShader = _volumeSliceShader.Get();
-    auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(volumeSliceShader, 0);
+    auto sliceBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(volumeSliceShader, 0);
     sliceBuilder.SetTextureBuffer(0, sdfTexture);
     sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     sliceBuilder.SetStorageBuffer(2, *boundsBuffer);
@@ -216,6 +217,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+    auto& frameResources = renderFrame.GetResources();
     auto* meshBufferManager = renderFrame.GetMeshBufferManager();
     if (!meshBufferManager)
         return;
@@ -251,7 +253,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 
     UpdateSDFParams();
 
-    auto depthTarget = renderFrame.GetCurrentDepth();
+    auto depthTarget = frameResources.GetCurrentDepth();
     if (!depthTarget.IsValid())
         return;
 
@@ -261,14 +263,14 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
 
-    auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+    auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
 
     auto& sdfParamsBuffer =
-        renderFrame.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
+        frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
     sdfParamsBuffer.Update(_sdfParams);
 
     auto& sdfShadowShader = _sdfShadowShader.Get();
-    auto builder = renderFrame.CreateDescriptorSetBuilder(sdfShadowShader, 0);
+    auto builder = frameResources.CreateDescriptorSetBuilder(sdfShadowShader, 0);
 
     builder.SetUniformBuffer(0, cameraBuffer);
     builder.SetTextureBuffer(1, sdfTexture);

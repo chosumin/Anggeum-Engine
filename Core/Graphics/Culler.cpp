@@ -86,7 +86,7 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
     commandBuffer.BindPipeline(_resetDrawCommandsPipeline.get());
 
     auto& resetShader = _resetDrawCommandsShader.Get();
-    auto builder = renderFrame.CreateDescriptorSetBuilder(resetShader, 0);
+    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(resetShader, 0);
     builder.SetStorageBuffer(0, *_indirectCommandBuffer);
     builder.SetStorageBuffer(1, *_pass2IndirectCommandBuffer);
     builder.SetStorageBuffer(2, *_rejectedCountBuffer);
@@ -157,7 +157,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
 
     commandBuffer.BindPipeline(cullingPipeline);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(cullingShader, 0);
+    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
     builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
@@ -318,7 +318,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             mipHeight = std::max(1u, mipHeight / 2);
 
             auto& hiZShader = _hiZGenerateShader.Get();
-            auto builder = renderFrame.CreateDescriptorSetBuilder(hiZShader, 0);
+            auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(hiZShader, 0);
             builder.SetTextureBuffer(0, _hiZTexture, mip - 1, VK_IMAGE_LAYOUT_GENERAL);
             builder.SetTextureBuffer(1, _hiZTexture, mip, VK_IMAGE_LAYOUT_GENERAL);
             auto& resources = builder.Build();
@@ -362,7 +362,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	commandBuffer.BindPipeline(_resetDrawCommandsSimplePipeline.get());
 
 	auto& resetSimpleShader = _resetDrawCommandsSimpleShader.Get();
-	auto resetBuilder = renderFrame.CreateDescriptorSetBuilder(resetSimpleShader);
+	auto resetBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(resetSimpleShader);
 	resetBuilder.SetStorageBuffer(0, *_indirectCommandBuffer);
 	auto& resetResources = resetBuilder.Build();
 

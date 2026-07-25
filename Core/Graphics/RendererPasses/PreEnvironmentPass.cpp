@@ -122,7 +122,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
             commandBuffer.BindPipeline(_irradiancePipeline);
 
-            auto irradianceBuilder = renderFrame.CreateDescriptorSetBuilder(_irradianceMaterial->GetShader(), 0);
+            auto irradianceBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(_irradianceMaterial->GetShader(), 0);
             irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& irradianceResources = irradianceBuilder.Build();
             commandBuffer.BindDescriptorSet(
@@ -188,7 +188,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
             commandBuffer.BindPipeline(_prefilteredPipeline);
 
-            auto prefilteredBuilder = renderFrame.CreateDescriptorSetBuilder(_prefilteredMaterial->GetShader(), 0);
+            auto prefilteredBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(_prefilteredMaterial->GetShader(), 0);
             prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& prefilteredResources = prefilteredBuilder.Build();
             commandBuffer.BindDescriptorSet(

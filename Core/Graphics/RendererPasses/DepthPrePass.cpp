@@ -65,6 +65,7 @@ Core::DepthPrePass::~DepthPrePass()
 
 void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
+    auto& frameResources = renderFrame.GetResources();
     // [0] Normal RT
     RenderTargetDesc normalDesc{};
     normalDesc.extent  = _extent;
@@ -72,7 +73,7 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     normalDesc.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     normalDesc.samples = _msaaSamples;
     normalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    auto normalTexture = renderFrame.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
+    auto normalTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
 
     // [1] Depth RT
     RenderTargetDesc depthDesc{};
@@ -81,19 +82,20 @@ void Core::DepthPrePass::EnsureRenderTargets(RenderFrame& renderFrame)
     depthDesc.usage   = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     depthDesc.samples = _msaaSamples;
     depthDesc.aspect  = VK_IMAGE_ASPECT_DEPTH_BIT;
-    auto depthTexture = renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
+    auto depthTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
 
     // If MSAA is disabled, set current depth/normal directly (no resolve needed)
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
     {
-        renderFrame.SetCurrentDepth(depthTexture);
-        renderFrame.SetCurrentNormal(normalTexture);
+        frameResources.SetCurrentDepth(depthTexture);
+        frameResources.SetCurrentNormal(normalTexture);
     }
 }
 
 void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-	auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+	auto& frameResources = renderFrame.GetResources();
+	auto* framebuffer = frameResources.GetOrCreateFramebuffer(
 		"DepthPrePass",
 		*_renderPass,
 		{ RT_MAIN_NORMAL, RT_MAIN_DEPTH });
@@ -104,10 +106,10 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 
 	commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-	auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
 
 	auto& depthNormalShader = _depthNormalShader.Get();
-	auto builder = renderFrame.CreateDescriptorSetBuilder(depthNormalShader, 0);
+	auto builder = frameResources.CreateDescriptorSetBuilder(depthNormalShader, 0);
 	builder.SetUniformBuffer(0, cameraBuffer);
 
 	auto& executor = renderFrame.GetRenderExecutor();

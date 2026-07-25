@@ -223,7 +223,7 @@ void Core::ShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 	depthDesc.arrayLayers = SHADOW_MAP_CASCADE_COUNT;
 	depthDesc.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY; // Always 2D_ARRAY for sampler2DArray
 
-	renderFrame.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
+	renderFrame.GetResources().GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 }
 
 void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
@@ -278,7 +278,7 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 	ImGui::SeparatorText("Cascaded Shadow Maps");
 	{
-		auto shadowTexture = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
+		auto shadowTexture = renderFrame.GetResources().GetRenderTarget(RT_SHADOW_DEPTH);
 
 		if (shadowTexture.IsValid())
 		{
@@ -320,6 +320,7 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+	auto& frameResources = renderFrame.GetResources();
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
 		return;
@@ -328,7 +329,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 	// ShadowPass produces the shared shadow block; GeometryPass runs later in the
 	// pass order and only reads it.
-	auto& shadowBuffer = renderFrame.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+	auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
 	shadowBuffer.Update(_shadowBuffer);
 
 	auto& shader = _shadowShader.Get();
@@ -337,7 +338,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	{
 		string fbName = "ShadowPass_Cascade" + std::to_string(cascadeIndex);
 
-		auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+		auto* framebuffer = frameResources.GetOrCreateFramebuffer(
 			fbName, *_renderPass, { RT_SHADOW_DEPTH }, cascadeIndex);
 
 		if (!framebuffer)
@@ -359,11 +360,11 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 		// Each cascade binds binding 0 with a different view, and all four
 		// descriptor sets are consumed after submit, so they need separate buffers.
-		auto& cascadeBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(
+		auto& cascadeBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(
 			"ShadowPass.Cascade" + std::to_string(cascadeIndex));
 		cascadeBuffer.Update(_cascadeViews[cascadeIndex]);
 
-		auto builder = renderFrame.CreateDescriptorSetBuilder(shader, 0);
+		auto builder = frameResources.CreateDescriptorSetBuilder(shader, 0);
 		builder.SetUniformBuffer(0, cascadeBuffer);
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);

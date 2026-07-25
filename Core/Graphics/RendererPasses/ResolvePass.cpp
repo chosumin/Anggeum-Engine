@@ -38,6 +38,7 @@ ResolvePass::~ResolvePass()
 
 void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
+    auto& frameResources = renderFrame.GetResources();
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
         return;
 
@@ -49,19 +50,20 @@ void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
     resolvedNormalDesc.usage   = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     resolvedNormalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     resolvedNormalDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
-    _resolvedNormalTexture = renderFrame.GetOrCreateRenderTarget(RT_RESOLVED_NORMAL, resolvedNormalDesc);
+    _resolvedNormalTexture = frameResources.GetOrCreateRenderTarget(RT_RESOLVED_NORMAL, resolvedNormalDesc);
 
-    renderFrame.SetCurrentDepth(_resolvedDepthTexture);
-    renderFrame.SetCurrentNormal(_resolvedNormalTexture);
+    frameResources.SetCurrentDepth(_resolvedDepthTexture);
+    frameResources.SetCurrentNormal(_resolvedNormalTexture);
 }
 
 void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+    auto& frameResources = renderFrame.GetResources();
     if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
         return;
 
-    auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
-    auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
+    auto depthTexture = frameResources.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
+    auto normalTexture = frameResources.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
     commandBuffer.TransitionImageLayout(depthTexture.Get(),
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -104,7 +106,7 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
     };
 
     auto& depthResolveShader = _depthResolveShader.Get();
-    auto builder = renderFrame.CreateDescriptorSetBuilder(depthResolveShader, 0);
+    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(depthResolveShader, 0);
     builder.SetTextureBuffer(0, msaaDepth);
     builder.SetTextureBuffer(1, resolvedDepth, 0, VK_IMAGE_LAYOUT_GENERAL);
     auto& resources = builder.Build();
@@ -144,7 +146,7 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
     };
 
     auto& normalResolveShader = _normalResolveShader.Get();
-    auto builder = renderFrame.CreateDescriptorSetBuilder(normalResolveShader, 0);
+    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(normalResolveShader, 0);
     builder.SetTextureBuffer(0, msaaNormal);
     builder.SetTextureBuffer(1, _resolvedNormalTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     auto& resources = builder.Build();
@@ -171,7 +173,7 @@ Handle<Texture> Core::ResolvePass::GetResolvedDepthTarget(RenderFrame& renderFra
     resolvedDepthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     resolvedDepthDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     
-    auto resolvedDepthTexture = renderFrame.GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, resolvedDepthDesc);
+    auto resolvedDepthTexture = renderFrame.GetResources().GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, resolvedDepthDesc);
 
     return resolvedDepthTexture;
 }

@@ -69,6 +69,7 @@ namespace Core
 
     void GeometryPass::EnsureRenderTargets(RenderFrame& renderFrame)
     {
+        auto& frameResources = renderFrame.GetResources();
         VkExtent2D screenExtent = { 
             static_cast<uint32_t>(_tileInfo.viewportSize.x), 
             static_cast<uint32_t>(_tileInfo.viewportSize.y) 
@@ -81,7 +82,7 @@ namespace Core
         colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
         colorDesc.samples = _msaaSamples;
         colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-        renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+        frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 
         // Main depth target
         RenderTargetDesc depthDesc{};
@@ -90,11 +91,12 @@ namespace Core
         depthDesc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         depthDesc.samples = _msaaSamples;
         depthDesc.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-        renderFrame.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
+        frameResources.GetOrCreateRenderTarget(RT_MAIN_DEPTH, depthDesc);
     }
 
     void GeometryPass::EnsureIBLResources(RenderFrame& renderFrame)
     {
+        auto& frameResources = renderFrame.GetResources();
         // Create only once since these are read only
         if (_offscreenTexture.IsValid())
             return;
@@ -106,7 +108,7 @@ namespace Core
         offscreenDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         offscreenDesc.samples = VK_SAMPLE_COUNT_1_BIT;
         offscreenDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-        _offscreenTexture = renderFrame.GetOrCreateRenderTarget(RT_OFFSCREEN, offscreenDesc);
+        _offscreenTexture = frameResources.GetOrCreateRenderTarget(RT_OFFSCREEN, offscreenDesc);
 
         // Irradiance cubemap
         RenderTargetDesc irradianceDesc{};
@@ -118,7 +120,7 @@ namespace Core
         irradianceDesc.isCubemap = true;
         irradianceDesc.mipLevels = 8;
         irradianceDesc.arrayLayers = 6;
-        _irradianceCubemap = renderFrame.GetOrCreateRenderTarget(RT_IRRADIANCE, irradianceDesc);
+        _irradianceCubemap = frameResources.GetOrCreateRenderTarget(RT_IRRADIANCE, irradianceDesc);
 
         // Prefiltered cubemap
         RenderTargetDesc prefilteredDesc{};
@@ -130,7 +132,7 @@ namespace Core
         prefilteredDesc.isCubemap = true;
         prefilteredDesc.mipLevels = 8;
         prefilteredDesc.arrayLayers = 6;
-        _prefilteredCubemap = renderFrame.GetOrCreateRenderTarget(RT_PREFILTERED, prefilteredDesc);
+        _prefilteredCubemap = frameResources.GetOrCreateRenderTarget(RT_PREFILTERED, prefilteredDesc);
 
         // BRDF LUT
         RenderTargetDesc brdfLutDesc{};
@@ -139,11 +141,12 @@ namespace Core
         brdfLutDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         brdfLutDesc.samples = VK_SAMPLE_COUNT_1_BIT;
         brdfLutDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-        _brdfLut = renderFrame.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
+        _brdfLut = frameResources.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
     }
 
     void GeometryPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
     {
+        auto& frameResources = renderFrame.GetResources();
         // Wait for compute queue (AmbientOcclusionPass) to finish producing the AO texture
         renderFrame.GetCurrentSubmitInfo().AddWaitSemaphore(
             QueueType::Compute,
@@ -153,7 +156,7 @@ namespace Core
         StorageBufferDesc lightVisibilityDesc{};
         lightVisibilityDesc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
         auto& lightVisibilityBuffer =
-            renderFrame.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc);
+            frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc);
 
 		commandBuffer.BufferBarrier(lightVisibilityBuffer,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -171,7 +174,7 @@ namespace Core
             _iblGenerated = true;
         }
 
-        auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+        auto* framebuffer = frameResources.GetOrCreateFramebuffer(
             "GeometryPass",
             *_renderPass,
             { RT_MAIN_COLOR, RT_MAIN_DEPTH });
@@ -180,14 +183,14 @@ namespace Core
             return;
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
-        auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
+        auto depth = frameResources.GetRenderTarget(RT_MAIN_DEPTH);
         commandBuffer.TransitionImageLayout(depth.Get(),
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-        auto shadowTarget    = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
-        auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
-        auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
+        auto shadowTarget    = frameResources.GetRenderTarget(RT_SHADOW_DEPTH);
+        auto sdfShadowTarget = frameResources.GetRenderTarget("SDFShadow");
+        auto aoTarget = frameResources.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
         if (shadowTarget.IsValid())
         {
@@ -218,14 +221,14 @@ namespace Core
 
         Pipeline* pipeline = GetOrCreatePipeline(*shader);
 
-        auto& cameraBuffer = renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
-        auto& lightBuffer = renderFrame.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
-        auto& shadowBuffer = renderFrame.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+        auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+        auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+        auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
 
-        auto& giBuffer = renderFrame.GetOrCreateUniformBuffer<GI>("GeometryPass.GI");
+        auto& giBuffer = frameResources.GetOrCreateUniformBuffer<GI>("GeometryPass.GI");
         giBuffer.Update(_giBuffer);
 
-        auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
+        auto builder = frameResources.CreateDescriptorSetBuilder(*shader, 0);
         builder.SetUniformBuffer(0, cameraBuffer);
         builder.SetUniformBuffer(3, giBuffer);
         builder.SetUniformBuffer(4, shadowBuffer);
@@ -315,6 +318,7 @@ namespace Core
 
     void GeometryPass::RegisterGiTexturesToBindless(RenderFrame& renderFrame)
     {
+        auto& frameResources = renderFrame.GetResources();
         if (!renderFrame.HasBindlessSupport())
             return;
 
@@ -323,9 +327,9 @@ namespace Core
 
         auto* bindlessManager = renderFrame.GetBindlessTextureManager();
 
-        uint32_t irradianceCubemapIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_IRRADIANCE));
-        uint32_t prefilteredCubemapIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_PREFILTERED));
-        uint32_t brdfLutIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_BRDF_LUT));
+        uint32_t irradianceCubemapIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_IRRADIANCE));
+        uint32_t prefilteredCubemapIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_PREFILTERED));
+        uint32_t brdfLutIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_BRDF_LUT));
 
         // Strip the MSB cubemap flag before passing to the shader.
         // The bindless index stores BindlessCubemapFlag as a cubemap marker internally,
@@ -342,6 +346,7 @@ namespace Core
 
     void GeometryPass::DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
     {
+        auto& frameResources = renderFrame.GetResources();
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto meshes = _scene.GetComponents<Core::Mesh>();
@@ -373,13 +378,13 @@ namespace Core
             }
 
             auto& skyCameraBuffer =
-                renderFrame.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+                frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
 
-            auto skyBuilder0 = renderFrame.CreateDescriptorSetBuilder(shader, 0);
+            auto skyBuilder0 = frameResources.CreateDescriptorSetBuilder(shader, 0);
             skyBuilder0.SetUniformBuffer(0, skyCameraBuffer);
             auto& skyResources0 = skyBuilder0.Build();
 
-            auto skyBuilder1 = renderFrame.CreateDescriptorSetBuilder(shader, 1);
+            auto skyBuilder1 = frameResources.CreateDescriptorSetBuilder(shader, 1);
             auto& textures = material->GetTexturesMap();
             for (auto& [binding, texture] : textures)
                 skyBuilder1.SetTextureBuffer(binding, texture);

@@ -119,7 +119,7 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 
 	uint32_t prevIndex = (_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
 	_previousFrameDepth = _frameDepthBuffers[prevIndex];
-	currentFrame.SetPreviousDepthBuffer(_previousFrameDepth);
+	currentFrame.GetResources().SetPreviousDepthBuffer(_previousFrameDepth);
 
 	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
@@ -136,14 +136,15 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 void RenderContext::Submit()
 {
 	auto& currentFrame = GetCurrentFrame();
+	auto& frameResources = currentFrame.GetResources();
 
-	auto currentResolvedDepth = currentFrame.GetRenderTarget("ResolvedDepth");
+	auto currentResolvedDepth = frameResources.GetRenderTarget("ResolvedDepth");
 
 	if (currentResolvedDepth.IsValid())
 		_frameDepthBuffers[_currentFrame] = currentResolvedDepth;
 	else
 	{
-		auto currentDepth = currentFrame.GetRenderTarget("MainDepth");
+		auto currentDepth = frameResources.GetRenderTarget("MainDepth");
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 

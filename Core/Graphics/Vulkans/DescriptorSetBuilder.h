@@ -12,7 +12,7 @@ namespace Core
 	 * The builder never takes ownership of anything passed into it.
 	 *
 	 * Usage:
-	 *   auto& builder = renderFrame.CreateDescriptorSetBuilder(shader);
+	 *   auto& builder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader);
 	 *   builder.SetUniformBuffer(0, &cameraData);    // Pass fills its bindings
 	 *   // ... hand off to RendererBatch ...
 	 *   builder.SetStorageBuffer(1, transformBuffer); // Batch fills its bindings

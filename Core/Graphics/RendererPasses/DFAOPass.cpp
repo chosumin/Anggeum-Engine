@@ -41,7 +41,7 @@ void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = renderFrame.GetResources().GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void DFAOPass::UpdateParams()
@@ -91,6 +91,7 @@ void DFAOPass::UpdateGUI()
 
 void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+    auto& frameResources = renderFrame.GetResources();
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
 
@@ -102,8 +103,8 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     UpdateParams();
     commandBuffer.BeginDebugMarker("DFAO");
 
-    auto depthForSampling = renderFrame.GetCurrentDepth();
-    auto normalForSampling = renderFrame.GetCurrentNormal();
+    auto depthForSampling = frameResources.GetCurrentDepth();
+    auto normalForSampling = frameResources.GetCurrentNormal();
     if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
@@ -116,12 +117,12 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     glm::mat4 invView = glm::inverse(camera->Matrices.View);
 
     auto& dfaoShader = _dfaoShader.Get();
-    auto builder = renderFrame.CreateDescriptorSetBuilder(dfaoShader, 0);
+    auto builder = frameResources.CreateDescriptorSetBuilder(dfaoShader, 0);
     builder.SetTextureBuffer(0, depthForSampling);
     builder.SetTextureBuffer(1, normalForSampling);
     builder.SetTextureBuffer(2, sdfTexture);
     builder.SetTextureBuffer(3, _aoTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    auto& paramsBuffer = renderFrame.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params");
+    auto& paramsBuffer = frameResources.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params");
     paramsBuffer.Update(_params);
 
     builder.SetStorageBuffer(4, *boundsBuffer);

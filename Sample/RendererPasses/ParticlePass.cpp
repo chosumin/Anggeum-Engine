@@ -53,7 +53,7 @@ void Sample::ParticlePass::EnsureRenderTargets(RenderFrame& renderFrame)
     colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
     colorDesc.samples = _msaaSamples;
     colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+    renderFrame.GetResources().GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
 void Sample::ParticlePass::Initialize()
@@ -109,7 +109,8 @@ void Sample::ParticlePass::Initialize()
 
 void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-    auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+    auto& frameResources = renderFrame.GetResources();
+    auto* framebuffer = frameResources.GetOrCreateFramebuffer(
         "ParticlePass",
         *_renderPass,
         { RT_MAIN_COLOR });
@@ -121,10 +122,10 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
     _deltaTime.deltaTime += 0.01f;
 
     auto& deltaTimeBuffer =
-        renderFrame.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime");
+        frameResources.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime");
     deltaTimeBuffer.Update(_deltaTime);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+    auto builder = frameResources.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
     builder.SetUniformBuffer(0, deltaTimeBuffer);
     builder.SetStorageBuffer(1, *_buffers[0]);
     builder.SetStorageBuffer(2, *_buffers[1]);
