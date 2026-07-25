@@ -29,7 +29,8 @@ uint32_t Core::Texture::GetLayers() const
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t binding, VkDescriptorType descriptorType)
 {
 	imageInfo.imageLayout = imageLayout;
-	imageInfo.imageView = texture->GetImage().GetOrCreateImageView(mipLevel);
+	auto& tex = texture.Get();
+	imageInfo.imageView = tex.GetImage().GetOrCreateImageView(mipLevel);
 
 	switch (descriptorType)
 	{
@@ -38,7 +39,7 @@ VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t bind
 			break;
 		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
 		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-			imageInfo.sampler = texture->GetVkSampler();
+			imageInfo.sampler = tex.GetVkSampler();
 			break;
 		default:
 			imageInfo.sampler = VK_NULL_HANDLE;

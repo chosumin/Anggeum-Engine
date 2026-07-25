@@ -57,8 +57,8 @@ void RenderFrame::Reset()
 	// Reset culler usage tracking for this frame
 	_renderExecutor->ResetFrame();
 
-	_currentDepth = nullptr;
-	_currentNormal = nullptr;
+	_currentDepth = Handle<Texture>{};
+	_currentNormal = Handle<Texture>{};
 }
 
 DescriptorSetResources* RenderFrame::GetBindlessResources()
@@ -105,20 +105,20 @@ void RenderFrame::CreateDescriptorPool()
 	_descriptorPool->CreatePool(poolSizes, maxSets);
 }
 
-shared_ptr<Texture> Core::RenderFrame::GetRenderTarget(const string& name) const
+Handle<Texture> Core::RenderFrame::GetRenderTarget(const string& name) const
 {
     auto it = _renderTargets.find(name);
     if (it != _renderTargets.end())
         return it->second;
-    return nullptr;
+    return Handle<Texture>{};
 }
 
-void Core::RenderFrame::SetPreviousDepthBuffer(shared_ptr<Texture> depth)
+void Core::RenderFrame::SetPreviousDepthBuffer(Handle<Texture> depth)
 {
     _previousDepthBuffer = depth;
 }
 
-shared_ptr<Texture> Core::RenderFrame::GetOrCreateRenderTarget(const string& name,
+Handle<Texture> Core::RenderFrame::GetOrCreateRenderTarget(const string& name,
     const RenderTargetDesc& desc)
 {
     auto it = _renderTargets.find(name);
@@ -128,7 +128,7 @@ shared_ptr<Texture> Core::RenderFrame::GetOrCreateRenderTarget(const string& nam
     return CreateRenderTarget(name, desc);
 }
 
-shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
+Handle<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     const RenderTargetDesc& desc)
 {
     VkFormat format = desc.format;
@@ -219,8 +219,9 @@ shared_ptr<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
         _device.EndSingleTimeCommands(commandBuffer);
     }
 
-    _renderTargets[name] = texture;
-    return texture;
+    Handle<Texture> handle = _renderTargetPool.Add(texture);
+    _renderTargets[name] = handle;
+    return handle;
 }
 
 Buffer& Core::RenderFrame::GetOrCreateStorageBuffer(const string& name,
@@ -277,24 +278,25 @@ Framebuffer* Core::RenderFrame::GetOrCreateFramebuffer(const string& name,
     
     for (const auto& attachmentName : attachmentNames)
     {
-        auto texture = GetRenderTarget(attachmentName);
-        if (texture)
+        auto textureHandle = GetRenderTarget(attachmentName);
+        if (textureHandle.IsValid())
         {
+            auto& texture = textureHandle.Get();
             if (layerIndex >= 0)
             {
                 // Use single layer image view for array textures
-                imageViews.push_back(texture->GetLayerImageView(
+                imageViews.push_back(texture.GetLayerImageView(
                     static_cast<uint32_t>(layerIndex)));
             }
             else
             {
                 // Use full image view (default behavior)
-                imageViews.push_back(texture->GetImageView());
+                imageViews.push_back(texture.GetImageView());
             }
 
             if (extent.width == 0)
             {
-                auto texExtent = texture->GetExtent();
+                auto texExtent = texture.GetExtent();
                 extent = { texExtent.width, texExtent.height };
             }
         }

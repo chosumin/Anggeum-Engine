@@ -41,7 +41,7 @@ namespace Core
 		void SetCachePath(const std::string& path) { _sdfCachePath = path; }
 		const std::string& GetCachePath() const { return _sdfCachePath; }
 
-		shared_ptr<Texture> GetSDFTexture() const { return _sdfTexture; }
+		Handle<Texture> GetSDFTexture() const { return _sdfTexture; }
 		Buffer* GetBoundsBuffer() const { return _boundsBuffer.get(); }
 		bool IsGenerated() const { return _generated; }
 
@@ -57,7 +57,9 @@ namespace Core
 	private:
 		Device& _device;
 
-		shared_ptr<Texture> _sdfTexture;
+		// GPU-generated volume texture. App-lifetime, so it lives in the
+		// ResourceCache texture pool; this generator just holds the handle.
+		Handle<Texture> _sdfTexture;
 		Handle<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 

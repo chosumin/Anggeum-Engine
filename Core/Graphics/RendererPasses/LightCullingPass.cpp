@@ -26,7 +26,7 @@ Core::LightCullingPass::~LightCullingPass()
 void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
 	auto depthTarget = renderFrame.GetCurrentDepth();
-	if (!depthTarget)
+	if (!depthTarget.IsValid())
 		return;
 
 	// Wait for graphics queue (ResolvePass) to finish producing the resolved depth

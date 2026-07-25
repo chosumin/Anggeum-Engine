@@ -76,10 +76,10 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
 {
     auto sdfTexture = _sdfGenerator->GetSDFTexture();
     auto* boundsBuffer = _sdfGenerator->GetBoundsBuffer();
-    if (!sdfTexture || !_volumeSliceTexture || !boundsBuffer)
+    if (!sdfTexture.IsValid() || !_volumeSliceTexture.IsValid() || !boundsBuffer)
         return;
 
-    auto& sliceImage = _volumeSliceTexture->GetImage();
+    auto& sliceImage = _volumeSliceTexture.Get().GetImage();
     commandBuffer.TransitionImageLayout(sliceImage,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -184,26 +184,26 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
     float aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
 
-    if (_sdfShadowTexture && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_sdfShadowTexture.IsValid() && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
         {
             _sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _sdfShadowTexture->GetVkSampler(),
-                _sdfShadowTexture->GetImageView(),
+                _sdfShadowTexture.Get().GetVkSampler(),
+                _sdfShadowTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS),
             ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
     }
 
-    if (_volumeSliceTexture && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_volumeSliceTexture.IsValid() && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
         {
             _volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _volumeSliceTexture->GetVkSampler(),
-                _volumeSliceTexture->GetImageView(),
+                _volumeSliceTexture.Get().GetVkSampler(),
+                _volumeSliceTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
@@ -247,16 +247,16 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     }
 
     auto sdfTexture = _sdfGenerator->GetSDFTexture();
-    if (!sdfTexture)
+    if (!sdfTexture.IsValid())
         return;
 
     UpdateSDFParams();
 
     auto depthTarget = renderFrame.GetCurrentDepth();
-    if (!depthTarget)
+    if (!depthTarget.IsValid())
         return;
 
-    commandBuffer.TransitionImageLayout(_sdfShadowTexture->GetImage(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get().GetImage(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
@@ -288,7 +288,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
 
-    commandBuffer.TransitionImageLayout(_sdfShadowTexture->GetImage(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get().GetImage(),
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

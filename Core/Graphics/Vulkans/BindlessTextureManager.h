@@ -16,7 +16,6 @@ namespace Core
 	// Internal texture slot
 	struct TextureSlot
 	{
-		//shared_ptr<Texture> texture;
 		TextureBuffer textureBuffer;
 		uint32_t generation = 0;
 		bool isActive = false;
@@ -36,9 +35,11 @@ namespace Core
 		void Initialize();
 
 		// Texture registration (auto-detects 2D vs Cubemap)
-		TextureHandle RegisterTexture(shared_ptr<Texture> texture);
+		// Accepts a cache/render-target Handle<Texture>; the manager holds shared
+		// ownership of the resolved texture for its descriptor slot.
+		TextureHandle RegisterTexture(Handle<Texture> texture);
 		void UnregisterTexture(TextureHandle handle);
-		void UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture);
+		void UpdateTexture(TextureHandle handle, Handle<Texture> texture);
 
 		// Descriptor management
 		void UpdateDescriptorSet();

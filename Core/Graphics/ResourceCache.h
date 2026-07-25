@@ -31,7 +31,7 @@ namespace Core
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
 		// Samplers are pool-owned; resolve the handle with handle.Get().
 		Handle<Sampler> LoadSampler(const SamplerCreateInfo info);
-		// Asset textures are pool-owned; resolve with handle.Get()/GetShared().
+		// Asset textures are pool-owned; resolve the handle with handle.Get().
 		Handle<Texture> LoadTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo,
 			const SamplerCreateInfo samplerCreateInfo);
@@ -39,6 +39,12 @@ namespace Core
 			const ImageCreateInfo imageCreateInfo);
 		Handle<Texture> LoadTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler);
+
+		// Adopts an externally built image (e.g. a GPU-generated volume) into the
+		// texture pool. For app-lifetime textures that aren't loaded from a file.
+		Handle<Texture> LoadTexture(const string& name,
+			unique_ptr<Image> image, Handle<Sampler> sampler);
+
 		shared_ptr<SubMesh> RequestSubMesh(const string& name);
 
 		Handle<Texture> GetDefaultTextureHandle() const { return _defaultTexture; }

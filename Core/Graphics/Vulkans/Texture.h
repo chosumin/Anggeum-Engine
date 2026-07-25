@@ -59,7 +59,7 @@ namespace Core
 
 	struct TextureBuffer
 	{
-		shared_ptr<Texture> texture;
+		Handle<Texture> texture;
 		uint mipLevel;
 		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		VkDescriptorImageInfo imageInfo{};

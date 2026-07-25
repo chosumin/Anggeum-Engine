@@ -2,6 +2,7 @@
 #include "IndirectDrawBuffer.h"
 #include "BufferObjects.h"
 #include "ResourceHandle.h"
+#include "ResourcePool.h"
 
 namespace Core
 {
@@ -37,11 +38,11 @@ namespace Core
 
         // Frustum + occlusion culling into the primary indirect command buffer (Pass 1).
         void DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, shared_ptr<Texture> depth);
+            const CameraBuffer& camera, Handle<Texture> depth);
 
         // Frustum + occlusion culling of the objects rejected by Pass 1 (Pass 2).
         void DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, shared_ptr<Texture> depth);
+            const CameraBuffer& camera, Handle<Texture> depth);
 
         // Frustum-only culling into the primary indirect command buffer.
         // The builder must be created for the frustum culling shader so a fresh
@@ -61,10 +62,10 @@ namespace Core
         void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
         void PrepareHiZResources(Device& device, VkExtent2D extents);
-        void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth);
+        void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth);
 
         void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, shared_ptr<Texture> depth,
+            const CameraBuffer& camera, Handle<Texture> depth,
             Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
             Shader& cullingShader, Pipeline* cullingPipeline);
 
@@ -85,8 +86,10 @@ namespace Core
         Handle<Shader> _cullingShader;
         unique_ptr<Pipeline> _cullingPipeline;
 
-        // Hi-Z Resources
-        shared_ptr<Texture> _hiZTexture;
+        // Hi-Z Resources. Pass-temp texture, owned by this Culler's own pool so it
+        // can be referred to by handle like every other bound texture.
+        ResourcePool<Texture> _texturePool;
+        Handle<Texture> _hiZTexture;
         Handle<Shader> _hiZGenerateShader;
         unique_ptr<Pipeline> _hiZPipeline;
         uint32_t _hiZMipLevels = 0;

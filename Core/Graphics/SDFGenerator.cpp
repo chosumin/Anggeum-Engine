@@ -202,7 +202,7 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
 
 	auto sampler = _device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
-	_sdfTexture = make_shared<Texture>("SDFVolume", std::move(image), sampler);
+	_sdfTexture = _device.GetResourceCache().LoadTexture("SDFVolume", std::move(image), sampler);
 }
 
 void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -285,7 +285,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	MeshBufferManager& meshBufferManager,
 	uint32_t resolution)
 {
-	if (!_sdfTexture)
+	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(resolution);
 
 	auto batch = renderFrame.GetRenderExecutor().GetRendererBatch();
@@ -307,7 +307,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
-	auto& sdfImage = _sdfTexture->GetImage();
+	auto& sdfImage = _sdfTexture.Get().GetImage();
 	commandBuffer.TransitionImageLayout(sdfImage,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL);
@@ -346,10 +346,10 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 bool SDFGenerator::SaveToFile(uint32_t resolution)
 {
-	if (!_sdfTexture || !_boundsBuffer)
+	if (!_sdfTexture.IsValid() || !_boundsBuffer)
 		return false;
 
-	auto& image = _sdfTexture->GetImage();
+	auto& image = _sdfTexture.Get().GetImage();
 
 	// The SDF generation commands were recorded into a frame command buffer that
 	// may still be executing (or not yet started) on the GPU. The download job
@@ -455,10 +455,10 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	memcpy(boundsMapped, header.rawBounds, sizeof(header.rawBounds));
 	boundsStaging->Unmap();
 
-	if (!_sdfTexture)
+	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(header.resolution);
 
-	auto& image = _sdfTexture->GetImage();
+	auto& image = _sdfTexture.Get().GetImage();
 
 	SDFUploadJob job(_device, image, *_boundsBuffer, header.resolution,
 		imageStaging, boundsStaging);

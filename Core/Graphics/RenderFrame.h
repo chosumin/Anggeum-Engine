@@ -1,6 +1,7 @@
 #pragma once
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/MemoryAllocator.h"
+#include "ResourcePool.h"
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
 #include "IndirectDrawBuffer.h"
@@ -75,11 +76,12 @@ namespace Core
 		void SetMaterialManager(MaterialManager* materialManager) { _materialManager = materialManager; }
 		MaterialManager* GetMaterialManager() { return _materialManager; }
 
-		// On-Demand createion
-		shared_ptr<Texture> GetOrCreateRenderTarget(const string& name, 
+		// On-Demand createion. Render targets are pool-owned per frame and referred
+		// to by handle, like cache textures.
+		Handle<Texture> GetOrCreateRenderTarget(const string& name,
 			const RenderTargetDesc& desc);
 
-		shared_ptr<Texture> GetRenderTarget(const string& name) const;
+		Handle<Texture> GetRenderTarget(const string& name) const;
 
 		// Storage buffers that one pass produces and another consumes within the
 		// same frame. Created on first request and reused for the frame's lifetime.
@@ -99,19 +101,16 @@ namespace Core
 		}
 
 		// Explicit creation (for cases where you want to control the timing of resource creation)
-		shared_ptr<Texture> CreateRenderTarget(const string& name,
+		Handle<Texture> CreateRenderTarget(const string& name,
 			const RenderTargetDesc& desc);
 
-		void SetPreviousDepthBuffer(shared_ptr<Texture> depth);
-		shared_ptr<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
+		void SetPreviousDepthBuffer(Handle<Texture> depth);
+		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
-		void SetCurrentDepth(shared_ptr<Texture> depth) { _currentDepth = depth; }
-		shared_ptr<Texture> GetCurrentDepth() const { return _currentDepth; }
-		void SetCurrentNormal(shared_ptr<Texture> normal) { _currentNormal = normal; }
-		shared_ptr<Texture> GetCurrentNormal() const { return _currentNormal; }
-
-		// For debugging purposes
-		const unordered_map<string, shared_ptr<Texture>>& GetAllRenderTargets() const { return _renderTargets; }
+		void SetCurrentDepth(Handle<Texture> depth) { _currentDepth = depth; }
+		Handle<Texture> GetCurrentDepth() const { return _currentDepth; }
+		void SetCurrentNormal(Handle<Texture> normal) { _currentNormal = normal; }
+		Handle<Texture> GetCurrentNormal() const { return _currentNormal; }
 
 		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
 			const vector<string>& attachmentNames, int32_t layerIndex = -1);
@@ -150,13 +149,14 @@ namespace Core
 		MeshBufferManager* _meshBufferManager = nullptr;
 		MaterialManager* _materialManager = nullptr;
 
-		unordered_map<string, shared_ptr<Texture>> _renderTargets;
+		ResourcePool<Texture> _renderTargetPool;
+		unordered_map<string, Handle<Texture>> _renderTargets;
 		unordered_map<string, unique_ptr<Buffer>> _storageBuffers;
 		unordered_map<string, unique_ptr<Buffer>> _uniformBuffers;
 
-		shared_ptr<Texture> _previousDepthBuffer;
-		shared_ptr<Texture> _currentDepth;
-		shared_ptr<Texture> _currentNormal;
+		Handle<Texture> _previousDepthBuffer;
+		Handle<Texture> _currentDepth;
+		Handle<Texture> _currentNormal;
 
 		Handle<Sampler> _defaultSampler;
 

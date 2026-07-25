@@ -50,7 +50,7 @@ void Core::PreEnvironmentPass::Initialize()
         return shader.GetPass() == "Skybox";
     });
 
-    shared_ptr<Texture> skyCubemap;
+    Handle<Texture> skyCubemap;
 
     if (it != meshes.end())
     {

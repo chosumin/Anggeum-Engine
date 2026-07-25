@@ -40,18 +40,19 @@ namespace Core
 		AllocateDescriptorSet();
 	}
 
-	TextureHandle BindlessTextureManager::RegisterTexture(shared_ptr<Texture> texture)
+	TextureHandle BindlessTextureManager::RegisterTexture(Handle<Texture> texture)
 	{
-		if (!texture)
+		Texture* resolved = texture.TryGet();
+		if (!resolved)
 		{
 			throw runtime_error("Cannot register null texture to bindless manager");
 		}
 
 		// Detect if cubemap or 2D
-		bool isCubemap = texture->GetLayers() == 6;
-		
+		bool isCubemap = resolved->GetLayers() == 6;
+
 		uint32_t slotIndex = AllocateSlot(isCubemap);
-		
+
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		slot.textureBuffer.texture = texture;
 		slot.generation++;
@@ -88,7 +89,7 @@ namespace Core
 		if (slot.generation != handle.generation || !slot.isActive)
 			return;
 
-		slot.textureBuffer.texture = nullptr;
+		slot.textureBuffer.texture = Handle<Texture>{};
 		slot.textureBuffer.mipLevel = 0;
 		slot.isActive = false;
 		
@@ -103,9 +104,9 @@ namespace Core
 		_needsUpdate = true;
 	}
 
-	void BindlessTextureManager::UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture)
+	void BindlessTextureManager::UpdateTexture(TextureHandle handle, Handle<Texture> texture)
 	{
-		if (!handle.IsValid() || !texture)
+		if (!handle.IsValid() || !texture.IsValid())
 			return;
 
 		bool isCubemap = (handle.index & 0x80000000) != 0;
@@ -149,7 +150,7 @@ namespace Core
 			uint binding = isCubemap ? 1 : 0;
 
 			VkDescriptorImageInfo imageInfo{};
-			if (slot.isActive && slot.textureBuffer.texture)
+			if (slot.isActive && slot.textureBuffer.texture.IsValid())
 			{
 				auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 				write.dstSet = _descriptorSet;

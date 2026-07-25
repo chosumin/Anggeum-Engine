@@ -55,14 +55,14 @@ namespace Core
 		return _shader.Get();
 	}
 
-	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
+	Handle<Texture> Material::GetTexture(uint32_t binding)
 	{
 		auto setIt = _textures.find(binding);
 		if (setIt != _textures.end())
 		{
-			return setIt->second.GetShared();
+			return setIt->second;
 		}
-		return nullptr;
+		return Handle<Texture>{};
 	}
 
 	void Material::SetDefault(Handle<Texture> defaultTexture)

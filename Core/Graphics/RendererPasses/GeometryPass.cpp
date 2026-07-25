@@ -96,7 +96,7 @@ namespace Core
     void GeometryPass::EnsureIBLResources(RenderFrame& renderFrame)
     {
         // Create only once since these are read only
-        if (_offscreenTexture)
+        if (_offscreenTexture.IsValid())
             return;
 
         // Offscreen (for IBL generation)
@@ -181,7 +181,7 @@ namespace Core
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
-        commandBuffer.TransitionImageLayout(depth->GetImage(),
+        commandBuffer.TransitionImageLayout(depth.Get().GetImage(),
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
@@ -189,9 +189,9 @@ namespace Core
         auto sdfShadowTarget = renderFrame.GetRenderTarget("SDFShadow");
         auto aoTarget = renderFrame.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
-        if (shadowTarget)
+        if (shadowTarget.IsValid())
         {
-            commandBuffer.TransitionImageLayout(shadowTarget->GetImage(),
+            commandBuffer.TransitionImageLayout(shadowTarget.Get().GetImage(),
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
@@ -233,10 +233,10 @@ namespace Core
         builder.SetStorageBuffer(6, lightVisibilityBuffer);
         builder.SetTextureBuffer(7, shadowTarget);
 
-        if (sdfShadowTarget)
+        if (sdfShadowTarget.IsValid())
             builder.SetTextureBuffer(10, sdfShadowTarget);
 
-        if (aoTarget)
+        if (aoTarget.IsValid())
             builder.SetTextureBuffer(11, aoTarget);
 
         auto perShaderHook = [&](Shader& shader)
@@ -271,11 +271,11 @@ namespace Core
         _timer.tick();
 
         auto preEnvironmentPass = new PreEnvironmentPass(_device, _workerThreadManager, _scene, 
-            _offscreenTexture.get(), _irradianceCubemap.get(), _prefilteredCubemap.get());
+            &_offscreenTexture.Get(), &_irradianceCubemap.Get(), &_prefilteredCubemap.Get());
         auto preEnvironmentJob = new PreEnvironmentJob(_device, *preEnvironmentPass);
         Enqueue(preEnvironmentJob);
 
-        auto brdf = new BrdfLutPass(_device, _workerThreadManager, _brdfLut.get());
+        auto brdf = new BrdfLutPass(_device, _workerThreadManager, &_brdfLut.Get());
         auto brdfJob = new BrdfLutJob(_device, *brdf);
         Enqueue(brdfJob);
 
@@ -318,14 +318,14 @@ namespace Core
         if (!renderFrame.HasBindlessSupport())
             return;
 
-        if (!_irradianceCubemap || !_prefilteredCubemap || !_brdfLut)
+        if (!_irradianceCubemap.IsValid() || !_prefilteredCubemap.IsValid() || !_brdfLut.IsValid())
             return;
 
         auto* bindlessManager = renderFrame.GetBindlessTextureManager();
 
-        TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(_irradianceCubemap);
-        TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(_prefilteredCubemap);
-        TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(_brdfLut);
+        TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_IRRADIANCE));
+        TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_PREFILTERED));
+        TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_BRDF_LUT));
 
         // Strip the MSB cubemap flag before passing to the shader.
         // handle.index stores 0x80000000 as a cubemap marker internally,
@@ -382,7 +382,7 @@ namespace Core
             auto skyBuilder1 = renderFrame.CreateDescriptorSetBuilder(shader, 1);
             auto& textures = material->GetTexturesMap();
             for (auto& [binding, texture] : textures)
-                skyBuilder1.SetTextureBuffer(binding, texture.GetShared());
+                skyBuilder1.SetTextureBuffer(binding, texture);
             auto& skyResources1 = skyBuilder1.Build();
 
             commandBuffer.BindPipeline(_skyboxPipeline);

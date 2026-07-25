@@ -41,7 +41,7 @@ namespace Core
 		ShadowPass& _shadowPass;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
-		shared_ptr<Texture> _sdfShadowTexture;
+		Handle<Texture> _sdfShadowTexture;
 
 		Handle<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
@@ -49,7 +49,7 @@ namespace Core
 		// Volume visualization
 		Handle<Shader> _volumeSliceShader;
 		unique_ptr<Pipeline> _volumeSlicePipeline;
-		shared_ptr<Texture> _volumeSliceTexture;
+		Handle<Texture> _volumeSliceTexture;
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
 

@@ -73,13 +73,13 @@ void DFAOPass::UpdateGUI()
         ImGui::SliderFloat("Contact Threshold", &_contactThreshold, 0.01f, 0.5f, "%.3f");
     }
 
-    if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_aoTexture.IsValid() && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_aoImGuiDS == VK_NULL_HANDLE)
         {
             _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _aoTexture->GetVkSampler(),
-                _aoTexture->GetImageView(),
+                _aoTexture.Get().GetVkSampler(),
+                _aoTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -96,7 +96,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
 
     auto  sdfTexture   = _sdfGenerator->GetSDFTexture();
     auto* boundsBuffer = _sdfGenerator->GetBoundsBuffer();
-    if (!sdfTexture || !boundsBuffer)
+    if (!sdfTexture.IsValid() || !boundsBuffer)
         return;
 
     UpdateParams();
@@ -104,10 +104,10 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
 
     auto depthForSampling = renderFrame.GetCurrentDepth();
     auto normalForSampling = renderFrame.GetCurrentNormal();
-    if (!depthForSampling || !normalForSampling)
+    if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
-    auto& aoImage = _aoTexture->GetImage();
+    auto& aoImage = _aoTexture.Get().GetImage();
     commandBuffer.TransitionImageLayout(aoImage,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);

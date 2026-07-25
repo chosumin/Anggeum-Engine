@@ -280,14 +280,15 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 	{
 		auto shadowTexture = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
 
-		if (shadowTexture)
+		if (shadowTexture.IsValid())
 		{
 			if (!_csmDescriptorsCreated)
 			{
-				auto vkSampler = shadowTexture->GetVkSampler();
+				auto& shadowTex = shadowTexture.Get();
+				auto vkSampler = shadowTex.GetVkSampler();
 				for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 				{
-					VkImageView layerView = shadowTexture->GetLayerImageView(i);
+					VkImageView layerView = shadowTex.GetLayerImageView(i);
 					_csmDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
 						vkSampler,
 						layerView,

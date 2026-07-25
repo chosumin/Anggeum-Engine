@@ -1,6 +1,7 @@
 #pragma once
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
+#include "ResourceHandle.h"
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
 
@@ -78,7 +79,7 @@ namespace Core
 		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
 		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
 
-		shared_ptr<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
+		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
 		SyncContext& GetSyncContext() { return *_syncContext; }
 	private:
@@ -118,7 +119,7 @@ namespace Core
 		unique_ptr<MaterialManager> _materialManager;
 
 		// Double/Triple buffered depth
-		array<shared_ptr<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
-		shared_ptr<Texture> _previousFrameDepth;
+		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
+		Handle<Texture> _previousFrameDepth;
 	};
 }

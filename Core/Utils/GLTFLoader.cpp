@@ -602,7 +602,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
 					material->AddBindlessTexture(handle);
 					pbrBuffer->BasemapIndex = handle.index & 0x7FFFFFFF; // Store index without cubemap flag
 				}
@@ -622,7 +622,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
 					material->AddBindlessTexture(handle);
 					pbrBuffer->MetallicRoughnessmapIndex = handle.index & 0x7FFFFFFF;
 				}
@@ -647,7 +647,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
+					TextureHandle handle = bindlessManager->RegisterTexture(texture);
 					material->AddBindlessTexture(handle);
 					pbrBuffer->NormalmapIndex = handle.index & 0x7FFFFFFF;
 				}

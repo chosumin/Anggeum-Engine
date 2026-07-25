@@ -100,7 +100,7 @@ void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandB
     if (!framebuffer)
     {
         vector<VkImageView> imageViews = {
-            colorTarget->GetImageView(),
+            colorTarget.Get().GetImageView(),
             _swapChain.GetImageView(imageIndex)  // Resolve target
         };
 

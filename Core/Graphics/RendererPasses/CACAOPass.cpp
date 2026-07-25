@@ -90,17 +90,17 @@ void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uin
 {
     auto depthForSampling = renderFrame.GetCurrentDepth();
     auto normalForSampling = renderFrame.GetCurrentNormal();
-    if (!depthForSampling || !normalForSampling)
+    if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
-    auto& aoImage = _aoTexture->GetImage();
+    auto& aoImage = _aoTexture.Get().GetImage();
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
         &renderFrame,
-        depthForSampling->GetImageView(),
-        normalForSampling->GetImageView(),
+        depthForSampling.Get().GetImageView(),
+        normalForSampling.Get().GetImageView(),
         aoImage.GetImage(),
-        _aoTexture->GetImageView());
+        _aoTexture.Get().GetImageView());
 
     // Apply current settings
     FFX_CACAO_Settings cacaoSettings = {};

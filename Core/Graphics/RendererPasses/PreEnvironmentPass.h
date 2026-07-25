@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
 
 namespace Core
@@ -38,7 +39,7 @@ namespace Core
         Pipeline* _prefilteredPipeline = nullptr;
 
         shared_ptr<SubMesh> _sky;
-        shared_ptr<Texture> _skyCubemap;
+        Handle<Texture> _skyCubemap;
 
         vector<mat4> _mvpMatrices;
         IrradianceDelta _delta;

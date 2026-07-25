@@ -107,7 +107,7 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
 }
 
 void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, shared_ptr<Texture> depth)
+    const CameraBuffer& camera, Handle<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
         *_indirectCommandBuffer, *_pass1CullDataBuffer,
@@ -115,7 +115,7 @@ void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer&
 }
 
 void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, shared_ptr<Texture> depth)
+    const CameraBuffer& camera, Handle<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
         *_pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
@@ -123,14 +123,14 @@ void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer&
 }
 
 void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, shared_ptr<Texture> depth,
+    const CameraBuffer& camera, Handle<Texture> depth,
     Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
     Shader& cullingShader, Pipeline* cullingPipeline)
 {
     // Generate Hi-Z from depth
     if (!_hiZInitialized)
     {
-        auto& hiZImage = _hiZTexture->GetImage();
+        auto& hiZImage = _hiZTexture.Get().GetImage();
         commandBuffer.TransitionImageLayout(hiZImage,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -265,17 +265,17 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     samplerDesc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
     auto sampler = device.GetResourceCache().LoadSampler(samplerDesc);
-    _hiZTexture = make_shared<Texture>("HiZ", std::move(image), sampler);
+    _hiZTexture = _texturePool.Add(make_shared<Texture>("HiZ", std::move(image), sampler));
 
     // Load shaders
     _hiZGenerateShader = device.GetResourceCache().LoadShader("Shaders/hiZGenerate.comp.spv");
     _hiZPipeline = make_unique<Pipeline>(device, _hiZGenerateShader.Get());
 }
 
-void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, shared_ptr<Texture> depth)
+void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth)
 {
-    auto& hiZTextureImage = _hiZTexture->GetImage();
-    auto& depthBufferImage = depth->GetImage();
+    auto& hiZTextureImage = _hiZTexture.Get().GetImage();
+    auto& depthBufferImage = depth.Get().GetImage();
 
     // Transition resolved depth: SHADER_READ_ONLY > TRANSFER_SRC
     commandBuffer.TransitionImageLayout(depthBufferImage,

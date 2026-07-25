@@ -32,8 +32,8 @@ namespace Core
 		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer& buffer);
 
 		// --- Texture: combined image sampler ---
-		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding, 
-			shared_ptr<Texture> texture,
+		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding,
+			Handle<Texture> texture,
 			uint32_t mipLevel = 0,
 			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

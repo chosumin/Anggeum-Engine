@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -53,10 +54,10 @@ namespace Core
 
         bool _iblGenerated = false;
 
-        shared_ptr<Texture> _offscreenTexture;
-        shared_ptr<Texture> _irradianceCubemap;
-        shared_ptr<Texture> _prefilteredCubemap;
-        shared_ptr<Texture> _brdfLut;
+        Handle<Texture> _offscreenTexture;
+        Handle<Texture> _irradianceCubemap;
+        Handle<Texture> _prefilteredCubemap;
+        Handle<Texture> _brdfLut;
 
         // Pass 2 RenderPass (color LOAD, depth LOAD)
         RenderPass* _renderPassPass2 = nullptr;

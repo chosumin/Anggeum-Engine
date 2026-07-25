@@ -185,6 +185,20 @@ namespace Core
 		return handle;
 	}
 
+	Handle<Texture> ResourceCache::LoadTexture(const string& name,
+		unique_ptr<Image> image, Handle<Sampler> sampler)
+	{
+		lock_guard<mutex> guard(_textureMutex);
+
+		auto texture = make_shared<Core::Texture>(name, std::move(image), sampler);
+
+		// Re-creation (e.g. SDF regenerate) orphans the previous slot rather than
+		// freeing it, since an in-flight frame may still reference the old texture.
+		Handle<Texture> handle = _texturePool.Add(texture);
+		_textureHandles[name] = handle;
+		return handle;
+	}
+
 	shared_ptr<Core::SubMesh> ResourceCache::RequestSubMesh(const string& name)
 	{
 		lock_guard<mutex> guard(_subMeshMutex);

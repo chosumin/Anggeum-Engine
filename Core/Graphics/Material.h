@@ -42,7 +42,7 @@ namespace Core
 			return static_cast<const T*>(setIt->second);
 		}
 
-		shared_ptr<Texture> GetTexture(uint32_t binding);
+		Handle<Texture> GetTexture(uint32_t binding);
 
 		void AddBuffer(uint32_t binding, void* data)
 		{

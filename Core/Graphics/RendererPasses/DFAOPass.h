@@ -32,7 +32,7 @@ namespace Core
         VkSampleCountFlagBits _msaaSamples;
         SDFGenerator* _sdfGenerator;
 
-        shared_ptr<Texture> _aoTexture;
+        Handle<Texture> _aoTexture;
 
         Handle<Shader>       _dfaoShader;
         unique_ptr<Pipeline> _dfaoPipeline;

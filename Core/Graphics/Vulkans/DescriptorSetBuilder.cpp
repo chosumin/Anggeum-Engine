@@ -31,7 +31,7 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
-	uint32_t binding, shared_ptr<Texture> texture, uint32_t mipLevel,
+	uint32_t binding, Handle<Texture> texture, uint32_t mipLevel,
 	VkImageLayout layout)
 {
 	TextureBuffer texBuffer{};
