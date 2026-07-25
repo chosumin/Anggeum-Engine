@@ -56,7 +56,7 @@ void Core::PreEnvironmentPass::Initialize()
     {
         auto skybox = *it;
         
-        _sky = skybox->GetSubMeshes()[0];
+        _sky = &skybox->GetSubMeshes()[0].Get();
         auto material = skybox->GetMaterials()[0];
         skyCubemap = material->GetTexture(1);
 

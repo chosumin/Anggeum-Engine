@@ -14,7 +14,7 @@ Core::Mesh::~Mesh()
 	_materials.clear();
 }
 
-void Core::Mesh::AddSubMesh(shared_ptr<SubMesh> subMesh)
+void Core::Mesh::AddSubMesh(Handle<SubMesh> subMesh)
 {
 	_subMeshes.push_back(subMesh);
 }

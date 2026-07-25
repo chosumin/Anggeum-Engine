@@ -1,6 +1,7 @@
 #pragma once
 #include "IndirectDrawBuffer.h"
 #include "BufferObjects.h"
+#include "ResourceHandle.h"
 
 namespace Core
 {
@@ -29,7 +30,7 @@ namespace Core
 
 	struct SubMeshBatch
 	{
-		weak_ptr<SubMesh> SubMesh;
+		Handle<SubMesh> SubMesh;
 		vector<uint> Transforms;
 		uint32_t FirstInstance;
 	};
@@ -60,7 +61,7 @@ namespace Core
 		shared_ptr<Material> GetFirstMaterial() const;
 
 	private:
-		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
+		void AddMesh(uint entityId, weak_ptr<Material> material, Handle<SubMesh> subMesh);
 		void PrepareGPUDrivenRendering(VkExtent2D extents);
 		void CreateInstanceBuffer(Device& device);
 

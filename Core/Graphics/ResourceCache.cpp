@@ -197,22 +197,19 @@ namespace Core
 		return handle;
 	}
 
-	shared_ptr<Core::SubMesh> ResourceCache::RequestSubMesh(const string& name)
+	Handle<Core::SubMesh> ResourceCache::LoadSubMesh(const string& name)
 	{
 		lock_guard<mutex> guard(_subMeshMutex);
 
-		auto it = _subMeshes.find(name);
-		if (it != _subMeshes.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
+		auto it = _subMeshHandles.find(name);
+		if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
+			return it->second;
 
-		auto subMesh = 
-			make_shared<Core::SubMesh>(_device, name);
-		_subMeshes[name] = subMesh;
+		auto subMesh = make_shared<Core::SubMesh>(_device, name);
 
-		return subMesh;
+		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
+		_subMeshHandles[name] = handle;
+		return handle;
 	}
 
 	void Core::ResourceCache::GetShaderFiles(const uint32_t hash,

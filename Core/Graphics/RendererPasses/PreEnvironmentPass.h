@@ -38,7 +38,9 @@ namespace Core
         Pipeline* _irradiancePipeline = nullptr;
         Pipeline* _prefilteredPipeline = nullptr;
 
-        shared_ptr<SubMesh> _sky;
+        // Resolved from a Handle<SubMesh> on the main thread in Initialize(); Draw()
+        // runs on a worker thread, so it must not resolve the handle through the pool.
+        SubMesh* _sky = nullptr;
         Handle<Texture> _skyCubemap;
 
         vector<mat4> _mvpMatrices;

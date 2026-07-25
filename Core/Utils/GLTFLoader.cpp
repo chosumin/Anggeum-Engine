@@ -675,13 +675,29 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 	return materials;
 }
 
+// Maps a glTF index accessor format to a Vulkan index type, widening 8-bit
+// indices to 16-bit in place (still stored in a uint8 vector).
+inline VkIndexType NormalizeIndexData(VkFormat format, vector<uint8_t>& indexData)
+{
+	switch (format)
+	{
+	case VK_FORMAT_R8_UINT:
+		indexData = ConvertDataStride(indexData, 1, 2);
+		return VK_INDEX_TYPE_UINT16;
+	case VK_FORMAT_R32_UINT:
+		return VK_INDEX_TYPE_UINT32;
+	case VK_FORMAT_R16_UINT:
+	default:
+		return VK_INDEX_TYPE_UINT16;
+	}
+}
+
 void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
 {
-	bool useGpuDriven = useGlobalBuffer;
 	MeshBufferManager* meshBufferManager = nullptr;
 	MaterialManager* materialManager = nullptr;
 
-	if (useGpuDriven)
+	if (useGlobalBuffer)
 	{
 		meshBufferManager = _renderContext->GetMeshBufferManager();
 		materialManager = _renderContext->GetMaterialManager();
@@ -716,135 +732,58 @@ void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials,
 			
 			string subMeshName = meshName + "_" + std::to_string(subMeshHash);
 
-			auto subMesh = 
-				_resourceCache.RequestSubMesh(subMeshName);
+			auto subMesh = _resourceCache.LoadSubMesh(subMeshName);
+			auto& sm = subMesh.Get();
 
-			if (useGpuDriven)
+			bool alreadyBuilt = useGlobalBuffer ? sm.HasAllocation() : sm.HasBuffers();
+			if (!alreadyBuilt)
 			{
-				if (subMesh->HasAllocation())
-				{
-					// Already jobified
-					mesh->AddSubMesh(subMesh);
-					mesh->AddMaterial(materials[primitive.material]);
-					continue;
-				}
-
-				size_t count = 0;
 				for (auto& attribute : primitive.attributes)
 				{
-					string name = attribute.first;
-
+					const string& name = attribute.first;
 					auto vertexData = GetAttributeData(_model, attribute.second);
 
-					auto& accessor = _model->accessors[attribute.second];
-
-					count = accessor.count;
-
-					VkFormat format = GetAttributeFormat(_model, attribute.second);
-					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-					meshBufferManager->Allocate(_transferContext, name, stride, 
-						move(vertexData), subMeshName);
+					if (useGlobalBuffer)
+					{
+						uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+						meshBufferManager->Allocate(_transferContext, name, stride,
+							move(vertexData), subMeshName);
+					}
+					else
+					{
+						_transferContext.Enqueue(new VkBufferJob(
+							_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+							sm.InsertBufferSpace(name), move(vertexData)), subMeshName + name);
+					}
 				}
 
 				if (primitive.indices >= 0)
 				{
-					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
+					sm.SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
 
 					auto indexData = GetAttributeData(_model, primitive.indices);
+					VkIndexType indexType = NormalizeIndexData(
+						GetAttributeFormat(_model, primitive.indices), indexData);
 
-					VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-					switch (format)
+					if (useGlobalBuffer)
 					{
-					case VK_FORMAT_R8_UINT:
-						// Converts uint8 data into uint16 data, still represented by a uint8 vector
-						indexData = ConvertDataStride(indexData, 1, 2);
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R16_UINT:
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R32_UINT:
-						indexType = VK_INDEX_TYPE_UINT32;
-						break;
+						meshBufferManager->Allocate(_transferContext, indexType,
+							move(indexData), sm.GetName() + " index");
 					}
-
-					meshBufferManager->Allocate(_transferContext, indexType, move(indexData), subMesh->GetName() + " index");
-				}
-
-				MeshAllocation allocation = meshBufferManager->Build();
-
-				subMesh->SetAllocation(allocation);
-
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
-			}
-			else
-			{
-				// Legacy
-				//Already jobified
-				if (subMesh.use_count() > 1)
-				{
-					mesh->AddSubMesh(subMesh);
-					mesh->AddMaterial(materials[primitive.material]);
-					continue;
-				}
-
-				size_t count = 0;
-				for (auto& attribute : primitive.attributes)
-				{
-					string name = attribute.first;
-
-					auto vertexData = GetAttributeData(_model, attribute.second);
-
-					auto& accessor = _model->accessors[attribute.second];
-					
-					count = accessor.count;
-
-					VkFormat format = GetAttributeFormat(_model, attribute.second);
-					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-					_transferContext.Enqueue(new VkBufferJob(
-						_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-						subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
-				}
-
-				if (primitive.indices >= 0)
-				{
-					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-					
-					auto indexData = GetAttributeData(_model, primitive.indices);
-					
-					VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-					switch (format)
+					else
 					{
-					case VK_FORMAT_R8_UINT:
-						// Converts uint8 data into uint16 data, still represented by a uint8 vector
-						indexData = ConvertDataStride(indexData, 1, 2);
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R16_UINT:
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R32_UINT:
-						indexType = VK_INDEX_TYPE_UINT32;
-						break;
+						_transferContext.Enqueue(new VkBufferJob(
+							_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+							sm.InsertBufferSpace(indexType), move(indexData)), sm.GetName() + " index");
 					}
-
-					_transferContext.Enqueue(new VkBufferJob(
-						_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-						subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
 				}
 
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
+				if (useGlobalBuffer)
+					sm.SetAllocation(meshBufferManager->Build());
 			}
+
+			mesh->AddSubMesh(subMesh);
+			mesh->AddMaterial(materials[primitive.material]);
 		}
 
 		_meshes.push_back(mesh.get());

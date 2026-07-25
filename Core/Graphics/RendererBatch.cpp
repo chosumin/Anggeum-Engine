@@ -57,7 +57,7 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
 
 Core::RendererBatch::~RendererBatch() = default;
 
-void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh)
+void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, Handle<SubMesh> subMesh)
 {
     auto materialPtr = material.lock();
     if (!materialPtr)
@@ -75,7 +75,7 @@ void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, we
 
     auto& subMeshBatches = _materialBatches[materialName].SubMeshBatches;
 
-    auto subMeshPtr = subMesh.lock();
+    auto* subMeshPtr = subMesh.TryGet();
     if (!subMeshPtr)
         return;
 
@@ -111,7 +111,7 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
 
         for (auto& [subMeshName, subMeshBatch] : materialBatch.SubMeshBatches)
         {
-            auto subMesh = subMeshBatch.SubMesh.lock();
+            auto* subMesh = subMeshBatch.SubMesh.TryGet();
             if (!subMesh || !subMesh->HasAllocation())
                 continue;
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "Foundation/Component.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -12,11 +13,11 @@ namespace Core
 		~Mesh();
 
 		const vector<shared_ptr<Material>>& GetMaterials() const { return _materials; }
-		const vector<shared_ptr<SubMesh>>& GetSubMeshes() const { return _subMeshes; }
+		const vector<Handle<SubMesh>>& GetSubMeshes() const { return _subMeshes; }
 
 		string GetModelPath() const { return _modelPath; }
 
-		void AddSubMesh(shared_ptr<SubMesh> subMesh);
+		void AddSubMesh(Handle<SubMesh> subMesh);
 		void AddMaterial(shared_ptr<Material> material);
 
 		void UpdateFrame(float deltaTime) override;
@@ -29,6 +30,6 @@ namespace Core
 		Device& _device;
 
 		vector<shared_ptr<Material>> _materials;
-		vector<shared_ptr<SubMesh>> _subMeshes;
+		vector<Handle<SubMesh>> _subMeshes;
 	};
 }

@@ -23,6 +23,11 @@ namespace Core
 
 		bool HasVertexAttribute(string attributeName) const;
 
+		// True once legacy (non-GPU-driven) vertex buffers have been built. Used by
+		// the loader to skip rebuilding a SubMesh that was already jobified, now that
+		// the pool owns it for the app's lifetime (shared_ptr use_count no longer works).
+		bool HasBuffers() const { return !_vertexBuffers.empty(); }
+
 		// Returns the owning slot for a transfer job to fill in.
 		unique_ptr<Buffer>& InsertBufferSpace(string name);
 		unique_ptr<Buffer>& InsertBufferSpace(VkIndexType indexType);

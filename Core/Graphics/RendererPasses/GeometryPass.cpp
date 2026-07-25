@@ -362,7 +362,7 @@ namespace Core
         {
             auto skybox = *it;
             auto material = skybox->GetMaterials()[0];
-            auto subMesh = skybox->GetSubMeshes()[0];
+            auto& subMesh = skybox->GetSubMeshes()[0].Get();
             auto& shader = material->GetShader();
 
             if (_skyboxPipeline == nullptr)
@@ -398,11 +398,11 @@ namespace Core
 
             auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
 
-            commandBuffer.BindVertexBuffers(subMesh->GetVertexBuffers(vertexAttibuteNames), 0);
+            commandBuffer.BindVertexBuffers(subMesh.GetVertexBuffers(vertexAttibuteNames), 0);
 
-            commandBuffer.BindIndexBuffer(subMesh->GetIndexBuffer(), subMesh->GetIndexType());
+            commandBuffer.BindIndexBuffer(subMesh.GetIndexBuffer(), subMesh.GetIndexType());
 
-            commandBuffer.DrawIndexed(subMesh->GetIndexCount(), 1);
+            commandBuffer.DrawIndexed(subMesh.GetIndexCount(), 1);
         }
     }
 

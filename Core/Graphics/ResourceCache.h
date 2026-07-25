@@ -43,7 +43,8 @@ namespace Core
 		Handle<Texture> LoadTexture(const string& name,
 			unique_ptr<Image> image, Handle<Sampler> sampler);
 
-		shared_ptr<SubMesh> RequestSubMesh(const string& name);
+		// Pool-owned; resolve the handle with handle.Get().
+		Handle<SubMesh> LoadSubMesh(const string& name);
 
 		Handle<Texture> GetDefaultTextureHandle() const { return _defaultTexture; }
 
@@ -77,6 +78,8 @@ namespace Core
 		ResourcePool<Texture> _texturePool;
 		unordered_map<string, Handle<Texture>> _textureHandles;
 
-		unordered_map<string, weak_ptr<SubMesh>> _subMeshes;
+		// SubMeshes: pool-owned, looked up by name for dedup.
+		ResourcePool<SubMesh> _subMeshPool;
+		unordered_map<string, Handle<SubMesh>> _subMeshHandles;
 	};
 }
