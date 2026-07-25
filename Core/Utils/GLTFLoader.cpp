@@ -543,15 +543,9 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 	
 	vector<shared_ptr<Core::Material>> materials(size);
 	
-	// Check bindless support
+	// Textures are registered to the bindless array by ResourceCache at load time;
+	// here we only read each texture's assigned index.
 	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
-	BindlessTextureManager* bindlessManager = nullptr;
-
-	if (useBindless)
-	{
-		bindlessManager = _renderContext->GetBindlessTextureManager();
-		cout << "GLTFLoader: Using bindless textures for materials" << endl;
-	}
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -601,10 +595,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->BasemapIndex = handle.index & 0x7FFFFFFF; // Store index without cubemap flag
+					pbrBuffer->BasemapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF; // strip cubemap flag
 				}
 				else
 				{
@@ -621,10 +612,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->MetallicRoughnessmapIndex = handle.index & 0x7FFFFFFF;
+					pbrBuffer->MetallicRoughnessmapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF;
 				}
 				else
 				{
@@ -646,10 +634,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->NormalmapIndex = handle.index & 0x7FFFFFFF;
+					pbrBuffer->NormalmapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF;
 				}
 				else
 				{

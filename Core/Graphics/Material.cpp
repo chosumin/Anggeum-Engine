@@ -22,8 +22,7 @@ namespace Core
 		  _alphaMode(other._alphaMode),
 		  _isAlphaCutoff(other._isAlphaCutoff),
 		  _buffers(other._buffers),
-		  _textures(other._textures),
-		  _bindlessTextureHandles(other._bindlessTextureHandles) // Copy bindless handles
+		  _textures(other._textures)
 	{
 	}
 
@@ -38,7 +37,6 @@ namespace Core
 			_isAlphaCutoff = other._isAlphaCutoff;
 			_buffers = other._buffers;
 			_textures = other._textures;
-			_bindlessTextureHandles = other._bindlessTextureHandles; // Copy bindless handles
 		}
 		return *this;
 	}

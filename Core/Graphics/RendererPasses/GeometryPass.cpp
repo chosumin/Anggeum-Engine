@@ -323,16 +323,16 @@ namespace Core
 
         auto* bindlessManager = renderFrame.GetBindlessTextureManager();
 
-        TextureHandle irradianceCubemapHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_IRRADIANCE));
-        TextureHandle prefilteredCubemapHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_PREFILTERED));
-        TextureHandle brdfLutHandle = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_BRDF_LUT));
+        uint32_t irradianceCubemapIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_IRRADIANCE));
+        uint32_t prefilteredCubemapIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_PREFILTERED));
+        uint32_t brdfLutIndex = bindlessManager->RegisterTexture(renderFrame.GetRenderTarget(RT_BRDF_LUT));
 
         // Strip the MSB cubemap flag before passing to the shader.
-        // handle.index stores 0x80000000 as a cubemap marker internally,
+        // The bindless index stores BindlessCubemapFlag as a cubemap marker internally,
         // but the shader uses the value as a direct array index (no flags expected).
-        _giBuffer.irradianceMapIndex = irradianceCubemapHandle.index & 0x7FFFFFFF;
-        _giBuffer.prefilterMapIndex  = prefilteredCubemapHandle.index & 0x7FFFFFFF;
-        _giBuffer.brdfLUTIndex       = brdfLutHandle.index & 0x7FFFFFFF;
+        _giBuffer.irradianceMapIndex = irradianceCubemapIndex & ~BindlessCubemapFlag;
+        _giBuffer.prefilterMapIndex  = prefilteredCubemapIndex & ~BindlessCubemapFlag;
+        _giBuffer.brdfLUTIndex       = brdfLutIndex & ~BindlessCubemapFlag;
 
         std::cout << "GI textures registered to bindless:" << endl;
         std::cout << "  Irradiance cubemap: index " << _giBuffer.irradianceMapIndex << endl;

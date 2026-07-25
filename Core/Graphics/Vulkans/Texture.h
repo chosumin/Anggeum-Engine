@@ -50,9 +50,15 @@ namespace Core
 		// need the VkSampler, so the Core::Sampler wrapper is not exposed.
 		VkSampler GetVkSampler();
 
+		// Bindless slot index (with the manager's cubemap MSB flag), assigned when
+		// the cache registers this texture. UINT32_MAX until then.
+		void SetBindlessIndex(uint32_t index) { _bindlessIndex = index; }
+		uint32_t GetBindlessIndex() const { return _bindlessIndex; }
+
 		string& GetName() { return _name; }
 	private:
 		string _name;
+		uint32_t _bindlessIndex = UINT32_MAX;
 		unique_ptr<Image> _image;
 		Handle<Sampler> _sampler;
 	};

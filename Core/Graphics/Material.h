@@ -54,12 +54,6 @@ namespace Core
 			_textures[binding] = texture;
 		}
 
-		// Bindless texture methods (no binding index needed)
-		void AddBindlessTexture(TextureHandle handle)
-		{
-			_bindlessTextureHandles.push_back(handle);
-		}
-
 		const unordered_map<uint32_t, Handle<Texture>>& GetTexturesMap() const { return _textures; }
 
 		// GPU Driven Rendering material
@@ -84,10 +78,6 @@ namespace Core
 		// Legacy bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
 		unordered_map<uint32_t, Handle<Texture>> _textures;
-
-		// Bindless texture handles (Set 2, Binding 0)
-		// Just store handles in order, no binding index needed
-		vector<TextureHandle> _bindlessTextureHandles;
 
 		// GPU Driven Rendering material index
 		uint32_t _materialIndex = UINT32_MAX;

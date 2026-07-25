@@ -182,6 +182,16 @@ namespace Core
 
 		Handle<Texture> handle = _texturePool.Add(texture);
 		_textureHandles[newName] = handle;
+
+		// File-loaded textures are the ones sampled through the bindless array, so
+		// register once here rather than per material reference at the call site.
+		if (_renderContext && _renderContext->HasBindlessSupport())
+		{
+			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+			uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
+			texture->SetBindlessIndex(bindlessIndex);
+		}
+
 		return handle;
 	}
 

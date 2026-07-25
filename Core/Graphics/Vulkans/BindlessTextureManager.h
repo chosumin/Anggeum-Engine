@@ -4,20 +4,15 @@
 
 namespace Core
 {
-	// Texture handle with validation
-	struct TextureHandle
-	{
-		uint32_t index = UINT32_MAX;
-		uint32_t generation = 0;
-		
-		bool IsValid() const { return index != UINT32_MAX; }
-	};
+	// Packed bindless slot index: low 31 bits are the array index, the MSB flags a
+	// cubemap (binding 1) vs a 2D texture (binding 0). UINT32_MAX means "none".
+	inline constexpr uint32_t InvalidBindlessIndex = UINT32_MAX;
+	inline constexpr uint32_t BindlessCubemapFlag = 0x80000000u;
 
 	// Internal texture slot
 	struct TextureSlot
 	{
 		TextureBuffer textureBuffer;
-		uint32_t generation = 0;
 		bool isActive = false;
 	};
 
@@ -34,12 +29,12 @@ namespace Core
 
 		void Initialize();
 
-		// Texture registration (auto-detects 2D vs Cubemap)
-		// Accepts a cache/render-target Handle<Texture>; the manager holds shared
-		// ownership of the resolved texture for its descriptor slot.
-		TextureHandle RegisterTexture(Handle<Texture> texture);
-		void UnregisterTexture(TextureHandle handle);
-		void UpdateTexture(TextureHandle handle, Handle<Texture> texture);
+		// Texture registration (auto-detects 2D vs Cubemap). Takes a Handle<Texture>
+		// and returns the packed bindless slot index (see BindlessCubemapFlag).
+		// Slot lifetime is driven by the cache that owns the texture, so the slot
+		// needs no generation of its own.
+		uint32_t RegisterTexture(Handle<Texture> texture);
+		void UnregisterTexture(uint32_t bindlessIndex);
 
 		// Descriptor management
 		void UpdateDescriptorSet();

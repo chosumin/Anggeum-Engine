@@ -40,7 +40,7 @@ namespace Core
 		AllocateDescriptorSet();
 	}
 
-	TextureHandle BindlessTextureManager::RegisterTexture(Handle<Texture> texture)
+	uint32_t BindlessTextureManager::RegisterTexture(Handle<Texture> texture)
 	{
 		Texture* resolved = texture.TryGet();
 		if (!resolved)
@@ -55,74 +55,48 @@ namespace Core
 
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		slot.textureBuffer.texture = texture;
-		slot.generation++;
 		slot.isActive = true;
-		
+
 		if (isCubemap)
 			_activeCubemapCount++;
 		else
 			_activeTexture2DCount++;
-		
-		_pendingUpdates.push_back(slotIndex | (isCubemap ? 0x80000000 : 0)); // MSB indicates cubemap
+
+		uint32_t bindlessIndex = slotIndex | (isCubemap ? BindlessCubemapFlag : 0);
+		_pendingUpdates.push_back(bindlessIndex);
 		_needsUpdate = true;
 
-		TextureHandle handle;
-		handle.index = slotIndex | (isCubemap ? 0x80000000 : 0); // MSB = cubemap flag
-		handle.generation = slot.generation;
-		
-		return handle;
+		return bindlessIndex;
 	}
 
-	void BindlessTextureManager::UnregisterTexture(TextureHandle handle)
+	void BindlessTextureManager::UnregisterTexture(uint32_t bindlessIndex)
 	{
-		if (!handle.IsValid())
+		if (bindlessIndex == InvalidBindlessIndex)
 			return;
 
-		bool isCubemap = (handle.index & 0x80000000) != 0;
-		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
-		
+		bool isCubemap = (bindlessIndex & BindlessCubemapFlag) != 0;
+		uint32_t slotIndex = bindlessIndex & ~BindlessCubemapFlag;
+
 		if (slotIndex >= _maxTextures)
 			return;
 
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		
-		if (slot.generation != handle.generation || !slot.isActive)
+
+		if (!slot.isActive)
 			return;
 
 		slot.textureBuffer.texture = Handle<Texture>{};
 		slot.textureBuffer.mipLevel = 0;
 		slot.isActive = false;
-		
+
 		FreeSlot(slotIndex, isCubemap);
-		
+
 		if (isCubemap)
 			_activeCubemapCount--;
 		else
 			_activeTexture2DCount--;
-		
-		_pendingUpdates.push_back(handle.index);
-		_needsUpdate = true;
-	}
 
-	void BindlessTextureManager::UpdateTexture(TextureHandle handle, Handle<Texture> texture)
-	{
-		if (!handle.IsValid() || !texture.IsValid())
-			return;
-
-		bool isCubemap = (handle.index & 0x80000000) != 0;
-		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
-		
-		if (slotIndex >= _maxTextures)
-			return;
-
-		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		
-		if (slot.generation != handle.generation || !slot.isActive)
-			return;
-
-		slot.textureBuffer.texture = texture;
-		
-		_pendingUpdates.push_back(handle.index);
+		_pendingUpdates.push_back(bindlessIndex);
 		_needsUpdate = true;
 	}
 
@@ -142,8 +116,8 @@ namespace Core
 
 		for (uint32_t packedIndex : _pendingUpdates)
 		{
-			bool isCubemap = (packedIndex & 0x80000000) != 0;
-			uint32_t slotIndex = packedIndex & 0x7FFFFFFF;
+			bool isCubemap = (packedIndex & BindlessCubemapFlag) != 0;
+			uint32_t slotIndex = packedIndex & ~BindlessCubemapFlag;
 			
 			auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 			

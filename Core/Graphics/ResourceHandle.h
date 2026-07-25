@@ -17,7 +17,7 @@ namespace Core
 	 * would keep just those two fields and rebind the pool on load.
 	 *
 	 * This is a CPU-side cache identifier and is deliberately NOT the same thing as
-	 * BindlessTextureManager's TextureHandle, which indexes a GPU descriptor array.
+	 * a BindlessTextureManager slot index, which indexes a GPU descriptor array.
 	 * The two may be unified later; until then a texture legitimately has both, and
 	 * they must not be assigned to one another.
 	 */
