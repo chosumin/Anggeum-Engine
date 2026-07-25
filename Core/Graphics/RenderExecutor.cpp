@@ -53,16 +53,16 @@ void RenderExecutor::InitializeBatches(Scene& scene, VkExtent2D extents)
         _transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
     }
 
-    _transformBatch.TransformBuffer = make_unique<Buffer>(_device,
-        bufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        MemoryType::DEVICE_LOCAL);
+    StorageBufferDesc transformDesc{};
+    transformDesc.size = bufferSize;
+    transformDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _transformBatch.TransformBuffer =
+        _renderFrame.GetResources().GetOrCreateStorageBuffer("TransformBatch.Transform", transformDesc);
 
-    VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        _transformBatch.TransformBuffer, transforms, true);
+    VkBufferCopyJob<mat4> job(_device, _transformBatch.TransformBuffer.Get(), move(transforms), 0);
     CommandBuffer::ImmediateSubmit(_device, job);
 
-    _rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, extents);
+    _rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, _renderFrame, extents);
 
     _batchesInitialized = true;
 }
@@ -82,7 +82,7 @@ Culler* RenderExecutor::GetOrCreateCuller(RendererBatch& batch, const CameraBuff
     if (it != _cullers.end())
         return it->second.get();
 
-    auto culler = make_unique<Culler>(_device, batch);
+    auto culler = make_unique<Culler>(_device, _renderFrame, batch, _nextCullerId++);
     auto* result = culler.get();
     _cullers[key] = std::move(culler);
     return result;
@@ -218,7 +218,7 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
 
     commandBuffer.BindPipeline(&pipeline);
 
-    builder.SetStorageBuffer(1, *_transformBatch.TransformBuffer);
+    builder.SetStorageBuffer(1, _transformBatch.TransformBuffer.Get());
     builder.SetStorageBuffer(2, _rendererBatch->GetInstanceBuffer());
     builder.SetUniformBuffer(8, _renderFrame.GetMaterialManager()->GetMaterialBuffer());
     builder.SetStorageBuffer(9, _rendererBatch->GetMaterialIndexBuffer());

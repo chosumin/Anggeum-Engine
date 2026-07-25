@@ -140,7 +140,9 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 
 	auto image = make_unique<Image>(_device, imageInfo, desc.aspect, viewType);
 	auto* imagePtr = image.get();
-	auto texture = make_shared<Texture>(name, std::move(image), _defaultSampler);
+
+	Handle<Sampler> sampler = desc.sampler.IsValid() ? desc.sampler : _defaultSampler;
+	auto texture = make_shared<Texture>(name, std::move(image), sampler);
 
 	// Render targets are what validation errors point at most of the time, so give
 	// the layer a name to print instead of a bare handle.

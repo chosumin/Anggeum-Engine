@@ -21,7 +21,8 @@
 
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents)
+Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch,
+    RenderFrame& renderFrame, VkExtent2D extents)
     : _device(device)
     , _transformBatch(transformBatch)
 {
@@ -51,8 +52,9 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
         }
     }
 
-    CreateInstanceBuffer(_device);
-    PrepareGPUDrivenRendering(extents);
+    auto& frameResources = renderFrame.GetResources();
+    CreateInstanceBuffer(frameResources);
+    PrepareGPUDrivenRendering(frameResources, extents);
 }
 
 Core::RendererBatch::~RendererBatch() = default;
@@ -92,7 +94,7 @@ void Core::RendererBatch::AddMesh(uint entityId, Handle<Material> material, Hand
     _instanceCount++;
 }
 
-void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
+void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResources, VkExtent2D extents)
 {
     _indirectDrawBuffer.Clear();
     uint32_t globalFirstInstance = 0;
@@ -142,24 +144,38 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
         }
     }
 
+    // Allocate the GPU-driven buffers from the frame's pool, then fill them via
+    // copy jobs (the buffers are pool-owned, not created by the transfer job).
+    const auto& drawCommands = _indirectDrawBuffer.GetDrawCommands();
+    const auto& materialIndices = _indirectDrawBuffer.GetMaterialIndices();
+
+    StorageBufferDesc indirectDesc{};
+    indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
+    indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.IndirectCommand", indirectDesc);
+
+    StorageBufferDesc materialDesc{};
+    materialDesc.size = materialIndices.size() * sizeof(uint32_t);
+    materialDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _materialIndexBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.MaterialIndex", materialDesc);
+
+    StorageBufferDesc objectDesc{};
+    objectDesc.size = objectData.size() * sizeof(GPUObjectData);
+    objectDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _objectDataBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.ObjectData", objectDesc);
+
     vector<Job*> jobs;
 
-    Core::VkBufferJob<DrawIndexedIndirectCommand> job(_device,
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        _indirectCommandBuffer,
-        _indirectDrawBuffer.GetDrawCommands(), 0);
+    Core::VkBufferCopyJob<DrawIndexedIndirectCommand> job(_device,
+        _indirectCommandBuffer.Get(), vector<DrawIndexedIndirectCommand>(drawCommands), 0);
     jobs.push_back(&job);
 
-    Core::VkBufferJob<uint32_t> job2(_device,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        _materialIndexBuffer,
-        _indirectDrawBuffer.GetMaterialIndices(), 0);
+    Core::VkBufferCopyJob<uint32_t> job2(_device,
+        _materialIndexBuffer.Get(), vector<uint32_t>(materialIndices), 0);
     jobs.push_back(&job2);
 
-    Core::VkBufferJob<GPUObjectData> job3(_device,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        _objectDataBuffer,
-        objectData, 0);
+    Core::VkBufferCopyJob<GPUObjectData> job3(_device,
+        _objectDataBuffer.Get(), move(objectData), 0);
     jobs.push_back(&job3);
 
     Core::CommandBuffer::ImmediateSubmit(_device, jobs);
@@ -167,7 +183,7 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
     _extents = extents;
 }
 
-void Core::RendererBatch::CreateInstanceBuffer(Device& device)
+void Core::RendererBatch::CreateInstanceBuffer(FrameResources& frameResources)
 {
     if (_instanceCount == 0)
         return;
@@ -186,10 +202,12 @@ void Core::RendererBatch::CreateInstanceBuffer(Device& device)
         }
     }
 
-    _instanceBuffer = make_unique<Core::Buffer>(device, _instanceCount * sizeof(uint),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL);
+    StorageBufferDesc desc{};
+    desc.size = _instanceCount * sizeof(uint);
+    desc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _instanceBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.Instance", desc);
 
-    Core::VkBufferJob<uint> job(device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, _instanceBuffer, instanceData, true);
-    Core::CommandBuffer::ImmediateSubmit(device, job);
+    Core::VkBufferCopyJob<uint> job(_device, _instanceBuffer.Get(), move(instanceData), 0);
+    Core::CommandBuffer::ImmediateSubmit(_device, job);
 }
 

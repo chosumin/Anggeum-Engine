@@ -11,14 +11,18 @@
 
 using namespace Core;
 
-Core::Culler::Culler(Device& device, RendererBatch& rendererBatch)
+Core::Culler::Culler(Device& device, RenderFrame& renderFrame, RendererBatch& rendererBatch, uint32_t id)
     : _device(device)
     , _rendererBatch(rendererBatch)
     , _instanceCount(rendererBatch.GetInstanceCount())
     , _drawCount(rendererBatch.GetIndirectDrawBuffer().GetDrawCount())
 {
-    PrepareHiZResources(device, rendererBatch.GetExtents());
-    PrepareCullingResources(device, rendererBatch.GetIndirectDrawBuffer());
+    // Per-frame unique prefix so multiple cullers (e.g. main camera + shadow
+    // cascades) get distinct FrameResources entries instead of sharing.
+    string namePrefix = "Culler" + std::to_string(id) + ".";
+
+    PrepareHiZResources(device, renderFrame, namePrefix, rendererBatch.GetExtents());
+    PrepareCullingResources(device, renderFrame, namePrefix, rendererBatch.GetIndirectDrawBuffer());
 }
 
 Core::Culler::~Culler() = default;
@@ -28,41 +32,54 @@ Shader& Core::Culler::GetFrustumCullingShader() const
     return _frustumCullingShader.Get();
 }
 
-void Core::Culler::PrepareCullingResources(Core::Device& device, const IndirectDrawBuffer& indirectDrawBuffer)
+void Core::Culler::PrepareCullingResources(Core::Device& device, RenderFrame& renderFrame, const string& namePrefix, const IndirectDrawBuffer& indirectDrawBuffer)
 {
+    auto& frameResources = renderFrame.GetResources();
+
     _cullingShader = device.GetResourceCache().LoadShader("Shaders/gpuCulling.comp.spv");
     _cullingPipeline = make_unique<Pipeline>(device, _cullingShader.Get());
 
-    _pass1CullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUCullData),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
-    _pass2CullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUCullData),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
-    _frustumCullDataBuffer = make_unique<Core::Buffer>(device, sizeof(GPUFrustumCullData),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
+    _pass1CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(namePrefix + "Pass1CullData");
+    _pass2CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(namePrefix + "Pass2CullData");
+    _frustumCullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUFrustumCullData>(namePrefix + "FrustumCullData");
 
-    _rejectedIndicesBuffer = make_unique<Core::Buffer>(device,
-        _instanceCount * sizeof(uint32_t),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        MemoryType::DEVICE_LOCAL);
+    StorageBufferDesc rejectedIndicesDesc{};
+    rejectedIndicesDesc.size = _instanceCount * sizeof(uint32_t);
+    rejectedIndicesDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    rejectedIndicesDesc.memoryType = MemoryType::DEVICE_LOCAL;
+    _rejectedIndicesBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "RejectedIndices", rejectedIndicesDesc);
 
-    _rejectedCountBuffer = make_unique<Core::Buffer>(device,
-        sizeof(uint32_t),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        MemoryType::DEVICE_LOCAL);
+    StorageBufferDesc rejectedCountDesc{};
+    rejectedCountDesc.size = sizeof(uint32_t);
+    rejectedCountDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    rejectedCountDesc.memoryType = MemoryType::DEVICE_LOCAL;
+    _rejectedCountBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "RejectedCount", rejectedCountDesc);
 
-    // Pass 1 Indirect Command Buffer (owned by this Culler)
-    Core::VkBufferJob<DrawIndexedIndirectCommand> pass1Job(device,
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        _indirectCommandBuffer,
-        indirectDrawBuffer.GetDrawCommands(), 0);
-    Core::CommandBuffer::ImmediateSubmit(device, pass1Job);
+    // Indirect command buffers: allocate from the pool, then fill with the initial
+    // draw commands via a copy job (the buffers are pool-owned, not job-owned).
+    const auto& drawCommands = indirectDrawBuffer.GetDrawCommands();
 
-    // Pass 2 Indirect Command Buffer
-    Core::VkBufferJob<DrawIndexedIndirectCommand> pass2Job(device,
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        _pass2IndirectCommandBuffer,
-        indirectDrawBuffer.GetDrawCommands(), 0);
-    Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
+    StorageBufferDesc indirectDesc{};
+    indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
+    indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+        | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    indirectDesc.memoryType = MemoryType::DEVICE_LOCAL;
+
+    _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "Pass1Indirect", indirectDesc);
+    {
+        Core::VkBufferCopyJob<DrawIndexedIndirectCommand> pass1Job(device,
+            _indirectCommandBuffer.Get(),
+            vector<DrawIndexedIndirectCommand>(drawCommands), 0);
+        Core::CommandBuffer::ImmediateSubmit(device, pass1Job);
+    }
+
+    _pass2IndirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "Pass2Indirect", indirectDesc);
+    {
+        Core::VkBufferCopyJob<DrawIndexedIndirectCommand> pass2Job(device,
+            _pass2IndirectCommandBuffer.Get(),
+            vector<DrawIndexedIndirectCommand>(drawCommands), 0);
+        Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
+    }
 
     _pass2CullingShader = device.GetResourceCache().LoadShader("Shaders/gpuCullingPass2.comp.spv");
     _pass2CullingPipeline = make_unique<Pipeline>(device, _pass2CullingShader.Get());
@@ -87,9 +104,9 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
 
     auto& resetShader = _resetDrawCommandsShader.Get();
     auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(resetShader, 0);
-    builder.SetStorageBuffer(0, *_indirectCommandBuffer);
-    builder.SetStorageBuffer(1, *_pass2IndirectCommandBuffer);
-    builder.SetStorageBuffer(2, *_rejectedCountBuffer);
+    builder.SetStorageBuffer(0, _indirectCommandBuffer.Get());
+    builder.SetStorageBuffer(1, _pass2IndirectCommandBuffer.Get());
+    builder.SetStorageBuffer(2, _rejectedCountBuffer.Get());
     auto& resources = builder.Build();
 
     commandBuffer.PushConstants(resetShader, 0, drawCount);
@@ -110,7 +127,7 @@ void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer&
     const CameraBuffer& camera, Handle<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        *_indirectCommandBuffer, *_pass1CullDataBuffer,
+        _indirectCommandBuffer.Get(), _pass1CullDataBuffer.Get(),
         _cullingShader.Get(), _cullingPipeline.get());
 }
 
@@ -118,7 +135,7 @@ void Core::Culler::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer&
     const CameraBuffer& camera, Handle<Texture> depth)
 {
     DispatchCulling(renderFrame, commandBuffer, camera, depth,
-        *_pass2IndirectCommandBuffer, *_pass2CullDataBuffer,
+        _pass2IndirectCommandBuffer.Get(), _pass2CullDataBuffer.Get(),
         _pass2CullingShader.Get(), _pass2CullingPipeline.get());
 }
 
@@ -160,12 +177,12 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
-    builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
+    builder.SetStorageBuffer(2, _rendererBatch.GetTransformBatch().TransformBuffer.Get());
     builder.SetStorageBuffer(3, _rendererBatch.GetInstanceBuffer());
     builder.SetStorageBuffer(4, indirectCommandBuffer);
     builder.SetTextureBuffer(5, _hiZTexture);
-    builder.SetStorageBuffer(10, *_rejectedIndicesBuffer);
-    builder.SetStorageBuffer(11, *_rejectedCountBuffer);
+    builder.SetStorageBuffer(10, _rejectedIndicesBuffer.Get());
+    builder.SetStorageBuffer(11, _rejectedCountBuffer.Get());
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(cullingPipeline->GetPipelineBindPoint(),
@@ -233,7 +250,7 @@ void Core::Culler::ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* pl
     }
 }
 
-void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
+void Core::Culler::PrepareHiZResources(Device& device, RenderFrame& renderFrame, const string& namePrefix, VkExtent2D extents)
 {
     _screenExtent = extents;
 
@@ -241,30 +258,22 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
     uint32_t maxDim = std::max(_screenExtent.width, _screenExtent.height);
     _hiZMipLevels = static_cast<uint32_t>(std::floor(std::log2(maxDim))) + 1;
 
-    // Create Hi-Z texture with mip chain (1x sample)
-    VkImageCreateInfo imageCreateInfo{};
-    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.format = VK_FORMAT_R32_SFLOAT;
-    imageCreateInfo.extent.width = _screenExtent.width;
-    imageCreateInfo.extent.height = _screenExtent.height;
-    imageCreateInfo.extent.depth = 1;
-    imageCreateInfo.mipLevels = _hiZMipLevels;
-    imageCreateInfo.arrayLayers = 1;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    auto image = make_unique<Image>(_device, imageCreateInfo, VK_IMAGE_ASPECT_COLOR_BIT);
-
+    // Hi-Z occlusion sampling must be point-filtered, so use a NEAREST sampler.
     auto samplerDesc = DEFAULT_SAMPLER;
     samplerDesc.minFilter = VK_FILTER_NEAREST;
     samplerDesc.magFilter = VK_FILTER_NEAREST;
     samplerDesc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 
-    auto sampler = device.GetResourceCache().LoadSampler(samplerDesc);
-    _hiZTexture = _texturePool.Add(make_shared<Texture>("HiZ", std::move(image), sampler));
+    RenderTargetDesc hiZDesc{};
+    hiZDesc.extent = _screenExtent;
+    hiZDesc.format = VK_FORMAT_R32_SFLOAT;
+    hiZDesc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    hiZDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+    hiZDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    hiZDesc.mipLevels = _hiZMipLevels;
+    hiZDesc.sampler = device.GetResourceCache().LoadSampler(samplerDesc);
+
+    _hiZTexture = renderFrame.GetResources().GetOrCreateRenderTarget(namePrefix + "HiZ", hiZDesc);
 
     // Load shaders
     _hiZGenerateShader = device.GetResourceCache().LoadShader("Shaders/hiZGenerate.comp.spv");
@@ -363,7 +372,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 
 	auto& resetSimpleShader = _resetDrawCommandsSimpleShader.Get();
 	auto resetBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(resetSimpleShader);
-	resetBuilder.SetStorageBuffer(0, *_indirectCommandBuffer);
+	resetBuilder.SetStorageBuffer(0, _indirectCommandBuffer.Get());
 	auto& resetResources = resetBuilder.Build();
 
 	commandBuffer.PushConstants(resetSimpleShader, 0, drawCount);
@@ -375,7 +384,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
 
 	commandBuffer.BufferBarrier(
-		*_indirectCommandBuffer,
+		_indirectCommandBuffer.Get(),
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_ACCESS_SHADER_WRITE_BIT,
@@ -390,7 +399,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	glm::mat4 viewProj = camera.Projection * camera.View;
 	ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
-	_frustumCullDataBuffer->Update(cullData);
+	_frustumCullDataBuffer.Get().Update(cullData);
 
 	commandBuffer.BindPipeline(_frustumCullingPipeline.get());
 
@@ -398,11 +407,11 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	// per-shader-hash cache made multiple cullers (shadow cascades) reuse the
 	// first culler's buffers, so their planes/buffers were never bound and
 	// nothing got culled.
-	builder.SetUniformBuffer(0, *_frustumCullDataBuffer);
+	builder.SetUniformBuffer(0, _frustumCullDataBuffer.Get());
 	builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
-	builder.SetStorageBuffer(2, *_rendererBatch.GetTransformBatch().TransformBuffer);
+	builder.SetStorageBuffer(2, _rendererBatch.GetTransformBatch().TransformBuffer.Get());
 	builder.SetStorageBuffer(3, _rendererBatch.GetInstanceBuffer());
-	builder.SetStorageBuffer(4, *_indirectCommandBuffer);
+	builder.SetStorageBuffer(4, _indirectCommandBuffer.Get());
 
 	auto& resources = builder.Build();
 
@@ -414,7 +423,7 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
 	commandBuffer.BufferBarrier(
-		*_indirectCommandBuffer,
+		_indirectCommandBuffer.Get(),
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
 		VK_ACCESS_SHADER_WRITE_BIT,

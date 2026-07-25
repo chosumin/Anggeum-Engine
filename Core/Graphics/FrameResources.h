@@ -26,6 +26,9 @@ namespace Core
 		uint32_t arrayLayers = 1;
 		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
 
+		// Optional custom sampler. Leave invalid to use default sampler
+		Handle<Sampler> sampler;
+
 		// NOT VkImageCreateInfo::initialLayout — the image is always created as
 		// UNDEFINED (the spec allows only UNDEFINED/PREINITIALIZED there).
 		// Use this for cross-queue targets that a graphics pass may sample before

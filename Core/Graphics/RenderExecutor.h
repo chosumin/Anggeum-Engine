@@ -88,6 +88,10 @@ namespace Core
         // Per-camera/RendererBatch cullers, reused within a frame
         unordered_map<CullerKey, unique_ptr<Culler>, CullerKeyHash> _cullers;
 
+        // Monotonic index handed to each new Culler so its FrameResources entries
+        // get unique names (cullers never removed, so ids stay stable per frame).
+        uint32_t _nextCullerId = 0;
+
         // Single RendererBatch for all meshes
         unique_ptr<RendererBatch> _rendererBatch;
         TransformBatch _transformBatch{};

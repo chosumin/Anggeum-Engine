@@ -2,29 +2,24 @@
 #include "IndirectDrawBuffer.h"
 #include "BufferObjects.h"
 #include "ResourceHandle.h"
+#include "ResourcePool.h"
 
 namespace Core
 {
 	class Material;
-	class Pipeline;
-	class Texture;
 	class SubMesh;
 	class Mesh;
-	class Shader;
-	class RenderPass;
-	class PipelineState;
 	class Transform;
-	class CommandBuffer;
 	class RenderFrame;
+	class FrameResources;
 	class Buffer;
-	class Framebuffer;
-	class DescriptorSetBuilder;
 	class Culler;
 	class Scene;
 
 	struct TransformBatch
 	{
-		unique_ptr<Buffer> TransformBuffer;
+		// Pool-owned by FrameResources (handle pattern); resolve with .Get().
+		Handle<Buffer> TransformBuffer;
 		vector<uint> EntityIds;
 	};
 
@@ -46,23 +41,24 @@ namespace Core
 	class RendererBatch
 	{
 	public:
-		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
+		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch,
+			RenderFrame& renderFrame, VkExtent2D extents);
 		~RendererBatch();
 
-		Buffer& GetObjectDataBuffer() const { return *_objectDataBuffer; }
-		Buffer& GetIndirectCommandBuffer() const { return *_indirectCommandBuffer; }
-		Buffer& GetMaterialIndexBuffer() const { return *_materialIndexBuffer; }
+		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
+		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
+		Buffer& GetMaterialIndexBuffer() const { return _materialIndexBuffer.Get(); }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
-		Buffer& GetInstanceBuffer() const { return *_instanceBuffer; }
+		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		TransformBatch& GetTransformBatch() const { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
 
 	private:
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
-		void PrepareGPUDrivenRendering(VkExtent2D extents);
-		void CreateInstanceBuffer(Device& device);
+		void PrepareGPUDrivenRendering(FrameResources& frameResources, VkExtent2D extents);
+		void CreateInstanceBuffer(FrameResources& frameResources);
 
 	private:
 		Device& _device;
@@ -72,15 +68,16 @@ namespace Core
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		unique_ptr<Core::Buffer> _instanceBuffer;
+		// Buffers are pool-owned by FrameResources (handle pattern); held by handle.
+		Handle<Buffer> _instanceBuffer;
 		uint _instanceCount = 0;
 
 		IndirectDrawBuffer _indirectDrawBuffer;
-		unique_ptr<Core::Buffer> _indirectCommandBuffer;
-		unique_ptr<Core::Buffer> _materialIndexBuffer;
+		Handle<Buffer> _indirectCommandBuffer;
+		Handle<Buffer> _materialIndexBuffer;
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
-		unique_ptr<Core::Buffer> _objectDataBuffer;
+		Handle<Buffer> _objectDataBuffer;
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};

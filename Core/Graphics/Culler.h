@@ -26,8 +26,11 @@ namespace Core
     {
     public:
         // Builds every culling resource up front. The batch supplies the geometry
-        // being culled and must outlive this Culler.
-        Culler(Device& device, RendererBatch& rendererBatch);
+        // being culled and must outlive this Culler. Buffers and the Hi-Z texture are
+        // allocated from the frame's FrameResources pool; this Culler keeps only
+        // handles. `id` is a per-frame unique index (from RenderExecutor) used to
+        // give this Culler's resources unique names so cullers don't collide.
+        Culler(Device& device, RenderFrame& renderFrame, RendererBatch& rendererBatch, uint32_t id);
         ~Culler();
 
         bool IsUsedThisFrame() const { return _markUsedThisFrame; }
@@ -51,17 +54,17 @@ namespace Core
             CommandBuffer& commandBuffer, DescriptorSetBuilder& builder,
             const CameraBuffer& camera);
 
-        Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer.get(); }
-        Buffer* GetPass2IndirectCommandBuffer() const { return _pass2IndirectCommandBuffer.get(); }
+        Buffer* GetIndirectCommandBuffer() const { return &_indirectCommandBuffer.Get(); }
+        Buffer* GetPass2IndirectCommandBuffer() const { return &_pass2IndirectCommandBuffer.Get(); }
 
         // Shader used for frustum-only culling (needed to build its descriptor set).
         Shader& GetFrustumCullingShader() const;
 
     private:
-        void PrepareCullingResources(Device& device, const IndirectDrawBuffer& indirectDrawBuffer);
+        void PrepareCullingResources(Device& device, RenderFrame& renderFrame, const string& namePrefix, const IndirectDrawBuffer& indirectDrawBuffer);
         void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
-        void PrepareHiZResources(Device& device, VkExtent2D extents);
+        void PrepareHiZResources(Device& device, RenderFrame& renderFrame, const string& namePrefix, VkExtent2D extents);
         void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth);
 
         void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -76,9 +79,9 @@ namespace Core
         // Owns the object/instance/transform buffers this Culler reads.
         RendererBatch& _rendererBatch;
 
-        // Pass 1 indirect command buffer owned by this Culler so multiple cullers
-        // don't overwrite each other.
-        unique_ptr<Core::Buffer> _indirectCommandBuffer;
+        // Pass 1 indirect command buffer (one per Culler so multiple cullers don't
+        // overwrite each other). Pool-owned by FrameResources; held here by handle.
+        Handle<Buffer> _indirectCommandBuffer;
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;
 
@@ -86,9 +89,8 @@ namespace Core
         Handle<Shader> _cullingShader;
         unique_ptr<Pipeline> _cullingPipeline;
 
-        // Hi-Z Resources. Pass-temp texture, owned by this Culler's own pool so it
-        // can be referred to by handle like every other bound texture.
-        ResourcePool<Texture> _texturePool;
+        // Hi-Z Resources. Pass-temp texture, pool-owned by FrameResources (like the
+        // buffers) and referred to here by handle.
         Handle<Texture> _hiZTexture;
         Handle<Shader> _hiZGenerateShader;
         unique_ptr<Pipeline> _hiZPipeline;
@@ -97,17 +99,17 @@ namespace Core
 
         bool _hiZInitialized = false;
 
-        // Culling parameters, one buffer per dispatch site. 
-        // Owned here because a Culler already lives per
-        // frame-in-flight (RenderFrame -> RenderExecutor -> Culler).
-        unique_ptr<Core::Buffer> _pass1CullDataBuffer;
-        unique_ptr<Core::Buffer> _pass2CullDataBuffer;
-        unique_ptr<Core::Buffer> _frustumCullDataBuffer;
+        // Culling parameters, one buffer per dispatch site. Pool-owned by
+        // FrameResources (a Culler lives per frame-in-flight:
+        // RenderFrame -> RenderExecutor -> Culler); held here by handle.
+        Handle<Buffer> _pass1CullDataBuffer;
+        Handle<Buffer> _pass2CullDataBuffer;
+        Handle<Buffer> _frustumCullDataBuffer;
 
         // 2-Pass Resources
-        unique_ptr<Core::Buffer> _rejectedIndicesBuffer;
-        unique_ptr<Core::Buffer> _rejectedCountBuffer;
-        unique_ptr<Core::Buffer> _pass2IndirectCommandBuffer;
+        Handle<Buffer> _rejectedIndicesBuffer;
+        Handle<Buffer> _rejectedCountBuffer;
+        Handle<Buffer> _pass2IndirectCommandBuffer;
 
         Handle<Shader> _pass2CullingShader;
         unique_ptr<Pipeline> _pass2CullingPipeline;
