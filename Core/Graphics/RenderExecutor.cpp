@@ -132,15 +132,19 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
         commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
         auto msaaDepth = frameResources.GetRenderTarget("MainDepth");
 
-        commandBuffer.TransitionImageLayout(msaaDepth.Get(),
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .Submit();
 
         auto curDepth = ResolvePass::ResolveDepth(_renderFrame, commandBuffer, msaaDepth);
 
-        commandBuffer.TransitionImageLayout(msaaDepth.Get(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .Submit();
 
         commandBuffer.EndDebugMarker();
 

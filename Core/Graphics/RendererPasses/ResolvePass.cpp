@@ -65,9 +65,11 @@ void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, u
     auto depthTexture = frameResources.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = frameResources.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
-    commandBuffer.TransitionImageLayout(depthTexture.Get(),
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(depthTexture.Get(),
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 
     // Resolve depth
     commandBuffer.BeginDebugMarker("Resolve MSAA Depth");
@@ -88,8 +90,10 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
 {
     auto resolvedDepth = GetResolvedDepthTarget(renderFrame);
 
-    commandBuffer.TransitionImageLayout(resolvedDepth.Get(),
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(resolvedDepth.Get(),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
 	auto extent = resolvedDepth.Get().GetExtent();
 
@@ -121,8 +125,10 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
     uint32_t groupY = (extent.height + 7) / 8;
     commandBuffer.Dispatch(groupX, groupY, 1);
 
-    commandBuffer.TransitionImageLayout(resolvedDepth.Get(),
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(resolvedDepth.Get(),
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 
     return resolvedDepth;
 }
@@ -130,8 +136,10 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
 void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     Handle<Texture> msaaNormal)
 {
-    commandBuffer.TransitionImageLayout(_resolvedNormalTexture.Get(),
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_resolvedNormalTexture.Get(),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
     struct PushConstants {
         int32_t outputWidth;
@@ -160,8 +168,10 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
         (_screenExtent.width + 7) / 8,
         (_screenExtent.height + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(_resolvedNormalTexture.Get(),
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_resolvedNormalTexture.Get(),
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 Handle<Texture> Core::ResolvePass::GetResolvedDepthTarget(RenderFrame& renderFrame)

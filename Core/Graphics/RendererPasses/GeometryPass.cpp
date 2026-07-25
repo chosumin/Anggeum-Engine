@@ -158,11 +158,13 @@ namespace Core
         auto& lightVisibilityBuffer =
             frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc).Get();
 
-		commandBuffer.BufferBarrier(lightVisibilityBuffer,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_SHADER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT);
+		commandBuffer.CreateBarrierBatch()
+			.Buffer(lightVisibilityBuffer,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT)
+			.Submit();
 
         // Lazy initialization
         EnsureIBLResources(renderFrame);
@@ -184,20 +186,23 @@ namespace Core
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = frameResources.GetRenderTarget(RT_MAIN_DEPTH);
-        commandBuffer.TransitionImageLayout(depth.Get(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
         auto shadowTarget    = frameResources.GetRenderTarget(RT_SHADOW_DEPTH);
         auto sdfShadowTarget = frameResources.GetRenderTarget("SDFShadow");
         auto aoTarget = frameResources.GetRenderTarget(AmbientOcclusionPass::RT_AO);
 
+        // Depth becomes this pass's depth attachment; the shadow map (if present)
+        // flips to shader-read. Both fold into a single pipeline barrier.
+        auto barrierBatch = commandBuffer.CreateBarrierBatch();
+        barrierBatch.Image(depth.Get(),
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
         if (shadowTarget.IsValid())
         {
-            commandBuffer.TransitionImageLayout(shadowTarget.Get(),
+            barrierBatch.Image(shadowTarget.Get(),
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
+        barrierBatch.Submit();
 
         commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 

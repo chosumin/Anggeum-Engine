@@ -34,8 +34,10 @@ void Core::VkImageJob::Execute()
 
 	_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
 
-	commandBuffer->TransitionImageLayout(_dstTexture, VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	commandBuffer->CreateBarrierBatch()
+		.Image(_dstTexture, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		.Submit();
 
 	auto extent = image.GetExtent();
 	commandBuffer->CopyBufferToImage(*_stagingBuffer, _dstTexture, extent.width, extent.height);

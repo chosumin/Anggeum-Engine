@@ -102,9 +102,11 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 {
     auto& shader = *_irradianceShader;
 
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_irradianceCubemap,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Submit();
 
     uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
     uint32_t layers = _irradianceCubemap->GetLayers();
@@ -144,31 +146,39 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                .Submit();
 
             commandBuffer.CopyImage(*_colorRenderTarget, 
                 *_irradianceCubemap, 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                .Submit();
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_irradianceCubemap,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
     auto& shader = *_prefilteredShader;
 
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_prefilteredCubemap,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Submit();
 
     uint32_t mipLevels = _prefilteredCubemap->GetMipLevels();
     uint32_t layers = _prefilteredCubemap->GetLayers();
@@ -210,22 +220,28 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                .Submit();
 
             commandBuffer.CopyImage(*_colorRenderTarget, 
                 *_prefilteredCubemap, 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                .Submit();
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_prefilteredCubemap,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& pass)

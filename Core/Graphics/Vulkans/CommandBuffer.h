@@ -1,5 +1,6 @@
 #pragma once
 #include "CommandPool.h"
+#include "BarrierBatch.h"
 #include "Graphics/SyncContext.h"
 
 namespace Core
@@ -63,28 +64,13 @@ namespace Core
 
 		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
 
-		void Barrier(
-			VkPipelineStageFlags srcStageMask,
-			VkPipelineStageFlags dstStageMask,
-			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask);
-
-		void BufferBarrier(
-			Buffer& buffer,
-			VkPipelineStageFlags srcStageMask,
-			VkPipelineStageFlags dstStageMask,
-			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask,
-			QueueType destQueue = QueueType::None);
+		BarrierBatch CreateBarrierBatch();
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
 
 		void CopyImage(Texture& srcTexture, Texture& dstTexture,
 			uint32_t srcMipLevel, uint32_t srcLayer,
 			uint32_t dstMipLevel, uint32_t dstLayer);
-		void TransitionImageLayout(Texture& texture,
-			VkImageLayout oldLayout, VkImageLayout newLayout,
-			QueueType destQueue = QueueType::None);
 		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height);
 		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
 		void EndRenderPass();
@@ -107,8 +93,6 @@ namespace Core
 		}
 	private:
 		void PushConstantsInternal(Shader& shader, uint32_t index, const void* data, uint32_t size);
-		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
-		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;

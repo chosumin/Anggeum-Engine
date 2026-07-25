@@ -158,8 +158,10 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
 	{
 		auto& commandBuffer = _device.BeginSingleTimeCommands();
-		commandBuffer.TransitionImageLayout(*texture,
-			VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout);
+		commandBuffer.CreateBarrierBatch()
+			.Image(*texture,
+				VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout)
+			.Submit();
 		_device.EndSingleTimeCommands(commandBuffer);
 	}
 

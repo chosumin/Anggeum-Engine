@@ -56,9 +56,11 @@ namespace
 				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::STAGE);
 
 			// Image: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
-			commandBuffer->TransitionImageLayout(_texture,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+				.Submit();
 
 			VkBufferImageCopy region{};
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -70,9 +72,11 @@ namespace
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				imageStaging->GetBuffer(), 1, &region);
 
-			commandBuffer->TransitionImageLayout(_texture,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				.Submit();
 
 			// Bounds buffer: storage -> staging
 			VkBufferCopy bcopy{};
@@ -111,9 +115,11 @@ namespace
 
 		void Execute() override
 		{
-			commandBuffer->TransitionImageLayout(_texture,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+				.Submit();
 
 			VkBufferImageCopy region{};
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -126,9 +132,11 @@ namespace
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1, &region);
 
-			commandBuffer->TransitionImageLayout(_texture,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				.Submit();
 
 			VkBufferCopy bcopy{};
 			bcopy.size = _boundsStaging->GetSize();
@@ -213,11 +221,13 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	Buffer& objectDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_TRANSFER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	commandBuffer.CreateBarrierBatch()
+		.Memory(
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+		.Submit();
 
 	auto& boundsReduceShader = _boundsReduceShader.Get();
 	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(boundsReduceShader, 0);
@@ -235,11 +245,13 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	uint32_t groupCount = (instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT);
+	commandBuffer.CreateBarrierBatch()
+		.Memory(
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Submit();
 }
 
 void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -283,11 +295,13 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	uint32_t groupCount = (totalTriangles + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT);
+	commandBuffer.CreateBarrierBatch()
+		.Memory(
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Submit();
 }
 
 void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -316,9 +330,11 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
-	commandBuffer.TransitionImageLayout(_sdfTexture.Get(),
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_GENERAL);
+	commandBuffer.CreateBarrierBatch()
+		.Image(_sdfTexture.Get(),
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL)
+		.Submit();
 
 	SDFGeneratePushConstants pc{};
 	pc.resolution = resolution;
@@ -345,9 +361,11 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	uint32_t groups = (resolution + 3) / 4;
 	commandBuffer.Dispatch(groups, groups, groups);
 
-	commandBuffer.TransitionImageLayout(_sdfTexture.Get(),
-		VK_IMAGE_LAYOUT_GENERAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	commandBuffer.CreateBarrierBatch()
+		.Image(_sdfTexture.Get(),
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		.Submit();
 
 	_generated = true;
 }

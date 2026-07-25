@@ -116,11 +116,13 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
     uint32_t groupCount = (drawCount + 63) / 64;
     commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
 
-    commandBuffer.Barrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+    commandBuffer.CreateBarrierBatch()
+        .Memory(
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+        .Submit();
 }
 
 void Core::Culler::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -147,9 +149,11 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     // Generate Hi-Z from depth
     if (!_hiZInitialized)
     {
-        commandBuffer.TransitionImageLayout(_hiZTexture.Get(),
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        commandBuffer.CreateBarrierBatch()
+            .Image(_hiZTexture.Get(),
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .Submit();
         _hiZInitialized = true;
     }
     else
@@ -191,11 +195,13 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     uint32_t groupCount = (_instanceCount + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);
 
-    commandBuffer.Barrier(
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
+    commandBuffer.CreateBarrierBatch()
+        .Memory(
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT)
+        .Submit();
 }
 
 void Core::Culler::ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes)
@@ -287,28 +293,28 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
     Texture& hiZTex = _hiZTexture.Get();
     Texture& depthTex = depth.Get();
 
-    // Transition resolved depth: SHADER_READ_ONLY > TRANSFER_SRC
-    commandBuffer.TransitionImageLayout(depthTex,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-    // Hi-Z texture: UNDEFINED > TRANSFER_DST
-    commandBuffer.TransitionImageLayout(hiZTex,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    // Prepare depth as copy source and Hi-Z as copy destination.
+    commandBuffer.CreateBarrierBatch()
+        .Image(depthTex,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        .Image(hiZTex,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Submit();
 
     // Copy resolved depth to Hi-Z mip 0
     commandBuffer.CopyImage(depthTex, hiZTex, 0, 0, 0, 0);
 
-    // Transition resolved depth back: TRANSFER_SRC > SHADER_READ_ONLY
-    commandBuffer.TransitionImageLayout(depthTex,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    // Hi-Z texture: TRANSFER_DST > GENERAL (for mip chain generation)
-    commandBuffer.TransitionImageLayout(hiZTex,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_GENERAL);
+    // Restore depth for sampling and move Hi-Z to GENERAL for mip chain generation.
+    commandBuffer.CreateBarrierBatch()
+        .Image(depthTex,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Image(hiZTex,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
     // Generate Hi-Z mip chain
     if (_hiZMipLevels > 1)
@@ -346,18 +352,20 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             groupY = (mipHeight + 7) / 8;
             commandBuffer.Dispatch(groupX, groupY, 1);
 
-            commandBuffer.TransitionImageLayout(
-                hiZTex,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_GENERAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(hiZTex,
+                    VK_IMAGE_LAYOUT_GENERAL,
+                    VK_IMAGE_LAYOUT_GENERAL)
+                .Submit();
         }
     }
 
     // Hi-Z: GENERAL > SHADER_READ_ONLY
-    commandBuffer.TransitionImageLayout(
-        hiZTex,
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(hiZTex,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
@@ -383,12 +391,14 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	uint32_t groupCount = (drawCount + 63) / 64;
 	commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
 
-	commandBuffer.BufferBarrier(
-		_indirectCommandBuffer.Get(),
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	commandBuffer.CreateBarrierBatch()
+		.Buffer(
+			_indirectCommandBuffer.Get(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+		.Submit();
 
 	// Dispatch frustum-only culling
 	GPUFrustumCullData cullData{};
@@ -422,10 +432,12 @@ void Core::Culler::DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
 	groupCount = (_instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
-	commandBuffer.BufferBarrier(
-		_indirectCommandBuffer.Get(),
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT);
+	commandBuffer.CreateBarrierBatch()
+		.Buffer(
+			_indirectCommandBuffer.Get(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT)
+		.Submit();
 }
