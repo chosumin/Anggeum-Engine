@@ -13,23 +13,6 @@ Core::BarrierBatch::BarrierBatch(CommandBuffer& commandBuffer, Device& device, u
 {
 }
 
-Core::BarrierBatch& Core::BarrierBatch::Memory(
-	VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
-	VkAccessFlags srcAccess, VkAccessFlags dstAccess)
-{
-	VkMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-	barrier.srcAccessMask = srcAccess;
-	barrier.dstAccessMask = dstAccess;
-
-	_memoryBarriers.push_back(barrier);
-
-	_srcStageMask |= srcStage;
-	_dstStageMask |= dstStage;
-
-	return *this;
-}
-
 Core::BarrierBatch& Core::BarrierBatch::Buffer(
 	Core::Buffer& buffer,
 	VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
@@ -101,12 +84,11 @@ void Core::BarrierBatch::Submit()
 		SanitizeStageMask(_srcStageMask),
 		SanitizeStageMask(_dstStageMask),
 		0,
-		static_cast<uint32_t>(_memoryBarriers.size()), _memoryBarriers.data(),
+		0, nullptr,
 		static_cast<uint32_t>(_bufferBarriers.size()), _bufferBarriers.data(),
 		static_cast<uint32_t>(_imageBarriers.size()), _imageBarriers.data());
 
 	// Reset so the batch can be reused for the next set of barriers.
-	_memoryBarriers.clear();
 	_bufferBarriers.clear();
 	_imageBarriers.clear();
 	_srcStageMask = 0;

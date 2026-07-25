@@ -117,7 +117,17 @@ void Core::Culler::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& co
     commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
 
     commandBuffer.CreateBarrierBatch()
-        .Memory(
+        .Buffer(_indirectCommandBuffer.Get(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+        .Buffer(_pass2IndirectCommandBuffer.Get(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+        .Buffer(_rejectedCountBuffer.Get(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,
@@ -196,7 +206,22 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     commandBuffer.Dispatch(groupCount, 1, 1);
 
     commandBuffer.CreateBarrierBatch()
-        .Memory(
+        .Buffer(indirectCommandBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT)
+        .Buffer(_rendererBatch.GetInstanceBuffer(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT)
+        .Buffer(_rejectedIndicesBuffer.Get(),
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT)
+        .Buffer(_rejectedCountBuffer.Get(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,

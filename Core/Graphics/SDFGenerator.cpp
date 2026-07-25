@@ -221,8 +221,20 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	Buffer& objectDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
+	// Make the transfer-uploaded inputs (and the initialized bounds buffer) visible
+	// to the reduce kernel. Scoped to the buffers it reads rather than all memory.
 	commandBuffer.CreateBarrierBatch()
-		.Memory(
+		.Buffer(objectDataBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Buffer(transformBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -245,8 +257,9 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	uint32_t groupCount = (instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
+	// The reduce kernel writes the bounds buffer; the SDF generate pass reads it.
 	commandBuffer.CreateBarrierBatch()
-		.Memory(
+		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
@@ -295,8 +308,9 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	uint32_t groupCount = (totalTriangles + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
+	// The lookup kernel writes the triangle-lookup buffer; the SDF generate pass reads it.
 	commandBuffer.CreateBarrierBatch()
-		.Memory(
+		.Buffer(_triLookupBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,

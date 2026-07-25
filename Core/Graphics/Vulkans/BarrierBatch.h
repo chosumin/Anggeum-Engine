@@ -8,18 +8,13 @@ namespace Core
 	class Texture;
 	class CommandBuffer;
 
-	// Accumulates memory / buffer / image barriers and flushes them as a single
+	// Accumulates buffer / image barriers and flushes them as a single
 	// vkCmdPipelineBarrier. Create one via CommandBuffer::CreateBarrierBatch(),
 	// chain the recording calls, then Submit().
 	class BarrierBatch
 	{
 	public:
 		BarrierBatch(CommandBuffer& commandBuffer, Device& device, uint32_t queueFamilyIndex);
-
-		// Global memory barrier.
-		BarrierBatch& Memory(
-			VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
-			VkAccessFlags srcAccess, VkAccessFlags dstAccess);
 
 		// Buffer memory barrier. destQueue != None records a queue-ownership transfer.
 		BarrierBatch& Buffer(
@@ -42,8 +37,7 @@ namespace Core
 
 		bool Empty() const
 		{
-			return _memoryBarriers.empty() &&
-				_bufferBarriers.empty() &&
+			return _bufferBarriers.empty() &&
 				_imageBarriers.empty();
 		}
 
@@ -66,7 +60,6 @@ namespace Core
 		VkPipelineStageFlags _srcStageMask = 0;
 		VkPipelineStageFlags _dstStageMask = 0;
 
-		vector<VkMemoryBarrier> _memoryBarriers;
 		vector<VkBufferMemoryBarrier> _bufferBarriers;
 		vector<VkImageMemoryBarrier> _imageBarriers;
 	};
