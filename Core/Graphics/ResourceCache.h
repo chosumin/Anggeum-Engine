@@ -31,16 +31,17 @@ namespace Core
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
 		// Samplers are pool-owned; resolve the handle with handle.Get().
 		Handle<Sampler> LoadSampler(const SamplerCreateInfo info);
-		shared_ptr<Texture> RequestTexture(const string& textureName,
+		// Asset textures are pool-owned; resolve with handle.Get()/GetShared().
+		Handle<Texture> LoadTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo,
 			const SamplerCreateInfo samplerCreateInfo);
-		shared_ptr<Texture> RequestTexture(const string& textureName,
+		Handle<Texture> LoadTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo);
-		shared_ptr<Texture> RequestTexture(const string& textureName,
+		Handle<Texture> LoadTexture(const string& textureName,
 			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler);
 		shared_ptr<SubMesh> RequestSubMesh(const string& name);
 
-		shared_ptr<Texture> GetDefaultTexture() { return _defaultTexture; }
+		Handle<Texture> GetDefaultTextureHandle() const { return _defaultTexture; }
 
 	private:
 		void GetShaderFiles(const uint32_t hash, string& pass, string& vert, string& frag);
@@ -50,7 +51,7 @@ namespace Core
 		Device& _device;
 		RenderContext* _renderContext = nullptr;
 
-		shared_ptr<Texture> _defaultTexture;
+		Handle<Texture> _defaultTexture;
 
 		mutex _materialMutex;
 		mutex _shaderMutex;
@@ -67,7 +68,11 @@ namespace Core
 		// Samplers: pool-owned, looked up by create-info for dedup.
 		ResourcePool<Sampler> _samplerPool;
 		unordered_map<SamplerCreateInfo, Handle<Sampler>, SamplerCreateInfoHasher> _samplerHandles;
-		unordered_map<string, weak_ptr<Texture>> _textures;
+
+		// Textures: pool-owned, looked up by name for dedup.
+		ResourcePool<Texture> _texturePool;
+		unordered_map<string, Handle<Texture>> _textureHandles;
+
 		unordered_map<string, weak_ptr<SubMesh>> _subMeshes;
 	};
 }

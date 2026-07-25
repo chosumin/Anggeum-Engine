@@ -11,7 +11,7 @@ namespace Core
 		:_device(device), _shader(shader), _name(materialName)
 	{
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().GetDefaultTexture());
+		SetDefault(device.GetResourceCache().GetDefaultTextureHandle());
 	}
 
 	Material::Material(const Material& other)
@@ -60,12 +60,12 @@ namespace Core
 		auto setIt = _textures.find(binding);
 		if (setIt != _textures.end())
 		{
-			return setIt->second;
+			return setIt->second.GetShared();
 		}
 		return nullptr;
 	}
 
-	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
+	void Material::SetDefault(Handle<Texture> defaultTexture)
 	{
 		auto& layouts = _shader.Get().GetDescriptorSetLayouts();
 		

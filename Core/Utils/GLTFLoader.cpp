@@ -305,9 +305,9 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		VK_FORMAT_R16G16B16A16_SFLOAT 
 	};
 
-	auto texture = _resourceCache.RequestTexture(textureName,
+	auto texture = _resourceCache.LoadTexture(textureName,
 		imageCreateInfo, DEFAULT_SAMPLER);
-	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path), textureName);
+	_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), path), textureName);
 
 	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
 	material->AddTexture(1, texture);
@@ -511,12 +511,12 @@ Core::Handle<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	return _resourceCache.LoadSampler(samplerCreateInfo);
 }
 
-vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
+vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 	vector<Core::Handle<Core::Sampler>>& samplers, const string& modelPath)
 {
 	size_t size = _model->textures.size();
 
-	vector<shared_ptr<Core::Texture>> textures(size);
+	vector<Handle<Core::Texture>> textures(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -528,7 +528,7 @@ vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
 
 		auto texture =
-			_resourceCache.RequestTexture(_model->textures[i].name,
+			_resourceCache.LoadTexture(_model->textures[i].name,
 				imageCreateInfo, samplers[samplerIndex]);
 
 		textures[i] = texture;
@@ -537,7 +537,7 @@ vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
 	return textures;
 }
 
-vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared_ptr<Core::Texture>>& textures)
+vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::Handle<Core::Texture>>& textures)
 {
 	size_t size = _model->materials.size();
 	
@@ -597,12 +597,12 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
 					material->AddBindlessTexture(handle);
 					pbrBuffer->BasemapIndex = handle.index & 0x7FFFFFFF; // Store index without cubemap flag
 				}
@@ -617,12 +617,12 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
 					material->AddBindlessTexture(handle);
 					pbrBuffer->MetallicRoughnessmapIndex = handle.index & 0x7FFFFFFF;
 				}
@@ -642,12 +642,12 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{
 					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
+					TextureHandle handle = bindlessManager->RegisterTexture(texture.GetShared());
 					material->AddBindlessTexture(handle);
 					pbrBuffer->NormalmapIndex = handle.index & 0x7FFFFFFF;
 				}

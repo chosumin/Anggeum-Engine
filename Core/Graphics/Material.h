@@ -32,15 +32,6 @@ namespace Core
 		Shader& GetShader() const;
 		Handle<Shader> GetShaderHandle() const { return _shader; }
 
-		void* GetBuffer(uint32_t binding)
-		{
-			auto setIt = _buffers.find(binding);
-			if (setIt == _buffers.end())
-				return nullptr;
-
-			return setIt->second;
-		}
-
 		template <typename T>
 		const T* GetBufferConst(uint32_t binding) const
 		{
@@ -58,7 +49,7 @@ namespace Core
 			_buffers[binding] = data;
 		}
 
-		void AddTexture(uint32_t binding, shared_ptr<Texture> texture)
+		void AddTexture(uint32_t binding, Handle<Texture> texture)
 		{
 			_textures[binding] = texture;
 		}
@@ -69,39 +60,7 @@ namespace Core
 			_bindlessTextureHandles.push_back(handle);
 		}
 
-		void SetBindlessTexture(size_t index, TextureHandle handle)
-		{
-			if (index >= _bindlessTextureHandles.size())
-			{
-				_bindlessTextureHandles.resize(index + 1);
-			}
-			_bindlessTextureHandles[index] = handle;
-		}
-
-		TextureHandle GetBindlessTexture(size_t index) const
-		{
-			if (index >= _bindlessTextureHandles.size())
-				return TextureHandle{};
-			return _bindlessTextureHandles[index];
-		}
-
-		const vector<TextureHandle>& GetBindlessTexturesVector() const
-		{
-			return _bindlessTextureHandles;
-		}
-
-		size_t GetBindlessTextureCount() const
-		{
-			return _bindlessTextureHandles.size();
-		}
-
-		void ClearBindlessTextures()
-		{
-			_bindlessTextureHandles.clear();
-		}
-
-		const unordered_map<uint32_t, void*>& GetBuffersMap() const { return _buffers; }
-		const unordered_map<uint32_t, shared_ptr<Texture>>& GetTexturesMap() const { return _textures; }
+		const unordered_map<uint32_t, Handle<Texture>>& GetTexturesMap() const { return _textures; }
 
 		// GPU Driven Rendering material
 		void SetMaterialIndex(uint32_t index) { _materialIndex = index; }
@@ -110,7 +69,7 @@ namespace Core
 
 		void SetShader(Handle<Shader> shader) { _shader = shader; }
 	private:
-		void SetDefault(shared_ptr<Texture> defaultTexture);
+		void SetDefault(Handle<Texture> defaultTexture);
 	protected:
 		Device& _device;
 		Handle<Shader> _shader;
@@ -124,7 +83,7 @@ namespace Core
 
 		// Legacy bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
-		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
+		unordered_map<uint32_t, Handle<Texture>> _textures;
 
 		// Bindless texture handles (Set 2, Binding 0)
 		// Just store handles in order, no binding index needed

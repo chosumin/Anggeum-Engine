@@ -382,7 +382,7 @@ namespace Core
             auto skyBuilder1 = renderFrame.CreateDescriptorSetBuilder(shader, 1);
             auto& textures = material->GetTexturesMap();
             for (auto& [binding, texture] : textures)
-                skyBuilder1.SetTextureBuffer(binding, texture);
+                skyBuilder1.SetTextureBuffer(binding, texture.GetShared());
             auto& skyResources1 = skyBuilder1.Build();
 
             commandBuffer.BindPipeline(_skyboxPipeline);

@@ -73,6 +73,19 @@ namespace Core
 
 		bool IsAlive(Handle<T> handle) const { return Get(handle) != nullptr; }
 
+		// Shared ownership of a live slot; empty shared_ptr if stale.
+		shared_ptr<T> GetShared(Handle<T> handle) const
+		{
+			if (!handle.IsValid() || handle.index >= _slots.size())
+				return nullptr;
+
+			const auto& slot = _slots[handle.index];
+			if (slot.generation != handle.generation)
+				return nullptr;
+
+			return slot.resource;
+		}
+
 		uint32_t GetLiveCount() const { return _liveCount; }
 		uint32_t GetSlotCount() const { return static_cast<uint32_t>(_slots.size()); }
 
@@ -101,5 +114,11 @@ namespace Core
 		T* resource = TryGet();
 		assert(resource != nullptr && "Get() on an invalid or stale handle");
 		return *resource;
+	}
+
+	template<typename T>
+	shared_ptr<T> Handle<T>::GetShared() const
+	{
+		return pool ? pool->GetShared(*this) : nullptr;
 	}
 }

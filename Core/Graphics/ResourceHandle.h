@@ -36,6 +36,9 @@ namespace Core
 		T* TryGet() const;
 		// Asserts the handle still resolves; use TryGet() when absence is expected.
 		T& Get() const;
+		// Shared ownership of the pooled resource, for APIs that still take a
+		// shared_ptr (e.g. binding a texture alongside shared_ptr render targets).
+		shared_ptr<T> GetShared() const;
 
 		bool operator==(const Handle& other) const
 		{

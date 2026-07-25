@@ -58,10 +58,10 @@ namespace Core
 		vector<Handle<Core::Sampler>> LoadSamplers();
 		// Each Texture owns its own Image (built from the glTF image URI), so there
 		// is no shared image list — textures are created directly from image paths.
-		vector<shared_ptr<Core::Texture>> LoadTextures(
+		vector<Handle<Core::Texture>> LoadTextures(
 			vector<Handle<Core::Sampler>>& samplers,
 			const string& modelPath);
-		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
+		vector<shared_ptr<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
 		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
 		void LoadCameras();
 		void LoadNodes();

@@ -12,9 +12,10 @@ namespace Core
 	{
 		ImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
-		_defaultTexture = RequestTexture(DEFAULT_TEXTURE, imageCreateInfo, DEFAULT_SAMPLER);
+		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, DEFAULT_SAMPLER);
 
-		VkImageJob job(_device, _defaultTexture->GetImage(), _defaultTexture->GetName());
+		auto& defaultTex = _defaultTexture.Get();
+		VkImageJob job(_device, defaultTex.GetImage(), defaultTex.GetName());
 
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}
@@ -22,9 +23,6 @@ namespace Core
 	ResourceCache::~ResourceCache()
 	{
 		_materials.clear();
-		_textures.clear();
-		
-		_defaultTexture = nullptr;
 	}
 
 	void ResourceCache::Prepare(RenderContext& renderContext)
@@ -155,33 +153,19 @@ namespace Core
 		return handle;
 	}
 
-	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName,
+	Handle<Texture> ResourceCache::LoadTexture(const string& textureName,
 		const ImageCreateInfo imageCreateInfo, const SamplerCreateInfo samplerCreateInfo)
 	{
-		lock_guard<mutex> guard(_textureMutex);
-
-		string newName = textureName;
-		if (newName.empty())
-			newName = imageCreateInfo.filePath;
-
-		auto it = _textures.find(newName);
-		if (it != _textures.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
-		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
-		auto sampler = LoadSampler(samplerCreateInfo);
-
-		auto texture =
-			make_shared<Core::Texture>(newName, std::move(image), sampler);
-		_textures[newName] = texture;
-
-		return texture;
+		// LoadSampler locks _samplerMutex; resolve it before taking _textureMutex.
+		return LoadTexture(textureName, imageCreateInfo, LoadSampler(samplerCreateInfo));
 	}
 
-	shared_ptr<Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo)
+	Handle<Texture> ResourceCache::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo)
+	{
+		return LoadTexture(textureName, imageCreateInfo, Handle<Sampler>{});
+	}
+
+	Handle<Texture> ResourceCache::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 
@@ -189,44 +173,16 @@ namespace Core
 		if (newName.empty())
 			newName = imageCreateInfo.filePath;
 
-		auto it = _textures.find(newName);
-		if (it != _textures.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
+		auto it = _textureHandles.find(newName);
+		if (it != _textureHandles.end() && _texturePool.IsAlive(it->second))
+			return it->second;
 
 		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
+		auto texture = make_shared<Core::Texture>(newName, std::move(image), sampler);
 
-		auto texture =
-			make_shared<Core::Texture>(newName, std::move(image), Handle<Sampler>{});
-		_textures[newName] = texture;
-
-		return texture;
-	}
-
-	shared_ptr<Core::Texture> ResourceCache::RequestTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
-	{
-		lock_guard<mutex> guard(_textureMutex);
-
-		string newName = textureName;
-		if (newName.empty())
-			newName = imageCreateInfo.filePath;
-
-		auto it = _textures.find(newName);
-		if (it != _textures.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
-		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
-
-		auto texture =
-			make_shared<Core::Texture>(newName, std::move(image), sampler);
-		_textures[newName] = texture;
-
-		return texture;
+		Handle<Texture> handle = _texturePool.Add(texture);
+		_textureHandles[newName] = handle;
+		return handle;
 	}
 
 	shared_ptr<Core::SubMesh> ResourceCache::RequestSubMesh(const string& name)
