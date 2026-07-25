@@ -331,7 +331,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 	// ShadowPass produces the shared shadow block; GeometryPass runs later in the
 	// pass order and only reads it.
-	auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+	auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW).Get();
 	shadowBuffer.Update(_shadowBuffer);
 
 	auto& shader = _shadowShader.Get();
@@ -363,7 +363,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		// Each cascade binds binding 0 with a different view, and all four
 		// descriptor sets are consumed after submit, so they need separate buffers.
 		auto& cascadeBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(
-			"ShadowPass.Cascade" + std::to_string(cascadeIndex));
+			"ShadowPass.Cascade" + std::to_string(cascadeIndex)).Get();
 		cascadeBuffer.Update(_cascadeViews[cascadeIndex]);
 
 		auto builder = frameResources.CreateDescriptorSetBuilder(shader, 0);

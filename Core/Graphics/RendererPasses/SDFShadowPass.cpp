@@ -263,10 +263,10 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
 
-    auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+    auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 
     auto& sdfParamsBuffer =
-        frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
+        frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params").Get();
     sdfParamsBuffer.Update(_sdfParams);
 
     auto& sdfShadowShader = _sdfShadowShader.Get();

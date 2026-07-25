@@ -156,7 +156,7 @@ namespace Core
         StorageBufferDesc lightVisibilityDesc{};
         lightVisibilityDesc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
         auto& lightVisibilityBuffer =
-            frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc);
+            frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc).Get();
 
 		commandBuffer.BufferBarrier(lightVisibilityBuffer,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -222,11 +222,11 @@ namespace Core
 
         Pipeline* pipeline = GetOrCreatePipeline(*shader);
 
-        auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
-        auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
-        auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW);
+        auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+        auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
+        auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW).Get();
 
-        auto& giBuffer = frameResources.GetOrCreateUniformBuffer<GI>("GeometryPass.GI");
+        auto& giBuffer = frameResources.GetOrCreateUniformBuffer<GI>("GeometryPass.GI").Get();
         giBuffer.Update(_giBuffer);
 
         auto builder = frameResources.CreateDescriptorSetBuilder(*shader, 0);
@@ -379,7 +379,7 @@ namespace Core
             }
 
             auto& skyCameraBuffer =
-                frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+                frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 
             auto skyBuilder0 = frameResources.CreateDescriptorSetBuilder(shader, 0);
             skyBuilder0.SetUniformBuffer(0, skyCameraBuffer);

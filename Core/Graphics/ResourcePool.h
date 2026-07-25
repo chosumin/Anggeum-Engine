@@ -58,6 +58,22 @@ namespace Core
 			_freeSlots.push_back(handle.index);
 		}
 
+		// Relocates the resource behind a live handle in place: the handle stays
+		// valid (same index/generation) and now resolves to `resource`. This is the
+		// primitive behind resize/relocation — a holder keeps its handle while the
+		// backing object is swapped for a bigger one.
+		//
+		// The previous resource is released immediately, so only call this once no
+		// in-flight frame still references it. Safe deferred destruction (retiring
+		// the old object for MAX_FRAMES_IN_FLIGHT) is future work for streaming.
+		void Replace(Handle<T> handle, shared_ptr<T> resource)
+		{
+			if (!IsAlive(handle))
+				return;
+
+			_slots[handle.index].resource = std::move(resource);
+		}
+
 		// nullptr when the handle is default-constructed, out of range, or stale.
 		T* Get(Handle<T> handle) const
 		{

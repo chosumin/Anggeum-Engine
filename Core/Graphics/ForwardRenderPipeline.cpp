@@ -151,7 +151,7 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 	auto& frameResources = renderFrame.GetResources();
 	if (auto* camera = _scene.GetMainCamera())
 	{
-		auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+		auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 		cameraBuffer.Update(camera->Matrices);
 	}
 
@@ -181,7 +181,7 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 	}
 	lights.Count = count;
 
-	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
 	lightBuffer.Update(lights);
 }
 

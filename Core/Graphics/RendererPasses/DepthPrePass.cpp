@@ -106,7 +106,7 @@ void Core::DepthPrePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBu
 
 	commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());
 
-	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
+	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 
 	auto& depthNormalShader = _depthNormalShader.Get();
 	auto builder = frameResources.CreateDescriptorSetBuilder(depthNormalShader, 0);

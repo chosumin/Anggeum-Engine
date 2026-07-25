@@ -120,7 +120,7 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
     _deltaTime.deltaTime += 0.01f;
 
     auto& deltaTimeBuffer =
-        frameResources.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime");
+        frameResources.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime").Get();
     deltaTimeBuffer.Update(_deltaTime);
 
     auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();

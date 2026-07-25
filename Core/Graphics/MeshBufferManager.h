@@ -1,4 +1,5 @@
 #pragma once
+#include "ResourcePool.h"
 
 namespace Core
 {
@@ -35,8 +36,11 @@ namespace Core
 		void Allocate(TransferContext& transferContext, VkIndexType indexType, vector<uint8_t>&& indexData, string subMeshName);
 		MeshAllocation Build();
 
-		vector<Buffer*> GetVertexBuffers(vector<string> names) const;
-		Buffer& GetIndexBuffer() { return *_indexBuffer; }
+		// Buffers are pool-owned (handle pattern) so the global vertex/index storage
+		// can be resized/relocated in place later via ResourcePool::Replace, while
+		// holders keep their handles. Resolve with handle.Get().
+		vector<Handle<Buffer>> GetVertexBuffers(vector<string> names) const;
+		Handle<Buffer> GetIndexBuffer() const { return _indexBufferHandle; }
 
 		VkIndexType GetIndexType() const { return _indexType; }
 
@@ -46,15 +50,17 @@ namespace Core
 
 	private:
 		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
-		Buffer& InsertBufferSpace(VkIndexType indexType);
+		Handle<Buffer> InsertBufferSpace(VkIndexType indexType);
 	private:
 		Device& _device;
 
-		//Key: Attribute name, Value: Attribute value
-		unordered_map<string, unique_ptr<Buffer>> _vertexBuffers;
+		ResourcePool<Buffer> _bufferPool;
+
+		//Key: Attribute name, Value: handle into _bufferPool
+		unordered_map<string, Handle<Buffer>> _vertexBufferHandles;
 
 		VkIndexType _indexType;
-		unique_ptr<Buffer> _indexBuffer;
+		Handle<Buffer> _indexBufferHandle;
 
 		// Allocation tracking
 		uint32_t _maxVertices = 10'000'000;

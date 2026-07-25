@@ -319,8 +319,8 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 	auto& sdfGenerateShader = _sdfGenerateShader.Get();
 	auto sdfBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(sdfGenerateShader, 0);
-	sdfBuilder.SetStorageBuffer(0, *meshBufferManager.GetVertexBuffers({ "POSITION" })[0]);
-	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer());
+	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0].Get());
+	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer().Get());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
 	sdfBuilder.SetStorageBuffer(3, *_boundsBuffer);
 	sdfBuilder.SetStorageBuffer(4, *_triLookupBuffer);

@@ -166,46 +166,46 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	return handle;
 }
 
-Buffer& FrameResources::GetOrCreateStorageBuffer(const string& name,
+Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 	const StorageBufferDesc& desc)
 {
-	auto it = _storageBuffers.find(name);
-	if (it != _storageBuffers.end())
-		return *it->second;
+	auto it = _storageBufferHandles.find(name);
+	if (it != _storageBufferHandles.end())
+		return it->second;
 
-	auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
 		(uint64_t)buffer->GetBuffer(), name.c_str());
 
-	auto& created = *buffer;
-	_storageBuffers[name] = std::move(buffer);
-	return created;
+	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	_storageBufferHandles[name] = handle;
+	return handle;
 }
 
-Buffer& FrameResources::GetOrCreateUniformBuffer(const string& name, VkDeviceSize size)
+Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDeviceSize size)
 {
-	auto it = _uniformBuffers.find(name);
-	if (it != _uniformBuffers.end())
+	auto it = _uniformBufferHandles.find(name);
+	if (it != _uniformBufferHandles.end())
 	{
-		if (it->second->GetSize() < size)
+		if (it->second.Get().GetSize() < size)
 		{
 			throw runtime_error(
 				"FrameResources: uniform buffer '" + name + "' already exists at a smaller size.");
 		}
 
-		return *it->second;
+		return it->second;
 	}
 
-	auto buffer = make_unique<Buffer>(_device, size,
+	auto buffer = make_shared<Buffer>(_device, size,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
 		(uint64_t)buffer->GetBuffer(), name.c_str());
 
-	auto& created = *buffer;
-	_uniformBuffers[name] = std::move(buffer);
-	return created;
+	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	_uniformBufferHandles[name] = handle;
+	return handle;
 }
 
 Framebuffer* FrameResources::GetOrCreateFramebuffer(const string& name,

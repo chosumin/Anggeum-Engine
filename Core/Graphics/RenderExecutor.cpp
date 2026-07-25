@@ -206,8 +206,15 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
     auto* meshBufferManager = _renderFrame.GetMeshBufferManager();
 
     auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+
+    auto vertexBufferHandles = meshBufferManager->GetVertexBuffers(vertexAttibuteNames);
+    vector<Buffer*> vertexBuffers;
+    vertexBuffers.reserve(vertexBufferHandles.size());
+    for (auto& handle : vertexBufferHandles)
+        vertexBuffers.push_back(&handle.Get());
+
+    commandBuffer.BindVertexBuffers(vertexBuffers, 0);
+    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer().Get(), meshBufferManager->GetIndexType());
 
     commandBuffer.BindPipeline(&pipeline);
 

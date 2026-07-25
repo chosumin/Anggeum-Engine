@@ -122,7 +122,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     builder.SetTextureBuffer(1, normalForSampling);
     builder.SetTextureBuffer(2, sdfTexture);
     builder.SetTextureBuffer(3, _aoTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    auto& paramsBuffer = frameResources.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params");
+    auto& paramsBuffer = frameResources.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params").Get();
     paramsBuffer.Update(_params);
 
     builder.SetStorageBuffer(4, *boundsBuffer);

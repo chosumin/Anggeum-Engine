@@ -38,10 +38,10 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 	StorageBufferDesc desc{};
 	desc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
 	auto& lightVisibilityBuffer =
-		frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc);
+		frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc).Get();
 
-	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
-	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
+	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
 
 	auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();
 

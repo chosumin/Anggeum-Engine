@@ -70,14 +70,15 @@ namespace Core
 
 		// Storage buffers that one pass produces and another consumes within the
 		// same frame. Created on first request and reused for the frame's lifetime.
-		Buffer& GetOrCreateStorageBuffer(const string& name, const StorageBufferDesc& desc);
+		// Pool-owned; resolve the handle with handle.Get().
+		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const StorageBufferDesc& desc);
 
 		// Uniform data for this frame. Each frame-in-flight owns its own buffer per
 		// name. A name identifies one value within a frame and may be shared by any
 		// number of passes; T fixes the size, so the producer and every consumer
-		// naming the same block necessarily agree on its layout.
+		// naming the same block necessarily agree on its layout. Pool-owned.
 		template<typename T>
-		Buffer& GetOrCreateUniformBuffer(const string& name)
+		Handle<Buffer> GetOrCreateUniformBuffer(const string& name)
 		{
 			static_assert(std::is_trivially_copyable<T>::value,
 				"Uniform data must be trivially copyable");
@@ -105,7 +106,7 @@ namespace Core
 	private:
 		// Only reachable through the typed overload, so a block's size always comes
 		// from a real C++ type rather than a hand-written byte count.
-		Buffer& GetOrCreateUniformBuffer(const string& name, VkDeviceSize size);
+		Handle<Buffer> GetOrCreateUniformBuffer(const string& name, VkDeviceSize size);
 
 		void CreateDescriptorPool();
 
@@ -116,8 +117,12 @@ namespace Core
 
 		ResourcePool<Texture> _renderTargetPool;
 		unordered_map<string, Handle<Texture>> _renderTargets;
-		unordered_map<string, unique_ptr<Buffer>> _storageBuffers;
-		unordered_map<string, unique_ptr<Buffer>> _uniformBuffers;
+
+		// Transient per-frame buffers are pool-owned (handle pattern) so they can be
+		// resized/relocated in place later via ResourcePool::Replace.
+		ResourcePool<Buffer> _bufferPool;
+		unordered_map<string, Handle<Buffer>> _storageBufferHandles;
+		unordered_map<string, Handle<Buffer>> _uniformBufferHandles;
 
 		Handle<Texture> _previousDepthBuffer;
 		Handle<Texture> _currentDepth;
