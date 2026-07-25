@@ -6,6 +6,16 @@ namespace Core
 	struct MemoryAllocation;
 	class CommandBuffer;
 	class CommandPool;
+
+	// Buffer creation parameters, shared by the ResourceCache global buffer pool
+	// and the FrameResources per-frame pool.
+	struct BufferDesc
+	{
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		MemoryType memoryType = MemoryType::DEVICE_LOCAL;
+	};
+
 	class Buffer
 	{
 	public:

@@ -181,6 +181,36 @@ namespace Core
 		return handle;
 	}
 
+	Handle<Buffer> ResourceCache::LoadBuffer(const BufferDesc& desc, const string& debugName)
+	{
+		lock_guard<mutex> guard(_bufferMutex);
+
+		auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+
+		if (!debugName.empty())
+		{
+			_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
+				(uint64_t)buffer->GetBuffer(), debugName.c_str());
+		}
+
+		return _bufferPool.Add(buffer);
+	}
+
+	void ResourceCache::ResizeBuffer(Handle<Buffer> handle, const BufferDesc& desc, const string& debugName)
+	{
+		lock_guard<mutex> guard(_bufferMutex);
+
+		auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+
+		if (!debugName.empty())
+		{
+			_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
+				(uint64_t)buffer->GetBuffer(), debugName.c_str());
+		}
+
+		_bufferPool.Replace(handle, buffer);
+	}
+
 	void Core::ResourceCache::GetShaderFiles(const uint32_t hash,
 		string& pass, string& vert, string& frag)
 	{

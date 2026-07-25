@@ -752,9 +752,14 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 					}
 					else
 					{
-						_transferContext.Enqueue(new VkBufferJob(
-							_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-							sm.InsertBufferSpace(name), move(vertexData)), subMeshName + name);
+						auto vertexBuffer = _resourceCache.LoadBuffer(
+							{ vertexData.size(),
+							  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  MemoryType::DEVICE_LOCAL },
+							subMeshName + name);
+						sm.SetVertexBuffer(name, vertexBuffer);
+						_transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(
+							_device, vertexBuffer.Get(), move(vertexData), 0), subMeshName + name);
 					}
 				}
 
@@ -773,9 +778,14 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 					}
 					else
 					{
-						_transferContext.Enqueue(new VkBufferJob(
-							_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-							sm.InsertBufferSpace(indexType), move(indexData)), sm.GetName() + " index");
+						auto indexBuffer = _resourceCache.LoadBuffer(
+							{ indexData.size(),
+							  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  MemoryType::DEVICE_LOCAL },
+							sm.GetName() + " index");
+						sm.SetIndexBuffer(indexBuffer, indexType);
+						_transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(
+							_device, indexBuffer.Get(), move(indexData), 0), sm.GetName() + " index");
 					}
 				}
 

@@ -169,15 +169,19 @@ SDFGenerator::SDFGenerator(Device& device)
 	_triLookupShader = _device.GetResourceCache().LoadShader("Shaders/sdfTriLookup.comp.spv");
 	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
 
-	// Initialize bounds buffer
+	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
 	uint32_t posInf = FloatToSortableUint(1e20f);
 	uint32_t negInf = FloatToSortableUint(-1e20f);
 	vector<uint32_t> initData = { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
 
-	VkBufferJob<uint32_t> boundsJob(_device,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-		| VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		_boundsBuffer, initData, 0);
+	_boundsBuffer = _device.GetResourceCache().LoadBuffer(
+		{ initData.size() * sizeof(uint32_t),
+		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		  MemoryType::DEVICE_LOCAL },
+		"SDF.Bounds");
+
+	VkBufferCopyJob<uint32_t> boundsJob(_device, _boundsBuffer.Get(), move(initData), 0);
 	CommandBuffer::ImmediateSubmit(_device, boundsJob);
 }
 
@@ -219,7 +223,7 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(boundsReduceShader, 0);
 	builder.SetStorageBuffer(0, objectDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
-	builder.SetStorageBuffer(2, *_boundsBuffer);
+	builder.SetStorageBuffer(2, _boundsBuffer.Get());
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(_boundsReducePipeline.get());
@@ -242,22 +246,27 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
-	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex)
+	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex).
+	// It grows with triangle count: first allocation adds a slot, a later grow swaps
+	// the backing buffer in place (Replace) so the handle stays valid.
 	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
 
-	if (!_triLookupBuffer || _triLookupBuffer->GetSize() < requiredSize)
+	auto& resourceCache = _device.GetResourceCache();
+	BufferDesc triLookupDesc{ requiredSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL };
+	if (!_triLookupBuffer.IsValid())
 	{
-		_triLookupBuffer = make_unique<Buffer>(_device,
-			requiredSize,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			MemoryType::DEVICE_LOCAL);
+		_triLookupBuffer = resourceCache.LoadBuffer(triLookupDesc, "SDF.TriLookup");
+	}
+	else if (_triLookupBuffer.Get().GetSize() < requiredSize)
+	{
+		resourceCache.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
 	}
 
 	auto& triLookupShader = _triLookupShader.Get();
 	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
 	builder.SetStorageBuffer(1, objectDataBuffer);
-	builder.SetStorageBuffer(2, *_triLookupBuffer);
+	builder.SetStorageBuffer(2, _triLookupBuffer.Get());
 	auto& resources = builder.Build();
 
 	struct TriLookupPushConstants {
@@ -322,8 +331,8 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0].Get());
 	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer().Get());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-	sdfBuilder.SetStorageBuffer(3, *_boundsBuffer);
-	sdfBuilder.SetStorageBuffer(4, *_triLookupBuffer);
+	sdfBuilder.SetStorageBuffer(3, _boundsBuffer.Get());
+	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer.Get());
 	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
@@ -345,7 +354,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 
 bool SDFGenerator::SaveToFile(uint32_t resolution)
 {
-	if (!_sdfTexture.IsValid() || !_boundsBuffer)
+	if (!_sdfTexture.IsValid() || !_boundsBuffer.IsValid())
 		return false;
 
 	auto& texture = _sdfTexture.Get();
@@ -360,7 +369,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	Buffer* imageStaging = nullptr;
 	Buffer* boundsStaging = nullptr;
 
-	SDFDownloadJob job(_device, texture, *_boundsBuffer, resolution,
+	SDFDownloadJob job(_device, texture, _boundsBuffer.Get(), resolution,
 		&imageStaging, &boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 
@@ -447,7 +456,7 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	imageStaging->Unmap();
 
 	// Bounds staging
-	auto* boundsStaging = new Buffer(_device, _boundsBuffer->GetSize(),
+	auto* boundsStaging = new Buffer(_device, _boundsBuffer.Get().GetSize(),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
 	void* boundsMapped = nullptr;
 	boundsStaging->Map(&boundsMapped);
@@ -459,7 +468,7 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 
 	auto& texture = _sdfTexture.Get();
 
-	SDFUploadJob job(_device, texture, *_boundsBuffer, header.resolution,
+	SDFUploadJob job(_device, texture, _boundsBuffer.Get(), header.resolution,
 		imageStaging, boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 

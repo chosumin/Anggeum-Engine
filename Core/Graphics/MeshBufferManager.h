@@ -54,9 +54,7 @@ namespace Core
 	private:
 		Device& _device;
 
-		ResourcePool<Buffer> _bufferPool;
-
-		//Key: Attribute name, Value: handle into _bufferPool
+		//Key: Attribute name, Value: handle
 		unordered_map<string, Handle<Buffer>> _vertexBufferHandles;
 
 		VkIndexType _indexType;

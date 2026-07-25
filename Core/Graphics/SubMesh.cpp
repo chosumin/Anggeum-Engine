@@ -16,17 +16,6 @@ bool Core::SubMesh::HasVertexAttribute(string attributeName) const
 	return vertexBuffer != _vertexBuffers.end();
 }
 
-unique_ptr<Core::Buffer>& Core::SubMesh::InsertBufferSpace(string name)
-{
-	return _vertexBuffers[name];
-}
-
-unique_ptr<Core::Buffer>& Core::SubMesh::InsertBufferSpace(VkIndexType indexType)
-{
-	_indexType = indexType;
-	return _indexBuffer;
-}
-
 vector<Core::Buffer*> Core::SubMesh::GetVertexBuffers(vector<string> names) const
 {
 	vector<Core::Buffer*> buffers;
@@ -36,7 +25,7 @@ vector<Core::Buffer*> Core::SubMesh::GetVertexBuffers(vector<string> names) cons
 		auto vertexBuffer = _vertexBuffers.find(name);
 		assert(vertexBuffer != _vertexBuffers.end());
 
-		buffers.push_back(vertexBuffer->second.get());
+		buffers.push_back(&vertexBuffer->second.Get());
 	}
 
 	return buffers;

@@ -169,7 +169,7 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 }
 
 Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
-	const StorageBufferDesc& desc)
+	const BufferDesc& desc)
 {
 	auto it = _storageBufferHandles.find(name);
 	if (it != _storageBufferHandles.end())

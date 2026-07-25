@@ -35,7 +35,7 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 		QueueType::Graphics,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-	StorageBufferDesc desc{};
+	BufferDesc desc{};
 	desc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
 	auto& lightVisibilityBuffer =
 		frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc).Get();

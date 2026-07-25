@@ -68,6 +68,13 @@ void Core::PreEnvironmentPass::Initialize()
 
         _irradiancePipeline = new Pipeline(_device, *_renderPass, *_irradianceShader, pipelineState);
         _prefilteredPipeline = new Pipeline(_device, *_renderPass, *_prefilteredShader, pipelineState);
+
+        // Resolve the sky's vertex/index buffers here (main thread) so Draw() on the
+        // worker thread binds raw pointers instead of resolving pool handles.
+        _irradianceVertexBuffers = _sky->GetVertexBuffers(_irradianceShader->GetVertexAttirbuteNames());
+        _prefilteredVertexBuffers = _sky->GetVertexBuffers(_prefilteredShader->GetVertexAttirbuteNames());
+        _skyIndexBuffer = &_sky->GetIndexBuffer();
+        _skyIndexType = _sky->GetIndexType();
     }
 
     _mvpMatrices = {
@@ -131,10 +138,8 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
                 _irradiancePipeline->GetPipelineBindPoint(),
                 shader, irradianceResources);
 
-            auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-
-            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
-            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.BindVertexBuffers(_irradianceVertexBuffers, 0);
+            commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
             commandBuffer.EndRenderPass();
@@ -199,10 +204,8 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
                 _prefilteredPipeline->GetPipelineBindPoint(),
                 shader, prefilteredResources);
 
-            auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-
-            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
-            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.BindVertexBuffers(_prefilteredVertexBuffers, 0);
+            commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
             commandBuffer.EndRenderPass();

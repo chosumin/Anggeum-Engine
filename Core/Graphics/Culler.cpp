@@ -43,13 +43,13 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, RenderFrame& re
     _pass2CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(namePrefix + "Pass2CullData");
     _frustumCullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUFrustumCullData>(namePrefix + "FrustumCullData");
 
-    StorageBufferDesc rejectedIndicesDesc{};
+    BufferDesc rejectedIndicesDesc{};
     rejectedIndicesDesc.size = _instanceCount * sizeof(uint32_t);
     rejectedIndicesDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     rejectedIndicesDesc.memoryType = MemoryType::DEVICE_LOCAL;
     _rejectedIndicesBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "RejectedIndices", rejectedIndicesDesc);
 
-    StorageBufferDesc rejectedCountDesc{};
+    BufferDesc rejectedCountDesc{};
     rejectedCountDesc.size = sizeof(uint32_t);
     rejectedCountDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     rejectedCountDesc.memoryType = MemoryType::DEVICE_LOCAL;
@@ -59,7 +59,7 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, RenderFrame& re
     // draw commands via a copy job (the buffers are pool-owned, not job-owned).
     const auto& drawCommands = indirectDrawBuffer.GetDrawCommands();
 
-    StorageBufferDesc indirectDesc{};
+    BufferDesc indirectDesc{};
     indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
     indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
         | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;

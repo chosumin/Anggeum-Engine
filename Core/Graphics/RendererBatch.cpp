@@ -149,17 +149,17 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResourc
     const auto& drawCommands = _indirectDrawBuffer.GetDrawCommands();
     const auto& materialIndices = _indirectDrawBuffer.GetMaterialIndices();
 
-    StorageBufferDesc indirectDesc{};
+    BufferDesc indirectDesc{};
     indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
     indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.IndirectCommand", indirectDesc);
 
-    StorageBufferDesc materialDesc{};
+    BufferDesc materialDesc{};
     materialDesc.size = materialIndices.size() * sizeof(uint32_t);
     materialDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     _materialIndexBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.MaterialIndex", materialDesc);
 
-    StorageBufferDesc objectDesc{};
+    BufferDesc objectDesc{};
     objectDesc.size = objectData.size() * sizeof(GPUObjectData);
     objectDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     _objectDataBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.ObjectData", objectDesc);
@@ -202,7 +202,7 @@ void Core::RendererBatch::CreateInstanceBuffer(FrameResources& frameResources)
         }
     }
 
-    StorageBufferDesc desc{};
+    BufferDesc desc{};
     desc.size = _instanceCount * sizeof(uint);
     desc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     _instanceBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.Instance", desc);

@@ -11,6 +11,7 @@ namespace Core
     class SubMesh;
     class Texture;
     class Shader;
+    class Buffer;
 
     class PreEnvironmentPass : public RendererPass
     {
@@ -45,7 +46,13 @@ namespace Core
 
         // Resolved from a Handle<SubMesh> on the main thread in Initialize(); Draw()
         // runs on a worker thread, so it must not resolve the handle through the pool.
+        // The sky's vertex/index buffers are resolved to raw pointers there too (the
+        // SubMesh now holds Handle<Buffer>, so resolving in Draw would touch the pool).
         SubMesh* _sky = nullptr;
+        vector<Buffer*> _irradianceVertexBuffers;
+        vector<Buffer*> _prefilteredVertexBuffers;
+        Buffer* _skyIndexBuffer = nullptr;
+        VkIndexType _skyIndexType{};
         Handle<Texture> _skyCubemap;
 
         vector<mat4> _mvpMatrices;

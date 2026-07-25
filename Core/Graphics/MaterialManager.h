@@ -1,6 +1,7 @@
 #pragma once
 #include "BufferObjects.h"
 #include "ResourceHandle.h"
+#include "ResourcePool.h"
 
 namespace Core
 {
@@ -31,7 +32,7 @@ namespace Core
 		const MaterialTable& GetMaterialData() const { return _materialData; }
 
 		// The GPU mirror of the table, bound by the passes that draw.
-		Buffer& GetMaterialBuffer() const { return *_materialDataBuffer; }
+		Buffer& GetMaterialBuffer() const { return _materialDataBuffer.Get(); }
 
 		uint32_t GetMaterialCount() const { return _materialCount; }
 
@@ -44,7 +45,7 @@ namespace Core
 		Device& _device;
 
 		MaterialTable _materialData;
-		unique_ptr<Buffer> _materialDataBuffer;
+		Handle<Buffer> _materialDataBuffer;
 		array<Handle<Material>, MAX_MATERIALS> _materials;
 
 		bitset<MAX_MATERIALS> _dirtyMaterials;

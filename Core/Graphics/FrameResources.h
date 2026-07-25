@@ -1,12 +1,12 @@
 #pragma once
 #include "Vulkans/MemoryAllocator.h"
+#include "Vulkans/Buffer.h"
 #include "ResourcePool.h"
 
 namespace Core
 {
 	class Device;
 	class Texture;
-	class Buffer;
 	class Framebuffer;
 	class RenderPass;
 	class Sampler;
@@ -35,13 +35,6 @@ namespace Core
 		// the producing compute pass has ever run, so the validation layer sees a
 		// valid layout on the first frame.
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	};
-
-	struct StorageBufferDesc
-	{
-		VkDeviceSize size = 0;
-		VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		MemoryType memoryType = MemoryType::DEVICE_LOCAL;
 	};
 
 	// Owns the per-frame-in-flight GPU resources: render targets, transient
@@ -74,7 +67,7 @@ namespace Core
 		// Storage buffers that one pass produces and another consumes within the
 		// same frame. Created on first request and reused for the frame's lifetime.
 		// Pool-owned; resolve the handle with handle.Get().
-		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const StorageBufferDesc& desc);
+		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc);
 
 		// Uniform data for this frame. Each frame-in-flight owns its own buffer per
 		// name. A name identifies one value within a frame and may be shared by any

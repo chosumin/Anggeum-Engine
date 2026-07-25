@@ -1,6 +1,7 @@
 #pragma once
 #include "BufferObjects.h"
 #include "Graphics/ResourceHandle.h"
+#include "Graphics/ResourcePool.h"
 
 namespace Core
 {
@@ -42,7 +43,7 @@ namespace Core
 		const std::string& GetCachePath() const { return _sdfCachePath; }
 
 		Handle<Texture> GetSDFTexture() const { return _sdfTexture; }
-		Buffer* GetBoundsBuffer() const { return _boundsBuffer.get(); }
+		Buffer* GetBoundsBuffer() const { return &_boundsBuffer.Get(); }
 		bool IsGenerated() const { return _generated; }
 
 	private:
@@ -63,14 +64,16 @@ namespace Core
 		Handle<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 
+		// Bounds/triLookup are app-lifetime, so they live in the ResourceCache global
+		// buffer pool (via CreateBuffer/ResizeBuffer); held here by handle.
 		Handle<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;
-		unique_ptr<Buffer> _boundsBuffer;
+		Handle<Buffer> _boundsBuffer;
 
 		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
 		Handle<Shader> _triLookupShader;
 		unique_ptr<Pipeline> _triLookupPipeline;
-		unique_ptr<Buffer> _triLookupBuffer;
+		Handle<Buffer> _triLookupBuffer;
 
 		std::string _sdfCachePath = "Assets/Cache/sdf_volume.sdfvol";
 		float _paddingFactor = 0.1f;

@@ -153,7 +153,7 @@ namespace Core
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         // Produced by LightCullingPass into this frame's own buffer.
-        StorageBufferDesc lightVisibilityDesc{};
+        BufferDesc lightVisibilityDesc{};
         lightVisibilityDesc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
         auto& lightVisibilityBuffer =
             frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc).Get();

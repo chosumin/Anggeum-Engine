@@ -2,6 +2,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourcePool.h"
@@ -46,6 +47,14 @@ namespace Core
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<SubMesh> LoadSubMesh(const string& name);
 
+		// Global (app-lifetime) GPU buffers
+		// NOT name-deduped — each call makes a new buffer; the caller keeps the handle.
+		Handle<Buffer> LoadBuffer(const BufferDesc& desc, const string& debugName = "");
+
+		// Reallocates the buffer behind `handle` in place — the handle stays valid and
+		// resolves to the new buffer. For grow/relocate of a global buffer.
+		void ResizeBuffer(Handle<Buffer> handle, const BufferDesc& desc, const string& debugName = "");
+
 		Handle<Texture> GetDefaultTextureHandle() const { return _defaultTexture; }
 
 	private:
@@ -63,6 +72,7 @@ namespace Core
 		mutex _samplerMutex;
 		mutex _textureMutex;
 		mutex _subMeshMutex;
+		mutex _bufferMutex;
 
 		// Materials: pool-owned, looked up by name for dedup.
 		ResourcePool<Material> _materialPool;
@@ -83,5 +93,8 @@ namespace Core
 		// SubMeshes: pool-owned, looked up by name for dedup.
 		ResourcePool<SubMesh> _subMeshPool;
 		unordered_map<string, Handle<SubMesh>> _subMeshHandles;
+
+		// Global GPU buffers: pool-owned, not deduped (callers keep their handles).
+		ResourcePool<Buffer> _bufferPool;
 	};
 }

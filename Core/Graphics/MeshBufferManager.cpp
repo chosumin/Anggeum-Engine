@@ -3,6 +3,8 @@
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/ResourceCache.h"
+#include "Graphics/Vulkans/Device.h"
 
 using namespace Core;
 
@@ -75,13 +77,12 @@ Handle<Buffer> MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 			throw runtime_error("Unsupported index type");
 	}
 
-	auto indexBuffer = make_shared<Core::Buffer>(_device,
-		_maxIndices * size,
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
 	_indexType = indexType;
-	_indexBufferHandle = _bufferPool.Add(indexBuffer);
+	_indexBufferHandle = _device.GetResourceCache().LoadBuffer(
+		{ _maxIndices * size,
+		  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		  MemoryType::DEVICE_LOCAL },
+		"Mesh.Index");
 	return _indexBufferHandle;
 }
 
@@ -97,12 +98,11 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 {
 	if (_vertexBufferHandles.find(name) == _vertexBufferHandles.end())
 	{
-		auto vertexBuffer = make_shared<Buffer>(_device,
-			_maxVertices * stride,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			MemoryType::DEVICE_LOCAL
-		);
-		_vertexBufferHandles[name] = _bufferPool.Add(vertexBuffer);
+		_vertexBufferHandles[name] = _device.GetResourceCache().LoadBuffer(
+			{ _maxVertices * stride,
+			  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			  MemoryType::DEVICE_LOCAL },
+			"Mesh." + name);
 	}
 
 	// If the data is position, calculate bounding sphere (also accumulates scene bounds)

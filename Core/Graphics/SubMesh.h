@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/MeshBufferManager.h"
+#include "Graphics/ResourcePool.h"
 
 namespace Core
 {
@@ -15,7 +16,7 @@ namespace Core
 		void SetIndexCount(uint32_t count) { _indexCount = count; }
 
 		vector<Buffer*> GetVertexBuffers(vector<string> names) const;
-		Buffer& GetIndexBuffer() { return *_indexBuffer; }
+		Buffer& GetIndexBuffer() { return _indexBuffer.Get(); }
 
 		string GetName() const { return _name; }
 
@@ -28,9 +29,12 @@ namespace Core
 		// the pool owns it for the app's lifetime (shared_ptr use_count no longer works).
 		bool HasBuffers() const { return !_vertexBuffers.empty(); }
 
-		// Returns the owning slot for a transfer job to fill in.
-		unique_ptr<Buffer>& InsertBufferSpace(string name);
-		unique_ptr<Buffer>& InsertBufferSpace(VkIndexType indexType);
+		void SetVertexBuffer(const string& name, Handle<Buffer> buffer) { _vertexBuffers[name] = buffer; }
+		void SetIndexBuffer(Handle<Buffer> buffer, VkIndexType indexType)
+		{
+			_indexBuffer = buffer;
+			_indexType = indexType;
+		}
 
 		void SetAllocation(const MeshAllocation& allocation) 
 		{ 
@@ -47,10 +51,9 @@ namespace Core
 		uint32_t _indexCount;
 		VkIndexType _indexType;
 
-		//Legacy Buffers
-		//Key: Attribute name, Value: Attribute value
-		unordered_map<string, unique_ptr<Buffer>> _vertexBuffers;
-		unique_ptr<Buffer> _indexBuffer;
+		// Key: attribute name.
+		unordered_map<string, Handle<Buffer>> _vertexBuffers;
+		Handle<Buffer> _indexBuffer;
 		
 		//Global Buffer Allocation Info
 		MeshAllocation _globalAllocation;
