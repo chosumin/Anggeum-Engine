@@ -79,8 +79,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
     if (!sdfTexture.IsValid() || !_volumeSliceTexture.IsValid() || !boundsBuffer)
         return;
 
-    auto& sliceImage = _volumeSliceTexture.Get().GetImage();
-    commandBuffer.TransitionImageLayout(sliceImage,
+    commandBuffer.TransitionImageLayout(_volumeSliceTexture.Get(),
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
@@ -130,7 +129,7 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
 
     commandBuffer.Dispatch((sliceWidth + 7) / 8, (DEBUG_SLICE_HEIGHT + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(sliceImage,
+    commandBuffer.TransitionImageLayout(_volumeSliceTexture.Get(),
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
@@ -256,7 +255,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     if (!depthTarget.IsValid())
         return;
 
-    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get().GetImage(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
@@ -288,7 +287,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
 
-    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get().GetImage(),
+    commandBuffer.TransitionImageLayout(_sdfShadowTexture.Get(),
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

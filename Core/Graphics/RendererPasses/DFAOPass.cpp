@@ -107,8 +107,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
     if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
-    auto& aoImage = _aoTexture.Get().GetImage();
-    commandBuffer.TransitionImageLayout(aoImage,
+    commandBuffer.TransitionImageLayout(_aoTexture.Get(),
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
@@ -152,7 +151,7 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
         (_screenExtent.width + 7) / 8,
         (_screenExtent.height + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(aoImage,
+    commandBuffer.TransitionImageLayout(_aoTexture.Get(),
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

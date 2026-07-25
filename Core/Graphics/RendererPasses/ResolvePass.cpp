@@ -63,7 +63,7 @@ void ResolvePass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, u
     auto depthTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_DEPTH);
     auto normalTexture = renderFrame.GetRenderTarget(DepthPrePass::RT_MAIN_NORMAL);
 
-    commandBuffer.TransitionImageLayout(depthTexture.Get().GetImage(),
+    commandBuffer.TransitionImageLayout(depthTexture.Get(),
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -86,8 +86,7 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
 {
     auto resolvedDepth = GetResolvedDepthTarget(renderFrame);
 
-    auto& resolvedImage = resolvedDepth.Get().GetImage();
-    commandBuffer.TransitionImageLayout(resolvedImage,
+    commandBuffer.TransitionImageLayout(resolvedDepth.Get(),
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 	auto extent = resolvedDepth.Get().GetExtent();
@@ -120,7 +119,7 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
     uint32_t groupY = (extent.height + 7) / 8;
     commandBuffer.Dispatch(groupX, groupY, 1);
 
-    commandBuffer.TransitionImageLayout(resolvedImage,
+    commandBuffer.TransitionImageLayout(resolvedDepth.Get(),
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     return resolvedDepth;
@@ -129,8 +128,7 @@ Handle<Texture> ResolvePass::ResolveDepth(RenderFrame& renderFrame, CommandBuffe
 void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     Handle<Texture> msaaNormal)
 {
-    auto& resolvedImage = _resolvedNormalTexture.Get().GetImage();
-    commandBuffer.TransitionImageLayout(resolvedImage,
+    commandBuffer.TransitionImageLayout(_resolvedNormalTexture.Get(),
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     struct PushConstants {
@@ -160,7 +158,7 @@ void ResolvePass::ResolveNormal(RenderFrame& renderFrame, CommandBuffer& command
         (_screenExtent.width + 7) / 8,
         (_screenExtent.height + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(resolvedImage,
+    commandBuffer.TransitionImageLayout(_resolvedNormalTexture.Get(),
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 

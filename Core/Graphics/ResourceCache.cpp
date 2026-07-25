@@ -15,7 +15,7 @@ namespace Core
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
 		auto& defaultTex = _defaultTexture.Get();
-		VkImageJob job(_device, defaultTex.GetImage(), defaultTex.GetName());
+		VkImageJob job(_device, defaultTex, defaultTex.GetName());
 
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}

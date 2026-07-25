@@ -214,7 +214,7 @@ Handle<Texture> Core::RenderFrame::CreateRenderTarget(const string& name,
     if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
     {
         auto& commandBuffer = _device.BeginSingleTimeCommands();
-        commandBuffer.TransitionImageLayout(*imagePtr,
+        commandBuffer.TransitionImageLayout(*texture,
             VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout);
         _device.EndSingleTimeCommands(commandBuffer);
     }

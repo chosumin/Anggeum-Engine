@@ -55,10 +55,13 @@ namespace Core
 	};
 
 	class Image;
+	class Texture;
 	class VkImageJob : public Job
 	{
 	public:
-		VkImageJob(Device& device, Image& dstImage, string filePath);
+		// Takes a main-thread resolved Texture&; the job records on a worker thread,
+		// so it must not resolve a handle through the (non-thread-safe) pool itself.
+		VkImageJob(Device& device, Texture& dstTexture, string filePath);
 		~VkImageJob();
 
 		void Execute() override;
@@ -66,7 +69,7 @@ namespace Core
 		Device& _device;
 		string _filePath;
 
-		Image& _dstImage;
+		Texture& _dstTexture;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 

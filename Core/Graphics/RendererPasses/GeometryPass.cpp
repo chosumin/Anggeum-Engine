@@ -181,7 +181,7 @@ namespace Core
         PerspectiveCamera* camera = _scene.GetMainCamera();
 
         auto depth = renderFrame.GetRenderTarget(RT_MAIN_DEPTH);
-        commandBuffer.TransitionImageLayout(depth.Get().GetImage(),
+        commandBuffer.TransitionImageLayout(depth.Get(),
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
@@ -191,7 +191,7 @@ namespace Core
 
         if (shadowTarget.IsValid())
         {
-            commandBuffer.TransitionImageLayout(shadowTarget.Get().GetImage(),
+            commandBuffer.TransitionImageLayout(shadowTarget.Get(),
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }

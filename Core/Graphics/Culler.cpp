@@ -130,8 +130,7 @@ void Core::Culler::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& comm
     // Generate Hi-Z from depth
     if (!_hiZInitialized)
     {
-        auto& hiZImage = _hiZTexture.Get().GetImage();
-        commandBuffer.TransitionImageLayout(hiZImage,
+        commandBuffer.TransitionImageLayout(_hiZTexture.Get(),
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         _hiZInitialized = true;
@@ -274,29 +273,31 @@ void Core::Culler::PrepareHiZResources(Device& device, VkExtent2D extents)
 
 void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth)
 {
-    auto& hiZTextureImage = _hiZTexture.Get().GetImage();
-    auto& depthBufferImage = depth.Get().GetImage();
+    // Resolve once on the render thread; the image ops take Texture& (the mip loop
+    // below still uses the _hiZTexture handle for SetTextureBuffer).
+    Texture& hiZTex = _hiZTexture.Get();
+    Texture& depthTex = depth.Get();
 
     // Transition resolved depth: SHADER_READ_ONLY > TRANSFER_SRC
-    commandBuffer.TransitionImageLayout(depthBufferImage,
+    commandBuffer.TransitionImageLayout(depthTex,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     // Hi-Z texture: UNDEFINED > TRANSFER_DST
-    commandBuffer.TransitionImageLayout(hiZTextureImage,
+    commandBuffer.TransitionImageLayout(hiZTex,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     // Copy resolved depth to Hi-Z mip 0
-    commandBuffer.CopyImage(depthBufferImage, hiZTextureImage, 0, 0, 0, 0);
+    commandBuffer.CopyImage(depthTex, hiZTex, 0, 0, 0, 0);
 
     // Transition resolved depth back: TRANSFER_SRC > SHADER_READ_ONLY
-    commandBuffer.TransitionImageLayout(depthBufferImage,
+    commandBuffer.TransitionImageLayout(depthTex,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     // Hi-Z texture: TRANSFER_DST > GENERAL (for mip chain generation)
-    commandBuffer.TransitionImageLayout(hiZTextureImage,
+    commandBuffer.TransitionImageLayout(hiZTex,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_GENERAL);
 
@@ -337,7 +338,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
             commandBuffer.Dispatch(groupX, groupY, 1);
 
             commandBuffer.TransitionImageLayout(
-                hiZTextureImage,
+                hiZTex,
                 VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_LAYOUT_GENERAL);
         }
@@ -345,7 +346,7 @@ void Core::Culler::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& co
 
     // Hi-Z: GENERAL > SHADER_READ_ONLY
     commandBuffer.TransitionImageLayout(
-        hiZTextureImage,
+        hiZTex,
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

@@ -307,7 +307,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 
 	auto texture = _resourceCache.LoadTexture(textureName,
 		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
-	_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), path), textureName);
+	_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), path), textureName);
 
 	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
 	material->AddTexture(1, texture);
@@ -591,7 +591,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{
@@ -608,7 +608,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{
@@ -630,7 +630,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), texture.Get().GetName()), texture.Get().GetName());
+				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
 
 				if (useBindless)
 				{

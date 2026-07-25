@@ -36,10 +36,10 @@ namespace
 	class SDFDownloadJob : public Job
 	{
 	public:
-		SDFDownloadJob(Device& device, Image& image, Buffer& boundsBuffer,
+		SDFDownloadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
 			uint32_t resolution, Buffer** outImageStaging, Buffer** outBoundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _image(image), _boundsBuffer(boundsBuffer)
+			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
 			, _outImageStaging(outImageStaging)
 			, _outBoundsStaging(outBoundsStaging)
@@ -56,7 +56,7 @@ namespace
 				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::STAGE);
 
 			// Image: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
-			commandBuffer->TransitionImageLayout(_image,
+			commandBuffer->TransitionImageLayout(_texture,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
@@ -66,11 +66,11 @@ namespace
 			region.imageExtent = { _resolution, _resolution, _resolution };
 
 			vkCmdCopyImageToBuffer(commandBuffer->GetHandle(),
-				_image.GetImage(),
+				_texture.GetImage().GetImage(),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				imageStaging->GetBuffer(), 1, &region);
 
-			commandBuffer->TransitionImageLayout(_image,
+			commandBuffer->TransitionImageLayout(_texture,
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -88,7 +88,7 @@ namespace
 
 	private:
 		Device& _device;
-		Image& _image;
+		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
 		Buffer** _outImageStaging;
@@ -99,11 +99,11 @@ namespace
 	class SDFUploadJob : public Job
 	{
 	public:
-		SDFUploadJob(Device& device, Image& image, Buffer& boundsBuffer,
+		SDFUploadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
 			uint32_t resolution,
 			Buffer* imageStaging, Buffer* boundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _image(image), _boundsBuffer(boundsBuffer)
+			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
 			, _imageStaging(imageStaging), _boundsStaging(boundsStaging)
 		{
@@ -111,7 +111,7 @@ namespace
 
 		void Execute() override
 		{
-			commandBuffer->TransitionImageLayout(_image,
+			commandBuffer->TransitionImageLayout(_texture,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -122,11 +122,11 @@ namespace
 
 			vkCmdCopyBufferToImage(commandBuffer->GetHandle(),
 				_imageStaging->GetBuffer(),
-				_image.GetImage(),
+				_texture.GetImage().GetImage(),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1, &region);
 
-			commandBuffer->TransitionImageLayout(_image,
+			commandBuffer->TransitionImageLayout(_texture,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -141,7 +141,7 @@ namespace
 
 	private:
 		Device& _device;
-		Image& _image;
+		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
 		Buffer* _imageStaging;
@@ -307,8 +307,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
-	auto& sdfImage = _sdfTexture.Get().GetImage();
-	commandBuffer.TransitionImageLayout(sdfImage,
+	commandBuffer.TransitionImageLayout(_sdfTexture.Get(),
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL);
 
@@ -337,7 +336,7 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	uint32_t groups = (resolution + 3) / 4;
 	commandBuffer.Dispatch(groups, groups, groups);
 
-	commandBuffer.TransitionImageLayout(sdfImage,
+	commandBuffer.TransitionImageLayout(_sdfTexture.Get(),
 		VK_IMAGE_LAYOUT_GENERAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -349,7 +348,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	if (!_sdfTexture.IsValid() || !_boundsBuffer)
 		return false;
 
-	auto& image = _sdfTexture.Get().GetImage();
+	auto& texture = _sdfTexture.Get();
 
 	// The SDF generation commands were recorded into a frame command buffer that
 	// may still be executing (or not yet started) on the GPU. The download job
@@ -361,7 +360,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	Buffer* imageStaging = nullptr;
 	Buffer* boundsStaging = nullptr;
 
-	SDFDownloadJob job(_device, image, *_boundsBuffer, resolution,
+	SDFDownloadJob job(_device, texture, *_boundsBuffer, resolution,
 		&imageStaging, &boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 
@@ -458,9 +457,9 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(header.resolution);
 
-	auto& image = _sdfTexture.Get().GetImage();
+	auto& texture = _sdfTexture.Get();
 
-	SDFUploadJob job(_device, image, *_boundsBuffer, header.resolution,
+	SDFUploadJob job(_device, texture, *_boundsBuffer, header.resolution,
 		imageStaging, boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 

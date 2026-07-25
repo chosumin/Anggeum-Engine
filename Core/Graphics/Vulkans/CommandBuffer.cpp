@@ -212,9 +212,12 @@ void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDev
         1, &copyRegion);
 }
 
-void Core::CommandBuffer::CopyImage(Image& srcImage, Image& dstImage, 
+void Core::CommandBuffer::CopyImage(Texture& srcTexture, Texture& dstTexture,
     uint32_t srcMipLevel, uint32_t srcLayer, uint32_t dstMipLevel, uint32_t dstLayer)
 {
+    Image& srcImage = srcTexture.GetImage();
+    Image& dstImage = dstTexture.GetImage();
+
     VkImageCopy copyRegion{};
 
     copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -249,8 +252,10 @@ void Core::CommandBuffer::CopyImage(Image& srcImage, Image& dstImage,
         &copyRegion);
 }
 
-void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height)
+void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height)
 {
+    Image& image = texture.GetImage();
+
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
@@ -274,8 +279,10 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Image& image, uint32
     );
 }
 
-void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldLayout, VkImageLayout newLayout, QueueType destQueue)
+void Core::CommandBuffer::TransitionImageLayout(Texture& texture, VkImageLayout oldLayout, VkImageLayout newLayout, QueueType destQueue)
 {
+    Image& image = texture.GetImage();
+
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
@@ -329,8 +336,10 @@ void Core::CommandBuffer::TransitionImageLayout(Image& image, VkImageLayout oldL
 	);
 }
 
-void Core::CommandBuffer::GenerateMipmaps(Image& image, uint32_t mipLevels)
+void Core::CommandBuffer::GenerateMipmaps(Texture& texture, uint32_t mipLevels)
 {
+    Image& image = texture.GetImage();
+
     VkFormatProperties formatProperties;
     vkGetPhysicalDeviceFormatProperties(
         _device.GetPhysicalDevice(), image.GetFormat(), &formatProperties);

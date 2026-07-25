@@ -11,6 +11,7 @@ namespace Core
 	class Buffer;
 	class Shader;
 	class Image;
+	class Texture;
 	class Job;
 	class Framebuffer;
 	class MeshBufferManager;
@@ -77,14 +78,15 @@ namespace Core
 			QueueType destQueue = QueueType::None);
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
-		void CopyImage(Image& srcImage, Image& dstImage, 
-			uint32_t srcMipLevel, uint32_t srcLayer, 
+
+		void CopyImage(Texture& srcTexture, Texture& dstTexture,
+			uint32_t srcMipLevel, uint32_t srcLayer,
 			uint32_t dstMipLevel, uint32_t dstLayer);
-		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
-		void TransitionImageLayout(Image& image, 
+		void TransitionImageLayout(Texture& texture,
 			VkImageLayout oldLayout, VkImageLayout newLayout,
 			QueueType destQueue = QueueType::None);
-		void GenerateMipmaps(Image& image, uint32_t mipLevels);
+		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height);
+		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
 		void EndRenderPass();
 		void EndCommandBuffer();
 
