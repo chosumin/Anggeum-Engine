@@ -24,8 +24,8 @@ namespace Core
 
 		void Prepare(RenderContext& renderContext);
 
-		shared_ptr<Material> RequestMaterial(const string materialName, const string& shaderName);
-		shared_ptr<Material> RequestOverrideMaterial(const shared_ptr<Material>& source, const string& overrideShaderName);
+		// Pool-owned; resolve the handle with handle.Get().
+		Handle<Material> LoadMaterial(const string materialName, const string& shaderName);
 
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
@@ -64,7 +64,9 @@ namespace Core
 		mutex _textureMutex;
 		mutex _subMeshMutex;
 
-		unordered_map<string, weak_ptr<Material>> _materials;
+		// Materials: pool-owned, looked up by name for dedup.
+		ResourcePool<Material> _materialPool;
+		unordered_map<string, Handle<Material>> _materialHandles;
 
 		// Shaders: pool-owned, looked up by name for dedup.
 		ResourcePool<Shader> _shaderPool;

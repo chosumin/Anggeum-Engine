@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "MaterialManager.h"
 #include "Material.h"
+#include "ResourcePool.h"
 #include "Vulkans/Buffer.h"
 #include "Vulkans/MemoryAllocator.h"
 
@@ -28,14 +29,14 @@ MaterialManager::~MaterialManager() = default;
 
 void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 {
-	auto& material = _materials[materialIndex];
-	if (material.expired())
+	Material* material = _materials[materialIndex].TryGet();
+	if (!material)
 		return;
 
 	GPUMaterialData& data = _materialData[materialIndex];
-	
+
 	//todo: cast out of this function if material is not PBR
-	auto pbrBuffer = material.lock()->GetBufferConst<PBRBuffer>(1);
+	auto pbrBuffer = material->GetBufferConst<PBRBuffer>(1);
 	if (pbrBuffer)
 	{
 		data.albedo = pbrBuffer->Albedo;
@@ -57,7 +58,7 @@ void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 	data.flags = 1;  // Enabled
 }
 
-uint32_t MaterialManager::RegisterMaterial(shared_ptr<Material> material)
+uint32_t MaterialManager::RegisterMaterial(Handle<Material> material)
 {
 	uint32_t index;
 
@@ -76,7 +77,7 @@ uint32_t MaterialManager::RegisterMaterial(shared_ptr<Material> material)
 	}
 
 	_materials[index] = material;
-	material->SetMaterialIndex(index);
+	material.Get().SetMaterialIndex(index);
 
 	_dirtyMaterials.set(index);
 	_anyDirty = true;
@@ -89,7 +90,7 @@ void MaterialManager::UnregisterMaterial(uint32_t materialIndex)
 	if (materialIndex >= MAX_MATERIALS)
 		return;
 
-	_materials[materialIndex].reset();
+	_materials[materialIndex] = Handle<Material>{};
 	_materialData[materialIndex] = GPUMaterialData{};
 	_freeIndices.push_back(materialIndex);
 

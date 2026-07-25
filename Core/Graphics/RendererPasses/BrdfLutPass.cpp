@@ -38,7 +38,7 @@ void Core::BrdfLutPass::Initialize()
     depthInfo.depthWriteEnable = VK_FALSE;
     depthInfo.depthTestEnable = VK_FALSE;
 
-    _brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
+    _brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShaderHandle().Get(), pipelineState);
 }
 
 void Core::BrdfLutPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)

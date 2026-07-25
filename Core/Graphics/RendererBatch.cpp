@@ -38,7 +38,7 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
             if (i >= subMeshes.size())
                 break;
 
-            auto shaderHandle = materials[i]->GetShaderHandle();
+            auto shaderHandle = materials[i].Get().GetShaderHandle();
             if (!shaderHandle.IsValid())
                 continue;
 
@@ -57,9 +57,9 @@ Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch&
 
 Core::RendererBatch::~RendererBatch() = default;
 
-void Core::RendererBatch::AddMesh(uint entityId, weak_ptr<Material> material, Handle<SubMesh> subMesh)
+void Core::RendererBatch::AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh)
 {
-    auto materialPtr = material.lock();
+    auto* materialPtr = material.TryGet();
     if (!materialPtr)
         return;
 
@@ -103,7 +103,7 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
 
     for (auto& [materialName, materialBatch] : _materialBatches)
     {
-        auto material = materialBatch.Material.lock();
+        auto* material = materialBatch.Material.TryGet();
         if (!material || !material->HasMaterialIndex())
             continue;
 
@@ -165,13 +165,6 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(VkExtent2D extents)
     Core::CommandBuffer::ImmediateSubmit(_device, jobs);
 
     _extents = extents;
-}
-
-shared_ptr<Material> Core::RendererBatch::GetFirstMaterial() const
-{
-    if (_materialBatches.empty())
-        return nullptr;
-    return _materialBatches.begin()->second.Material.lock();
 }
 
 void Core::RendererBatch::CreateInstanceBuffer(Device& device)

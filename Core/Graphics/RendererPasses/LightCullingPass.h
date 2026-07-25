@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RendererPass.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -23,7 +24,7 @@ namespace Core
 
 		TileInfo _tileInfo;
 
-		shared_ptr<Core::Material> _computeMaterial;
+		Handle<Core::Material> _computeMaterial;
 		unique_ptr<Core::Pipeline> _computePipeline;
 	};
 }

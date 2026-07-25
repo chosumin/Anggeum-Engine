@@ -309,10 +309,10 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
 	_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), path), textureName);
 
-	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
-	material->AddTexture(1, texture);
+	auto material = _resourceCache.LoadMaterial("skybox", "Skybox");
+	material.Get().AddTexture(1, texture);
 
-	vector<shared_ptr<Material>> materials = { material };
+	vector<Handle<Material>> materials = { material };
 	LoadMeshes(materials, false);
 
 	LoadNodes();
@@ -537,11 +537,11 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 	return textures;
 }
 
-vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::Handle<Core::Texture>>& textures)
+vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::Handle<Core::Texture>>& textures)
 {
 	size_t size = _model->materials.size();
-	
-	vector<shared_ptr<Core::Material>> materials(size);
+
+	vector<Handle<Core::Material>> materials(size);
 	
 	// Textures are registered to the bindless array by ResourceCache at load time;
 	// here we only read each texture's assigned index.
@@ -555,17 +555,18 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 			_modelPath + to_string(i) : gltfMaterial.name;
 
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = _resourceCache.RequestMaterial(matName, "PBR");
+		auto material = _resourceCache.LoadMaterial(matName, "PBR");
+		auto& mat = material.Get();
 
-		//Already bound
-		if (material.use_count() > 1)
+		//Already configured (deduped by name)
+		if (mat.HasBuffers())
 		{
 			materials[i] = material;
 			continue;
 		}
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
-		material->AddBuffer(1, pbrBuffer);
+		mat.AddBuffer(1, pbrBuffer);
 
 		pbrBuffer->Albedo = glm::vec4(1);
 
@@ -600,7 +601,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				else
 				{
 					// Traditional binding
-					material->AddTexture(2, texture);
+					mat.AddTexture(2, texture);
 				}
 				
 				pbrBuffer->AlbedoTextureSet = 1;
@@ -616,7 +617,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				}
 				else
 				{
-					material->AddTexture(4, texture);
+					mat.AddTexture(4, texture);
 				}
 				
 				pbrBuffer->RoughnessTextureSet = 1;
@@ -638,7 +639,7 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::
 				}
 				else
 				{
-					material->AddTexture(3, texture);
+					mat.AddTexture(3, texture);
 				}
 			}
 			else if (additionalValue.first.find("emissiveTexture") != string::npos)
@@ -692,7 +693,7 @@ inline VkIndexType NormalizeIndexData(VkFormat format, vector<uint8_t>& indexDat
 	}
 }
 
-void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
+void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, bool useGlobalBuffer)
 {
 	MeshBufferManager* meshBufferManager = nullptr;
 	MaterialManager* materialManager = nullptr;

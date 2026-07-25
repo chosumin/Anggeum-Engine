@@ -28,8 +28,10 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
 	rasterization.depthBiasEnable = VK_TRUE;
 
-	_shadowMaterial = _device.GetResourceCache().RequestMaterial("shadow", "Shadow");
-	_shadowShader = _shadowMaterial->GetShaderHandle();
+	// The material is registered in the cache/material table; we only need its
+	// shader handle here, so it isn't kept as a member.
+	auto shadowMaterial = _device.GetResourceCache().LoadMaterial("shadow", "Shadow");
+	_shadowShader = shadowMaterial.Get().GetShaderHandle();
 
 	// Create Pipeline for this pass
 	_pipeline = new Pipeline(device, *_renderPass, _shadowShader.Get(), *_pipelineState);

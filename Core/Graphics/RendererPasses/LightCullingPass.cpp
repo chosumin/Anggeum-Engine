@@ -12,8 +12,8 @@
 Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums)
 	:RendererPass(device, workerThreadManager), _scene(scene)
 {
-	_computeMaterial = device.GetResourceCache().RequestMaterial("lightCulling", "shaders/lightCulling.comp.spv");
-	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial->GetShader());
+	_computeMaterial = device.GetResourceCache().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
+	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial.Get().GetShaderHandle().Get());
 
 	_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
 	_tileInfo.tileNums = tileNums;
@@ -43,7 +43,9 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 	auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA);
 	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS);
 
-	auto builder = frameResources.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+	auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();
+
+	auto builder = frameResources.CreateDescriptorSetBuilder(computeShader, 0);
 	builder.SetUniformBuffer(0, cameraBuffer);
 	builder.SetStorageBuffer(1, lightVisibilityBuffer);
 	builder.SetTextureBuffer(2, depthTarget);
@@ -54,9 +56,9 @@ void Core::LightCullingPass::Draw(RenderFrame& renderFrame, CommandBuffer& comma
 
 	commandBuffer.BindDescriptorSet(
 		_computePipeline->GetPipelineBindPoint(),
-		_computeMaterial->GetShader(), resources);
+		computeShader, resources);
 
-	commandBuffer.PushConstants(_computeMaterial->GetShader(), 0, _tileInfo);
+	commandBuffer.PushConstants(computeShader, 0, _tileInfo);
 
 	commandBuffer.Dispatch(_tileInfo.tileNums.x, _tileInfo.tileNums.y, 1);
 }

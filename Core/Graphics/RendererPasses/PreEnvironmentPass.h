@@ -10,6 +10,7 @@ namespace Core
     class Material;
     class SubMesh;
     class Texture;
+    class Shader;
 
     class PreEnvironmentPass : public RendererPass
     {
@@ -32,8 +33,12 @@ namespace Core
         Texture* _irradianceCubemap;
         Texture* _prefilteredCubemap;
 
-        shared_ptr<Material> _irradianceMaterial;
-        shared_ptr<Material> _prefilteredMaterial;
+        // Resolved on the main thread in the ctor; Draw() runs on a worker thread,
+        // so it must not resolve a handle through the pool. The pool owns the
+        // shaders for the app's lifetime, so these pointers stay valid. The
+        // materials are only needed for their shaders, so we keep just those.
+        Shader* _irradianceShader = nullptr;
+        Shader* _prefilteredShader = nullptr;
 
         Pipeline* _irradiancePipeline = nullptr;
         Pipeline* _prefilteredPipeline = nullptr;

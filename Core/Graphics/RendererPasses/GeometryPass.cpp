@@ -207,11 +207,12 @@ namespace Core
         for (auto* mesh : meshes)
         {
             auto& materials = mesh->GetMaterials();
-            for (auto& material : materials)
+            for (auto& materialHandle : materials)
             {
-                if (material->GetShader().GetPass() == "Geometry")
+                auto& materialShader = materialHandle.Get().GetShaderHandle().Get();
+                if (materialShader.GetPass() == "Geometry")
                 {
-                    shader = &material->GetShader();
+                    shader = &materialShader;
                     break;
                 }
             }
@@ -351,19 +352,19 @@ namespace Core
 
         auto meshes = _scene.GetComponents<Core::Mesh>();
 
-        auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh) 
+        auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
         {
-            auto material = mesh->GetMaterials()[0];
-            auto& shader = material->GetShader();
+            auto& material = mesh->GetMaterials()[0].Get();
+            auto& shader = material.GetShaderHandle().Get();
             return shader.GetPass() == "Skybox";
         });
 
         if (it != meshes.end())
         {
             auto skybox = *it;
-            auto material = skybox->GetMaterials()[0];
+            auto& material = skybox->GetMaterials()[0].Get();
             auto& subMesh = skybox->GetSubMeshes()[0].Get();
-            auto& shader = material->GetShader();
+            auto& shader = material.GetShaderHandle().Get();
 
             if (_skyboxPipeline == nullptr)
             {
@@ -385,7 +386,7 @@ namespace Core
             auto& skyResources0 = skyBuilder0.Build();
 
             auto skyBuilder1 = frameResources.CreateDescriptorSetBuilder(shader, 1);
-            auto& textures = material->GetTexturesMap();
+            auto& textures = material.GetTexturesMap();
             for (auto& [binding, texture] : textures)
                 skyBuilder1.SetTextureBuffer(binding, texture);
             auto& skyResources1 = skyBuilder1.Build();
@@ -396,7 +397,7 @@ namespace Core
                 _skyboxPipeline->GetPipelineBindPoint(),
                 shader, { &skyResources0, &skyResources1 });
 
-            auto vertexAttibuteNames = material->GetShader().GetVertexAttirbuteNames();
+            auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
 
             commandBuffer.BindVertexBuffers(subMesh.GetVertexBuffers(vertexAttibuteNames), 0);
 

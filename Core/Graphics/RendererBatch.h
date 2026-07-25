@@ -37,7 +37,7 @@ namespace Core
 
 	struct MaterialBatch
 	{
-		weak_ptr<Material> Material;
+		Handle<Material> Material;
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
@@ -58,10 +58,9 @@ namespace Core
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		TransformBatch& GetTransformBatch() const { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
-		shared_ptr<Material> GetFirstMaterial() const;
 
 	private:
-		void AddMesh(uint entityId, weak_ptr<Material> material, Handle<SubMesh> subMesh);
+		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
 		void PrepareGPUDrivenRendering(VkExtent2D extents);
 		void CreateInstanceBuffer(Device& device);
 

@@ -41,7 +41,6 @@ namespace Core
 
 		ShadowUniform _shadowBuffer;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeViews{};
-		shared_ptr<Material> _shadowMaterial;
 
 		VkSampleCountFlagBits _msaaSamples;
 

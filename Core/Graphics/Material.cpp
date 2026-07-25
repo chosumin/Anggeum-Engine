@@ -48,11 +48,6 @@ namespace Core
 		_textures.clear();
 	}
 
-	Shader& Core::Material::GetShader() const
-	{
-		return _shader.Get();
-	}
-
 	Handle<Texture> Material::GetTexture(uint32_t binding)
 	{
 		auto setIt = _textures.find(binding);

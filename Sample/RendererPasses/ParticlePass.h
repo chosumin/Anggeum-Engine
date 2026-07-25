@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 struct Particle
 {
@@ -49,9 +50,8 @@ namespace Sample
 		vector<unique_ptr<Core::Buffer>> _buffers;
 
 		DeltaTime _deltaTime;
-		shared_ptr<Core::Material> _computeMaterial;
+		Core::Handle<Core::Material> _computeMaterial;
 		unique_ptr<Core::Pipeline> _computePipeline;
-		shared_ptr<Core::Material> _graphicsMaterial;
 		unique_ptr<Core::Pipeline> _graphicsPipeline;
 
 		bool _initialized = false;

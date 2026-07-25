@@ -22,12 +22,10 @@ Sample::ParticlePass::ParticlePass(Device& device, WorkerThreadManager& workerTh
     , _swapChainFormat(swapChainFormat)
     , _msaaSamples(msaaSamples)
 {
-    _computeMaterial = device.GetResourceCache().RequestMaterial("particle", "shaders/particle.comp.spv");
-    _computePipeline = make_unique<Pipeline>(device, _computeMaterial->GetShader());
+    _computeMaterial = device.GetResourceCache().LoadMaterial("particle", "shaders/particle.comp.spv");
+    _computePipeline = make_unique<Pipeline>(device, _computeMaterial.Get().GetShaderHandle().Get());
 
     auto graphicsShader = device.GetResourceCache().LoadShader("shaders/particle.vert", "shaders/particle.frag");
-    _graphicsMaterial =
-        make_shared<Material>(_device, graphicsShader, "particleGraphics");
 
     auto& multiSampling = _pipelineState->GetMultisampleStateCreateInfo();
     multiSampling.rasterizationSamples = msaaSamples;
@@ -40,7 +38,7 @@ Sample::ParticlePass::ParticlePass(Device& device, WorkerThreadManager& workerTh
     _renderPass->CreateRenderPass();
 
     _graphicsPipeline = make_unique<Pipeline>(_device, *_renderPass,
-        _graphicsMaterial->GetShader(), *_pipelineState);
+        graphicsShader.Get(), *_pipelineState);
 }
 
 Sample::ParticlePass::~ParticlePass() = default;
@@ -125,7 +123,9 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
         frameResources.GetOrCreateUniformBuffer<DeltaTime>("ParticlePass.DeltaTime");
     deltaTimeBuffer.Update(_deltaTime);
 
-    auto builder = frameResources.CreateDescriptorSetBuilder(_computeMaterial->GetShader(), 0);
+    auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();
+
+    auto builder = frameResources.CreateDescriptorSetBuilder(computeShader, 0);
     builder.SetUniformBuffer(0, deltaTimeBuffer);
     builder.SetStorageBuffer(1, *_buffers[0]);
     builder.SetStorageBuffer(2, *_buffers[1]);
@@ -137,7 +137,7 @@ void Sample::ParticlePass::Draw(Core::RenderFrame& renderFrame, Core::CommandBuf
 
     commandBuffer.BindDescriptorSet(
         _computePipeline->GetPipelineBindPoint(),
-        _computeMaterial->GetShader(), resources);
+        computeShader, resources);
 
     commandBuffer.Dispatch(PARTICLE_COUNT / 256, 1, 1);
 

@@ -20,10 +20,7 @@ namespace Core
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}
 
-	ResourceCache::~ResourceCache()
-	{
-		_materials.clear();
-	}
+	ResourceCache::~ResourceCache() = default;
 
 	void ResourceCache::Prepare(RenderContext& renderContext)
 	{
@@ -35,53 +32,25 @@ namespace Core
 		}
 	}
 
-	shared_ptr<Material> ResourceCache::RequestMaterial(const string materialName,
+	Handle<Material> ResourceCache::LoadMaterial(const string materialName,
 		const string& shaderName)
 	{
 		lock_guard<mutex> guard(_materialMutex);
 
-		auto it = _materials.find(materialName);
-		if (it != _materials.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
+		auto it = _materialHandles.find(materialName);
+		if (it != _materialHandles.end() && _materialPool.IsAlive(it->second))
+			return it->second;
 
 		auto material =
 			make_shared<Core::Material>(_device, LoadShader(shaderName), materialName);
-		_materials[materialName] = material;
+
+		Handle<Material> handle = _materialPool.Add(material);
+		_materialHandles[materialName] = handle;
 
 		MaterialManager* materialManager = _renderContext->GetMaterialManager();
-		materialManager->RegisterMaterial(material);
+		materialManager->RegisterMaterial(handle);
 
-		return material;
-	}
-
-	shared_ptr<Material> ResourceCache::RequestOverrideMaterial(const shared_ptr<Material>& source, const string& overrideShaderName)
-	{
-		lock_guard<mutex> guard(_materialMutex);
-
-		// Unique name: "originalName@synthesizeShader"
-		string overrideName = source->GetName() + "@" + overrideShaderName;
-
-		auto it = _materials.find(overrideName);
-		if (it != _materials.end())
-		{
-			if (auto shared = it->second.lock())
-				return shared;
-		}
-
-		// Copy original material (preserves PBR data, bindless handles, etc.)
-		auto overrideMaterial = make_shared<Material>(*source);
-		overrideMaterial->SetShader(LoadShader(overrideShaderName));
-
-		_materials[overrideName] = overrideMaterial;
-
-		// Register to get a valid materialIndex
-		MaterialManager* materialManager = _renderContext->GetMaterialManager();
-		materialManager->RegisterMaterial(overrideMaterial);
-
-		return overrideMaterial;
+		return handle;
 	}
 
 	Handle<Shader> ResourceCache::LoadShader(const string& shaderName)

@@ -18,8 +18,6 @@ namespace Core
 	class Material
 	{
 	public:
-		// The shader is loaded by ResourceCache (or the owner) and passed in, so
-		// Material does not reach the cache to resolve it.
 		Material(Device& device, Handle<Shader> shader, string materialName);
 		Material(const Material& other);
 
@@ -29,7 +27,6 @@ namespace Core
 
 		const string GetName() const { return _name; }
 
-		Shader& GetShader() const;
 		Handle<Shader> GetShaderHandle() const { return _shader; }
 
 		template <typename T>
@@ -48,6 +45,11 @@ namespace Core
 		{
 			_buffers[binding] = data;
 		}
+
+		// True once bound buffers have been added. The loader uses this to skip
+		// re-configuring a material it already built, now that the pool owns it for
+		// the app's lifetime.
+		bool HasBuffers() const { return !_buffers.empty(); }
 
 		void AddTexture(uint32_t binding, Handle<Texture> texture)
 		{

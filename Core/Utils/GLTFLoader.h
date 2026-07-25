@@ -61,8 +61,8 @@ namespace Core
 		vector<Handle<Core::Texture>> LoadTextures(
 			vector<Handle<Core::Sampler>>& samplers,
 			const string& modelPath);
-		vector<shared_ptr<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
-		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
+		vector<Handle<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
+		void LoadMeshes(vector<Handle<Core::Material>>& materials, bool useGlobalBuffer = true);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();

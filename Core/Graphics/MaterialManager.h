@@ -1,5 +1,6 @@
 #pragma once
 #include "BufferObjects.h"
+#include "ResourceHandle.h"
 
 namespace Core
 {
@@ -21,7 +22,7 @@ namespace Core
 		MaterialManager(Device& device);
 		~MaterialManager();
 
-		uint32_t RegisterMaterial(shared_ptr<Material> material);
+		uint32_t RegisterMaterial(Handle<Material> material);
 		void UnregisterMaterial(uint32_t materialIndex);
 
 		// Refreshes dirty entries and re-uploads the table if anything changed.
@@ -44,7 +45,7 @@ namespace Core
 
 		MaterialTable _materialData;
 		unique_ptr<Buffer> _materialDataBuffer;
-		array<weak_ptr<Material>, MAX_MATERIALS> _materials;
+		array<Handle<Material>, MAX_MATERIALS> _materials;
 
 		bitset<MAX_MATERIALS> _dirtyMaterials;
 		bool _anyDirty = false;
