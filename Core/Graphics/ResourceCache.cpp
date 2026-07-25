@@ -12,7 +12,7 @@ namespace Core
 	{
 		ImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
-		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, DEFAULT_SAMPLER);
+		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
 		auto& defaultTex = _defaultTexture.Get();
 		VkImageJob job(_device, defaultTex.GetImage(), defaultTex.GetName());
@@ -151,18 +151,6 @@ namespace Core
 		Handle<Sampler> handle = _samplerPool.Add(make_shared<Core::Sampler>(_device, info));
 		_samplerHandles[info] = handle;
 		return handle;
-	}
-
-	Handle<Texture> ResourceCache::LoadTexture(const string& textureName,
-		const ImageCreateInfo imageCreateInfo, const SamplerCreateInfo samplerCreateInfo)
-	{
-		// LoadSampler locks _samplerMutex; resolve it before taking _textureMutex.
-		return LoadTexture(textureName, imageCreateInfo, LoadSampler(samplerCreateInfo));
-	}
-
-	Handle<Texture> ResourceCache::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo)
-	{
-		return LoadTexture(textureName, imageCreateInfo, Handle<Sampler>{});
 	}
 
 	Handle<Texture> ResourceCache::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)

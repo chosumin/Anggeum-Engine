@@ -306,7 +306,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	};
 
 	auto texture = _resourceCache.LoadTexture(textureName,
-		imageCreateInfo, DEFAULT_SAMPLER);
+		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
 	_transferContext.Enqueue(new VkImageJob(_device, texture.Get().GetImage(), path), textureName);
 
 	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");

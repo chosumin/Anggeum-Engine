@@ -29,16 +29,14 @@ namespace Core
 
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
-		// Samplers are pool-owned; resolve the handle with handle.Get().
+
 		Handle<Sampler> LoadSampler(const SamplerCreateInfo info);
-		// Asset textures are pool-owned; resolve the handle with handle.Get().
+
+		// Loads a file-based asset texture (ImageCreateInfo.filePath) into the pool
+		// and registers it with the bindless array. Pass a sampler handle, or leave
+		// it empty to bind none.
 		Handle<Texture> LoadTexture(const string& textureName,
-			const ImageCreateInfo imageCreateInfo,
-			const SamplerCreateInfo samplerCreateInfo);
-		Handle<Texture> LoadTexture(const string& textureName,
-			const ImageCreateInfo imageCreateInfo);
-		Handle<Texture> LoadTexture(const string& textureName,
-			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler);
+			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler = Handle<Sampler>{});
 
 		// Adopts an externally built image (e.g. a GPU-generated volume) into the
 		// texture pool. For app-lifetime textures that aren't loaded from a file.
