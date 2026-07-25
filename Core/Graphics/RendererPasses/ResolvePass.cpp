@@ -32,6 +32,8 @@ ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManage
 
 ResolvePass::~ResolvePass()
 {
+    _depthResolvePipeline.reset();
+    _depthResolveShader = Handle<Shader>{};
 }
 
 void ResolvePass::EnsureRenderTargets(RenderFrame& renderFrame)
