@@ -26,8 +26,11 @@ namespace Core
 		void FreeMesh(uint32_t meshID);
 		void Defragment();
 
-		uint32_t GetTotalVertexCount() const { return _currentVertexOffset; }
-		uint32_t GetTotalIndexCount() const { return _currentIndexOffset; }
+		// High-water marks of the shared vertex/index storage. With the free-span
+		// suballocator these are the tail, not the sum of live allocations (freed
+		// spans below the tail are reused rather than reclaimed from the count).
+		uint32_t GetTotalVertexCount() const { return _vertexTail; }
+		uint32_t GetTotalIndexCount() const { return _indexTail; }
 		uint32_t GetAllocatedMeshCount() const { return static_cast<uint32_t>(_allocations.size()); }
 
 		const MeshAllocation* GetAllocation(uint32_t meshID) const;
@@ -49,8 +52,25 @@ namespace Core
 		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
 
 	private:
+		// A free region of the shared storage, measured in elements (vertices or
+		// indices), not bytes. Kept sorted by offset so neighbours can coalesce.
+		struct FreeSpan
+		{
+			uint32_t offset;
+			uint32_t size;
+		};
+
 		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
 		Handle<Buffer> InsertBufferSpace(VkIndexType indexType);
+
+		// Carve `count` elements out of the free-span list (first-fit), falling back
+		// to extending the tail. `maxCount` bounds the tail against the buffer size.
+		static uint32_t AllocateSpan(vector<FreeSpan>& freeSpans, uint32_t& tail,
+			uint32_t count, uint32_t maxCount, const char* what);
+		// Return a span to the free list, coalescing with neighbours; shrinks the
+		// tail when the freed region sits at the very end.
+		static void ReleaseSpan(vector<FreeSpan>& freeSpans, uint32_t& tail,
+			uint32_t offset, uint32_t count);
 	private:
 		Device& _device;
 
@@ -60,14 +80,23 @@ namespace Core
 		VkIndexType _indexType;
 		Handle<Buffer> _indexBufferHandle;
 
-		// Allocation tracking
+		// Allocation tracking. Geometry is variable-sized (each submesh differs), so
+		// load/unload fragments the storage; a size-aware free-span list reuses freed
+		// regions. Fixed-size meshlet pooling would replace this later.
 		uint32_t _maxVertices = 10'000'000;
 		uint32_t _maxIndices = 30'000'000;
-		uint32_t _currentVertexOffset = 0;
-		uint32_t _currentIndexOffset = 0;
+		uint32_t _vertexTail = 0;
+		uint32_t _indexTail = 0;
+		vector<FreeSpan> _vertexFreeSpans;
+		vector<FreeSpan> _indexFreeSpans;
 
-		uint32_t _tempVertexOffset = 0;
-		uint32_t _tempIndexCount = 0;
+		// The span reserved for the submesh currently being assembled (one span reused
+		// across all its vertex attributes, committed on Build).
+		uint32_t _pendingVertexOffset = 0;
+		uint32_t _pendingVertexCount = 0;
+		bool _hasPendingVertexSpan = false;
+		uint32_t _pendingIndexOffset = 0;
+		uint32_t _pendingIndexCount = 0;
 		vec4 _tempBoundingSphere;
 
 		unordered_map<uint32_t, MeshAllocation> _allocations;

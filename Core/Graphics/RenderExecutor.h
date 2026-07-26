@@ -45,12 +45,9 @@ namespace Core
         RenderExecutor(Device& device, RenderFrame& renderFrame);
         ~RenderExecutor();
 
-        // Batch initialization - called once at the start of rendering
-        void InitializeBatches(Scene& scene, VkExtent2D extents);
-        bool IsBatchesInitialized() const { return _batchesInitialized; }
-
-        // RendererBatch access (for data queries like GetObjectDataBuffer)
-        RendererBatch* GetRendererBatch() const { return _rendererBatch.get(); }
+        // RendererBatch access (for data queries like GetObjectDataBuffer). The batch
+        // is owned by RenderContext and shared across frames; forwarded from the frame.
+        RendererBatch* GetRendererBatch() const;
 
         // Two-pass occlusion culling + draw
         void OcclusionCullAndDraw(CommandBuffer& commandBuffer,
@@ -91,10 +88,5 @@ namespace Core
         // Monotonic index handed to each new Culler so its FrameResources entries
         // get unique names (cullers never removed, so ids stay stable per frame).
         uint32_t _nextCullerId = 0;
-
-        // Single RendererBatch for all meshes
-        unique_ptr<RendererBatch> _rendererBatch;
-        TransformBatch _transformBatch{};
-        bool _batchesInitialized = false;
     };
 }

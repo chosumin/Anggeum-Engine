@@ -222,9 +222,7 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
     auto& frameResources = renderFrame.GetResources();
-    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-    if (!meshBufferManager)
-        return;
+    auto& meshBufferManager = renderFrame.GetMeshBufferManager();
 
     // Deferred save: the SDF was generated on a previous frame
     // is now complete, so it's safe to read back the image/bounds and write to disk.
@@ -243,7 +241,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         {
             commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
             _sdfGenerator->Generate(renderFrame, commandBuffer,
-                *meshBufferManager,
+                meshBufferManager,
                 SDF_VOLUME_DIM);
             commandBuffer.EndDebugMarker();
 

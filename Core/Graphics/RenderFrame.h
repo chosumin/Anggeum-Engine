@@ -3,33 +3,24 @@
 #include "Vulkans/MemoryAllocator.h"
 #include "ResourcePool.h"
 #include "FrameResources.h"
-#include "MeshBufferManager.h"
-#include "MaterialManager.h"
-#include "IndirectDrawBuffer.h"
 #include "RenderExecutor.h"
+#include "GDRManagers.h"
 #include "Vulkans/SubmitInfo.h"
 
 namespace Core
 {
-	class CommandBuffer;
-	class CommandPool;
-	class Material;
-	class Shader;
-	class Texture;
-	class Buffer;
 	class BindlessTextureManager;
-	class IndirectDrawBuffer;
-	class RenderPass;
-	class Framebuffer;
 	class DescriptorSetBuilder;
 	class RendererBatch;
-	class PipelineState;
-	class Scene;
+	struct GDRManagers;
 
 	class RenderFrame
 	{
 	public:
-		RenderFrame(Device& device, BindlessTextureManager* bindlessManager = nullptr);
+		// Primary frames receive the shared GPU-driven managers by reference.
+		RenderFrame(Device& device, GDRManagers& managers);
+		// Temporary frames (e.g. IBL prefilter) draw without the GPU-driven managers.
+		explicit RenderFrame(Device& device);
 		~RenderFrame();
 		
 		// Reset frame resources
@@ -40,15 +31,14 @@ namespace Core
 		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
 		FrameSubmission& GetSubmission() { return _submission; }
 
-		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
-		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
+		BindlessTextureManager* GetBindlessTextureManager() const { return _gdrManagers.Bindless.get(); }
+		bool HasBindlessSupport() const { return _gdrManagers.Bindless != nullptr; }
 		DescriptorSetResources* GetBindlessResources();
 
-		void SetMeshBufferManager(MeshBufferManager* meshBufferManager) { _meshBufferManager = meshBufferManager; }
-		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager; }
+		// Always present on scene frames (temp frames must not call these).
+		MeshBufferManager& GetMeshBufferManager() const { return *_gdrManagers.MeshBuffer; }
 
-		void SetMaterialManager(MaterialManager* materialManager) { _materialManager = materialManager; }
-		MaterialManager* GetMaterialManager() { return _materialManager; }
+		MaterialManager& GetMaterialManager() { return *_gdrManagers.Material; }
 
 		// Per-frame GPU resources (render targets, transient buffers, framebuffers)
 		// live in FrameResources. Passes reach them through here.
@@ -58,8 +48,8 @@ namespace Core
 		// Culler management - per camera and RendererBatch, reused within a frame
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
-		// Batch initialization - called once at the start of rendering
-		void InitializeBatches(Scene& scene, VkExtent2D extents);
+		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
+		RendererBatch& GetRendererBatch() const { return *_gdrManagers.Batch; }
 	private:
 		void CreateSyncObjects();
 
@@ -68,12 +58,12 @@ namespace Core
 
 		FrameSubmission _submission;
 
-		BindlessTextureManager* _bindlessTextureManager;
-		DescriptorSetResources _bindlessResources;
+		// Non-owning: the GPU-driven managers owned by RenderContext. Temp frames bind
+		// this to a shared empty instance (all managers null). Grouped so a frame is
+		// wired up with a single reference.
+		GDRManagers& _gdrManagers;
 
-		// GPU Driven Rendering Buffers
-		MeshBufferManager* _meshBufferManager = nullptr;
-		MaterialManager* _materialManager = nullptr;
+		DescriptorSetResources _bindlessResources;
 
 		// Per-frame GPU resources (render targets / transient buffers / framebuffers)
 		FrameResources _resources;

@@ -1,32 +1,36 @@
 #include "stdafx.h"
 #include "RenderFrame.h"
-#include "Material.h"
 #include "Vulkans/UniformBuffer.h"
 #include "Vulkans/Buffer.h"
-#include "Vulkans/DescriptorPool.h"
-#include "Vulkans/Shader.h"
-#include "Vulkans/Framebuffer.h"
-#include "Vulkans/DescriptorSetBuilder.h"
 #include "Vulkans/CommandBuffer.h"
-#include "Vulkans/CommandPool.h"
 #include "Vulkans/SubmitInfo.h"
-#include "ResourceCache.h"
-#include "TransferJob.h"
-#include "Foundation/Scene.h"
-#include "Foundation/Entity.h"
-#include "Components/Mesh.h"
-#include "Components/Transform.h"
 
 using namespace Core;
 
-RenderFrame::RenderFrame(Device& device, BindlessTextureManager* bindlessManager)
+namespace
+{
+	// Shared sentinel for temp frames that draw without GPU-driven managers; all of
+	// its managers stay null, so the accessors report "no manager" as before.
+	GDRManagers& EmptyManagers()
+	{
+		static GDRManagers empty;
+		return empty;
+	}
+}
+
+RenderFrame::RenderFrame(Device& device, GDRManagers& managers)
 	: _device(device)
-	, _bindlessTextureManager(bindlessManager)
+	, _gdrManagers(managers)
 	, _resources(device)
 {
 	CreateSyncObjects();
 
 	_renderExecutor = make_unique<RenderExecutor>(device, *this);
+}
+
+RenderFrame::RenderFrame(Device& device)
+	: RenderFrame(device, EmptyManagers())
+{
 }
 
 RenderFrame::~RenderFrame()
@@ -59,7 +63,7 @@ DescriptorSetResources* RenderFrame::GetBindlessResources()
 	if (!HasBindlessSupport())
 		return nullptr;
 
-	_bindlessResources.descriptorSet = _bindlessTextureManager->GetDescriptorSet();
+	_bindlessResources.descriptorSet = _gdrManagers.Bindless->GetDescriptorSet();
 	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
 	return &_bindlessResources;
 }
@@ -74,11 +78,6 @@ void RenderFrame::CreateSyncObjects()
 	{
 		throw std::runtime_error("failed to create semaphores for a frame!");
 	}
-}
-
-void RenderFrame::InitializeBatches(Scene& scene, VkExtent2D extents)
-{
-	_renderExecutor->InitializeBatches(scene, extents);
 }
 
 SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)

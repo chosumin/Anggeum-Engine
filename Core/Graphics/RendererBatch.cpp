@@ -1,63 +1,69 @@
 #include "stdafx.h"
 #include "Graphics/RendererBatch.h"
-#include "Graphics/Culler.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Material.h"
+#include "Graphics/SubMesh.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/ResourceCache.h"
 #include "Foundation/Entity.h"
 #include "Foundation/Scene.h"
 #include "Components/Mesh.h"
 #include "Components/Transform.h"
-#include "Graphics/SubMesh.h"
-#include "Graphics/Vulkans/PipelineState.h"
-#include "Graphics/Vulkans/Pipeline.h"
-#include "Graphics/Vulkans/RenderPass.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
-#include "Graphics/RenderFrame.h"
-#include "Graphics/ResourceCache.h"
-#include "Vulkans/Texture.h"
-#include "Vulkans/DescriptorSetBuilder.h"
 #include "TransferJob.h"
-#include "RendererPasses/ResolvePass.h"
 
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch,
-    RenderFrame& renderFrame, VkExtent2D extents)
+Core::RendererBatch::RendererBatch(Device& device)
     : _device(device)
-    , _transformBatch(transformBatch)
 {
-    auto meshes = scene.GetComponents<Mesh>();
-
-    for (auto* mesh : meshes)
-    {
-        uint entityId = mesh->GetEntity().GetId();
-        auto& materials = mesh->GetMaterials();
-        auto& subMeshes = mesh->GetSubMeshes();
-
-        for (size_t i = 0; i < materials.size(); ++i)
-        {
-            if (i >= subMeshes.size())
-                break;
-
-            auto shaderHandle = materials[i].Get().GetShaderHandle();
-            if (!shaderHandle.IsValid())
-                continue;
-
-            // Skip non-geometry passes (Skybox, etc.)
-            const string& pass = shaderHandle.Get().GetPass();
-            if (pass != "Geometry")
-                continue;
-
-            AddMesh(entityId, materials[i], subMeshes[i]);
-        }
-    }
-
-    auto& frameResources = renderFrame.GetResources();
-    CreateInstanceBuffer(frameResources);
-    PrepareGPUDrivenRendering(frameResources, extents);
 }
 
 Core::RendererBatch::~RendererBatch() = default;
+
+void Core::RendererBatch::RegisterMesh(uint entityId, Handle<Material> material,
+    Handle<SubMesh> subMesh, const glm::mat4& transform)
+{
+    _transforms[entityId] = transform;
+    AddMesh(entityId, material, subMesh);
+    _dirty = true;
+}
+
+void Core::RendererBatch::UnregisterMesh(uint entityId)
+{
+    // Drop every instance contributed by this entity. Buffers are recompacted (and
+    // _instanceCount / FirstInstance recomputed) in RebuildGpuBuffers.
+    bool removed = false;
+    for (auto matIt = _materialBatches.begin(); matIt != _materialBatches.end(); )
+    {
+        auto& subMeshBatches = matIt->second.SubMeshBatches;
+        for (auto smIt = subMeshBatches.begin(); smIt != subMeshBatches.end(); )
+        {
+            auto& transforms = smIt->second.Transforms;
+            auto newEnd = std::remove(transforms.begin(), transforms.end(), entityId);
+            if (newEnd != transforms.end())
+            {
+                transforms.erase(newEnd, transforms.end());
+                removed = true;
+            }
+
+            if (transforms.empty())
+                smIt = subMeshBatches.erase(smIt);
+            else
+                ++smIt;
+        }
+
+        if (subMeshBatches.empty())
+            matIt = _materialBatches.erase(matIt);
+        else
+            ++matIt;
+    }
+
+    _transforms.erase(entityId);
+
+    if (removed)
+        _dirty = true;
+}
 
 void Core::RendererBatch::AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh)
 {
@@ -85,23 +91,99 @@ void Core::RendererBatch::AddMesh(uint entityId, Handle<Material> material, Hand
     auto& subMeshBatch = subMeshBatches[subMeshName];
 
     if (subMeshBatch.Transforms.empty())
-    {
         subMeshBatch.SubMesh = subMesh;
-        subMeshBatch.FirstInstance = _instanceCount;
-    }
 
     subMeshBatch.Transforms.push_back(entityId);
-    _instanceCount++;
 }
 
-void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResources, VkExtent2D extents)
+void Core::RendererBatch::InitializeFromScene(Scene& scene)
 {
+    auto meshes = scene.GetComponents<Mesh>();
+
+    for (auto* mesh : meshes)
+    {
+        uint entityId = mesh->GetEntity().GetId();
+        glm::mat4 world = mesh->GetEntity().GetTransform().GetMatrix();
+
+        auto& materials = mesh->GetMaterials();
+        auto& subMeshes = mesh->GetSubMeshes();
+
+        for (size_t i = 0; i < materials.size(); ++i)
+        {
+            if (i >= subMeshes.size())
+                break;
+
+            auto shaderHandle = materials[i].Get().GetShaderHandle();
+            if (!shaderHandle.IsValid())
+                continue;
+
+            // Skip non-geometry passes (Skybox, etc.)
+            const string& pass = shaderHandle.Get().GetPass();
+            if (pass != "Geometry")
+                continue;
+
+            _transforms[entityId] = world;
+            AddMesh(entityId, materials[i], subMeshes[i]);
+        }
+    }
+}
+
+Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> current,
+    const BufferDesc& desc, const string& name)
+{
+    auto& cache = _device.GetResourceCache();
+    if (current.IsValid())
+    {
+        cache.ResizeBuffer(current, desc, name);
+        return current;
+    }
+    return cache.LoadBuffer(desc, name);
+}
+
+void Core::RendererBatch::RebuildGpuBuffers()
+{
+    // Replacing a live buffer frees the old one immediately, so make sure no frame is
+    // still reading it. The very first build happens before any frame is in flight.
+    if (_hasGpuBuffers)
+        vkDeviceWaitIdle(_device.GetDevice());
+
+    // --- Transform buffer (indexed by entity id) ---
+    uint32_t maxEntityId = 0;
+    bool anyTransform = !_transforms.empty();
+    for (const auto& kv : _transforms)
+        maxEntityId = std::max(maxEntityId, static_cast<uint32_t>(kv.first));
+
+    vector<Job*> jobs;
+
+    vector<mat4> transforms;
+    if (anyTransform)
+    {
+        transforms.assign(static_cast<size_t>(maxEntityId) + 1, mat4(1.0f));
+        for (const auto& [entityId, matrix] : _transforms)
+            transforms[entityId] = matrix;
+
+        BufferDesc transformDesc{};
+        transformDesc.size = transforms.size() * sizeof(mat4);
+        transformDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        _transformBatch.TransformBuffer = AcquirePersistentBuffer(
+            _transformBatch.TransformBuffer, transformDesc, "RendererBatch.Transform");
+    }
+
+    // --- Instance + GPU-driven buffers ---
     _indirectDrawBuffer.Clear();
-    uint32_t globalFirstInstance = 0;
-    uint32_t drawCommandIndex = 0;
+    _instanceCount = 0;
+    for (auto& [materialName, materialBatch] : _materialBatches)
+        for (auto& [subMeshName, subMeshBatch] : materialBatch.SubMeshBatches)
+            _instanceCount += static_cast<uint>(subMeshBatch.Transforms.size());
+
+    vector<uint> instanceData;
+    instanceData.reserve(_instanceCount);
 
     vector<GPUObjectData> objectData;
     objectData.reserve(_instanceCount);
+
+    uint32_t globalFirstInstance = 0;
+    uint32_t drawCommandIndex = 0;
 
     for (auto& [materialName, materialBatch] : _materialBatches)
     {
@@ -129,6 +211,8 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResourc
 
             for (size_t i = 0; i < subMeshBatch.Transforms.size(); ++i)
             {
+                instanceData.push_back(subMeshBatch.Transforms[i]);
+
                 GPUObjectData data{};
                 data.boundingSphere = glm::vec4(
                     allocation.boundingSphereCenter,
@@ -144,27 +228,40 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResourc
         }
     }
 
-    // Allocate the GPU-driven buffers from the frame's pool, then fill them via
-    // copy jobs (the buffers are pool-owned, not created by the transfer job).
     const auto& drawCommands = _indirectDrawBuffer.GetDrawCommands();
     const auto& materialIndices = _indirectDrawBuffer.GetMaterialIndices();
+
+    // Nothing to draw: keep whatever (possibly empty) buffers exist; the draw paths
+    // early-out on GetDrawCommandCount() == 0.
+    if (drawCommands.empty())
+    {
+        _hasGpuBuffers = true;
+        return;
+    }
 
     BufferDesc indirectDesc{};
     indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
     indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.IndirectCommand", indirectDesc);
+    _indirectCommandBuffer = AcquirePersistentBuffer(
+        _indirectCommandBuffer, indirectDesc, "RendererBatch.IndirectCommand");
 
     BufferDesc materialDesc{};
     materialDesc.size = materialIndices.size() * sizeof(uint32_t);
     materialDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    _materialIndexBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.MaterialIndex", materialDesc);
+    _materialIndexBuffer = AcquirePersistentBuffer(
+        _materialIndexBuffer, materialDesc, "RendererBatch.MaterialIndex");
 
     BufferDesc objectDesc{};
     objectDesc.size = objectData.size() * sizeof(GPUObjectData);
     objectDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    _objectDataBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.ObjectData", objectDesc);
+    _objectDataBuffer = AcquirePersistentBuffer(
+        _objectDataBuffer, objectDesc, "RendererBatch.ObjectData");
 
-    vector<Job*> jobs;
+    BufferDesc instanceDesc{};
+    instanceDesc.size = instanceData.size() * sizeof(uint);
+    instanceDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    _instanceBuffer = AcquirePersistentBuffer(
+        _instanceBuffer, instanceDesc, "RendererBatch.Instance");
 
     Core::VkBufferCopyJob<DrawIndexedIndirectCommand> job(_device,
         _indirectCommandBuffer.Get(), vector<DrawIndexedIndirectCommand>(drawCommands), 0);
@@ -178,36 +275,38 @@ void Core::RendererBatch::PrepareGPUDrivenRendering(FrameResources& frameResourc
         _objectDataBuffer.Get(), move(objectData), 0);
     jobs.push_back(&job3);
 
-    Core::CommandBuffer::ImmediateSubmit(_device, jobs);
+    Core::VkBufferCopyJob<uint> job4(_device,
+        _instanceBuffer.Get(), move(instanceData), 0);
+    jobs.push_back(&job4);
 
-    _extents = extents;
-}
-
-void Core::RendererBatch::CreateInstanceBuffer(FrameResources& frameResources)
-{
-    if (_instanceCount == 0)
-        return;
-
-    vector<uint> instanceData(_instanceCount);
-
-    uint i = 0;
-    for (auto& [materialName, materialBatch] : _materialBatches)
+    // A transform buffer job only exists when there were transforms to upload.
+    unique_ptr<Core::VkBufferCopyJob<mat4>> transformJob;
+    if (anyTransform)
     {
-        for (auto& [subMeshName, subMeshBatch] : materialBatch.SubMeshBatches)
-        {
-            for (auto& transform : subMeshBatch.Transforms)
-            {
-                instanceData[i++] = transform;
-            }
-        }
+        transformJob = make_unique<Core::VkBufferCopyJob<mat4>>(_device,
+            _transformBatch.TransformBuffer.Get(), move(transforms), 0);
+        jobs.push_back(transformJob.get());
     }
 
-    BufferDesc desc{};
-    desc.size = _instanceCount * sizeof(uint);
-    desc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    _instanceBuffer = frameResources.GetOrCreateStorageBuffer("RendererBatch.Instance", desc);
+    Core::CommandBuffer::ImmediateSubmit(_device, jobs);
 
-    Core::VkBufferCopyJob<uint> job(_device, _instanceBuffer.Get(), move(instanceData), 0);
-    Core::CommandBuffer::ImmediateSubmit(_device, job);
+    _hasGpuBuffers = true;
 }
 
+void Core::RendererBatch::Prepare(Scene& scene, VkExtent2D extents)
+{
+    _extents = extents;
+
+    if (!_initialized)
+    {
+        InitializeFromScene(scene);
+        _initialized = true;
+        _dirty = true;
+    }
+
+    if (_dirty)
+    {
+        RebuildGpuBuffers();
+        _dirty = false;
+    }
+}

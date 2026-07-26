@@ -45,20 +45,100 @@ glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& po
 	return glm::vec4(center, radius);
 }
 
+uint32_t MeshBufferManager::AllocateSpan(vector<FreeSpan>& freeSpans, uint32_t& tail,
+	uint32_t count, uint32_t maxCount, const char* what)
+{
+	if (count == 0)
+		return tail;
+
+	// First-fit over reclaimed spans.
+	for (auto it = freeSpans.begin(); it != freeSpans.end(); ++it)
+	{
+		if (it->size < count)
+			continue;
+
+		uint32_t offset = it->offset;
+		if (it->size == count)
+			freeSpans.erase(it);
+		else
+		{
+			it->offset += count;
+			it->size -= count;
+		}
+		return offset;
+	}
+
+	// Otherwise grow the tail.
+	if (tail + count > maxCount)
+		throw runtime_error(string("MeshBufferManager: out of ") + what + " space");
+
+	uint32_t offset = tail;
+	tail += count;
+	return offset;
+}
+
+void MeshBufferManager::ReleaseSpan(vector<FreeSpan>& freeSpans, uint32_t& tail,
+	uint32_t offset, uint32_t count)
+{
+	if (count == 0)
+		return;
+
+	// Insert keeping the list sorted by offset.
+	auto pos = std::lower_bound(freeSpans.begin(), freeSpans.end(), offset,
+		[](const FreeSpan& span, uint32_t value) { return span.offset < value; });
+	auto inserted = freeSpans.insert(pos, FreeSpan{ offset, count });
+
+	// Coalesce with the previous span.
+	if (inserted != freeSpans.begin())
+	{
+		auto prev = std::prev(inserted);
+		if (prev->offset + prev->size == inserted->offset)
+		{
+			prev->size += inserted->size;
+			freeSpans.erase(inserted);
+			inserted = prev;
+		}
+	}
+
+	// Coalesce with the next span.
+	auto next = std::next(inserted);
+	if (next != freeSpans.end() && inserted->offset + inserted->size == next->offset)
+	{
+		inserted->size += next->size;
+		freeSpans.erase(next);
+	}
+
+	// If the tail span is now free, hand it back to the tail so the high-water
+	// mark shrinks instead of leaving a permanent free region at the end.
+	if (!freeSpans.empty())
+	{
+		auto& last = freeSpans.back();
+		if (last.offset + last.size == tail)
+		{
+			tail = last.offset;
+			freeSpans.pop_back();
+		}
+	}
+}
+
 void MeshBufferManager::FreeMesh(uint32_t meshID)
 {
 	auto it = _allocations.find(meshID);
 	if (it != _allocations.end())
 	{
+		const MeshAllocation& alloc = it->second;
+		ReleaseSpan(_vertexFreeSpans, _vertexTail, alloc.vertexOffset, alloc.vertexCount);
+		ReleaseSpan(_indexFreeSpans, _indexTail, alloc.indexOffset, alloc.indexCount);
+
 		_freeList.push_back(meshID);
 		_allocations.erase(it);
-		// TODO: Implement defragmentation
 	}
 }
 
 void MeshBufferManager::Defragment()
 {
-	// TODO: Implement buffer defragmentation
+	// TODO: Compaction pass (relocate live spans, patch MeshAllocation offsets).
+	// Not needed yet: the free-span list in FreeMesh reuses holes in place.
 }
 
 Handle<Buffer> MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
@@ -108,9 +188,7 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 	// If the data is position, calculate bounding sphere (also accumulates scene bounds)
 	if (name == "POSITION")
 	{
-		// POSITION is tightly packed with the source stride (e.g. 12 bytes for float3),
-		// which does not match sizeof(glm::vec3) (16 bytes under GLM_FORCE_DEFAULT_ALIGNED_GENTYPES).
-		// Walk the raw buffer using the actual stride and copy only the 3 valid floats per vertex.
+		// POSITION is tightly packed with the source stride (e.g. 12 bytes for float3)
 		size_t positionCount = data.size() / stride;
 		vector<glm::vec3> positionVec(positionCount);
 
@@ -122,11 +200,18 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 		_tempBoundingSphere = CalculateBoundingSphere(positionVec);
 	}
 
-	// Update _tempVertexOffset
+	// All vertex attributes of one submesh share the same span; reserve it on the
+	// first attribute and reuse the offset for the rest (they have equal counts).
 	uint32_t vertexCount = static_cast<uint32_t>(data.size() / stride);
-	_tempVertexOffset = vertexCount;
+	if (!_hasPendingVertexSpan)
+	{
+		_pendingVertexOffset = AllocateSpan(_vertexFreeSpans, _vertexTail,
+			vertexCount, _maxVertices, "vertex");
+		_pendingVertexCount = vertexCount;
+		_hasPendingVertexSpan = true;
+	}
 
-	VkDeviceSize offset = _currentVertexOffset * stride;
+	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingVertexOffset) * stride;
 
 	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
 		_vertexBufferHandles[name].Get(), move(data), offset), subMeshName + name);
@@ -154,11 +239,12 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndex
 
 	_indexType = indexType;
 
-	// Update _tempIndexCount
 	uint32_t indexCount = static_cast<uint32_t>(indexData.size() / indexStride);
-	_tempIndexCount = indexCount;
+	_pendingIndexOffset = AllocateSpan(_indexFreeSpans, _indexTail,
+		indexCount, _maxIndices, "index");
+	_pendingIndexCount = indexCount;
 
-	VkDeviceSize offset = _currentIndexOffset * indexStride;
+	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingIndexOffset) * indexStride;
 
 	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
 		_indexBufferHandle.Get(), move(indexData), offset), subMeshName);
@@ -166,25 +252,25 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndex
 
 MeshAllocation MeshBufferManager::Build()
 {
-	// Finalize allocations
+	// Finalize allocation from the spans reserved during Allocate().
 	MeshAllocation allocation;
-	allocation.vertexOffset = _currentVertexOffset;
-	allocation.vertexCount = _tempVertexOffset;
-	allocation.indexOffset = _currentIndexOffset;
-	allocation.indexCount = _tempIndexCount;
+	allocation.vertexOffset = _pendingVertexOffset;
+	allocation.vertexCount = _pendingVertexCount;
+	allocation.indexOffset = _pendingIndexOffset;
+	allocation.indexCount = _pendingIndexCount;
 	allocation.meshID = _nextMeshID++;
 	allocation.boundingSphereCenter = _tempBoundingSphere;
 	allocation.boundingSphereRadius = _tempBoundingSphere.w;
 
-	// Update offsets
-	_currentVertexOffset += allocation.vertexCount;
-	_currentIndexOffset += allocation.indexCount;
-
 	// Store allocation
 	_allocations[allocation.meshID] = allocation;
 
-	// Reset temp values
-	_tempVertexOffset = 0;
+	// Reset per-submesh temp state
+	_hasPendingVertexSpan = false;
+	_pendingVertexOffset = 0;
+	_pendingVertexCount = 0;
+	_pendingIndexOffset = 0;
+	_pendingIndexCount = 0;
 	_tempBoundingSphere = vec4();
 
 	return allocation;

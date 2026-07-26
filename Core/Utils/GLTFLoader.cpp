@@ -695,14 +695,8 @@ inline VkIndexType NormalizeIndexData(VkFormat format, vector<uint8_t>& indexDat
 
 void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, bool useGlobalBuffer)
 {
-	MeshBufferManager* meshBufferManager = nullptr;
-	MaterialManager* materialManager = nullptr;
-
-	if (useGlobalBuffer)
-	{
-		meshBufferManager = _renderContext->GetMeshBufferManager();
-		materialManager = _renderContext->GetMaterialManager();
-	}
+	MeshBufferManager* meshBufferManager = useGlobalBuffer ? 
+		_renderContext->GetMeshBufferManager() : nullptr;
 
 	for (auto& gltfMesh : _model->meshes)
 	{

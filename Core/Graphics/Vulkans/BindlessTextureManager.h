@@ -27,8 +27,6 @@ namespace Core
 		BindlessTextureManager(BindlessTextureManager&&) = delete;
 		BindlessTextureManager& operator=(BindlessTextureManager&&) = delete;
 
-		void Initialize();
-
 		// Texture registration (auto-detects 2D vs Cubemap). Takes a Handle<Texture>
 		// and returns the packed bindless slot index (see BindlessCubemapFlag).
 		// Slot lifetime is driven by the cache that owns the texture, so the slot
@@ -47,7 +45,6 @@ namespace Core
 		uint32_t GetActiveTextureCount() const { return _activeTexture2DCount + _activeCubemapCount; }
 		uint32_t GetActive2DTextureCount() const { return _activeTexture2DCount; }
 		uint32_t GetActiveCubemapCount() const { return _activeCubemapCount; }
-		uint32_t GetMaxTextures() const { return _maxTextures; }
 		float GetUsagePercentage() const 
 		{ 
 			return (GetActiveTextureCount() * 100.0f) / (_maxTextures * 2); 

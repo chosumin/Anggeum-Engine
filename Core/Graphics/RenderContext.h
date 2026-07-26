@@ -1,9 +1,8 @@
 #pragma once
-#include "MeshBufferManager.h"
-#include "MaterialManager.h"
 #include "ResourceHandle.h"
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
+#include "GDRManagers.h"
 
 namespace Core
 {
@@ -26,6 +25,7 @@ namespace Core
 	class CommandPool;
 	class RenderFrame;
 	class BindlessTextureManager;
+	class RendererBatch;
 	class Texture;
 	class Scene;
 	class SyncContext;
@@ -71,13 +71,12 @@ namespace Core
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
 
-		// Bindless texture manager
-		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager.get(); }
-		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
-
-		// Managers
-		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
-		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
+		// GPU-driven rendering managers (grouped; see GpuDrivenManagers)
+		BindlessTextureManager* GetBindlessTextureManager() const { return _gdrManagers.Bindless.get(); }
+		bool HasBindlessSupport() const { return _gdrManagers.Bindless != nullptr; }
+		MeshBufferManager* GetMeshBufferManager() const { return _gdrManagers.MeshBuffer.get(); }
+		MaterialManager* GetMaterialManager() const { return _gdrManagers.Material.get(); }
+		RendererBatch* GetRendererBatch() const { return _gdrManagers.Batch.get(); }
 
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
@@ -112,11 +111,9 @@ namespace Core
 		double _lastQueueSubmitMs = 0.0;
 		double _lastPresentMs = 0.0;
 
-		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
-
-		// GPU Driven Rendering managers
-		unique_ptr<MeshBufferManager> _meshBufferManager;
-		unique_ptr<MaterialManager> _materialManager;
+		// GPU-driven rendering managers, owned as one unit and shared (by reference)
+		// with every frame-in-flight.
+		GDRManagers _gdrManagers;
 
 		// Double/Triple buffered depth
 		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;

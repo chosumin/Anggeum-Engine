@@ -10,24 +10,19 @@ namespace Core
 	class SubMesh;
 	class Mesh;
 	class Transform;
-	class RenderFrame;
-	class FrameResources;
 	class Buffer;
-	class Culler;
 	class Scene;
 
 	struct TransformBatch
 	{
-		// Pool-owned by FrameResources (handle pattern); resolve with .Get().
+		// Persistent (handle pattern), owned via ResourceCache; resolve with .Get().
 		Handle<Buffer> TransformBuffer;
-		vector<uint> EntityIds;
 	};
 
 	struct SubMeshBatch
 	{
 		Handle<SubMesh> SubMesh;
-		vector<uint> Transforms;
-		uint32_t FirstInstance;
+		vector<uint> Transforms;   // entity ids, one per instance
 	};
 
 	struct MaterialBatch
@@ -36,14 +31,27 @@ namespace Core
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
-	// RendererBatch: A batch of draw calls for meshes.
-	// Contains material batches grouped by material.
+	// RendererBatch: the application-wide GPU-driven draw set. Owned by RenderContext
+	// as a single instance (alongside MeshBufferManager / MaterialManager) and shared
+	// by every frame-in-flight. Its buffers are read-only inputs to the per-frame
+	// Cullers, so one shared copy is safe (the mutable culling outputs live per-frame
+	// in the Culler). Membership changes mark the batch dirty; Prepare() rebuilds the
+	// GPU buffers when dirty.
 	class RendererBatch
 	{
 	public:
-		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch,
-			RenderFrame& renderFrame, VkExtent2D extents);
+		RendererBatch(Device& device);
 		~RendererBatch();
+
+		// Streaming API: add/remove a submesh instance. Both mark the batch dirty; the
+		// GPU buffers are recompacted on the next Prepare().
+		void RegisterMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh,
+			const glm::mat4& transform);
+		void UnregisterMesh(uint entityId);
+
+		// Called once per frame from RenderContext::Begin: performs the one-time
+		// population from the scene, then rebuilds the GPU buffers if dirty.
+		void Prepare(Scene& scene, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
@@ -52,23 +60,29 @@ namespace Core
 		uint32_t GetInstanceCount() const { return _instanceCount; }
 		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
-		TransformBatch& GetTransformBatch() const { return _transformBatch; }
+		TransformBatch& GetTransformBatch() { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
 
 	private:
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
-		void PrepareGPUDrivenRendering(FrameResources& frameResources, VkExtent2D extents);
-		void CreateInstanceBuffer(FrameResources& frameResources);
+		void InitializeFromScene(Scene& scene);
+		void RebuildGpuBuffers();
+
+		// Create the buffer on first use, resize it in place afterwards so the handle
+		// stays valid. Callers must ensure no frame is in flight when resizing.
+		Handle<Buffer> AcquirePersistentBuffer(Handle<Buffer> current,
+			const struct BufferDesc& desc, const string& name);
 
 	private:
 		Device& _device;
-		// Owned by RenderExecutor, which outlives this batch.
-		TransformBatch& _transformBatch;
+
+		TransformBatch _transformBatch;
+		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix
 
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		// Buffers are pool-owned by FrameResources (handle pattern); held by handle.
+		// Persistent GPU buffers (handle pattern), owned via ResourceCache.
 		Handle<Buffer> _instanceBuffer;
 		uint _instanceCount = 0;
 
@@ -79,8 +93,11 @@ namespace Core
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Handle<Buffer> _objectDataBuffer;
 
+		bool _initialized = false;   // scene populated once
+		bool _hasGpuBuffers = false; // GPU buffers created at least once
+		bool _dirty = false;         // membership changed since last rebuild
+
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};
 	};
 }
-

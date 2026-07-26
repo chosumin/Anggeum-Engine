@@ -18,6 +18,13 @@ namespace Core
 			_freeTexture2DSlots.push_back(i);
 			_freeCubemapSlots.push_back(i);
 		}
+
+		CreateDescriptorSetLayout();
+		CreateDescriptorPool();
+		AllocateDescriptorSet();
+
+		cout << "Bindless texture system initialized with "
+			<< _maxTextures << " slots" << endl;
 	}
 
 	BindlessTextureManager::~BindlessTextureManager()
@@ -31,13 +38,6 @@ namespace Core
 		{
 			vkDestroyDescriptorSetLayout(_device.GetDevice(), _descriptorSetLayout, nullptr);
 		}
-	}
-
-	void BindlessTextureManager::Initialize()
-	{
-		CreateDescriptorSetLayout();
-		CreateDescriptorPool();
-		AllocateDescriptorSet();
 	}
 
 	uint32_t BindlessTextureManager::RegisterTexture(Handle<Texture> texture)
