@@ -2,7 +2,7 @@
 #include "ResourceHandle.h"
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
-#include "GDRManagers.h"
+#include "RenderScene.h"
 
 namespace Core
 {
@@ -38,7 +38,7 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device);
+		RenderContext(Device& device, RenderScene& renderScene);
 		~RenderContext();
 
 		void RecreateSwapChain();
@@ -71,12 +71,12 @@ namespace Core
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
 
-		// GPU-driven rendering managers (grouped; see GpuDrivenManagers)
-		BindlessTextureManager* GetBindlessTextureManager() const { return _gdrManagers.Bindless.get(); }
-		bool HasBindlessSupport() const { return _gdrManagers.Bindless != nullptr; }
-		MeshBufferManager* GetMeshBufferManager() const { return _gdrManagers.MeshBuffer.get(); }
-		MaterialManager* GetMaterialManager() const { return _gdrManagers.Material.get(); }
-		RendererBatch* GetRendererBatch() const { return _gdrManagers.Batch.get(); }
+		// GPU-driven rendering managers (grouped in RenderScene, owned by Engine)
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.Bindless.get(); }
+		bool HasBindlessSupport() const { return _renderScene.Bindless != nullptr; }
+		MeshBufferManager* GetMeshBufferManager() const { return _renderScene.MeshBuffer.get(); }
+		MaterialManager* GetMaterialManager() const { return _renderScene.Material.get(); }
+		RendererBatch* GetRendererBatch() const { return _renderScene.Batch.get(); }
 
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
@@ -111,9 +111,10 @@ namespace Core
 		double _lastQueueSubmitMs = 0.0;
 		double _lastPresentMs = 0.0;
 
-		// GPU-driven rendering managers, owned as one unit and shared (by reference)
-		// with every frame-in-flight.
-		GDRManagers _gdrManagers;
+		// GPU mirror of the scene, owned by Engine and borrowed here (shared by
+		// reference with every frame-in-flight). RenderContext only reads it for
+		// rendering.
+		RenderScene& _renderScene;
 
 		// Double/Triple buffered depth
 		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;

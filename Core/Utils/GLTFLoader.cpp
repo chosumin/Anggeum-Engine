@@ -805,6 +805,9 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 		_meshes.push_back(mesh.get());
 		_scene.AddComponent(move(mesh));
 
+		// A mesh renderer was added, so the GPU draw set must be rebuilt.
+		_scene.MarkDirty();
+
 		++meshIndex;
 	}
 }

@@ -10,6 +10,7 @@ namespace Core
     class TransferContext;
     class WorkerThreadManager;
     class IRenderPipeline;
+    struct RenderScene;
 
     struct EngineOptions
     {
@@ -35,5 +36,8 @@ namespace Core
         Scene* _scene;
         TransferContext* _transferContext;
         WorkerThreadManager* _workerThreadManager;
+
+        // GPU mirror of the scene for GPU-driven rendering, synced from scene dirty.
+        RenderScene* _renderScene;
     };
 }

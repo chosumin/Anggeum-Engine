@@ -9,18 +9,18 @@ using namespace Core;
 
 namespace
 {
-	// Shared sentinel for temp frames that draw without GPU-driven managers; all of
-	// its managers stay null, so the accessors report "no manager" as before.
-	GDRManagers& EmptyManagers()
+	// Shared sentinel for temp frames that draw without a RenderScene; all of its
+	// managers stay null, so the accessors report "no manager" as before.
+	RenderScene& EmptyRenderScene()
 	{
-		static GDRManagers empty;
+		static RenderScene empty;
 		return empty;
 	}
 }
 
-RenderFrame::RenderFrame(Device& device, GDRManagers& managers)
+RenderFrame::RenderFrame(Device& device, RenderScene& renderScene)
 	: _device(device)
-	, _gdrManagers(managers)
+	, _renderScene(renderScene)
 	, _resources(device)
 {
 	CreateSyncObjects();
@@ -29,7 +29,7 @@ RenderFrame::RenderFrame(Device& device, GDRManagers& managers)
 }
 
 RenderFrame::RenderFrame(Device& device)
-	: RenderFrame(device, EmptyManagers())
+	: RenderFrame(device, EmptyRenderScene())
 {
 }
 
@@ -63,7 +63,7 @@ DescriptorSetResources* RenderFrame::GetBindlessResources()
 	if (!HasBindlessSupport())
 		return nullptr;
 
-	_bindlessResources.descriptorSet = _gdrManagers.Bindless->GetDescriptorSet();
+	_bindlessResources.descriptorSet = _renderScene.Bindless->GetDescriptorSet();
 	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
 	return &_bindlessResources;
 }

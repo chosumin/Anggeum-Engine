@@ -21,50 +21,6 @@ Core::RendererBatch::RendererBatch(Device& device)
 
 Core::RendererBatch::~RendererBatch() = default;
 
-void Core::RendererBatch::RegisterMesh(uint entityId, Handle<Material> material,
-    Handle<SubMesh> subMesh, const glm::mat4& transform)
-{
-    _transforms[entityId] = transform;
-    AddMesh(entityId, material, subMesh);
-    _dirty = true;
-}
-
-void Core::RendererBatch::UnregisterMesh(uint entityId)
-{
-    // Drop every instance contributed by this entity. Buffers are recompacted (and
-    // _instanceCount / FirstInstance recomputed) in RebuildGpuBuffers.
-    bool removed = false;
-    for (auto matIt = _materialBatches.begin(); matIt != _materialBatches.end(); )
-    {
-        auto& subMeshBatches = matIt->second.SubMeshBatches;
-        for (auto smIt = subMeshBatches.begin(); smIt != subMeshBatches.end(); )
-        {
-            auto& transforms = smIt->second.Transforms;
-            auto newEnd = std::remove(transforms.begin(), transforms.end(), entityId);
-            if (newEnd != transforms.end())
-            {
-                transforms.erase(newEnd, transforms.end());
-                removed = true;
-            }
-
-            if (transforms.empty())
-                smIt = subMeshBatches.erase(smIt);
-            else
-                ++smIt;
-        }
-
-        if (subMeshBatches.empty())
-            matIt = _materialBatches.erase(matIt);
-        else
-            ++matIt;
-    }
-
-    _transforms.erase(entityId);
-
-    if (removed)
-        _dirty = true;
-}
-
 void Core::RendererBatch::AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh)
 {
     auto* materialPtr = material.TryGet();
@@ -295,18 +251,13 @@ void Core::RendererBatch::RebuildGpuBuffers()
 
 void Core::RendererBatch::Prepare(Scene& scene, VkExtent2D extents)
 {
+    // Rebuild the draw set from scratch off the current scene. The caller
+    // (RenderScene::Sync) only invokes this when the scene structure changed.
     _extents = extents;
 
-    if (!_initialized)
-    {
-        InitializeFromScene(scene);
-        _initialized = true;
-        _dirty = true;
-    }
+    _materialBatches.clear();
+    _transforms.clear();
 
-    if (_dirty)
-    {
-        RebuildGpuBuffers();
-        _dirty = false;
-    }
+    InitializeFromScene(scene);
+    RebuildGpuBuffers();
 }

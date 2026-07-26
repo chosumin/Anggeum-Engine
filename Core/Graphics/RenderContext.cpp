@@ -30,20 +30,11 @@ void RenderContext::RemoveResizeCallback(function<void(SwapChain&)> callback)
 	}
 }
 
-RenderContext::RenderContext(Device& device)
+RenderContext::RenderContext(Device& device, RenderScene& renderScene)
 	: _device(device)
+	, _renderScene(renderScene)
 {
 	_swapChain = new SwapChain(device);
-
-	// Create bindless texture manager if supported
-	if (device.SupportsDescriptorIndexing())
-	{
-		_gdrManagers.Bindless = make_unique<BindlessTextureManager>(device, 4096);
-	}
-
-	_gdrManagers.MeshBuffer = make_unique<MeshBufferManager>(_device);
-	_gdrManagers.Material = make_unique<MaterialManager>(_device);
-	_gdrManagers.Batch = make_unique<RendererBatch>(_device);
 
 	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 
@@ -82,7 +73,7 @@ void RenderContext::CreateRenderFrames()
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		_frames[i] = make_unique<RenderFrame>(_device, _gdrManagers);
+		_frames[i] = make_unique<RenderFrame>(_device, _renderScene);
 	}
 }
 
@@ -114,14 +105,6 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 
 	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
-
-	if (_gdrManagers.Bindless)
-		_gdrManagers.Bindless->UpdateDescriptorSet();
-
-	_gdrManagers.Material->RefreshDirtyMaterials();
-
-	// Shared batch: populate from the scene once, then rebuild GPU buffers if dirty.
-	_gdrManagers.Batch->Prepare(scene, extents);
 }
 
 void RenderContext::Submit()

@@ -31,26 +31,18 @@ namespace Core
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
-	// RendererBatch: the application-wide GPU-driven draw set. Owned by RenderContext
-	// as a single instance (alongside MeshBufferManager / MaterialManager) and shared
-	// by every frame-in-flight. Its buffers are read-only inputs to the per-frame
-	// Cullers, so one shared copy is safe (the mutable culling outputs live per-frame
-	// in the Culler). Membership changes mark the batch dirty; Prepare() rebuilds the
-	// GPU buffers when dirty.
+	// RendererBatch: the application-wide GPU-driven draw set. Part of RenderScene
+	// (owned by Engine), a single instance shared by every frame-in-flight. Its buffers
+	// are read-only inputs to the per-frame Cullers, so one shared copy is safe (the
+	// mutable culling outputs live per-frame in the Culler). Rebuilt from the scene by
+	// Prepare(), which RenderScene::Sync calls only when the scene structure changed.
 	class RendererBatch
 	{
 	public:
 		RendererBatch(Device& device);
 		~RendererBatch();
 
-		// Streaming API: add/remove a submesh instance. Both mark the batch dirty; the
-		// GPU buffers are recompacted on the next Prepare().
-		void RegisterMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh,
-			const glm::mat4& transform);
-		void UnregisterMesh(uint entityId);
-
-		// Called once per frame from RenderContext::Begin: performs the one-time
-		// population from the scene, then rebuilds the GPU buffers if dirty.
+		// Rebuild the whole draw set from the current scene membership.
 		void Prepare(Scene& scene, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
@@ -93,9 +85,7 @@ namespace Core
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Handle<Buffer> _objectDataBuffer;
 
-		bool _initialized = false;   // scene populated once
 		bool _hasGpuBuffers = false; // GPU buffers created at least once
-		bool _dirty = false;         // membership changed since last rebuild
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};

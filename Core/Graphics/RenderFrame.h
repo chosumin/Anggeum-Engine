@@ -4,7 +4,7 @@
 #include "ResourcePool.h"
 #include "FrameResources.h"
 #include "RenderExecutor.h"
-#include "GDRManagers.h"
+#include "RenderScene.h"
 #include "Vulkans/SubmitInfo.h"
 
 namespace Core
@@ -12,13 +12,13 @@ namespace Core
 	class BindlessTextureManager;
 	class DescriptorSetBuilder;
 	class RendererBatch;
-	struct GDRManagers;
+	struct RenderScene;
 
 	class RenderFrame
 	{
 	public:
 		// Primary frames receive the shared GPU-driven managers by reference.
-		RenderFrame(Device& device, GDRManagers& managers);
+		RenderFrame(Device& device, RenderScene& renderScene);
 		// Temporary frames (e.g. IBL prefilter) draw without the GPU-driven managers.
 		explicit RenderFrame(Device& device);
 		~RenderFrame();
@@ -31,14 +31,14 @@ namespace Core
 		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
 		FrameSubmission& GetSubmission() { return _submission; }
 
-		BindlessTextureManager* GetBindlessTextureManager() const { return _gdrManagers.Bindless.get(); }
-		bool HasBindlessSupport() const { return _gdrManagers.Bindless != nullptr; }
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.Bindless.get(); }
+		bool HasBindlessSupport() const { return _renderScene.Bindless != nullptr; }
 		DescriptorSetResources* GetBindlessResources();
 
 		// Always present on scene frames (temp frames must not call these).
-		MeshBufferManager& GetMeshBufferManager() const { return *_gdrManagers.MeshBuffer; }
+		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.MeshBuffer; }
 
-		MaterialManager& GetMaterialManager() { return *_gdrManagers.Material; }
+		MaterialManager& GetMaterialManager() { return *_renderScene.Material; }
 
 		// Per-frame GPU resources (render targets, transient buffers, framebuffers)
 		// live in FrameResources. Passes reach them through here.
@@ -49,7 +49,7 @@ namespace Core
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
 		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
-		RendererBatch& GetRendererBatch() const { return *_gdrManagers.Batch; }
+		RendererBatch& GetRendererBatch() const { return *_renderScene.Batch; }
 	private:
 		void CreateSyncObjects();
 
@@ -58,10 +58,9 @@ namespace Core
 
 		FrameSubmission _submission;
 
-		// Non-owning: the GPU-driven managers owned by RenderContext. Temp frames bind
-		// this to a shared empty instance (all managers null). Grouped so a frame is
-		// wired up with a single reference.
-		GDRManagers& _gdrManagers;
+		// Non-owning: the RenderScene owned by Engine. Temp frames bind this to a shared
+		// empty instance (all managers null).
+		RenderScene& _renderScene;
 
 		DescriptorSetResources _bindlessResources;
 

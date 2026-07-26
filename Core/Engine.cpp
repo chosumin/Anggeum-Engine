@@ -4,7 +4,9 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/TransferContext.h"
+#include "Graphics/RenderScene.h"
 #include "Graphics/ResourceCache.h"
+#include "Foundation/Scene.h"
 #include "Graphics/ForwardRenderPipeline.h"
 #include "Sample/SampleScene.h"
 #include "Utils/timer.h"
@@ -18,7 +20,8 @@ Core::Engine::Engine(const EngineOptions& options)
     _device = new Core::Device(*options.window);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
-    _renderContext = new Core::RenderContext(*_device);
+    _renderScene = new Core::RenderScene(*_device);
+    _renderContext = new Core::RenderContext(*_device, *_renderScene);
     _status = make_unique<Core::Status>(*_renderContext);
 
     auto& resourceCache = _device->GetResourceCache();
@@ -39,7 +42,8 @@ Core::Engine::~Engine()
 {
     delete(_renderPipeline);
     delete(_scene);
-    delete(_renderContext);
+    delete(_renderContext);   // frames/cullers reference the batch, so destroy them first
+    delete(_renderScene);
     delete(_transferContext);
     delete(_workerThreadManager);
     delete(_device);
@@ -68,13 +72,18 @@ void Core::Engine::Draw()
 {
 	auto& phases = _status->GetCpuPhases();
 
+	auto extents = _renderContext->GetSurfaceExtent();
+
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
 		_transferContext->Wait();
-	}
 
-	auto extents = _renderContext->GetSurfaceExtent();
+		// Push scene changes to the GPU-driven managers. Bindless/material self-gate;
+		// the draw set is rebuilt only when the scene structure changed.
+		_renderScene->Sync(*_scene, extents);
+		_scene->ClearDirty();
+	}
 	{
 		ScopedCpuTimer timer(phases.beginMs);
 		_renderContext->Begin(*_scene, extents);
