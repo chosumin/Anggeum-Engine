@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "MeshBufferManager.h"
 #include "Graphics/Vulkans/Buffer.h"
-#include "Graphics/TransferContext.h"
-#include "Graphics/TransferJob.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/Vulkans/Device.h"
 
@@ -174,7 +172,7 @@ const MeshAllocation* MeshBufferManager::GetAllocation(uint32_t meshID) const
 	return nullptr;
 }
 
-void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const std::string& name, uint32_t stride, std::vector<uint8_t>&& data, string subMeshName)
+Core::MeshBufferRegion Core::MeshBufferManager::Allocate(const std::string& name, uint32_t stride, const std::vector<uint8_t>& data)
 {
 	if (_vertexBufferHandles.find(name) == _vertexBufferHandles.end())
 	{
@@ -212,12 +210,10 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, const s
 	}
 
 	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingVertexOffset) * stride;
-
-	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
-		_vertexBufferHandles[name].Get(), move(data), offset), subMeshName + name);
+	return { &_vertexBufferHandles[name].Get(), offset };
 }
 
-void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndexType indexType, std::vector<uint8_t>&& indexData, string subMeshName)
+Core::MeshBufferRegion Core::MeshBufferManager::Allocate(VkIndexType indexType, const std::vector<uint8_t>& indexData)
 {
 	if (!_indexBufferHandle.IsValid())
 	{
@@ -245,9 +241,7 @@ void Core::MeshBufferManager::Allocate(TransferContext& transferContext, VkIndex
 	_pendingIndexCount = indexCount;
 
 	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingIndexOffset) * indexStride;
-
-	transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(_device,
-		_indexBufferHandle.Get(), move(indexData), offset), subMeshName);
+	return { &_indexBufferHandle.Get(), offset };
 }
 
 MeshAllocation MeshBufferManager::Build()

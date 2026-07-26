@@ -201,12 +201,13 @@ void Core::CommandBuffer::Dispatch(uint32_t x, uint32_t y, uint32_t z)
     vkCmdDispatch(_commandBuffer, x, y, z);
 }
 
-void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset)
+void Core::CommandBuffer::CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer,
+    VkDeviceSize dstOffset, VkDeviceSize srcOffset, VkDeviceSize size)
 {
     VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
+    copyRegion.srcOffset = srcOffset;
     copyRegion.dstOffset = dstOffset;
-    copyRegion.size = srcBuffer.GetSize();
+    copyRegion.size = (size == 0) ? srcBuffer.GetSize() : size;
 
     vkCmdCopyBuffer(_commandBuffer, srcBuffer.GetBuffer(), dstBuffer.GetBuffer(),
         1, &copyRegion);

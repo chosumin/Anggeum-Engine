@@ -698,11 +698,16 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 	MeshBufferManager* meshBufferManager = useGlobalBuffer ? 
 		_renderContext->GetMeshBufferManager() : nullptr;
 
+	size_t meshIndex = 0;
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
 
 		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
+
+		// Every attribute + index copy for this glTF mesh is gathered here and issued
+		// as a single transfer job below.
+		vector<BufferCopyRegion> meshCopies;
 
 		size_t primSize = gltfMesh.primitives.size();
 		for (int i = 0; i < primSize; ++i)
@@ -711,20 +716,20 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 
 			// Generate hash based on primitive data
 			size_t subMeshHash = 0;
-			
+
 			// Hash vertex attributes
 			for (auto& attribute : primitive.attributes)
 			{
 				Core::Utility::HashCombine(subMeshHash, attribute.first);
 				Core::Utility::HashCombine(subMeshHash, attribute.second);
 			}
-			
+
 			// Hash indices
 			if (primitive.indices >= 0)
 			{
 				Core::Utility::HashCombine(subMeshHash, primitive.indices);
 			}
-			
+
 			string subMeshName = meshName + "_" + std::to_string(subMeshHash);
 
 			auto subMesh = _resourceCache.LoadSubMesh(subMeshName);
@@ -741,8 +746,8 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 					if (useGlobalBuffer)
 					{
 						uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-						meshBufferManager->Allocate(_transferContext, name, stride,
-							move(vertexData), subMeshName);
+						auto region = meshBufferManager->Allocate(name, stride, vertexData);
+						meshCopies.push_back({ region.destination, move(vertexData), region.offset });
 					}
 					else
 					{
@@ -752,8 +757,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 							  MemoryType::DEVICE_LOCAL },
 							subMeshName + name);
 						sm.SetVertexBuffer(name, vertexBuffer);
-						_transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(
-							_device, vertexBuffer.Get(), move(vertexData), 0), subMeshName + name);
+						meshCopies.push_back({ &vertexBuffer.Get(), move(vertexData), 0 });
 					}
 				}
 
@@ -767,8 +771,8 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 
 					if (useGlobalBuffer)
 					{
-						meshBufferManager->Allocate(_transferContext, indexType,
-							move(indexData), sm.GetName() + " index");
+						auto region = meshBufferManager->Allocate(indexType, indexData);
+						meshCopies.push_back({ region.destination, move(indexData), region.offset });
 					}
 					else
 					{
@@ -778,8 +782,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 							  MemoryType::DEVICE_LOCAL },
 							sm.GetName() + " index");
 						sm.SetIndexBuffer(indexBuffer, indexType);
-						_transferContext.Enqueue(new VkBufferCopyJob<uint8_t>(
-							_device, indexBuffer.Get(), move(indexData), 0), sm.GetName() + " index");
+						meshCopies.push_back({ &indexBuffer.Get(), move(indexData), 0 });
 					}
 				}
 
@@ -791,8 +794,18 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials, boo
 			mesh->AddMaterial(materials[primitive.material]);
 		}
 
+		// One transfer job per glTF mesh: all its attribute + index copies at once.
+		if (!meshCopies.empty())
+		{
+			_transferContext.Enqueue(
+				new VkBufferCopyBatchJob(_device, move(meshCopies)),
+				meshName + "_" + std::to_string(meshIndex));
+		}
+
 		_meshes.push_back(mesh.get());
 		_scene.AddComponent(move(mesh));
+
+		++meshIndex;
 	}
 }
 

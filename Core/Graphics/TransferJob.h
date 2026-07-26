@@ -10,50 +10,6 @@ namespace Core
 	class CommandBuffer;
 	class Buffer;
 
-	template<typename T>
-	class VkBufferJob : public Job
-	{
-	public:
-		// The job creates the destination buffer and hands ownership to `dstBuffer`,
-		// which must outlive the job.
-		VkBufferJob(Device& device, VkBufferUsageFlags usageFlag, unique_ptr<Buffer>& dstBuffer, vector<T> bufferData, bool empty = false)
-			:Job(JobType::TRANSFER), _device(device), _destination(dstBuffer), _bufferData(bufferData), _usageFlag(usageFlag), _dstOffset(0)
-		{
-		}
-
-		void Execute() override
-		{
-			VkDeviceSize bufferSize = sizeof(_bufferData[0]) * _bufferData.size();
-
-			_stagingBuffer = make_unique<Core::Buffer>(_device,
-				bufferSize,
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				MemoryType::STAGE);
-
-			_stagingBuffer->CopyBuffer(_bufferData.data(), bufferSize);
-
-			auto vertexBuffer = make_unique<Core::Buffer>(_device,
-				bufferSize,
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT | _usageFlag,
-				MemoryType::DEVICE_LOCAL);
-
-			commandBuffer->CopyBuffer(*_stagingBuffer, *vertexBuffer, _dstOffset);
-
-			_destination = std::move(vertexBuffer);
-
-			status = JobStatus::COMPLETE;
-		}
-	private:
-		Device& _device;
-		vector<T> _bufferData;
-		VkDeviceSize _dstOffset;
-
-		VkBufferUsageFlags _usageFlag;
-
-		unique_ptr<Buffer>& _destination;
-		unique_ptr<Buffer> _stagingBuffer;
-	};
-
 	class Image;
 	class Texture;
 	class VkImageJob : public Job
@@ -70,6 +26,66 @@ namespace Core
 		string _filePath;
 
 		Texture& _dstTexture;
+		unique_ptr<Buffer> _stagingBuffer;
+	};
+
+	// One staging->device copy inside a VkBufferCopyBatchJob.
+	struct BufferCopyRegion
+	{
+		Buffer* destination;   // caller-owned, must outlive the job
+		vector<uint8_t> data;
+		VkDeviceSize dstOffset;
+	};
+
+	// Copies many regions into their destinations within a single transfer job, 
+	// so a mesh upload is one worker-thread task.
+	class VkBufferCopyBatchJob : public Job
+	{
+	public:
+		VkBufferCopyBatchJob(Device& device, vector<BufferCopyRegion>&& regions)
+			: Job(JobType::TRANSFER)
+			, _device(device)
+			, _regions(std::move(regions))
+		{
+		}
+
+		void Execute() override
+		{
+			// Pack every region into one staging buffer and copy each out of its
+			// sub-range, so a mesh upload needs a single staging allocation.
+			VkDeviceSize totalSize = 0;
+			for (auto& region : _regions)
+				totalSize += region.data.size();
+
+			_stagingBuffer = make_unique<Core::Buffer>(_device,
+				totalSize,
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				MemoryType::STAGE);
+
+			void* mapped = nullptr;
+			_stagingBuffer->Map(&mapped);
+			auto* base = static_cast<uint8_t*>(mapped);
+
+			VkDeviceSize srcOffset = 0;
+			for (auto& region : _regions)
+			{
+				VkDeviceSize size = region.data.size();
+
+				memcpy(base + srcOffset, region.data.data(), size);
+				commandBuffer->CopyBuffer(*_stagingBuffer, *region.destination,
+					region.dstOffset, srcOffset, size);
+
+				srcOffset += size;
+			}
+
+			_stagingBuffer->Unmap();
+
+			status = JobStatus::COMPLETE;
+		}
+
+	private:
+		Device& _device;
+		vector<BufferCopyRegion> _regions;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 

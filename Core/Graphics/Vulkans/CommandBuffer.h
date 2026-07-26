@@ -66,7 +66,8 @@ namespace Core
 
 		BarrierBatch CreateBarrierBatch();
 
-		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
+		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer,
+			VkDeviceSize dstOffset = 0, VkDeviceSize srcOffset = 0, VkDeviceSize size = 0);
 
 		void CopyImage(Texture& srcTexture, Texture& dstTexture,
 			uint32_t srcMipLevel, uint32_t srcLayer,

@@ -15,8 +15,16 @@ namespace Core
 		float boundingSphereRadius;
 	};
 
-	class TransferContext;
 	class Buffer;
+
+	// Destination of a reserved region in the shared storage: which buffer to copy
+	// into and at what byte offset.
+	struct MeshBufferRegion
+	{
+		Buffer* destination;
+		VkDeviceSize offset;
+	};
+
 	class MeshBufferManager
 	{
 	public:
@@ -35,8 +43,11 @@ namespace Core
 
 		const MeshAllocation* GetAllocation(uint32_t meshID) const;
 
-		void Allocate(TransferContext& transferContext, const string& name, uint32_t stride, vector<uint8_t>&& data, string subMeshName);
-		void Allocate(TransferContext& transferContext, VkIndexType indexType, vector<uint8_t>&& indexData, string subMeshName);
+		// Reserve space for a vertex attribute / index buffer and return where to copy
+		// it (buffer + byte offset). `data` is read (count/bounds) but not
+		// consumed. Call Build() after a submesh's attributes+index are reserved.
+		MeshBufferRegion Allocate(const string& name, uint32_t stride, const vector<uint8_t>& data);
+		MeshBufferRegion Allocate(VkIndexType indexType, const vector<uint8_t>& indexData);
 		MeshAllocation Build();
 
 		// Buffers are pool-owned (handle pattern) so the global vertex/index storage
