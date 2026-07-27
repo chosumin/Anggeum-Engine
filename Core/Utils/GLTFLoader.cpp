@@ -3,8 +3,6 @@
 #include "Log.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Entity.h"
-#include "Graphics/TransferJob.h"
-#include "Graphics/TransferContext.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Texture.h"
@@ -257,8 +255,8 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
-Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene, TransferContext& transferContext)
-	: _device(device), _scene(scene), _transferContext(transferContext), 
+Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
+	: _device(device), _scene(scene),
 	_resourceCache(device.GetResourceCache())
 {
 	_model = new tinygltf::Model();
@@ -303,7 +301,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 
 	auto texture = _resourceCache.LoadTexture(textureName,
 		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
-	_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), path), textureName);
+	_renderContext->GetTextureUploadQueue().Push({ texture, path });
 
 	auto material = _resourceCache.LoadMaterial("skybox", "Skybox");
 	material.Get().AddTexture(1, texture);
@@ -588,7 +586,7 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
+				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -605,7 +603,7 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
+				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -627,7 +625,7 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture.Get(), texture.Get().GetName()), texture.Get().GetName());
+				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -780,15 +778,15 @@ void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& material
 {
 	// The skybox is not part of the GPU-driven draw set (it draws with its own bound
 	// buffers), so its geometry gets per-submesh buffers instead of the global ones.
-	size_t meshIndex = 0;
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
 
 		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
 
-		// One transfer job per glTF mesh, covering all its attribute + index copies.
-		vector<BufferCopyRegion> meshCopies;
+		// One upload (one transfer job) per glTF mesh, covering all its buffers.
+		BufferUpload bufferUpload;
+		bufferUpload.debugName = meshName;
 
 		for (auto& primitive : gltfMesh.primitives)
 		{
@@ -810,7 +808,7 @@ void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& material
 						  MemoryType::DEVICE_LOCAL },
 						subMeshName + name);
 					sm.SetVertexBuffer(name, vertexBuffer);
-					meshCopies.push_back({ &vertexBuffer.Get(), move(vertexData), 0 });
+					bufferUpload.regions.push_back({ vertexBuffer, move(vertexData), 0 });
 				}
 
 				if (primitive.indices >= 0)
@@ -827,7 +825,7 @@ void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& material
 						  MemoryType::DEVICE_LOCAL },
 						sm.GetName() + " index");
 					sm.SetIndexBuffer(indexBuffer, indexType);
-					meshCopies.push_back({ &indexBuffer.Get(), move(indexData), 0 });
+					bufferUpload.regions.push_back({ indexBuffer, move(indexData), 0 });
 				}
 			}
 
@@ -835,17 +833,11 @@ void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& material
 			mesh->AddMaterial(materials[primitive.material]);
 		}
 
-		if (!meshCopies.empty())
-		{
-			_transferContext.Enqueue(
-				new VkBufferCopyBatchJob(_device, move(meshCopies)),
-				meshName + "_" + std::to_string(meshIndex));
-		}
+		if (!bufferUpload.regions.empty())
+			_renderContext->GetBufferUploadQueue().Push(move(bufferUpload));
 
 		_meshes.push_back(mesh.get());
 		_scene.AddComponent(move(mesh));
-
-		++meshIndex;
 	}
 }
 

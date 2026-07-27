@@ -4,6 +4,8 @@
 #include "Vulkans/BindlessTextureManager.h"
 #include "RendererBatch.h"
 #include "GeometryUpload.h"
+#include "TextureUpload.h"
+#include "BufferUpload.h"
 
 namespace Core
 {
@@ -13,30 +15,58 @@ namespace Core
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
-	// reference with RenderContext / RenderFrames. Sync() pushes scene changes to the
-	// GPU and is driven by the scene's dirty state (see Engine::Draw).
-	struct RenderScene
+	// reference with RenderContext / RenderFrames.
+	//
+	// It is the coordinator, not a manager itself: every manager follows the same dirty
+	// pattern — it owns its pending state and its Sync() is a no-op when clean — and
+	// RenderScene::Sync() only sequences them (geometry upload before draw-set rebuild).
+	// Dirty states are independent axes:
+	//   Bindless        — pending descriptor writes
+	//   Material        — dirty table entries
+	//   MeshBuffer      — non-empty geometry upload queue (geometry residency)
+	//   RendererBatch   — the scene's draw-set dirty flag (membership changes)
+	// so geometry can stream in without a batch rebuild, and instancing changes can
+	// rebuild the batch without touching geometry.
+	class RenderScene
 	{
-		unique_ptr<BindlessTextureManager> Bindless;
-		unique_ptr<MeshBufferManager> MeshBuffer;
-		unique_ptr<MaterialManager> Material;
-		unique_ptr<RendererBatch> Batch;
-
-		// Where loaders drop raw geometry; drained by Sync (see GeometryUploadQueue).
-		GeometryUploadQueue GeometryUploads;
-
-		// Default: all managers null (the empty sentinel temp frames bind to).
+	public:
+		// Default: all managers null — the empty sentinel temp frames bind to. Such an
+		// instance must not be Sync()'d.
 		RenderScene() = default;
 		explicit RenderScene(Device& device);
 
-		// Flush pending GPU updates. Bindless/material self-gate on their own pending
-		// state (e.g. IBL textures register outside scene structure changes) and run
-		// every frame. On scene-dirty, uploads queued geometry (via `transfer`) and
-		// rebuilds the draw set.
+		// Run every manager's self-gated sync, in dependency order.
 		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
 
+		// Null when descriptor indexing is unsupported (and on the empty sentinel).
+		BindlessTextureManager* GetBindlessTextureManager() const { return _bindless.get(); }
+		bool HasBindlessSupport() const { return _bindless != nullptr; }
+
+		MeshBufferManager* GetMeshBufferManager() const { return _meshBuffer.get(); }
+		MaterialManager* GetMaterialManager() const { return _material.get(); }
+		RendererBatch* GetRendererBatch() const { return _batch.get(); }
+
+		// Where asset loaders drop raw geometry (owned by MeshBufferManager).
+		GeometryUploadQueue& GetGeometryUploadQueue() { return _meshBuffer->GetUploadQueue(); }
+
+		// Loaders never issue transfer jobs themselves; they push requests here and
+		// Sync() turns them into jobs. Held by the coordinator until a dedicated
+		// texture-residency manager exists.
+		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
+		BufferUploadQueue& GetBufferUploadQueue() { return _bufferUploads; }
+
 	private:
-		void UploadQueuedGeometry(TransferContext& transfer);
+		void UploadQueuedTextures(TransferContext& transfer);
+		void UploadQueuedBuffers(TransferContext& transfer);
+
+	private:
+		unique_ptr<BindlessTextureManager> _bindless;
+		unique_ptr<MeshBufferManager> _meshBuffer;
+		unique_ptr<MaterialManager> _material;
+		unique_ptr<RendererBatch> _batch;
+
+		TextureUploadQueue _textureUploads;
+		BufferUploadQueue _bufferUploads;
 
 		// Non-owning; null for the default (empty) instance, which never syncs.
 		Device* _device = nullptr;

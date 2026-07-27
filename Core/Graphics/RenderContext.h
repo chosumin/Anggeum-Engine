@@ -72,14 +72,17 @@ namespace Core
 		VkExtent2D GetSurfaceExtent() const;
 
 		// GPU-driven rendering managers (grouped in RenderScene, owned by Engine)
-		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.Bindless.get(); }
-		bool HasBindlessSupport() const { return _renderScene.Bindless != nullptr; }
-		MeshBufferManager* GetMeshBufferManager() const { return _renderScene.MeshBuffer.get(); }
-		MaterialManager* GetMaterialManager() const { return _renderScene.Material.get(); }
-		RendererBatch* GetRendererBatch() const { return _renderScene.Batch.get(); }
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.GetBindlessTextureManager(); }
+		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
+		MeshBufferManager* GetMeshBufferManager() const { return _renderScene.GetMeshBufferManager(); }
+		MaterialManager* GetMaterialManager() const { return _renderScene.GetMaterialManager(); }
+		RendererBatch* GetRendererBatch() const { return _renderScene.GetRendererBatch(); }
 
-		// Where asset loaders drop raw geometry for the render side to upload.
-		GeometryUploadQueue& GetGeometryUploadQueue() const { return _renderScene.GeometryUploads; }
+		// Where asset loaders drop upload requests for the render side; loaders never
+		// issue transfer jobs themselves (RenderScene::Sync does).
+		GeometryUploadQueue& GetGeometryUploadQueue() const { return _renderScene.GetGeometryUploadQueue(); }
+		TextureUploadQueue& GetTextureUploadQueue() const { return _renderScene.GetTextureUploadQueue(); }
+		BufferUploadQueue& GetBufferUploadQueue() const { return _renderScene.GetBufferUploadQueue(); }
 
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 

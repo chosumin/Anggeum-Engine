@@ -1,5 +1,7 @@
 #pragma once
 #include "ResourcePool.h"
+#include "GeometryUpload.h"
+#include "BufferUpload.h"
 
 namespace Core
 {
@@ -21,7 +23,7 @@ namespace Core
 	// into and at what byte offset.
 	struct MeshBufferRegion
 	{
-		Buffer* destination;
+		Handle<Buffer> destination;
 		VkDeviceSize offset;
 	};
 
@@ -30,6 +32,16 @@ namespace Core
 	public:
 		MeshBufferManager(Device& device);
 		~MeshBufferManager();
+
+		// Where loaders drop raw geometry. A non-empty queue IS this manager's dirty
+		// state; Sync() drains it.
+		GeometryUploadQueue& GetUploadQueue() { return _uploadQueue; }
+
+		// Flush pending geometry into the global buffers: reserve spans and record each
+		// SubMesh's MeshAllocation. Returns the copies to perform (one BufferUpload per
+		// source mesh) — this manager does allocation only; the transfer jobs are
+		// issued by RenderScene::Sync. Empty when nothing was queued.
+		vector<BufferUpload> Sync();
 
 		void FreeMesh(uint32_t meshID);
 		void Defragment();
@@ -113,6 +125,9 @@ namespace Core
 		unordered_map<uint32_t, MeshAllocation> _allocations;
 		vector<uint32_t> _freeList;
 		uint32_t _nextMeshID = 0;
+
+		// Raw geometry handed over by loaders, drained by Sync().
+		GeometryUploadQueue _uploadQueue;
 
 		// Scene-wide local-space bounds (accumulated across all POSITION allocations)
 		glm::vec3 _sceneBoundsMin{FLT_MAX};

@@ -30,9 +30,7 @@ Core::Engine::Engine(const EngineOptions& options)
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
 
-    _scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext, _renderContext);
-
-    _transferContext->Wait();
+    _scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
     _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
         *_scene, swapChain);
@@ -78,12 +76,10 @@ void Core::Engine::Draw()
 		ScopedCpuTimer timer(phases.transferWaitMs);
 		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
 
-		// Sync first: it may enqueue geometry uploads, which the Wait below flushes
-		// before rendering reads the mesh buffers this frame.
+		// Sync flushes the upload queues internally (enqueue + wait) before it writes
+		// descriptors and rebuilds the draw set, so no separate Wait is needed here.
 		_renderScene->Sync(*_scene, *_transferContext, extents);
 		_scene->ClearDirty();
-
-		_transferContext->Wait();
 	}
 	{
 		ScopedCpuTimer timer(phases.beginMs);

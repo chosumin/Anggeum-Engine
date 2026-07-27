@@ -1,7 +1,8 @@
 #include "stdafx.h"
 #include "RenderScene.h"
 #include "Graphics/Vulkans/Device.h"
-#include "Graphics/SubMesh.h"
+#include "Graphics/Vulkans/Texture.h"
+#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/TransferJob.h"
 #include "Foundation/Scene.h"
@@ -13,72 +14,70 @@ RenderScene::RenderScene(Device& device)
 {
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
-		Bindless = make_unique<BindlessTextureManager>(device, 4096);
+		_bindless = make_unique<BindlessTextureManager>(device, 4096);
 
-	MeshBuffer = make_unique<MeshBufferManager>(device);
-	Material = make_unique<MaterialManager>(device);
-	Batch = make_unique<RendererBatch>(device);
+	_meshBuffer = make_unique<MeshBufferManager>(device);
+	_material = make_unique<MaterialManager>(device);
+	_batch = make_unique<RendererBatch>(device);
 }
 
 void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents)
 {
-	// Bindless/material only do work when they have pending changes (new textures,
-	// dirty materials), so they are safe to poll every frame.
-	if (Bindless)
-		Bindless->UpdateDescriptorSet();
+	// Every manager self-gates on its own dirty state; this only fixes the order.
+	// Enqueue all pending uploads first. The mesh buffer manager only allocates; its
+	// copies join the same buffer-upload path as standalone buffers, so every transfer
+	// job is issued here (in UploadQueued*), never inside a manager.
+	UploadQueuedTextures(transfer);
 
-	Material->RefreshDirtyMaterials();
+	for (auto& upload : _meshBuffer->Sync())
+		_bufferUploads.Push(move(upload));
 
-	if (!scene.IsDirty())
-		return;
+	UploadQueuedBuffers(transfer);
 
-	// A mesh renderer was added/removed: upload any new geometry, then rebuild the
-	// (expensive) draw set. The caller waits on `transfer` before rendering this frame.
-	UploadQueuedGeometry(transfer);
-	Batch->Prepare(scene, extents);
+	// ...and flush them before the steps below: the bindless descriptor writes need
+	// the uploaded textures' image views (created by the image jobs), and the draw
+	// set references the uploaded geometry.
+	transfer.Wait();
+
+	if (_bindless)
+		_bindless->Sync();
+
+	_material->Sync();
+	_batch->Sync(scene, extents);
 }
 
-void RenderScene::UploadQueuedGeometry(TransferContext& transfer)
+void RenderScene::UploadQueuedTextures(TransferContext& transfer)
 {
-	// Drain the queue loaders filled: reserve space in the global mesh buffers and
-	// enqueue one transfer job per source mesh.
-	auto uploads = GeometryUploads.Take();
+	if (_textureUploads.Empty())
+		return;
 
-	size_t meshIndex = 0;
-	for (auto& upload : uploads)
+	// The job reads the file on a worker thread; resolve the handle here on the main
+	// thread (the pool is not thread-safe).
+	for (auto& request : _textureUploads.Take())
 	{
-		vector<BufferCopyRegion> meshCopies;
+		auto& texture = request.texture.Get();
+		transfer.Enqueue(new VkImageJob(*_device, texture, request.filePath),
+			texture.GetName());
+	}
+}
 
-		for (auto& geometry : upload.subMeshes)
-		{
-			auto& sm = geometry.subMesh.Get();
-			if (sm.HasAllocation())
-				continue;
+void RenderScene::UploadQueuedBuffers(TransferContext& transfer)
+{
+	if (_bufferUploads.Empty())
+		return;
 
-			// One span per submesh, shared across its vertex attributes (see
-			// MeshBufferManager::Allocate); Build() commits it.
-			for (auto& attr : geometry.attributes)
-			{
-				auto region = MeshBuffer->Allocate(attr.name, attr.stride, attr.data);
-				meshCopies.push_back({ region.destination, move(attr.data), region.offset });
-			}
+	size_t uploadIndex = 0;
+	for (auto& upload : _bufferUploads.Take())
+	{
+		vector<BufferCopyRegion> copies;
+		copies.reserve(upload.regions.size());
 
-			if (geometry.hasIndex)
-			{
-				auto region = MeshBuffer->Allocate(geometry.indexType, geometry.indexData);
-				meshCopies.push_back({ region.destination, move(geometry.indexData), region.offset });
-			}
+		for (auto& region : upload.regions)
+			copies.push_back({ &region.buffer.Get(), move(region.data), region.offset });
 
-			sm.SetAllocation(MeshBuffer->Build());
-		}
+		transfer.Enqueue(new VkBufferCopyBatchJob(*_device, move(copies)),
+			"BufferUpload_" + upload.debugName + "_" + std::to_string(uploadIndex));
 
-		if (!meshCopies.empty())
-		{
-			transfer.Enqueue(
-				new VkBufferCopyBatchJob(*_device, move(meshCopies)),
-				"GeometryUpload_" + upload.debugName + "_" + std::to_string(meshIndex));
-		}
-
-		++meshIndex;
+		++uploadIndex;
 	}
 }

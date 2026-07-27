@@ -63,7 +63,7 @@ DescriptorSetResources* RenderFrame::GetBindlessResources()
 	if (!HasBindlessSupport())
 		return nullptr;
 
-	_bindlessResources.descriptorSet = _renderScene.Bindless->GetDescriptorSet();
+	_bindlessResources.descriptorSet = _renderScene.GetBindlessTextureManager()->GetDescriptorSet();
 	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
 	return &_bindlessResources;
 }

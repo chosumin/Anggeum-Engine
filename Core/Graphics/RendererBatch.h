@@ -42,8 +42,9 @@ namespace Core
 		RendererBatch(Device& device);
 		~RendererBatch();
 
-		// Rebuild the whole draw set from the current scene membership.
-		void Prepare(Scene& scene, VkExtent2D extents);
+		// Rebuild the whole draw set from the current scene membership. Self-gated on
+		// the scene's draw-set dirty flag; no-op otherwise.
+		void Sync(Scene& scene, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }

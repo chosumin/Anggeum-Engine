@@ -10,7 +10,7 @@ namespace Core
     class TransferContext;
     class WorkerThreadManager;
     class IRenderPipeline;
-    struct RenderScene;
+    class RenderScene;
 
     struct EngineOptions
     {

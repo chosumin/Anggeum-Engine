@@ -26,8 +26,8 @@ namespace Core
 		uint32_t RegisterMaterial(Handle<Material> material);
 		void UnregisterMaterial(uint32_t materialIndex);
 
-		// Refreshes dirty entries and re-uploads the table if anything changed.
-		void RefreshDirtyMaterials();
+		// Refreshes dirty entries and re-uploads the table; no-op when nothing changed.
+		void Sync();
 
 		const MaterialTable& GetMaterialData() const { return _materialData; }
 

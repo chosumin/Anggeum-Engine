@@ -35,7 +35,8 @@ namespace Core
 		void UnregisterTexture(uint32_t bindlessIndex);
 
 		// Descriptor management
-		void UpdateDescriptorSet();
+		// Flush pending descriptor writes; no-op when nothing was registered/freed.
+		void Sync();
 		VkDescriptorSet GetDescriptorSet() const { return _descriptorSet; }
 		VkDescriptorSetLayout GetDescriptorSetLayout() const { return _descriptorSetLayout; }
 		

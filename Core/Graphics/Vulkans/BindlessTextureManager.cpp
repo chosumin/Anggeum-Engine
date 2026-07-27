@@ -100,7 +100,7 @@ namespace Core
 		_needsUpdate = true;
 	}
 
-	void BindlessTextureManager::UpdateDescriptorSet()
+	void BindlessTextureManager::Sync()
 	{
 		if (!_needsUpdate || _pendingUpdates.empty())
 			return;

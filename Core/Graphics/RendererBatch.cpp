@@ -249,10 +249,14 @@ void Core::RendererBatch::RebuildGpuBuffers()
     _hasGpuBuffers = true;
 }
 
-void Core::RendererBatch::Prepare(Scene& scene, VkExtent2D extents)
+void Core::RendererBatch::Sync(Scene& scene, VkExtent2D extents)
 {
-    // Rebuild the draw set from scratch off the current scene. The caller
-    // (RenderScene::Sync) only invokes this when the scene structure changed.
+    // The draw set derives from scene membership, so its dirty state lives on the
+    // scene (cleared by Engine after the sync pass).
+    if (!scene.IsDirty())
+        return;
+
+    // Rebuild the draw set from scratch off the current scene.
     _extents = extents;
 
     _materialBatches.clear();

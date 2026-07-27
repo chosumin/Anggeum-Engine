@@ -18,7 +18,6 @@ namespace Core
 	class Mesh;
 	class PerspectiveCamera;
 	class Light;
-	class TransferContext;
 	class ResourceCache;
 	class RenderContext;
 
@@ -40,7 +39,7 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene, TransferContext& transferContext);
+		GLTFLoader(Device& device, Scene& scene);
 		~GLTFLoader();
 
 		void LoadScene(string path);
@@ -71,7 +70,6 @@ namespace Core
 	private:
 		Device& _device;
 		Scene& _scene;
-		TransferContext& _transferContext;
 		ResourceCache& _resourceCache;
 		RenderContext* _renderContext = nullptr;
 

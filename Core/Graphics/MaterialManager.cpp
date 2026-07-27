@@ -108,7 +108,7 @@ void MaterialManager::MarkDirty(uint32_t materialIndex)
 	}
 }
 
-void MaterialManager::RefreshDirtyMaterials()
+void MaterialManager::Sync()
 {
 	if (!_anyDirty)
 		return;

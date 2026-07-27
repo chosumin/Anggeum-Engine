@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/Vulkans/Device.h"
+#include "Graphics/SubMesh.h"
 
 using namespace Core;
 
@@ -12,6 +13,54 @@ MeshBufferManager::MeshBufferManager(Device& device)
 }
 
 MeshBufferManager::~MeshBufferManager() = default;
+
+vector<BufferUpload> MeshBufferManager::Sync()
+{
+	vector<BufferUpload> result;
+	if (_uploadQueue.Empty())
+		return result;
+
+	// Drain the queue loaders filled: reserve space in the global mesh buffers and
+	// report the copies to perform, one BufferUpload per source mesh.
+	auto uploads = _uploadQueue.Take();
+	result.reserve(uploads.size());
+
+	for (auto& upload : uploads)
+	{
+		BufferUpload bufferUpload;
+		bufferUpload.debugName = "Geometry_" + upload.debugName;
+
+		for (auto& geometry : upload.subMeshes)
+		{
+			auto& sm = geometry.subMesh.Get();
+			if (sm.HasAllocation())
+				continue;
+
+			// One span per submesh, shared across its vertex attributes (see
+			// Allocate); Build() commits it.
+			for (auto& attr : geometry.attributes)
+			{
+				auto region = Allocate(attr.name, attr.stride, attr.data);
+				bufferUpload.regions.push_back(
+					{ region.destination, move(attr.data), region.offset });
+			}
+
+			if (geometry.hasIndex)
+			{
+				auto region = Allocate(geometry.indexType, geometry.indexData);
+				bufferUpload.regions.push_back(
+					{ region.destination, move(geometry.indexData), region.offset });
+			}
+
+			sm.SetAllocation(Build());
+		}
+
+		if (!bufferUpload.regions.empty())
+			result.push_back(move(bufferUpload));
+	}
+
+	return result;
+}
 
 glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& positions)
 {
@@ -210,7 +259,7 @@ Core::MeshBufferRegion Core::MeshBufferManager::Allocate(const std::string& name
 	}
 
 	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingVertexOffset) * stride;
-	return { &_vertexBufferHandles[name].Get(), offset };
+	return { _vertexBufferHandles[name], offset };
 }
 
 Core::MeshBufferRegion Core::MeshBufferManager::Allocate(VkIndexType indexType, const std::vector<uint8_t>& indexData)
@@ -241,7 +290,7 @@ Core::MeshBufferRegion Core::MeshBufferManager::Allocate(VkIndexType indexType, 
 	_pendingIndexCount = indexCount;
 
 	VkDeviceSize offset = static_cast<VkDeviceSize>(_pendingIndexOffset) * indexStride;
-	return { &_indexBufferHandle.Get(), offset };
+	return { _indexBufferHandle, offset };
 }
 
 MeshAllocation MeshBufferManager::Build()

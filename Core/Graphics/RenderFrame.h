@@ -12,7 +12,7 @@ namespace Core
 	class BindlessTextureManager;
 	class DescriptorSetBuilder;
 	class RendererBatch;
-	struct RenderScene;
+	class RenderScene;
 
 	class RenderFrame
 	{
@@ -31,14 +31,14 @@ namespace Core
 		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
 		FrameSubmission& GetSubmission() { return _submission; }
 
-		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.Bindless.get(); }
-		bool HasBindlessSupport() const { return _renderScene.Bindless != nullptr; }
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.GetBindlessTextureManager(); }
+		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
 		DescriptorSetResources* GetBindlessResources();
 
 		// Always present on scene frames (temp frames must not call these).
-		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.MeshBuffer; }
+		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.GetMeshBufferManager(); }
 
-		MaterialManager& GetMaterialManager() { return *_renderScene.Material; }
+		MaterialManager& GetMaterialManager() { return *_renderScene.GetMaterialManager(); }
 
 		// Per-frame GPU resources (render targets, transient buffers, framebuffers)
 		// live in FrameResources. Passes reach them through here.
@@ -49,7 +49,7 @@ namespace Core
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
 		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
-		RendererBatch& GetRendererBatch() const { return *_renderScene.Batch; }
+		RendererBatch& GetRendererBatch() const { return *_renderScene.GetRendererBatch(); }
 	private:
 		void CreateSyncObjects();
 
