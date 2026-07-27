@@ -36,10 +36,10 @@ namespace Core
 			_indexType = indexType;
 		}
 
-		void SetAllocation(const MeshAllocation& allocation) 
-		{ 
-			_globalAllocation = allocation; 
-			_hasGlobalAllocation = true; 
+		void SetAllocation(const MeshAllocation& allocation)
+		{
+			_globalAllocation = allocation;
+			_hasGlobalAllocation = true;
 		}
 		const MeshAllocation& GetAllocation() const { return _globalAllocation; }
 		bool HasAllocation() const { return _hasGlobalAllocation; }

@@ -12,13 +12,11 @@ namespace tinygltf
 namespace Core
 {
 	class Scene;
-	class Image;
 	class Sampler;
 	class Texture;
 	class Material;
 	class Mesh;
 	class PerspectiveCamera;
-	class CommandBuffer;
 	class Light;
 	class TransferContext;
 	class ResourceCache;
@@ -62,7 +60,10 @@ namespace Core
 			vector<Handle<Core::Sampler>>& samplers,
 			const string& modelPath);
 		vector<Handle<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
-		void LoadMeshes(vector<Handle<Core::Material>>& materials, bool useGlobalBuffer = true);
+		// Scene geometry: handed to the render side's global mesh buffers.
+		void LoadMeshes(vector<Handle<Core::Material>>& materials);
+		// Skybox geometry: per-submesh buffers, outside the GPU-driven draw set.
+		void LoadSkyboxMeshes(vector<Handle<Core::Material>>& materials);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();

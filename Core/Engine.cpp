@@ -77,12 +77,13 @@ void Core::Engine::Draw()
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
-		_transferContext->Wait();
 
-		// Push scene changes to the GPU-driven managers. Bindless/material self-gate;
-		// the draw set is rebuilt only when the scene structure changed.
-		_renderScene->Sync(*_scene, extents);
+		// Sync first: it may enqueue geometry uploads, which the Wait below flushes
+		// before rendering reads the mesh buffers this frame.
+		_renderScene->Sync(*_scene, *_transferContext, extents);
 		_scene->ClearDirty();
+
+		_transferContext->Wait();
 	}
 	{
 		ScopedCpuTimer timer(phases.beginMs);

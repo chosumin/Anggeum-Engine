@@ -78,6 +78,9 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _renderScene.Material.get(); }
 		RendererBatch* GetRendererBatch() const { return _renderScene.Batch.get(); }
 
+		// Where asset loaders drop raw geometry for the render side to upload.
+		GeometryUploadQueue& GetGeometryUploadQueue() const { return _renderScene.GeometryUploads; }
+
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
 		SyncContext& GetSyncContext() { return *_syncContext; }

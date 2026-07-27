@@ -57,28 +57,31 @@ namespace Core
 			for (auto& region : _regions)
 				totalSize += region.data.size();
 
+			// Concatenate on the host first, then upload in one shot via Buffer::CopyBuffer,
+			// which maps+copies+unmaps atomically inside the allocator. Keeping the mapping
+			// open across the copies would let concurrent jobs sharing a memory block map
+			// the same VkDeviceMemory twice (VUID-vkMapMemory-memory-00678).
+			vector<uint8_t> packed(totalSize);
+			VkDeviceSize srcOffset = 0;
+			for (auto& region : _regions)
+			{
+				memcpy(packed.data() + srcOffset, region.data.data(), region.data.size());
+				srcOffset += region.data.size();
+			}
+
 			_stagingBuffer = make_unique<Core::Buffer>(_device,
 				totalSize,
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				MemoryType::STAGE);
+			_stagingBuffer->CopyBuffer(packed.data(), totalSize);
 
-			void* mapped = nullptr;
-			_stagingBuffer->Map(&mapped);
-			auto* base = static_cast<uint8_t*>(mapped);
-
-			VkDeviceSize srcOffset = 0;
+			srcOffset = 0;
 			for (auto& region : _regions)
 			{
-				VkDeviceSize size = region.data.size();
-
-				memcpy(base + srcOffset, region.data.data(), size);
 				commandBuffer->CopyBuffer(*_stagingBuffer, *region.destination,
-					region.dstOffset, srcOffset, size);
-
-				srcOffset += size;
+					region.dstOffset, srcOffset, region.data.size());
+				srcOffset += region.data.size();
 			}
-
-			_stagingBuffer->Unmap();
 
 			status = JobStatus::COMPLETE;
 		}
