@@ -4,6 +4,7 @@
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Image.h"
+#include "Graphics/GeometryUpload.h"
 
 namespace Core
 {
@@ -37,20 +38,41 @@ namespace Core
 		VkDeviceSize dstOffset;
 	};
 
-	// Copies many regions into their destinations within a single transfer job, 
+	// Bounds to compute from one of the job's regions, while its data is already in
+	// hand on the worker thread. `result` is owned by the caller and read only after
+	// the job completes.
+	struct BoundsTask
+	{
+		size_t regionIndex;
+		uint32_t stride;
+		GeometryBounds* result;
+	};
+
+	// Copies many regions into their destinations within a single transfer job,
 	// so a mesh upload is one worker-thread task.
 	class VkBufferCopyBatchJob : public Job
 	{
 	public:
-		VkBufferCopyBatchJob(Device& device, vector<BufferCopyRegion>&& regions)
+		VkBufferCopyBatchJob(Device& device, vector<BufferCopyRegion>&& regions,
+			vector<BoundsTask>&& boundsTasks = {})
 			: Job(JobType::TRANSFER)
 			, _device(device)
 			, _regions(std::move(regions))
+			, _boundsTasks(std::move(boundsTasks))
 		{
 		}
 
 		void Execute() override
 		{
+			// Runs here rather than on the loading thread: scanning every vertex is the
+			// expensive part of a mesh upload, and the data is already resident.
+			for (auto& task : _boundsTasks)
+			{
+				auto& region = _regions[task.regionIndex];
+				ComputeGeometryBounds(region.data.data(), region.data.size(),
+					task.stride, *task.result);
+			}
+
 			// Pack every region into one staging buffer and copy each out of its
 			// sub-range, so a mesh upload needs a single staging allocation.
 			VkDeviceSize totalSize = 0;
@@ -89,6 +111,7 @@ namespace Core
 	private:
 		Device& _device;
 		vector<BufferCopyRegion> _regions;
+		vector<BoundsTask> _boundsTasks;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 

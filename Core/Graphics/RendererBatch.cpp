@@ -251,10 +251,10 @@ void Core::RendererBatch::RebuildGpuBuffers()
 
 void Core::RendererBatch::Sync(Scene& scene, VkExtent2D extents)
 {
-    // The draw set derives from scene membership, so its dirty state lives on the
-    // scene (cleared by Engine after the sync pass).
-    if (!scene.IsDirty())
+    if (!_dirty)
         return;
+
+    _dirty = false;
 
     // Rebuild the draw set from scratch off the current scene.
     _extents = extents;

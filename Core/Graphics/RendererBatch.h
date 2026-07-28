@@ -42,8 +42,13 @@ namespace Core
 		RendererBatch(Device& device);
 		~RendererBatch();
 
-		// Rebuild the whole draw set from the current scene membership. Self-gated on
-		// the scene's draw-set dirty flag; no-op otherwise.
+		// Marks the draw set stale — call after adding/removing scene meshes. Kept here
+		// rather than on Scene: which membership changes matter is a rendering concern,
+		// and it keeps every manager owning its own dirty state.
+		void MarkDirty() { _dirty = true; }
+
+		// Rebuild the whole draw set from the current scene membership. Self-gated;
+		// no-op when clean.
 		void Sync(Scene& scene, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
@@ -87,6 +92,7 @@ namespace Core
 		Handle<Buffer> _objectDataBuffer;
 
 		bool _hasGpuBuffers = false; // GPU buffers created at least once
+		bool _dirty = false;         // scene membership changed since the last rebuild
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};

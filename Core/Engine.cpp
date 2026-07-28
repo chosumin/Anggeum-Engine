@@ -78,8 +78,8 @@ void Core::Engine::Draw()
 
 		// Sync flushes the upload queues internally (enqueue + wait) before it writes
 		// descriptors and rebuilds the draw set, so no separate Wait is needed here.
+		// Each manager self-gates and clears its own dirty state.
 		_renderScene->Sync(*_scene, *_transferContext, extents);
-		_scene->ClearDirty();
 	}
 	{
 		ScopedCpuTimer timer(phases.beginMs);

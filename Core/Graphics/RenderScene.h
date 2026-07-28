@@ -5,7 +5,6 @@
 #include "RendererBatch.h"
 #include "GeometryUpload.h"
 #include "TextureUpload.h"
-#include "BufferUpload.h"
 
 namespace Core
 {
@@ -46,18 +45,29 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _material.get(); }
 		RendererBatch* GetRendererBatch() const { return _batch.get(); }
 
-		// Where asset loaders drop raw geometry (owned by MeshBufferManager).
-		GeometryUploadQueue& GetGeometryUploadQueue() { return _meshBuffer->GetUploadQueue(); }
+		// Local-space bounds covering every mesh registered so far, grown as the upload
+		// jobs report what they measured.
+		const glm::vec3& GetSceneBoundsMin() const { return _sceneBoundsMin; }
+		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
 
-		// Loaders never issue transfer jobs themselves; they push requests here and
-		// Sync() turns them into jobs. Held by the coordinator until a dedicated
-		// texture-residency manager exists.
+		// Resource loading never issues transfer jobs itself; it pushes requests here
+		// and Sync() turns them into jobs. Held by the coordinator until dedicated
+		// residency managers exist.
+		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
 		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
-		BufferUploadQueue& GetBufferUploadQueue() { return _bufferUploads; }
 
 	private:
 		void UploadQueuedTextures(TransferContext& transfer);
-		void UploadQueuedBuffers(TransferContext& transfer);
+		void UploadQueuedGeometry(TransferContext& transfer);
+		// Writes back what the upload jobs computed; only valid once they have finished.
+		void ApplyComputedBounds();
+
+		// A bounds result being computed by an in-flight upload job.
+		struct PendingBounds
+		{
+			SubMesh* target;
+			unique_ptr<GeometryBounds> result;
+		};
 
 	private:
 		unique_ptr<BindlessTextureManager> _bindless;
@@ -66,7 +76,11 @@ namespace Core
 		unique_ptr<RendererBatch> _batch;
 
 		TextureUploadQueue _textureUploads;
-		BufferUploadQueue _bufferUploads;
+		GeometryCopyQueue _geometryCopies;
+		vector<PendingBounds> _pendingBounds;
+
+		glm::vec3 _sceneBoundsMin{ FLT_MAX };
+		glm::vec3 _sceneBoundsMax{ -FLT_MAX };
 
 		// Non-owning; null for the default (empty) instance, which never syncs.
 		Device* _device = nullptr;

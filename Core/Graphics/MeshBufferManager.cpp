@@ -3,7 +3,6 @@
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/ResourceCache.h"
 #include "Graphics/Vulkans/Device.h"
-#include "Graphics/SubMesh.h"
 
 using namespace Core;
 
@@ -14,82 +13,27 @@ MeshBufferManager::MeshBufferManager(Device& device)
 
 MeshBufferManager::~MeshBufferManager() = default;
 
-vector<BufferUpload> MeshBufferManager::Sync()
+MeshAllocation MeshBufferManager::AllocateGeometry(SubMeshGeometry& geometry,
+	vector<GeometryCopy>& outCopies)
 {
-	vector<BufferUpload> result;
-	if (_uploadQueue.Empty())
-		return result;
-
-	// Drain the queue loaders filled: reserve space in the global mesh buffers and
-	// report the copies to perform, one BufferUpload per source mesh.
-	auto uploads = _uploadQueue.Take();
-	result.reserve(uploads.size());
-
-	for (auto& upload : uploads)
+	// One span per submesh, shared across its vertex attributes (see Allocate);
+	// Build() commits it.
+	for (auto& attr : geometry.attributes)
 	{
-		BufferUpload bufferUpload;
-		bufferUpload.debugName = "Geometry_" + upload.debugName;
+		auto region = Allocate(attr.name, attr.stride, attr.data);
 
-		for (auto& geometry : upload.subMeshes)
-		{
-			auto& sm = geometry.subMesh.Get();
-			if (sm.HasAllocation())
-				continue;
-
-			// One span per submesh, shared across its vertex attributes (see
-			// Allocate); Build() commits it.
-			for (auto& attr : geometry.attributes)
-			{
-				auto region = Allocate(attr.name, attr.stride, attr.data);
-				bufferUpload.regions.push_back(
-					{ region.destination, move(attr.data), region.offset });
-			}
-
-			if (geometry.hasIndex)
-			{
-				auto region = Allocate(geometry.indexType, geometry.indexData);
-				bufferUpload.regions.push_back(
-					{ region.destination, move(geometry.indexData), region.offset });
-			}
-
-			sm.SetAllocation(Build());
-		}
-
-		if (!bufferUpload.regions.empty())
-			result.push_back(move(bufferUpload));
+		// Mark POSITION so the upload job computes the bounds off the main thread.
+		uint32_t boundsStride = (attr.name == "POSITION") ? attr.stride : 0;
+		outCopies.push_back({ region.destination, move(attr.data), region.offset, boundsStride });
 	}
 
-	return result;
-}
-
-glm::vec4 MeshBufferManager::CalculateBoundingSphere(const vector<glm::vec3>& positions)
-{
-	if (positions.empty())
-		return glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-
-	glm::vec3 min = positions[0];
-	glm::vec3 max = positions[0];
-
-	for (const auto& pos : positions)
+	if (geometry.hasIndex)
 	{
-		min = glm::min(min, pos);
-		max = glm::max(max, pos);
+		auto region = Allocate(geometry.indexType, geometry.indexData);
+		outCopies.push_back({ region.destination, move(geometry.indexData), region.offset });
 	}
 
-	// Accumulate scene-wide bounds
-	_sceneBoundsMin = glm::min(_sceneBoundsMin, min);
-	_sceneBoundsMax = glm::max(_sceneBoundsMax, max);
-
-	glm::vec3 center = (min + max) * 0.5f;
-
-	float radius = 0.0f;
-	for (const auto& pos : positions)
-	{
-		float dist = glm::distance(center, pos);
-		radius = glm::max(radius, dist);
-	}
-
-	return glm::vec4(center, radius);
+	return Build();
 }
 
 uint32_t MeshBufferManager::AllocateSpan(vector<FreeSpan>& freeSpans, uint32_t& tail,
@@ -232,21 +176,6 @@ Core::MeshBufferRegion Core::MeshBufferManager::Allocate(const std::string& name
 			"Mesh." + name);
 	}
 
-	// If the data is position, calculate bounding sphere (also accumulates scene bounds)
-	if (name == "POSITION")
-	{
-		// POSITION is tightly packed with the source stride (e.g. 12 bytes for float3)
-		size_t positionCount = data.size() / stride;
-		vector<glm::vec3> positionVec(positionCount);
-
-		for (size_t i = 0; i < positionCount; ++i)
-		{
-			memcpy(&positionVec[i], data.data() + i * stride, sizeof(float) * 3);
-		}
-
-		_tempBoundingSphere = CalculateBoundingSphere(positionVec);
-	}
-
 	// All vertex attributes of one submesh share the same span; reserve it on the
 	// first attribute and reuse the offset for the rest (they have equal counts).
 	uint32_t vertexCount = static_cast<uint32_t>(data.size() / stride);
@@ -302,8 +231,9 @@ MeshAllocation MeshBufferManager::Build()
 	allocation.indexOffset = _pendingIndexOffset;
 	allocation.indexCount = _pendingIndexCount;
 	allocation.meshID = _nextMeshID++;
-	allocation.boundingSphereCenter = _tempBoundingSphere;
-	allocation.boundingSphereRadius = _tempBoundingSphere.w;
+	// Bounds are filled in later, by the upload job that scans the POSITION stream.
+	allocation.boundingSphereCenter = glm::vec3(0.0f);
+	allocation.boundingSphereRadius = 0.0f;
 
 	// Store allocation
 	_allocations[allocation.meshID] = allocation;
@@ -314,7 +244,6 @@ MeshAllocation MeshBufferManager::Build()
 	_pendingVertexCount = 0;
 	_pendingIndexOffset = 0;
 	_pendingIndexCount = 0;
-	_tempBoundingSphere = vec4();
 
 	return allocation;
 }

@@ -44,8 +44,12 @@ namespace Core
 		Handle<Texture> LoadTexture(const string& name,
 			unique_ptr<Image> image, Handle<Sampler> sampler);
 
-		// Pool-owned; resolve the handle with handle.Get().
-		Handle<SubMesh> LoadSubMesh(const string& name);
+		// Pool-owned (resolve with handle.Get()) and deduped by name. Space for the
+		// geometry is reserved right here so the SubMesh is immediately usable
+		//   LoadSubMesh           -> global mesh buffers (GPU-driven draw set)
+		//   LoadStandaloneSubMesh -> its own vertex/index buffers (e.g. the skybox)
+		Handle<SubMesh> LoadSubMesh(const string& name, SubMeshGeometry&& geometry);
+		Handle<SubMesh> LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry);
 
 		// Global (app-lifetime) GPU buffers
 		// NOT name-deduped — each call makes a new buffer; the caller keeps the handle.

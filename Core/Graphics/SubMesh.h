@@ -43,6 +43,14 @@ namespace Core
 		}
 		const MeshAllocation& GetAllocation() const { return _globalAllocation; }
 		bool HasAllocation() const { return _hasGlobalAllocation; }
+
+		// Filled in once the upload job has scanned the POSITION stream (the allocation
+		// itself is recorded up front, at load time).
+		void SetBoundingSphere(const glm::vec3& center, float radius)
+		{
+			_globalAllocation.boundingSphereCenter = center;
+			_globalAllocation.boundingSphereRadius = radius;
+		}
 	private:
 		Device& _device;
 

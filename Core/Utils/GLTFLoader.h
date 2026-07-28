@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/ResourceHandle.h"
+#include "Graphics/GeometryUpload.h"
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
 
@@ -7,6 +8,7 @@ namespace tinygltf
 {
 	class Model;
 	struct Sampler;
+	struct Primitive;
 }
 
 namespace Core
@@ -59,10 +61,17 @@ namespace Core
 			vector<Handle<Core::Sampler>>& samplers,
 			const string& modelPath);
 		vector<Handle<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
+		// Where a mesh's geometry is stored: the shared global buffers (GPU-driven draw
+		// set) or buffers of its own.
+		enum class GeometryStorage { Global, Standalone };
+
+		// Reads a primitive's attributes + indices into the form ResourceCache takes.
+		SubMeshGeometry ReadGeometry(const tinygltf::Primitive& primitive);
 		// Scene geometry: handed to the render side's global mesh buffers.
 		void LoadMeshes(vector<Handle<Core::Material>>& materials);
 		// Skybox geometry: per-submesh buffers, outside the GPU-driven draw set.
 		void LoadSkyboxMeshes(vector<Handle<Core::Material>>& materials);
+		void LoadMeshes(vector<Handle<Core::Material>>& materials, GeometryStorage storage);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();

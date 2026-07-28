@@ -3,6 +3,8 @@
 #include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/SubMesh.h"
+#include "Graphics/ResourceCache.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/TransferJob.h"
 #include "Foundation/Scene.h"
@@ -24,20 +26,17 @@ RenderScene::RenderScene(Device& device)
 void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents)
 {
 	// Every manager self-gates on its own dirty state; this only fixes the order.
-	// Enqueue all pending uploads first. The mesh buffer manager only allocates; its
-	// copies join the same buffer-upload path as standalone buffers, so every transfer
-	// job is issued here (in UploadQueued*), never inside a manager.
+	// Space was already reserved at load time, so this just enqueues the pending data
+	// copies — every transfer job is issued here.
 	UploadQueuedTextures(transfer);
-
-	for (auto& upload : _meshBuffer->Sync())
-		_bufferUploads.Push(move(upload));
-
-	UploadQueuedBuffers(transfer);
+	UploadQueuedGeometry(transfer);
 
 	// ...and flush them before the steps below: the bindless descriptor writes need
 	// the uploaded textures' image views (created by the image jobs), and the draw
-	// set references the uploaded geometry.
+	// set references the uploaded geometry and the bounds those jobs computed.
 	transfer.Wait();
+
+	ApplyComputedBounds();
 
 	if (_bindless)
 		_bindless->Sync();
@@ -61,23 +60,52 @@ void RenderScene::UploadQueuedTextures(TransferContext& transfer)
 	}
 }
 
-void RenderScene::UploadQueuedBuffers(TransferContext& transfer)
+void RenderScene::UploadQueuedGeometry(TransferContext& transfer)
 {
-	if (_bufferUploads.Empty())
+	if (_geometryCopies.Empty())
 		return;
 
-	size_t uploadIndex = 0;
-	for (auto& upload : _bufferUploads.Take())
+	// One transfer job per batch (i.e. per submesh).
+	size_t batchIndex = 0;
+	for (auto& batch : _geometryCopies.Take())
 	{
 		vector<BufferCopyRegion> copies;
-		copies.reserve(upload.regions.size());
+		copies.reserve(batch.copies.size());
 
-		for (auto& region : upload.regions)
-			copies.push_back({ &region.buffer.Get(), move(region.data), region.offset });
+		vector<BoundsTask> boundsTasks;
 
-		transfer.Enqueue(new VkBufferCopyBatchJob(*_device, move(copies)),
-			"BufferUpload_" + upload.debugName + "_" + std::to_string(uploadIndex));
+		for (auto& copy : batch.copies)
+		{
+			// The job computes bounds from the POSITION stream while it holds the data.
+			if (copy.boundsStride > 0 && batch.boundsTarget)
+			{
+				auto result = make_unique<GeometryBounds>();
+				boundsTasks.push_back({ copies.size(), copy.boundsStride, result.get() });
+				_pendingBounds.push_back({ batch.boundsTarget, move(result) });
+			}
 
-		++uploadIndex;
+			copies.push_back({ &copy.destination.Get(), move(copy.data), copy.offset });
+		}
+
+		transfer.Enqueue(
+			new VkBufferCopyBatchJob(*_device, move(copies), move(boundsTasks)),
+			batch.debugName + "_" + std::to_string(batchIndex));
+
+		++batchIndex;
 	}
+}
+
+void RenderScene::ApplyComputedBounds()
+{
+	// Called once the upload jobs are done, so each result is safe to read here.
+	for (auto& pending : _pendingBounds)
+	{
+		auto& bounds = *pending.result;
+		pending.target->SetBoundingSphere(bounds.center, bounds.radius);
+
+		_sceneBoundsMin = glm::min(_sceneBoundsMin, bounds.min);
+		_sceneBoundsMax = glm::max(_sceneBoundsMax, bounds.max);
+	}
+
+	_pendingBounds.clear();
 }

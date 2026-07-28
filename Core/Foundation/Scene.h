@@ -95,20 +95,12 @@ namespace Core
 		PerspectiveCamera* GetMainCamera() const;
 		Light* GetMainLight() const;
 
-		// Render dirty flag: set when mesh renderers are added (by GLTFLoader), consumed
-		// by RenderScene::Sync to rebuild the GPU draw set. Other entity/component
-		// changes do not affect the draw set, so they don't set this.
-		void MarkDirty() { _dirty = true; }
-		bool IsDirty() const { return _dirty; }
-		void ClearDirty() { _dirty = false; }
-
 		virtual void Update() = 0;
 	private:
 		string _name;
 		vector<unique_ptr<Core::Entity>> _entities;
 		unique_ptr<Entity> _root;
 		unordered_map<type_index, vector<unique_ptr<Component>>> _components;
-		bool _dirty = false;
 	};
 }
 

@@ -80,9 +80,8 @@ namespace Core
 
 		// Where asset loaders drop upload requests for the render side; loaders never
 		// issue transfer jobs themselves (RenderScene::Sync does).
-		GeometryUploadQueue& GetGeometryUploadQueue() const { return _renderScene.GetGeometryUploadQueue(); }
+		GeometryCopyQueue& GetGeometryCopyQueue() const { return _renderScene.GetGeometryCopyQueue(); }
 		TextureUploadQueue& GetTextureUploadQueue() const { return _renderScene.GetTextureUploadQueue(); }
-		BufferUploadQueue& GetBufferUploadQueue() const { return _renderScene.GetBufferUploadQueue(); }
 
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 

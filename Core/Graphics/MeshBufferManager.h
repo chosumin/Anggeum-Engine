@@ -1,7 +1,6 @@
 #pragma once
 #include "ResourcePool.h"
 #include "GeometryUpload.h"
-#include "BufferUpload.h"
 
 namespace Core
 {
@@ -33,15 +32,10 @@ namespace Core
 		MeshBufferManager(Device& device);
 		~MeshBufferManager();
 
-		// Where loaders drop raw geometry. A non-empty queue IS this manager's dirty
-		// state; Sync() drains it.
-		GeometryUploadQueue& GetUploadQueue() { return _uploadQueue; }
-
-		// Flush pending geometry into the global buffers: reserve spans and record each
-		// SubMesh's MeshAllocation. Returns the copies to perform (one BufferUpload per
-		// source mesh) — this manager does allocation only; the transfer jobs are
-		// issued by RenderScene::Sync. Empty when nothing was queued.
-		vector<BufferUpload> Sync();
+		// Reserve space in the global buffers for one submesh: appends the copies to
+		// perform to `outCopies` and returns the committed allocation. Allocation only —
+		// the transfer jobs are issued by RenderScene::Sync.
+		MeshAllocation AllocateGeometry(SubMeshGeometry& geometry, vector<GeometryCopy>& outCopies);
 
 		void FreeMesh(uint32_t meshID);
 		void Defragment();
@@ -55,13 +49,6 @@ namespace Core
 
 		const MeshAllocation* GetAllocation(uint32_t meshID) const;
 
-		// Reserve space for a vertex attribute / index buffer and return where to copy
-		// it (buffer + byte offset). `data` is read (count/bounds) but not
-		// consumed. Call Build() after a submesh's attributes+index are reserved.
-		MeshBufferRegion Allocate(const string& name, uint32_t stride, const vector<uint8_t>& data);
-		MeshBufferRegion Allocate(VkIndexType indexType, const vector<uint8_t>& indexData);
-		MeshAllocation Build();
-
 		// Buffers are pool-owned (handle pattern) so the global vertex/index storage
 		// can be resized/relocated in place later via ResourcePool::Replace, while
 		// holders keep their handles. Resolve with handle.Get().
@@ -70,9 +57,6 @@ namespace Core
 
 		VkIndexType GetIndexType() const { return _indexType; }
 
-		// Scene-wide bounds accumulated during mesh loading
-		const glm::vec3& GetSceneBoundsMin() const { return _sceneBoundsMin; }
-		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
 
 	private:
 		// A free region of the shared storage, measured in elements (vertices or
@@ -83,8 +67,13 @@ namespace Core
 			uint32_t size;
 		};
 
-		glm::vec4 CalculateBoundingSphere(const vector<glm::vec3>& positions);
 		Handle<Buffer> InsertBufferSpace(VkIndexType indexType);
+
+		// Reserve one attribute / index range; Build() then commits the submesh. All
+		// attributes of a submesh share the span reserved by the first Allocate call.
+		MeshBufferRegion Allocate(const string& name, uint32_t stride, const vector<uint8_t>& data);
+		MeshBufferRegion Allocate(VkIndexType indexType, const vector<uint8_t>& indexData);
+		MeshAllocation Build();
 
 		// Carve `count` elements out of the free-span list (first-fit), falling back
 		// to extending the tail. `maxCount` bounds the tail against the buffer size.
@@ -120,17 +109,9 @@ namespace Core
 		bool _hasPendingVertexSpan = false;
 		uint32_t _pendingIndexOffset = 0;
 		uint32_t _pendingIndexCount = 0;
-		vec4 _tempBoundingSphere;
 
 		unordered_map<uint32_t, MeshAllocation> _allocations;
 		vector<uint32_t> _freeList;
 		uint32_t _nextMeshID = 0;
-
-		// Raw geometry handed over by loaders, drained by Sync().
-		GeometryUploadQueue _uploadQueue;
-
-		// Scene-wide local-space bounds (accumulated across all POSITION allocations)
-		glm::vec3 _sceneBoundsMin{FLT_MAX};
-		glm::vec3 _sceneBoundsMax{-FLT_MAX};
 	};
 }

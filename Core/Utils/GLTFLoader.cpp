@@ -301,7 +301,6 @@ void Core::GLTFLoader::LoadSkybox(string path)
 
 	auto texture = _resourceCache.LoadTexture(textureName,
 		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
-	_renderContext->GetTextureUploadQueue().Push({ texture, path });
 
 	auto material = _resourceCache.LoadMaterial("skybox", "Skybox");
 	material.Get().AddTexture(1, texture);
@@ -586,7 +585,6 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -603,7 +601,6 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -625,7 +622,6 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-				_renderContext->GetTextureUploadQueue().Push({ texture, texture.Get().GetName() });
 
 				if (useBindless)
 				{
@@ -705,139 +701,69 @@ static string MakeSubMeshName(const string& meshName, const tinygltf::Primitive&
 	return meshName + "_" + std::to_string(subMeshHash);
 }
 
+Core::SubMeshGeometry Core::GLTFLoader::ReadGeometry(const tinygltf::Primitive& primitive)
+{
+	SubMeshGeometry geometry;
+
+	for (auto& attribute : primitive.attributes)
+	{
+		uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+		geometry.attributes.push_back(
+			{ attribute.first, stride, GetAttributeData(_model, attribute.second) });
+	}
+
+	if (primitive.indices >= 0)
+	{
+		auto indexData = GetAttributeData(_model, primitive.indices);
+		geometry.indexType = NormalizeIndexData(
+			GetAttributeFormat(_model, primitive.indices), indexData);
+		geometry.indexData = move(indexData);
+		geometry.hasIndex = true;
+	}
+
+	return geometry;
+}
+
 void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials)
 {
-	// Scene geometry lives in the global mesh buffers: hand the raw data to the render
-	// side's upload queue, which allocates and uploads it (RenderScene::Sync).
-	auto& uploadQueue = _renderContext->GetGeometryUploadQueue();
-
-	for (auto& gltfMesh : _model->meshes)
-	{
-		auto meshName = gltfMesh.name;
-
-		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
-
-		MeshGeometryUpload geometryUpload;
-		geometryUpload.debugName = meshName;
-
-		for (auto& primitive : gltfMesh.primitives)
-		{
-			string subMeshName = MakeSubMeshName(meshName, primitive);
-
-			auto subMesh = _resourceCache.LoadSubMesh(subMeshName);
-			auto& sm = subMesh.Get();
-
-			// Already queued: either from an earlier mesh (queue) or an identical
-			// primitive within this one (local batch, not pushed yet).
-			bool queuedHere = any_of(geometryUpload.subMeshes.begin(), geometryUpload.subMeshes.end(),
-				[&](const SubMeshGeometry& g) { return g.subMesh == subMesh; });
-
-			if (!sm.HasAllocation() && !queuedHere && !uploadQueue.IsQueued(subMesh))
-			{
-				SubMeshGeometry geometry;
-				geometry.subMesh = subMesh;
-
-				for (auto& attribute : primitive.attributes)
-				{
-					const string& name = attribute.first;
-					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-					geometry.attributes.push_back(
-						{ name, stride, GetAttributeData(_model, attribute.second) });
-				}
-
-				if (primitive.indices >= 0)
-				{
-					sm.SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-
-					auto indexData = GetAttributeData(_model, primitive.indices);
-					geometry.indexType = NormalizeIndexData(
-						GetAttributeFormat(_model, primitive.indices), indexData);
-					geometry.indexData = move(indexData);
-					geometry.hasIndex = true;
-				}
-
-				geometryUpload.subMeshes.push_back(move(geometry));
-			}
-
-			mesh->AddSubMesh(subMesh);
-			mesh->AddMaterial(materials[primitive.material]);
-		}
-
-		if (!geometryUpload.subMeshes.empty())
-			uploadQueue.Push(move(geometryUpload));
-
-		// The dirty flag is what triggers the drain + draw-set rebuild.
-		_scene.MarkDirty();
-
-		_meshes.push_back(mesh.get());
-		_scene.AddComponent(move(mesh));
-	}
+	LoadMeshes(materials, GeometryStorage::Global);
 }
 
 void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& materials)
 {
-	// The skybox is not part of the GPU-driven draw set (it draws with its own bound
-	// buffers), so its geometry gets per-submesh buffers instead of the global ones.
+	// The skybox draws with its own bound buffers, outside the GPU-driven draw set.
+	LoadMeshes(materials, GeometryStorage::Standalone);
+}
+
+void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
+	GeometryStorage storage)
+{
+	// ResourceCache reserves space for the geometry as it is registered and defers the
+	// copy (RenderScene::Sync); the only difference between the two storage modes is
+	// which buffers that space comes from.
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
 
 		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
 
-		// One upload (one transfer job) per glTF mesh, covering all its buffers.
-		BufferUpload bufferUpload;
-		bufferUpload.debugName = meshName;
-
 		for (auto& primitive : gltfMesh.primitives)
 		{
 			string subMeshName = MakeSubMeshName(meshName, primitive);
 
-			auto subMesh = _resourceCache.LoadSubMesh(subMeshName);
-			auto& sm = subMesh.Get();
-
-			if (!sm.HasBuffers())
-			{
-				for (auto& attribute : primitive.attributes)
-				{
-					const string& name = attribute.first;
-					auto vertexData = GetAttributeData(_model, attribute.second);
-
-					auto vertexBuffer = _resourceCache.LoadBuffer(
-						{ vertexData.size(),
-						  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  MemoryType::DEVICE_LOCAL },
-						subMeshName + name);
-					sm.SetVertexBuffer(name, vertexBuffer);
-					bufferUpload.regions.push_back({ vertexBuffer, move(vertexData), 0 });
-				}
-
-				if (primitive.indices >= 0)
-				{
-					sm.SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-
-					auto indexData = GetAttributeData(_model, primitive.indices);
-					VkIndexType indexType = NormalizeIndexData(
-						GetAttributeFormat(_model, primitive.indices), indexData);
-
-					auto indexBuffer = _resourceCache.LoadBuffer(
-						{ indexData.size(),
-						  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  MemoryType::DEVICE_LOCAL },
-						sm.GetName() + " index");
-					sm.SetIndexBuffer(indexBuffer, indexType);
-					bufferUpload.regions.push_back({ indexBuffer, move(indexData), 0 });
-				}
-			}
+			auto subMesh = (storage == GeometryStorage::Global)
+				? _resourceCache.LoadSubMesh(subMeshName, ReadGeometry(primitive))
+				: _resourceCache.LoadStandaloneSubMesh(subMeshName, ReadGeometry(primitive));
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
 		}
 
-		if (!bufferUpload.regions.empty())
-			_renderContext->GetBufferUploadQueue().Push(move(bufferUpload));
-
 		_meshes.push_back(mesh.get());
 		_scene.AddComponent(move(mesh));
+
+		// Scene membership changed, so the draw set has to be rebuilt.
+		_renderContext->GetRendererBatch()->MarkDirty();
 	}
 }
 

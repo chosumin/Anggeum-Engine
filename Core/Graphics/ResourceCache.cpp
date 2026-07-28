@@ -140,13 +140,16 @@ namespace Core
 		Handle<Texture> handle = _texturePool.Add(texture);
 		_textureHandles[newName] = handle;
 
-		// File-loaded textures are the ones sampled through the bindless array, so
-		// register once here rather than per material reference at the call site.
-		if (_renderContext && _renderContext->HasBindlessSupport())
+		if (_renderContext)
 		{
-			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-			uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
-			texture->SetBindlessIndex(bindlessIndex);
+			if (_renderContext->HasBindlessSupport())
+			{
+				auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+				uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
+				texture->SetBindlessIndex(bindlessIndex);
+			}
+
+			_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
 		}
 
 		return handle;
@@ -166,7 +169,18 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Core::SubMesh> ResourceCache::LoadSubMesh(const string& name)
+	// Index count is implied by the data, so callers don't have to pass it separately.
+	static uint32_t IndexCountOf(const SubMeshGeometry& geometry)
+	{
+		if (!geometry.hasIndex)
+			return 0;
+
+		uint32_t stride = (geometry.indexType == VK_INDEX_TYPE_UINT16)
+			? sizeof(uint16_t) : sizeof(uint32_t);
+		return static_cast<uint32_t>(geometry.indexData.size() / stride);
+	}
+
+	Handle<Core::SubMesh> ResourceCache::LoadSubMesh(const string& name, SubMeshGeometry&& geometry)
 	{
 		lock_guard<mutex> guard(_subMeshMutex);
 
@@ -175,9 +189,74 @@ namespace Core
 			return it->second;
 
 		auto subMesh = make_shared<Core::SubMesh>(_device, name);
+		subMesh->SetIndexCount(IndexCountOf(geometry));
+
+		GeometryCopyBatch batch;
+		batch.debugName = "Geometry_" + name;
+		// Scanning every vertex for bounds is the expensive part, so the upload job
+		// does it on a worker thread and reports back here.
+		batch.boundsTarget = subMesh.get();
+
+		auto* meshBufferManager = _renderContext->GetMeshBufferManager();
+		subMesh->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
+
+		if (!batch.copies.empty())
+			_renderContext->GetGeometryCopyQueue().Push(move(batch));
 
 		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
 		_subMeshHandles[name] = handle;
+		return handle;
+	}
+
+	Handle<Core::SubMesh> ResourceCache::LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry)
+	{
+		Handle<SubMesh> handle;
+		Core::SubMesh* subMesh = nullptr;
+		{
+			lock_guard<mutex> guard(_subMeshMutex);
+
+			auto it = _subMeshHandles.find(name);
+			if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
+				return it->second;
+
+			auto created = make_shared<Core::SubMesh>(_device, name);
+			created->SetIndexCount(IndexCountOf(geometry));
+
+			subMesh = created.get();
+			handle = _subMeshPool.Add(created);
+			_subMeshHandles[name] = handle;
+		}
+
+		// Not part of the global storage, so this geometry gets its own buffers.
+		// LoadBuffer takes its own lock, hence outside the guard above.
+		GeometryCopyBatch batch;
+		batch.debugName = "Standalone_" + name;
+
+		for (auto& attr : geometry.attributes)
+		{
+			auto buffer = LoadBuffer(
+				{ attr.data.size(),
+				  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				  MemoryType::DEVICE_LOCAL },
+				name + attr.name);
+			subMesh->SetVertexBuffer(attr.name, buffer);
+			batch.copies.push_back({ buffer, move(attr.data), 0 });
+		}
+
+		if (geometry.hasIndex)
+		{
+			auto buffer = LoadBuffer(
+				{ geometry.indexData.size(),
+				  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				  MemoryType::DEVICE_LOCAL },
+				name + " index");
+			subMesh->SetIndexBuffer(buffer, geometry.indexType);
+			batch.copies.push_back({ buffer, move(geometry.indexData), 0 });
+		}
+
+		if (!batch.copies.empty())
+			_renderContext->GetGeometryCopyQueue().Push(move(batch));
+
 		return handle;
 	}
 
