@@ -94,8 +94,12 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 	}
 }
 
-void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocation)
+void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size)
 {
+	// Copy the caller's byte count, NOT allocation.size: allocations are rounded up to
+	// the alignment, so the reservation is always larger than the data behind srcData.
+	assert(size <= allocation.size && "copy larger than the allocation");
+
 	lock_guard<mutex> lock(_mutex);
 
 	auto device = _device.GetDevice();
@@ -104,9 +108,9 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 
 	auto& block = *FindMemoryBlock(allocation.id);
 
-	vkMapMemory(device, block.memory, 
+	vkMapMemory(device, block.memory,
 		allocation.offset, allocation.size, 0, &tempData);
-	memcpy(tempData, srcData, (size_t)allocation.size);
+	memcpy(tempData, srcData, (size_t)size);
 	vkUnmapMemory(device, block.memory);
 }
 
@@ -366,7 +370,7 @@ void Core::MemoryAllocatorManager::UnmapMemory(MemoryAllocation& allocation)
 	_memoryAllocators[allocation.type]->UnmapMemory(allocation);
 }
 
-void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation)
+void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size)
 {
-	_memoryAllocators[allocation.type]->CopyBuffer(srcData, allocation);
+	_memoryAllocators[allocation.type]->CopyBuffer(srcData, allocation, size);
 }

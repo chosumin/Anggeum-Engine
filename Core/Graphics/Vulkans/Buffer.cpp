@@ -50,7 +50,7 @@ Core::Buffer::~Buffer()
 
 void Core::Buffer::CopyBuffer(void* data, VkDeviceSize size)
 {
-	_allocator->CopyBuffer(data, *_allocation);
+	_allocator->CopyBuffer(data, *_allocation, size);
 }
 
 void Core::Buffer::GetMappedPtr(void** data)
