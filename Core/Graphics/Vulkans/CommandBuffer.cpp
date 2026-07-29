@@ -17,7 +17,7 @@
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
-	_frame = -MAX_FRAMES_IN_FLIGHT;
+	_frame = Core::FrameCounter::GetFrameNumber();
 	_queueFamilyIndex = commandPool.GetQueueFamilyIndex();
 
 	VkCommandBufferAllocateInfo allocInfo{};
@@ -387,7 +387,9 @@ void Core::CommandBuffer::EndCommandBuffer()
 
 bool Core::CommandBuffer::IsBusy()
 {
-    return _frame + 1 >= Core::FrameCounter::GetFrameNumber();
+    // A buffer used at frame N may still be executing on the GPU until its frame
+    // slot has cycled through every frame in flight.
+    return Core::FrameCounter::GetFrameNumber() < _frame + MAX_FRAMES_IN_FLIGHT;
 }
 
 void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, Core::Job& job)
