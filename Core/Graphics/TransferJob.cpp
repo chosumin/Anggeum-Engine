@@ -1,48 +1,50 @@
 #include "stdafx.h"
 #include "TransferJob.h"
+#include "Graphics/Vulkans/Texture.h"
 
-Core::VkImageJob::VkImageJob(Device& device, weak_ptr<Image> dstImage, string filePath)
-	:Job(JobType::TRANSFER), _device(device), _dstImage(dstImage), _filePath(filePath)
+Core::VkImageJob::VkImageJob(Device& device, Texture& dstTexture, string filePath)
+	:Job(JobType::TRANSFER), _device(device), _dstTexture(dstTexture), _filePath(filePath)
 {
 }
 
-Core::VkImageJob::~VkImageJob()
-{
-	if (_stagingBuffer != nullptr)
-		delete(_stagingBuffer);
-}
+Core::VkImageJob::~VkImageJob() = default;
 
 void Core::VkImageJob::Execute()
 {
-	auto sharedImage = _dstImage.lock();
-	if (sharedImage == nullptr ||
-		sharedImage->GetImage() != VK_NULL_HANDLE)
+	// The command methods take the Texture&; the Image is only needed for the
+	// CPU-side file load and dimension queries.
+	Image& image = _dstTexture.GetImage();
+
+	// Already uploaded (VkImage created) — nothing to do.
+	if (image.GetImage() != VK_NULL_HANDLE)
 	{
 		status = JobStatus::COMPLETE;
 		return;
 	}
 
 	vector<uint8_t> imageData;
-	sharedImage->Load(imageData);
+	image.Load(imageData);
 
 	VkDeviceSize bufferSize = imageData.size();
 
-	_stagingBuffer = new Core::Buffer(_device,
+	_stagingBuffer = make_unique<Core::Buffer>(_device,
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		MemoryType::STAGE);
 
 	_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
 
-	commandBuffer->TransitionImageLayout(*sharedImage, VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	commandBuffer->CreateBarrierBatch()
+		.Image(_dstTexture, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		.Submit();
 
-	auto extent = sharedImage->GetExtent();
-	commandBuffer->CopyBufferToImage(*_stagingBuffer, *sharedImage, extent.width, extent.height);
+	auto extent = image.GetExtent();
+	commandBuffer->CopyBufferToImage(*_stagingBuffer, _dstTexture, extent.width, extent.height);
 
 	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
-	if (sharedImage->GetMipLevel() > 1)
-		commandBuffer->GenerateMipmaps(*sharedImage, sharedImage->GetMipLevel());
+	if (image.GetMipLevel() > 1)
+		commandBuffer->GenerateMipmaps(_dstTexture, image.GetMipLevel());
 
 	status = JobStatus::COMPLETE;
 }

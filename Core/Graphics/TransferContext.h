@@ -14,7 +14,9 @@ namespace Core
 
 		void UpdateFrame(uint32_t frame);
 
-		void Enqueue(Job* job, const string& jobName);
+		// Takes ownership of the job. A name already pending drops the new job
+		// (destroyed on return) — the queued one covers the request.
+		void Enqueue(unique_ptr<Job> job, const string& jobName);
 		void Wait();
 	private:
 		void ClearJobs();
@@ -32,7 +34,7 @@ namespace Core
 
 		Core::Timer _timer;
 
-		unordered_map<string, Job*> _pendingJobs;
+		unordered_map<string, unique_ptr<Job>> _pendingJobs;
 	};
 }
 

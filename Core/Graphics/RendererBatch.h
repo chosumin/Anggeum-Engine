@@ -1,88 +1,107 @@
 #pragma once
 #include "IndirectDrawBuffer.h"
 #include "BufferObjects.h"
+#include "ResourceHandle.h"
+#include "ResourcePool.h"
 
 namespace Core
 {
 	class Material;
-	class Pipeline;
-	class Texture;
 	class SubMesh;
 	class Mesh;
-	class Shader;
-	class RenderPass;
-	class PipelineState;
 	class Transform;
-	class CommandBuffer;
-	class RenderFrame;
 	class Buffer;
-	class Framebuffer;
-	class DescriptorSetBuilder;
-	class Culler;
 	class Scene;
+	class TransferContext;
 
 	struct TransformBatch
 	{
-		Buffer* TransformBuffer;
-		vector<uint> EntityIds;
+		// Persistent (handle pattern), owned via ResourceManager; resolve with .Get().
+		Handle<Buffer> TransformBuffer;
 	};
 
 	struct SubMeshBatch
 	{
-		weak_ptr<SubMesh> SubMesh;
-		vector<uint> Transforms;
-		uint32_t FirstInstance;
+		Handle<SubMesh> SubMesh;
+		vector<uint> Transforms;   // entity ids, one per instance
 	};
 
 	struct MaterialBatch
 	{
-		weak_ptr<Material> Material;
+		Handle<Material> Material;
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
-	// RendererBatch: A batch of draw calls for meshes.
-	// Contains material batches grouped by material.
+	// RendererBatch: the application-wide GPU-driven draw set. Part of RenderScene
+	// (owned by Engine), a single instance shared by every frame-in-flight. Its buffers
+	// are read-only inputs to the per-frame Cullers, so one shared copy is safe (the
+	// mutable culling outputs live per-frame in the Culler). Rebuilt from the scene by
+	// Prepare(), which RenderScene::Sync calls only when the scene structure changed.
 	class RendererBatch
 	{
 	public:
-		RendererBatch(Device& device, Scene& scene, TransformBatch& transformBatch, VkExtent2D extents);
+		RendererBatch(Device& device);
 		~RendererBatch();
 
-		Buffer* GetObjectDataBuffer() const { return _objectDataBuffer; }
-		Buffer* GetIndirectCommandBuffer() const { return _indirectCommandBuffer; }
-		Buffer* GetMaterialIndexBuffer() const { return _materialIndexBuffer; }
+		// Marks the draw set stale — call after adding/removing scene meshes. Kept here
+		// rather than on Scene: which membership changes matter is a rendering concern,
+		// and it keeps every manager owning its own dirty state.
+		void MarkDirty() { _dirty = true; }
+
+		// Bumped every time the draw set is rebuilt. Holders that sized themselves
+		// against the batch (Cullers) compare this to notice they went stale
+		uint64_t GetRevision() const { return _revision; }
+
+		// Rebuild the whole draw set from the current scene membership. Self-gated;
+		// no-op when clean. The buffer fills are enqueued on `transfer`, so the
+		// caller has to flush it before the frame reads the draw set.
+		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
+
+		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
+		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
+		Buffer& GetMaterialIndexBuffer() const { return _materialIndexBuffer.Get(); }
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
-		Buffer* GetInstanceBuffer() const { return _instanceBuffer; }
+		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
-		TransformBatch* GetTransformBatch() const { return _transformBatch; }
+		TransformBatch& GetTransformBatch() { return _transformBatch; }
 		VkExtent2D GetExtents() const { return _extents; }
-		shared_ptr<Material> GetFirstMaterial() const;
 
 	private:
-		void AddMesh(uint entityId, weak_ptr<Material> material, weak_ptr<SubMesh> subMesh);
-		void PrepareGPUDrivenRendering(VkExtent2D extents);
-		void CreateInstanceBuffer(Device& device);
+		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
+		void InitializeFromScene(Scene& scene);
+		void RebuildGpuBuffers(TransferContext& transfer);
+
+		// Create the buffer on first use, resize it in place afterwards so the handle
+		// stays valid. Callers must ensure no frame is in flight when resizing.
+		Handle<Buffer> AcquirePersistentBuffer(Handle<Buffer> current,
+			const struct BufferDesc& desc, const string& name);
 
 	private:
 		Device& _device;
-		TransformBatch* _transformBatch = nullptr;
+
+		TransformBatch _transformBatch;
+		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix
 
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		Core::Buffer* _instanceBuffer = nullptr;
+		// Persistent GPU buffers (handle pattern), owned via ResourceManager.
+		Handle<Buffer> _instanceBuffer;
 		uint _instanceCount = 0;
 
 		IndirectDrawBuffer _indirectDrawBuffer;
-		Core::Buffer* _indirectCommandBuffer = nullptr;
-		Core::Buffer* _materialIndexBuffer = nullptr;
+		Handle<Buffer> _indirectCommandBuffer;
+		Handle<Buffer> _materialIndexBuffer;
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
-		Core::Buffer* _objectDataBuffer = nullptr;
+		Handle<Buffer> _objectDataBuffer;
+
+		bool _hasGpuBuffers = false; // GPU buffers created at least once
+		bool _dirty = false;         // scene membership changed since the last rebuild
+		uint64_t _revision = 0;      // incremented on every rebuild
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};
 	};
 }
-

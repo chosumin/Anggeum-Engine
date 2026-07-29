@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -26,7 +27,7 @@ namespace Core
         VkExtent2D _extent;
         VkSampleCountFlagBits _msaaSamples;
 
-        shared_ptr<Shader> _depthNormalShader;
+        Handle<Shader> _depthNormalShader;
         Pipeline* _pipeline = nullptr;
 
         // Pass 2 RenderPass (color LOAD, depth LOAD)

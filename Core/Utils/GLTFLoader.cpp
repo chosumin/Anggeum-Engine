@@ -3,19 +3,13 @@
 #include "Log.h"
 #include "Foundation/Scene.h"
 #include "Foundation/Entity.h"
-#include "Graphics/TransferJob.h"
-#include "Graphics/TransferContext.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/Vulkans/BindlessTextureManager.h"
-#include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Texture.h"
-#include "Graphics/Vulkans/Vertex.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
-#include "Graphics/ResourceCache.h"
-#include "Graphics/MeshBufferManager.h"
+#include "Graphics/GeometryUpload.h"
+#include "Graphics/ResourceManager.h"
 #include "Components/Mesh.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
@@ -261,9 +255,9 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
-Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene, TransferContext& transferContext)
-	: _device(device), _scene(scene), _transferContext(transferContext), 
-	_resourceCache(device.GetResourceCache())
+Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
+	: _device(device), _scene(scene),
+	_resourceManager(device.GetResourceManager())
 {
 	_model = new tinygltf::Model();
 }
@@ -305,15 +299,14 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		VK_FORMAT_R16G16B16A16_SFLOAT 
 	};
 
-	auto texture = _resourceCache.RequestTexture(textureName,
-		imageCreateInfo, DEFAULT_SAMPLER);
-	_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), path), textureName);
+	auto texture = _resourceManager.LoadTexture(textureName,
+		imageCreateInfo, _resourceManager.LoadSampler(DEFAULT_SAMPLER));
 
-	auto material = _resourceCache.RequestMaterial("skybox", "Skybox");
-	material->AddTexture(1, texture);
+	auto material = _resourceManager.LoadMaterial("skybox", "Skybox");
+	material.Get().AddTexture(1, texture);
 
-	vector<shared_ptr<Material>> materials = { material };
-	LoadMeshes(materials, false);
+	vector<Handle<Material>> materials = { material };
+	LoadSkyboxMeshes(materials);
 
 	LoadNodes();
 }
@@ -355,9 +348,7 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 
 	auto samplers = LoadSamplers();
 
-	auto images = LoadImages(modelPath);
-
-	auto textures = LoadTextures(samplers, images);
+	auto textures = LoadTextures(samplers, modelPath);
 
 	auto materials = LoadMaterials(textures);
 	
@@ -484,11 +475,11 @@ void Core::GLTFLoader::LoadLights()
 	}
 }
 
-vector<shared_ptr<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
+vector<Core::Handle<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
 {
 	size_t size = _model->samplers.size();
 
-	vector<shared_ptr<Core::Sampler>> samplers(size);
+	vector<Core::Handle<Core::Sampler>> samplers(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -500,7 +491,7 @@ vector<shared_ptr<Core::Sampler>> Core::GLTFLoader::LoadSamplers()
 	return samplers;
 }
 
-shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
+Core::Handle<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	Device& device, tinygltf::Sampler& gltfSampler)
 {
 	SamplerCreateInfo samplerCreateInfo{};
@@ -510,47 +501,28 @@ shared_ptr<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	samplerCreateInfo.wrapT = FindWrapMode(gltfSampler.wrapT);
 	samplerCreateInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
 
-	auto sampler = _resourceCache.RequestSampler(samplerCreateInfo);
-
-	return sampler;
+	return _resourceManager.LoadSampler(samplerCreateInfo);
 }
 
-vector<shared_ptr<Core::Image>> Core::GLTFLoader::LoadImages(const string& modelPath)
-{
-	auto size = _model->images.size();
-
-	vector<shared_ptr<Core::Image>> images(size);
-
-	for (size_t i = 0; i < size; ++i)
-	{
-		auto image = _model->images[i];
-
-		// From URI
-		ImageCreateInfo imageCreateInfo{};
-		imageCreateInfo.filePath = modelPath + "/" + image.uri;
-
-		auto vkImage = _resourceCache.RequestImage(imageCreateInfo);
-		images[i] = vkImage;
-	}
-
-	return images;
-}
-
-vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
-	vector<shared_ptr<Core::Sampler>>& samplers, vector<shared_ptr<Core::Image>>& images)
+vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
+	vector<Core::Handle<Core::Sampler>>& samplers, const string& modelPath)
 {
 	size_t size = _model->textures.size();
 
-	vector<shared_ptr<Core::Texture>> textures(size);
+	vector<Handle<Core::Texture>> textures(size);
 
 	for (size_t i = 0; i < size; ++i)
 	{
 		int imageIndex = _model->textures[i].source;
 		int samplerIndex = _model->textures[i].sampler;
 
-		auto texture = 
-			_resourceCache.RequestTexture(_model->textures[i].name,
-			images[imageIndex], samplers[samplerIndex]);
+		// Texture owns its Image 1:1; build it from the glTF image URI.
+		ImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
+
+		auto texture =
+			_resourceManager.LoadTexture(_model->textures[i].name,
+				imageCreateInfo, samplers[samplerIndex]);
 
 		textures[i] = texture;
 	}
@@ -558,21 +530,15 @@ vector<shared_ptr<Core::Texture>> Core::GLTFLoader::LoadTextures(
 	return textures;
 }
 
-vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared_ptr<Core::Texture>>& textures)
+vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core::Handle<Core::Texture>>& textures)
 {
 	size_t size = _model->materials.size();
-	
-	vector<shared_ptr<Core::Material>> materials(size);
-	
-	// Check bindless support
-	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
-	BindlessTextureManager* bindlessManager = nullptr;
 
-	if (useBindless)
-	{
-		bindlessManager = _renderContext->GetBindlessTextureManager();
-		cout << "GLTFLoader: Using bindless textures for materials" << endl;
-	}
+	vector<Handle<Core::Material>> materials(size);
+	
+	// Textures are registered to the bindless array by ResourceManager at load time;
+	// here we only read each texture's assigned index.
+	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
 
 	for (size_t i = 0; i < size; ++i)
 	{
@@ -582,17 +548,18 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			_modelPath + to_string(i) : gltfMaterial.name;
 
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = _resourceCache.RequestMaterial(matName, "PBR");
+		auto material = _resourceManager.LoadMaterial(matName, "PBR");
+		auto& mat = material.Get();
 
-		//Already bound
-		if (material.use_count() > 1)
+		//Already configured (deduped by name)
+		if (mat.HasBuffers())
 		{
 			materials[i] = material;
 			continue;
 		}
 
 		PBRBuffer* pbrBuffer = new PBRBuffer();
-		material->AddBuffer(1, pbrBuffer);
+		mat.AddBuffer(1, pbrBuffer);
 
 		pbrBuffer->Albedo = glm::vec4(1);
 
@@ -618,19 +585,15 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			else if (value.first.find("baseColorTexture") != string::npos)
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->BasemapIndex = handle.index & 0x7FFFFFFF; // Store index without cubemap flag
+					pbrBuffer->BasemapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF; // strip cubemap flag
 				}
 				else
 				{
 					// Traditional binding
-					material->AddTexture(2, texture);
+					mat.AddTexture(2, texture);
 				}
 				
 				pbrBuffer->AlbedoTextureSet = 1;
@@ -638,18 +601,14 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			else if (value.first.find("metallicRoughnessTexture") != string::npos) 
 			{
 				auto texture = textures[value.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->MetallicRoughnessmapIndex = handle.index & 0x7FFFFFFF;
+					pbrBuffer->MetallicRoughnessmapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF;
 				}
 				else
 				{
-					material->AddTexture(4, texture);
+					mat.AddTexture(4, texture);
 				}
 				
 				pbrBuffer->RoughnessTextureSet = 1;
@@ -663,18 +622,14 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 			if (additionalValue.first.find("normalTexture") != string::npos)
 			{
 				auto texture = textures[additionalValue.second.TextureIndex()];
-				_transferContext.Enqueue(new VkImageJob(_device, texture->GetImage(), texture->GetName()), texture->GetName());
 
 				if (useBindless)
 				{
-					// Register to bindless manager
-					TextureHandle handle = bindlessManager->RegisterTexture(texture);
-					material->AddBindlessTexture(handle);
-					pbrBuffer->NormalmapIndex = handle.index & 0x7FFFFFFF;
+					pbrBuffer->NormalmapIndex = texture.Get().GetBindlessIndex() & 0x7FFFFFFF;
 				}
 				else
 				{
-					material->AddTexture(3, texture);
+					mat.AddTexture(3, texture);
 				}
 			}
 			else if (additionalValue.first.find("emissiveTexture") != string::npos)
@@ -711,180 +666,104 @@ vector<shared_ptr<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<shared
 	return materials;
 }
 
-void Core::GLTFLoader::LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer)
+// Maps a glTF index accessor format to a Vulkan index type, widening 8-bit
+// indices to 16-bit in place (still stored in a uint8 vector).
+inline VkIndexType NormalizeIndexData(VkFormat format, vector<uint8_t>& indexData)
 {
-	bool useGpuDriven = useGlobalBuffer;
-	MeshBufferManager* meshBufferManager = nullptr;
-	MaterialManager* materialManager = nullptr;
-
-	if (useGpuDriven)
+	switch (format)
 	{
-		meshBufferManager = _renderContext->GetMeshBufferManager();
-		materialManager = _renderContext->GetMaterialManager();
+	case VK_FORMAT_R8_UINT:
+		indexData = ConvertDataStride(indexData, 1, 2);
+		return VK_INDEX_TYPE_UINT16;
+	case VK_FORMAT_R32_UINT:
+		return VK_INDEX_TYPE_UINT32;
+	case VK_FORMAT_R16_UINT:
+	default:
+		return VK_INDEX_TYPE_UINT16;
+	}
+}
+
+// SubMeshes are deduped by name; the hash covers the accessors a primitive reads, so
+// identical primitives resolve to the same cached SubMesh.
+static string MakeSubMeshName(const string& meshName, const tinygltf::Primitive& primitive)
+{
+	size_t subMeshHash = 0;
+
+	for (auto& attribute : primitive.attributes)
+	{
+		Core::Utility::HashCombine(subMeshHash, attribute.first);
+		Core::Utility::HashCombine(subMeshHash, attribute.second);
 	}
 
+	if (primitive.indices >= 0)
+		Core::Utility::HashCombine(subMeshHash, primitive.indices);
+
+	return meshName + "_" + std::to_string(subMeshHash);
+}
+
+Core::SubMeshGeometry Core::GLTFLoader::ReadGeometry(const tinygltf::Primitive& primitive)
+{
+	SubMeshGeometry geometry;
+
+	for (auto& attribute : primitive.attributes)
+	{
+		uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+		geometry.attributes.push_back(
+			{ attribute.first, stride, GetAttributeData(_model, attribute.second) });
+	}
+
+	if (primitive.indices >= 0)
+	{
+		auto indexData = GetAttributeData(_model, primitive.indices);
+		geometry.indexType = NormalizeIndexData(
+			GetAttributeFormat(_model, primitive.indices), indexData);
+		geometry.indexData = move(indexData);
+		geometry.hasIndex = true;
+	}
+
+	return geometry;
+}
+
+void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials)
+{
+	LoadMeshes(materials, GeometryStorage::Global);
+}
+
+void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& materials)
+{
+	// The skybox draws with its own bound buffers, outside the GPU-driven draw set.
+	LoadMeshes(materials, GeometryStorage::Standalone);
+}
+
+void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
+	GeometryStorage storage)
+{
+	// ResourceManager reserves space for the geometry as it is registered and defers the
+	// copy (RenderScene::Sync); the only difference between the two storage modes is
+	// which buffers that space comes from.
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
 
 		unique_ptr<Core::Mesh> mesh = make_unique<Mesh>(_device);
 
-		size_t primSize = gltfMesh.primitives.size();
-		for (int i = 0; i < primSize; ++i)
+		for (auto& primitive : gltfMesh.primitives)
 		{
-			auto primitive = gltfMesh.primitives[i];
+			string subMeshName = MakeSubMeshName(meshName, primitive);
 
-			// Generate hash based on primitive data
-			size_t subMeshHash = 0;
-			
-			// Hash vertex attributes
-			for (auto& attribute : primitive.attributes)
-			{
-				Core::Utility::HashCombine(subMeshHash, attribute.first);
-				Core::Utility::HashCombine(subMeshHash, attribute.second);
-			}
-			
-			// Hash indices
-			if (primitive.indices >= 0)
-			{
-				Core::Utility::HashCombine(subMeshHash, primitive.indices);
-			}
-			
-			string subMeshName = meshName + "_" + std::to_string(subMeshHash);
+			auto subMesh = (storage == GeometryStorage::Global)
+				? _resourceManager.LoadSubMesh(subMeshName, ReadGeometry(primitive))
+				: _resourceManager.LoadStandaloneSubMesh(subMeshName, ReadGeometry(primitive));
 
-			auto subMesh = 
-				_resourceCache.RequestSubMesh(subMeshName);
-
-			if (useGpuDriven)
-			{
-				if (subMesh->HasAllocation())
-				{
-					// Already jobified
-					mesh->AddSubMesh(subMesh);
-					mesh->AddMaterial(materials[primitive.material]);
-					continue;
-				}
-
-				size_t count = 0;
-				for (auto& attribute : primitive.attributes)
-				{
-					string name = attribute.first;
-
-					auto vertexData = GetAttributeData(_model, attribute.second);
-
-					auto& accessor = _model->accessors[attribute.second];
-
-					count = accessor.count;
-
-					VkFormat format = GetAttributeFormat(_model, attribute.second);
-					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-					meshBufferManager->Allocate(_transferContext, name, stride, 
-						move(vertexData), subMeshName);
-				}
-
-				if (primitive.indices >= 0)
-				{
-					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-
-					auto indexData = GetAttributeData(_model, primitive.indices);
-
-					VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-					switch (format)
-					{
-					case VK_FORMAT_R8_UINT:
-						// Converts uint8 data into uint16 data, still represented by a uint8 vector
-						indexData = ConvertDataStride(indexData, 1, 2);
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R16_UINT:
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R32_UINT:
-						indexType = VK_INDEX_TYPE_UINT32;
-						break;
-					}
-
-					meshBufferManager->Allocate(_transferContext, indexType, move(indexData), subMesh->GetName() + " index");
-				}
-
-				MeshAllocation allocation = meshBufferManager->Build();
-
-				subMesh->SetAllocation(allocation);
-
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
-			}
-			else
-			{
-				// Legacy
-				//Already jobified
-				if (subMesh.use_count() > 1)
-				{
-					mesh->AddSubMesh(subMesh);
-					mesh->AddMaterial(materials[primitive.material]);
-					continue;
-				}
-
-				size_t count = 0;
-				for (auto& attribute : primitive.attributes)
-				{
-					string name = attribute.first;
-
-					auto vertexData = GetAttributeData(_model, attribute.second);
-
-					auto& accessor = _model->accessors[attribute.second];
-					
-					count = accessor.count;
-
-					VkFormat format = GetAttributeFormat(_model, attribute.second);
-					uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
-
-					_transferContext.Enqueue(new VkBufferJob(
-						_device, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-						subMesh->InsertBufferSpace(name), move(vertexData)), subMeshName + name);
-				}
-
-				if (primitive.indices >= 0)
-				{
-					subMesh->SetIndexCount(Utility::ToU32(_model->accessors[primitive.indices].count));
-					
-					auto indexData = GetAttributeData(_model, primitive.indices);
-					
-					VkFormat format = GetAttributeFormat(_model, primitive.indices);
-
-					VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-
-					switch (format)
-					{
-					case VK_FORMAT_R8_UINT:
-						// Converts uint8 data into uint16 data, still represented by a uint8 vector
-						indexData = ConvertDataStride(indexData, 1, 2);
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R16_UINT:
-						indexType = VK_INDEX_TYPE_UINT16;
-						break;
-					case VK_FORMAT_R32_UINT:
-						indexType = VK_INDEX_TYPE_UINT32;
-						break;
-					}
-
-					_transferContext.Enqueue(new VkBufferJob(
-						_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-						subMesh->InsertBufferSpace(indexType), move(indexData)), subMesh->GetName() + " index");
-				}
-
-				mesh->AddSubMesh(subMesh);
-				mesh->AddMaterial(materials[primitive.material]);
-			}
+			mesh->AddSubMesh(subMesh);
+			mesh->AddMaterial(materials[primitive.material]);
 		}
 
 		_meshes.push_back(mesh.get());
 		_scene.AddComponent(move(mesh));
+
+		// Scene membership changed, so the draw set has to be rebuilt.
+		_renderContext->GetRendererBatch()->MarkDirty();
 	}
 }
 

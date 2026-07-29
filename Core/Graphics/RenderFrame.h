@@ -1,52 +1,26 @@
 #pragma once
 #include "Vulkans/DescriptorPool.h"
-#include "MeshBufferManager.h"
-#include "MaterialManager.h"
-#include "IndirectDrawBuffer.h"
+#include "Vulkans/MemoryAllocator.h"
+#include "ResourcePool.h"
+#include "FrameResources.h"
 #include "RenderExecutor.h"
+#include "RenderScene.h"
 #include "Vulkans/SubmitInfo.h"
 
 namespace Core
 {
-	class CommandBuffer;
-	class CommandPool;
-	class Material;
-	class Shader;
-	class Texture;
-	class Buffer;
 	class BindlessTextureManager;
-	class IndirectDrawBuffer;
-	class RenderPass;
-	class Framebuffer;
 	class DescriptorSetBuilder;
 	class RendererBatch;
-	class PipelineState;
-	class Scene;
-
-	struct RenderTargetDesc
-	{
-		VkExtent2D extent;
-		VkFormat format = VK_FORMAT_UNDEFINED; // For depth targets, this can be left as VK_FORMAT_UNDEFINED to auto-select a suitable depth format
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		bool isCubemap = false;
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-
-		// NOT VkImageCreateInfo::initialLayout — the image is always created as
-		// UNDEFINED (the spec allows only UNDEFINED/PREINITIALIZED there).
-		// Use this for cross-queue targets that a graphics pass may sample before
-		// the producing compute pass has ever run, so the validation layer sees a
-		// valid layout on the first frame.
-		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	};
+	class RenderScene;
 
 	class RenderFrame
 	{
 	public:
-		RenderFrame(Device& device, BindlessTextureManager* bindlessManager = nullptr);
+		// Primary frames receive the shared GPU-driven managers by reference.
+		RenderFrame(Device& device, RenderScene& renderScene);
+		// Temporary frames (e.g. IBL prefilter) draw without the GPU-driven managers.
+		explicit RenderFrame(Device& device);
 		~RenderFrame();
 		
 		// Reset frame resources
@@ -57,81 +31,41 @@ namespace Core
 		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
 		FrameSubmission& GetSubmission() { return _submission; }
 
-		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager; }
-		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.GetBindlessTextureManager(); }
+		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
 		DescriptorSetResources* GetBindlessResources();
 
-		void SetMeshBufferManager(MeshBufferManager* meshBufferManager) { _meshBufferManager = meshBufferManager; }
-		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager; }
+		// Always present on scene frames (temp frames must not call these).
+		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.GetMeshBufferManager(); }
 
-		void SetMaterialManager(MaterialManager* materialManager) { _materialManager = materialManager; }
-		MaterialManager* GetMaterialManager() { return _materialManager; }
+		MaterialManager& GetMaterialManager() { return *_renderScene.GetMaterialManager(); }
 
-		// On-Demand createion
-		shared_ptr<Texture> GetOrCreateRenderTarget(const string& name, 
-			const RenderTargetDesc& desc);
-
-		shared_ptr<Texture> GetRenderTarget(const string& name) const;
-
-		// Explicit creation (for cases where you want to control the timing of resource creation)
-		shared_ptr<Texture> CreateRenderTarget(const string& name,
-			const RenderTargetDesc& desc);
-
-		void SetPreviousDepthBuffer(shared_ptr<Texture> depth);
-		shared_ptr<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
-
-		void SetCurrentDepth(shared_ptr<Texture> depth) { _currentDepth = depth; }
-		shared_ptr<Texture> GetCurrentDepth() const { return _currentDepth; }
-		void SetCurrentNormal(shared_ptr<Texture> normal) { _currentNormal = normal; }
-		shared_ptr<Texture> GetCurrentNormal() const { return _currentNormal; }
-
-		// For debugging purposes
-		const unordered_map<string, shared_ptr<Texture>>& GetAllRenderTargets() const { return _renderTargets; }
-
-		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
-			const vector<string>& attachmentNames, int32_t layerIndex = -1);
-		Framebuffer* GetFramebuffer(const string& name) const;
-
-		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);
-
-		// Create a DescriptorSetBuilder for the given shader and set index.
-		// The built resources are stored in the frame and cleaned up on Reset().
-		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
+		// Per-frame GPU resources (render targets, transient buffers, framebuffers)
+		// live in FrameResources. Passes reach them through here.
+		FrameResources& GetResources() { return _resources; }
+		const FrameResources& GetResources() const { return _resources; }
 
 		// Culler management - per camera and RendererBatch, reused within a frame
 		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
 
-		// Batch initialization - called once at the start of rendering
-		void InitializeBatches(Scene& scene, VkExtent2D extents);
+		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
+		RendererBatch& GetRendererBatch() const { return *_renderScene.GetRendererBatch(); }
 	private:
 		void CreateSyncObjects();
-		void CreateDescriptorPool();
 
 	private:
 		Device& _device;
 
 		FrameSubmission _submission;
 
-		unique_ptr<DescriptorPool> _descriptorPool;
+		// Non-owning: the RenderScene owned by Engine. Temp frames bind this to a shared
+		// empty instance (all managers null).
+		RenderScene& _renderScene;
 
-		BindlessTextureManager* _bindlessTextureManager;
 		DescriptorSetResources _bindlessResources;
 
-		// GPU Driven Rendering Buffers
-		MeshBufferManager* _meshBufferManager = nullptr;
-		MaterialManager* _materialManager = nullptr;
-
-		unordered_map<string, shared_ptr<Texture>> _renderTargets;
-		shared_ptr<Texture> _previousDepthBuffer;
-		shared_ptr<Texture> _currentDepth;
-		shared_ptr<Texture> _currentNormal;
-
-		shared_ptr<Sampler> _defaultSampler;
-
-		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
-
-		// Builder-created resources, cleaned up on Reset()
-		vector<DescriptorSetResources> _builderResources;
+		// Per-frame GPU resources (render targets / transient buffers / framebuffers)
+		FrameResources _resources;
 
 		// Per-camera/RendererBatch cullers, reused within a frame
 		unique_ptr<RenderExecutor> _renderExecutor;

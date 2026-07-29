@@ -15,69 +15,23 @@ Core::DescriptorSetBuilder::DescriptorSetBuilder(
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
-	uint32_t binding, void* data)
+	uint32_t binding, Buffer& buffer)
 {
-	auto it = _resources.uniformBuffers.find(binding);
-	if (it == _resources.uniformBuffers.end())
-	{
-		// Find buffer size from shader layout
-		auto& layouts = _shader.GetDescriptorSetLayouts();
-		auto layoutIt = layouts.find(_setIndex);
-		if (layoutIt != layouts.end())
-		{
-			auto& uniformBindings = layoutIt->second->GetUniformBufferBindings();
-			for (auto& bindingInfo : uniformBindings)
-			{
-				if (bindingInfo.Binding == binding)
-				{
-					auto buffer = new UniformBuffer(_device, bindingInfo.BufferSize);
-					_resources.uniformBuffers[binding] = buffer;
-					it = _resources.uniformBuffers.find(binding);
-					break;
-				}
-			}
-		}
-	}
-
-	if (it != _resources.uniformBuffers.end())
-	{
-		it->second->Update(data);
-	}
-
-	return *this;
-}
-
-Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetUniformBuffer(
-	uint32_t binding, UniformBuffer* buffer)
-{
-	// Caller owns this buffer — store pointer without ownership.
-	// NOTE: CleanupBuffers will delete it, so caller must not delete separately,
-	// or we need to track ownership. For now, treat as "builder owns all".
-	_resources.uniformBuffers[binding] = buffer;
+	// UniformBuffer is a non-owning view; `buffer` stays owned by the caller.
+	_resources.uniformBuffers[binding].SetBuffer(&buffer);
 	return *this;
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
-	uint32_t binding, Buffer* buffer)
+	uint32_t binding, Buffer& buffer)
 {
-	auto it = _resources.storageBuffers.find(binding);
-	if (it == _resources.storageBuffers.end())
-	{
-		auto storageBuffer = new StorageBuffer();
-		_resources.storageBuffers[binding] = storageBuffer;
-		it = _resources.storageBuffers.find(binding);
-	}
-
-	if (it != _resources.storageBuffers.end())
-	{
-		it->second->SetBuffer(buffer);
-	}
-
+	// StorageBuffer is a non-owning view; `buffer` stays owned by the caller.
+	_resources.storageBuffers[binding].SetBuffer(buffer);
 	return *this;
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
-	uint32_t binding, shared_ptr<Texture> texture, uint32_t mipLevel,
+	uint32_t binding, Handle<Texture> texture, uint32_t mipLevel,
 	VkImageLayout layout)
 {
 	TextureBuffer texBuffer{};
@@ -127,7 +81,7 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 		if (validUniformBindings.find(binding) == validUniformBindings.end())
 			continue; // Skip bindings not in shader layout
 
-		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
+		VkWriteDescriptorSet write = buffer.CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}
@@ -138,7 +92,7 @@ Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 		if (validStorageBindings.find(binding) == validStorageBindings.end())
 			continue; // Skip bindings not in shader layout
 
-		VkWriteDescriptorSet write = buffer->CreateWriteDescriptorSet(binding);
+		VkWriteDescriptorSet write = buffer.CreateWriteDescriptorSet(binding);
 		write.dstSet = _resources.descriptorSet;
 		writes.push_back(write);
 	}

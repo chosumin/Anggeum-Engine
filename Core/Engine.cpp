@@ -4,7 +4,9 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/TransferContext.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/RenderScene.h"
+#include "Graphics/ResourceManager.h"
+#include "Foundation/Scene.h"
 #include "Graphics/ForwardRenderPipeline.h"
 #include "Sample/SampleScene.h"
 #include "Utils/timer.h"
@@ -18,18 +20,17 @@ Core::Engine::Engine(const EngineOptions& options)
     _device = new Core::Device(*options.window);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
-    _renderContext = new Core::RenderContext(*_device);
+    _renderScene = new Core::RenderScene(*_device);
+    _renderContext = new Core::RenderContext(*_device, *_renderScene);
     _status = make_unique<Core::Status>(*_renderContext);
 
-    auto& resourceCache = _device->GetResourceCache();
-    resourceCache.Prepare(*_renderContext);
+    auto& resourceManager = _device->GetResourceManager();
+    resourceManager.Prepare(*_renderContext);
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
 
-    _scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _transferContext, _renderContext);
-
-    _transferContext->Wait();
+    _scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
     _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
         *_scene, swapChain);
@@ -39,7 +40,8 @@ Core::Engine::~Engine()
 {
     delete(_renderPipeline);
     delete(_scene);
-    delete(_renderContext);
+    delete(_renderContext);   // frames/cullers reference the batch, so destroy them first
+    delete(_renderScene);
     delete(_transferContext);
     delete(_workerThreadManager);
     delete(_device);
@@ -68,13 +70,17 @@ void Core::Engine::Draw()
 {
 	auto& phases = _status->GetCpuPhases();
 
+	auto extents = _renderContext->GetSurfaceExtent();
+
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
-		_transferContext->Wait();
-	}
 
-	auto extents = _renderContext->GetSurfaceExtent();
+		// Sync flushes the upload queues internally (enqueue + wait) before it writes
+		// descriptors and rebuilds the draw set, so no separate Wait is needed here.
+		// Each manager self-gates and clears its own dirty state.
+		_renderScene->Sync(*_scene, *_transferContext, extents);
+	}
 	{
 		ScopedCpuTimer timer(phases.beginMs);
 		_renderContext->Begin(*_scene, extents);

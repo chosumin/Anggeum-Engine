@@ -14,12 +14,12 @@ Core::Mesh::~Mesh()
 	_materials.clear();
 }
 
-void Core::Mesh::AddSubMesh(shared_ptr<SubMesh> subMesh)
+void Core::Mesh::AddSubMesh(Handle<SubMesh> subMesh)
 {
 	_subMeshes.push_back(subMesh);
 }
 
-void Core::Mesh::AddMaterial(shared_ptr<Material> material)
+void Core::Mesh::AddMaterial(Handle<Material> material)
 {
 	_materials.push_back(material);
 }

@@ -3,6 +3,7 @@
 #include "Graphics/BufferObjects.h"
 #include "Graphics/RendererBatch.h"
 #include "ResolvePass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -40,15 +41,15 @@ namespace Core
 		ShadowPass& _shadowPass;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
-		shared_ptr<Texture> _sdfShadowTexture;
+		Handle<Texture> _sdfShadowTexture;
 
-		shared_ptr<Shader> _sdfShadowShader;
+		Handle<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
 
 		// Volume visualization
-		shared_ptr<Shader> _volumeSliceShader;
+		Handle<Shader> _volumeSliceShader;
 		unique_ptr<Pipeline> _volumeSlicePipeline;
-		shared_ptr<Texture> _volumeSliceTexture;
+		Handle<Texture> _volumeSliceTexture;
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
 

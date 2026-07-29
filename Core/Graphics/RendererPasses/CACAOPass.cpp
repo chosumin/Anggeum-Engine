@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CACAOPass.h"
 #include "Foundation/Scene.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Components/PerspectiveCamera.h"
@@ -88,19 +88,20 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
 void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-    auto depthForSampling = renderFrame.GetCurrentDepth();
-    auto normalForSampling = renderFrame.GetCurrentNormal();
-    if (!depthForSampling || !normalForSampling)
+    auto& frameResources = renderFrame.GetResources();
+    auto depthForSampling = frameResources.GetCurrentDepth();
+    auto normalForSampling = frameResources.GetCurrentNormal();
+    if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
-    auto& aoImage = *_aoTexture->GetImage().lock();
+    auto& aoImage = _aoTexture.Get().GetImage();
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
         &renderFrame,
-        depthForSampling->GetImageView(),
-        normalForSampling->GetImageView(),
+        depthForSampling.Get().GetImageView(),
+        normalForSampling.Get().GetImageView(),
         aoImage.GetImage(),
-        _aoTexture->GetImageView());
+        _aoTexture.Get().GetImageView());
 
     // Apply current settings
     FFX_CACAO_Settings cacaoSettings = {};
@@ -156,7 +157,7 @@ void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = renderFrame.GetResources().GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void CACAOPass::UpdateGUI()

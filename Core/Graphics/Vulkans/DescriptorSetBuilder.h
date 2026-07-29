@@ -7,11 +7,12 @@ namespace Core
 
 	/*
 	 * DescriptorSetBuilder accumulates binding entries from multiple sources
-	 * (Pass + RendererBatch) and builds a DescriptorSetResources with
-	 * allocated VkDescriptorSet + created buffers.
+	 * and builds a DescriptorSetResources: an allocated
+	 * VkDescriptorSet plus non-owning references to the bound buffers/textures.
+	 * The builder never takes ownership of anything passed into it.
 	 *
 	 * Usage:
-	 *   auto& builder = renderFrame.CreateDescriptorSetBuilder(shader);
+	 *   auto& builder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader);
 	 *   builder.SetUniformBuffer(0, &cameraData);    // Pass fills its bindings
 	 *   // ... hand off to RendererBatch ...
 	 *   builder.SetStorageBuffer(1, transformBuffer); // Batch fills its bindings
@@ -21,21 +22,18 @@ namespace Core
 	class DescriptorSetBuilder
 	{
 	public:
-		DescriptorSetBuilder(Device& device, DescriptorPool& pool, 
+		DescriptorSetBuilder(Device& device, DescriptorPool& pool,
 			Shader& shader, uint32_t setIndex = 0);
 
-		// --- Uniform buffer: creates internal UBO from layout size, copies data ---
-		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, void* data);
+		// --- Uniform buffer: references an existing buffer, ownership unchanged ---
+		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, Buffer& buffer);
 
-		// --- Uniform buffer: uses an existing UBO (no copy, caller owns lifetime) ---
-		DescriptorSetBuilder& SetUniformBuffer(uint32_t binding, UniformBuffer* buffer);
-
-		// --- Storage buffer: wraps an existing buffer ---
-		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer* buffer);
+		// --- Storage buffer: references an existing buffer, ownership unchanged ---
+		DescriptorSetBuilder& SetStorageBuffer(uint32_t binding, Buffer& buffer);
 
 		// --- Texture: combined image sampler ---
-		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding, 
-			shared_ptr<Texture> texture,
+		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding,
+			Handle<Texture> texture,
 			uint32_t mipLevel = 0,
 			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 

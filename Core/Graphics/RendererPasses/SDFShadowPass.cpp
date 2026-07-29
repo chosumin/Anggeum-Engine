@@ -9,7 +9,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "ShadowPass.h"
 using namespace Core;
 
@@ -26,11 +26,11 @@ SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 {
     _sdfGenerator = make_unique<SDFGenerator>(device);
 
-    _sdfShadowShader = _device.GetResourceCache().RequestShader("Shaders/sdfShadow.comp.spv");
-    _sdfShadowPipeline = make_unique<Pipeline>(_device, *_sdfShadowShader);
+    _sdfShadowShader = _device.GetResourceManager().LoadShader("Shaders/sdfShadow.comp.spv");
+    _sdfShadowPipeline = make_unique<Pipeline>(_device, _sdfShadowShader.Get());
 
-    _volumeSliceShader = _device.GetResourceCache().RequestShader("Shaders/sdfVolumeSlice.comp.spv");
-    _volumeSlicePipeline = make_unique<Pipeline>(_device, *_volumeSliceShader);
+    _volumeSliceShader = _device.GetResourceManager().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
+    _volumeSlicePipeline = make_unique<Pipeline>(_device, _volumeSliceShader.Get());
 }
 
 SDFShadowPass::~SDFShadowPass()
@@ -43,6 +43,7 @@ SDFShadowPass::~SDFShadowPass()
 
 void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 {
+    auto& frameResources = renderFrame.GetResources();
     RenderTargetDesc sdfShadowDesc{};
     sdfShadowDesc.extent = {
         _screenExtent.width / 2,
@@ -56,7 +57,7 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // production, so start it in the layout the consumer expects.
     sdfShadowDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    _sdfShadowTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
+    _sdfShadowTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
     // Volume raytrace debug texture - match screen aspect ratio
     float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -69,19 +70,20 @@ void SDFShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
     sliceDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     sliceDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    _volumeSliceTexture = renderFrame.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
+    _volumeSliceTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
 }
 
 void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
     auto sdfTexture = _sdfGenerator->GetSDFTexture();
     auto* boundsBuffer = _sdfGenerator->GetBoundsBuffer();
-    if (!sdfTexture || !_volumeSliceTexture || !boundsBuffer)
+    if (!sdfTexture.IsValid() || !_volumeSliceTexture.IsValid() || !boundsBuffer)
         return;
 
-    auto& sliceImage = *_volumeSliceTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(sliceImage,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_volumeSliceTexture.Get(),
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     glm::mat4 viewMatrix = camera->Matrices.View;
@@ -113,24 +115,27 @@ void SDFShadowPass::RenderVolumeSlice(RenderFrame& renderFrame, CommandBuffer& c
         0.1f
     };
 
-    auto sliceBuilder = renderFrame.CreateDescriptorSetBuilder(*_volumeSliceShader, 0);
+    auto& volumeSliceShader = _volumeSliceShader.Get();
+    auto sliceBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(volumeSliceShader, 0);
     sliceBuilder.SetTextureBuffer(0, sdfTexture);
     sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    sliceBuilder.SetStorageBuffer(2, boundsBuffer);
+    sliceBuilder.SetStorageBuffer(2, *boundsBuffer);
     auto& sliceResources = sliceBuilder.Build();
 
     commandBuffer.BindPipeline(_volumeSlicePipeline.get());
-    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, *_volumeSliceShader,
+    commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, volumeSliceShader,
         sliceResources);
-    commandBuffer.PushConstants(*_volumeSliceShader, 0, pc);
+    commandBuffer.PushConstants(volumeSliceShader, 0, pc);
 
     float    aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     uint32_t sliceWidth = static_cast<uint32_t>(DEBUG_SLICE_HEIGHT * aspect);
 
     commandBuffer.Dispatch((sliceWidth + 7) / 8, (DEBUG_SLICE_HEIGHT + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(sliceImage,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_volumeSliceTexture.Get(),
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 void SDFShadowPass::UpdateSDFParams()
@@ -183,26 +188,26 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
     float aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
     float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
 
-    if (_sdfShadowTexture && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_sdfShadowTexture.IsValid() && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
         {
             _sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _sdfShadowTexture->GetSampler()->GetSampler(),
-                _sdfShadowTexture->GetImageView(),
+                _sdfShadowTexture.Get().GetVkSampler(),
+                _sdfShadowTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS),
             ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
     }
 
-    if (_volumeSliceTexture && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_volumeSliceTexture.IsValid() && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
         {
             _volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _volumeSliceTexture->GetSampler()->GetSampler(),
-                _volumeSliceTexture->GetImageView(),
+                _volumeSliceTexture.Get().GetVkSampler(),
+                _volumeSliceTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");
@@ -216,9 +221,8 @@ void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-    auto* meshBufferManager = renderFrame.GetMeshBufferManager();
-    if (!meshBufferManager)
-        return;
+    auto& frameResources = renderFrame.GetResources();
+    auto& meshBufferManager = renderFrame.GetMeshBufferManager();
 
     // Deferred save: the SDF was generated on a previous frame
     // is now complete, so it's safe to read back the image/bounds and write to disk.
@@ -237,7 +241,7 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
         {
             commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
             _sdfGenerator->Generate(renderFrame, commandBuffer,
-                *meshBufferManager,
+                meshBufferManager,
                 SDF_VOLUME_DIM);
             commandBuffer.EndDebugMarker();
 
@@ -246,42 +250,54 @@ void SDFShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
     }
 
     auto sdfTexture = _sdfGenerator->GetSDFTexture();
-    if (!sdfTexture)
+    if (!sdfTexture.IsValid())
         return;
 
     UpdateSDFParams();
 
-    auto depthTarget = renderFrame.GetCurrentDepth();
-    if (!depthTarget)
+    auto depthTarget = frameResources.GetCurrentDepth();
+    if (!depthTarget.IsValid())
         return;
 
-    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL);
-
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_sdfShadowShader, 0);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_sdfShadowTexture.Get(),
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
-    builder.SetUniformBuffer(0, &camera->Matrices);
+
+    auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+
+    auto& sdfParamsBuffer =
+        frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params").Get();
+    sdfParamsBuffer.Update(_sdfParams);
+
+    auto& sdfShadowShader = _sdfShadowShader.Get();
+    auto builder = frameResources.CreateDescriptorSetBuilder(sdfShadowShader, 0);
+
+    builder.SetUniformBuffer(0, cameraBuffer);
     builder.SetTextureBuffer(1, sdfTexture);
-    builder.SetUniformBuffer(2, &_sdfParams);
+    builder.SetUniformBuffer(2, sdfParamsBuffer);
     builder.SetTextureBuffer(3, depthTarget);
     builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    builder.SetStorageBuffer(5, _sdfGenerator->GetBoundsBuffer());
+    builder.SetStorageBuffer(5, *_sdfGenerator->GetBoundsBuffer());
     auto& resources = builder.Build();
 
     commandBuffer.BindPipeline(_sdfShadowPipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_sdfShadowShader,
+        sdfShadowShader,
         resources);
 
     uint32_t dispatchX = (_screenExtent.width / 2 + 7) / 8;
     uint32_t dispatchY = (_screenExtent.height / 2 + 7) / 8;
     commandBuffer.Dispatch(dispatchX, dispatchY, 1);
 
-    commandBuffer.TransitionImageLayout(*_sdfShadowTexture->GetImage().lock(),
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_sdfShadowTexture.Get(),
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 
     {
         commandBuffer.BeginDebugMarker("SDF Volume Raytrace Debug");

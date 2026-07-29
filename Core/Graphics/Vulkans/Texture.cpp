@@ -1,14 +1,19 @@
 #include "stdafx.h"
 #include "Texture.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
-Core::Texture::Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler)
-	:_name(name), _image(image), _sampler(sampler)
+Core::Texture::Texture(string name, unique_ptr<Image> image, Handle<Sampler> sampler)
+	:_name(name), _image(std::move(image)), _sampler(sampler)
 {
 }
 
 Core::Texture::~Texture()
 {
+}
+
+VkSampler Core::Texture::GetVkSampler()
+{
+	return _sampler.Get().GetSampler();
 }
 
 uint32_t Core::Texture::GetMipLevels() const
@@ -24,7 +29,8 @@ uint32_t Core::Texture::GetLayers() const
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t binding, VkDescriptorType descriptorType)
 {
 	imageInfo.imageLayout = imageLayout;
-	imageInfo.imageView = texture->GetImage().lock()->GetOrCreateImageView(mipLevel);
+	auto& tex = texture.Get();
+	imageInfo.imageView = tex.GetImage().GetOrCreateImageView(mipLevel);
 
 	switch (descriptorType)
 	{
@@ -33,7 +39,7 @@ VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t bind
 			break;
 		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
 		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-			imageInfo.sampler = texture->GetSampler()->GetSampler();
+			imageInfo.sampler = tex.GetVkSampler();
 			break;
 		default:
 			imageInfo.sampler = VK_NULL_HANDLE;

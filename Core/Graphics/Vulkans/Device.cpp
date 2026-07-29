@@ -3,7 +3,7 @@
 #include "CommandPool.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 namespace Core
 {
@@ -31,12 +31,12 @@ namespace Core
 
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 
-	    _resourceCache = new ResourceCache(*this);
+	    _resourceManager = new ResourceManager(*this);
 	}
 
 	Device::~Device()
 	{
-	    delete(_resourceCache);
+	    delete(_resourceManager);
 	    delete(_memoryAllocatorManager);
 	    delete(_graphicsCommandPool);
 

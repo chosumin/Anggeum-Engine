@@ -2,7 +2,8 @@
 #include "RenderExecutor.h"
 #include "RenderFrame.h"
 #include "RendererBatch.h"
-#include "Culler.h"
+#include "OcclusionCuller.h"
+#include "FrustumCuller.h"
 #include "Vulkans/Shader.h"
 #include "Vulkans/Pipeline.h"
 #include "Vulkans/RenderPass.h"
@@ -25,53 +26,11 @@ RenderExecutor::RenderExecutor(Device& device, RenderFrame& renderFrame)
 {
 }
 
-RenderExecutor::~RenderExecutor()
+RenderExecutor::~RenderExecutor() = default;
+
+RendererBatch* RenderExecutor::GetRendererBatch() const
 {
-    if (_transformBatch.TransformBuffer)
-    {
-        delete _transformBatch.TransformBuffer;
-        _transformBatch.TransformBuffer = nullptr;
-    }
-}
-
-void RenderExecutor::InitializeBatches(Scene& scene, VkExtent2D extents)
-{
-    if (_batchesInitialized)
-        return;
-
-    auto meshes = scene.GetComponents<Mesh>();
-    size_t meshCount = meshes.size();
-
-    if (meshCount == 0)
-    {
-        _batchesInitialized = true;
-        return;
-    }
-
-    VkDeviceSize bufferSize = sizeof(mat4) * meshCount;
-    vector<mat4> transforms(meshCount);
-    _transformBatch.EntityIds.resize(meshCount);
-
-    for (size_t i = 0; i < meshCount; ++i)
-    {
-        auto& entity = meshes[i]->GetEntity();
-        auto& transform = entity.GetTransform();
-        transforms[i] = transform.GetMatrix();
-        _transformBatch.EntityIds[i] = static_cast<uint>(entity.GetId());
-    }
-
-    _transformBatch.TransformBuffer = new Buffer(_device,
-        bufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        MemoryType::DEVICE_LOCAL);
-
-    VkBufferJob<mat4> job(_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        &_transformBatch.TransformBuffer, transforms, true);
-    CommandBuffer::ImmediateSubmit(_device, job);
-
-    _rendererBatch = make_unique<RendererBatch>(_device, scene, _transformBatch, extents);
-
-    _batchesInitialized = true;
+    return &_renderFrame.GetRendererBatch();
 }
 
 void RenderExecutor::ResetFrame()
@@ -82,19 +41,6 @@ void RenderExecutor::ResetFrame()
     }
 }
 
-Culler* RenderExecutor::GetOrCreateCuller(RendererBatch* batch, const CameraBuffer& camera, TransformBatch& transformBatch)
-{
-    CullerKey key{ &camera, batch };
-    auto it = _cullers.find(key);
-    if (it != _cullers.end())
-        return it->second.get();
-
-    auto culler = make_unique<Culler>(_device, transformBatch);
-    auto* result = culler.get();
-    _cullers[key] = std::move(culler);
-    return result;
-}
-
 void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     Shader& shader, Pipeline& pipeline,
     CameraBuffer& camera,
@@ -103,20 +49,20 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
     function<void()> postDraw)
 {
-    auto* culler = GetOrCreateCuller(_rendererBatch.get(), camera, _transformBatch);
+    auto& frameResources = _renderFrame.GetResources();
+    auto* batch = GetRendererBatch();
+    // Nothing to cull: with no draw commands the batch has no instance/object
+    // buffers for the Culler to read, so it must not be constructed either.
+    if (!batch || batch->GetDrawCommandCount() == 0)
+        return;
 
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _rendererBatch->GetExtents(),
-            _rendererBatch->GetObjectDataBuffer(), _rendererBatch->GetInstanceBuffer(),
-            _rendererBatch->GetInstanceCount(), _rendererBatch->GetIndirectDrawBuffer());
-    }
+    auto* culler = GetOrCreateCuller<OcclusionCuller>(*batch, camera);
 
     bool cullerAlreadyUsed = culler->IsUsedThisFrame();
 
     if (!cullerAlreadyUsed)
     {
-        auto prevDepth = _renderFrame.GetPreviousDepthBuffer();
+        auto prevDepth = frameResources.GetPreviousDepthBuffer();
 
         commandBuffer.BeginDebugMarker("Reset Draw Commands");
         culler->ResetDrawCommands(_renderFrame, commandBuffer);
@@ -138,17 +84,21 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     if (!cullerAlreadyUsed)
     {
         commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
-        auto msaaDepth = _renderFrame.GetRenderTarget("MainDepth");
+        auto msaaDepth = frameResources.GetRenderTarget("MainDepth");
 
-        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .Submit();
 
         auto curDepth = ResolvePass::ResolveDepth(_renderFrame, commandBuffer, msaaDepth);
 
-        commandBuffer.TransitionImageLayout(*msaaDepth->GetImage().lock(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .Submit();
 
         commandBuffer.EndDebugMarker();
 
@@ -187,21 +137,15 @@ void RenderExecutor::FrustumCullAndDraw(CommandBuffer& commandBuffer,
     DescriptorSetBuilder& builder,
     const CameraBuffer& camera, function<void(Shader&)> perShaderHook)
 {
-    if (_rendererBatch->GetDrawCommandCount() == 0)
+    auto* batch = GetRendererBatch();
+    if (!batch || batch->GetDrawCommandCount() == 0)
         return;
 
-    auto* culler = GetOrCreateCuller(_rendererBatch.get(), camera, _transformBatch);
-
-    if (!culler->IsPrepared())
-    {
-        culler->Prepare(_device, _rendererBatch->GetExtents(),
-            _rendererBatch->GetObjectDataBuffer(), _rendererBatch->GetInstanceBuffer(),
-            _rendererBatch->GetInstanceCount(), _rendererBatch->GetIndirectDrawBuffer());
-    }
+    auto* culler = GetOrCreateCuller<FrustumCuller>(*batch, camera);
 
     // Frustum culling dispatch
-    auto cullingBuilder = _renderFrame.CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
-    culler->DispatchFrustumOnlyCulling(_renderFrame, commandBuffer, cullingBuilder, camera);
+    auto cullingBuilder = _renderFrame.GetResources().CreateDescriptorSetBuilder(culler->GetCullingShader());
+    culler->Dispatch(_renderFrame, commandBuffer, cullingBuilder, camera);
 
     commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
 
@@ -215,22 +159,29 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
     Core::Buffer& indirectCommandBuffer,
     DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook)
 {
-    if (_rendererBatch->GetDrawCommandCount() == 0)
+    auto* batch = GetRendererBatch();
+    if (!batch || batch->GetDrawCommandCount() == 0)
         return;
 
-    auto* meshBufferManager = _renderFrame.GetMeshBufferManager();
+    auto& meshBufferManager = _renderFrame.GetMeshBufferManager();
 
     auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-    commandBuffer.BindVertexBuffers(meshBufferManager->GetVertexBuffers(vertexAttibuteNames), 0);
-    commandBuffer.BindIndexBuffer(meshBufferManager->GetIndexBuffer(), meshBufferManager->GetIndexType());
+
+    auto vertexBufferHandles = meshBufferManager.GetVertexBuffers(vertexAttibuteNames);
+    vector<Buffer*> vertexBuffers;
+    vertexBuffers.reserve(vertexBufferHandles.size());
+    for (auto& handle : vertexBufferHandles)
+        vertexBuffers.push_back(&handle.Get());
+
+    commandBuffer.BindVertexBuffers(vertexBuffers, 0);
+    commandBuffer.BindIndexBuffer(meshBufferManager.GetIndexBuffer().Get(), meshBufferManager.GetIndexType());
 
     commandBuffer.BindPipeline(&pipeline);
 
-    builder.SetStorageBuffer(1, _transformBatch.TransformBuffer);
-    builder.SetStorageBuffer(2, _rendererBatch->GetInstanceBuffer());
-    builder.SetUniformBuffer(8,
-        const_cast<GPUMaterialData*>(_renderFrame.GetMaterialManager()->GetMaterialData()));
-    builder.SetStorageBuffer(9, _rendererBatch->GetMaterialIndexBuffer());
+    builder.SetStorageBuffer(1, batch->GetTransformBatch().TransformBuffer.Get());
+    builder.SetStorageBuffer(2, batch->GetInstanceBuffer());
+    builder.SetUniformBuffer(8, _renderFrame.GetMaterialManager().GetMaterialBuffer());
+    builder.SetStorageBuffer(9, batch->GetMaterialIndexBuffer());
 
     // Runs before Build() so the hook can contribute its own descriptor resources.
     if (perShaderHook)
@@ -250,7 +201,7 @@ void RenderExecutor::DrawIndirectInternal(CommandBuffer& commandBuffer,
 
     commandBuffer.DrawIndexedIndirect(
         indirectCommandBuffer,
-        _rendererBatch->GetDrawCommandCount(),
+        batch->GetDrawCommandCount(),
         static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
     );
 }

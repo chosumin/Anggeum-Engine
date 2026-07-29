@@ -1,8 +1,8 @@
 #pragma once
-#include "MeshBufferManager.h"
-#include "MaterialManager.h"
+#include "ResourceHandle.h"
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
+#include "RenderScene.h"
 
 namespace Core
 {
@@ -25,6 +25,7 @@ namespace Core
 	class CommandPool;
 	class RenderFrame;
 	class BindlessTextureManager;
+	class RendererBatch;
 	class Texture;
 	class Scene;
 	class SyncContext;
@@ -37,7 +38,7 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device);
+		RenderContext(Device& device, RenderScene& renderScene);
 		~RenderContext();
 
 		void RecreateSwapChain();
@@ -70,15 +71,19 @@ namespace Core
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
 
-		// Bindless texture manager
-		BindlessTextureManager* GetBindlessTextureManager() const { return _bindlessTextureManager.get(); }
-		bool HasBindlessSupport() const { return _bindlessTextureManager != nullptr; }
+		// GPU-driven rendering managers (grouped in RenderScene, owned by Engine)
+		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.GetBindlessTextureManager(); }
+		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
+		MeshBufferManager* GetMeshBufferManager() const { return _renderScene.GetMeshBufferManager(); }
+		MaterialManager* GetMaterialManager() const { return _renderScene.GetMaterialManager(); }
+		RendererBatch* GetRendererBatch() const { return _renderScene.GetRendererBatch(); }
 
-		// Managers
-		MeshBufferManager* GetMeshBufferManager() const { return _meshBufferManager.get(); }
-		MaterialManager* GetMaterialManager() const { return _materialManager.get(); }
+		// Where asset loaders drop upload requests for the render side; loaders never
+		// issue transfer jobs themselves (RenderScene::Sync does).
+		GeometryCopyQueue& GetGeometryCopyQueue() const { return _renderScene.GetGeometryCopyQueue(); }
+		TextureUploadQueue& GetTextureUploadQueue() const { return _renderScene.GetTextureUploadQueue(); }
 
-		shared_ptr<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
+		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
 		SyncContext& GetSyncContext() { return *_syncContext; }
 	private:
@@ -111,14 +116,13 @@ namespace Core
 		double _lastQueueSubmitMs = 0.0;
 		double _lastPresentMs = 0.0;
 
-		unique_ptr<BindlessTextureManager> _bindlessTextureManager;
-
-		// GPU Driven Rendering managers
-		unique_ptr<MeshBufferManager> _meshBufferManager;
-		unique_ptr<MaterialManager> _materialManager;
+		// GPU mirror of the scene, owned by Engine and borrowed here (shared by
+		// reference with every frame-in-flight). RenderContext only reads it for
+		// rendering.
+		RenderScene& _renderScene;
 
 		// Double/Triple buffered depth
-		array<shared_ptr<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
-		shared_ptr<Texture> _previousFrameDepth;
+		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
+		Handle<Texture> _previousFrameDepth;
 	};
 }

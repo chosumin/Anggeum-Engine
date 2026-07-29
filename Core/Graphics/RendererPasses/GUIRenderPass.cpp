@@ -85,28 +85,29 @@ void Core::GUIRenderPass::EnsureRenderTargets(RenderFrame& renderFrame)
     colorDesc.samples = _msaaSamples;
     colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    renderFrame.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+    renderFrame.GetResources().GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 }
 
 void Core::GUIRenderPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
-    auto colorTarget = renderFrame.GetRenderTarget(RT_MAIN_COLOR);
+    auto& frameResources = renderFrame.GetResources();
+    auto colorTarget = frameResources.GetRenderTarget(RT_MAIN_COLOR);
 
 	// Create framebuffer using swapchain image view as resolve attachment for each frame
 	// This framebuffer is referencing different swapchain image for each frame, so we create it per frame
     string framebufferName = "GUIRenderPass_" + to_string(imageIndex);
 
-    auto* framebuffer = renderFrame.GetFramebuffer(framebufferName);
+    auto* framebuffer = frameResources.GetFramebuffer(framebufferName);
     if (!framebuffer)
     {
         vector<VkImageView> imageViews = {
-            colorTarget->GetImageView(),
+            colorTarget.Get().GetImageView(),
             _swapChain.GetImageView(imageIndex)  // Resolve target
         };
 
         auto fb = make_unique<Framebuffer>(_device, *_renderPass, imageViews, _extent);
         framebuffer = fb.get();
-        renderFrame.RegisterFramebuffer(framebufferName, std::move(fb));
+        frameResources.RegisterFramebuffer(framebufferName, std::move(fb));
     }
 
     commandBuffer.SetViewportAndScissor(framebuffer->GetExtent());

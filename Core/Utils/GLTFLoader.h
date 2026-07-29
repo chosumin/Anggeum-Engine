@@ -1,4 +1,6 @@
 #pragma once
+#include "Graphics/ResourceHandle.h"
+#include "Graphics/GeometryUpload.h"
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
 
@@ -6,21 +8,19 @@ namespace tinygltf
 {
 	class Model;
 	struct Sampler;
+	struct Primitive;
 }
 
 namespace Core
 {
 	class Scene;
-	class Image;
 	class Sampler;
 	class Texture;
 	class Material;
 	class Mesh;
 	class PerspectiveCamera;
-	class CommandBuffer;
 	class Light;
-	class TransferContext;
-	class ResourceCache;
+	class ResourceManager;
 	class RenderContext;
 
 	/**
@@ -41,7 +41,7 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene, TransferContext& transferContext);
+		GLTFLoader(Device& device, Scene& scene);
 		~GLTFLoader();
 
 		void LoadScene(string path);
@@ -54,22 +54,32 @@ namespace Core
 		void LoadAssets(const string& modelPath);
 		void CheckExtensions();
 		void LoadLights();
-		vector<shared_ptr<Core::Sampler>> LoadSamplers();
-		vector<shared_ptr<Core::Image>> LoadImages(const string& modelPath);
-		vector<shared_ptr<Core::Texture>> LoadTextures(
-			vector<shared_ptr<Core::Sampler>>& samplers,
-			vector<shared_ptr<Core::Image>>& images);
-		vector<shared_ptr<Core::Material>> LoadMaterials(vector<shared_ptr<Core::Texture>>& textures);
-		void LoadMeshes(vector<shared_ptr<Core::Material>>& materials, bool useGlobalBuffer = true);
+		vector<Handle<Core::Sampler>> LoadSamplers();
+		// Each Texture owns its own Image (built from the glTF image URI), so there
+		// is no shared image list — textures are created directly from image paths.
+		vector<Handle<Core::Texture>> LoadTextures(
+			vector<Handle<Core::Sampler>>& samplers,
+			const string& modelPath);
+		vector<Handle<Core::Material>> LoadMaterials(vector<Handle<Core::Texture>>& textures);
+		// Where a mesh's geometry is stored: the shared global buffers (GPU-driven draw
+		// set) or buffers of its own.
+		enum class GeometryStorage { Global, Standalone };
+
+		// Reads a primitive's attributes + indices into the form ResourceManager takes.
+		SubMeshGeometry ReadGeometry(const tinygltf::Primitive& primitive);
+		// Scene geometry: handed to the render side's global mesh buffers.
+		void LoadMeshes(vector<Handle<Core::Material>>& materials);
+		// Skybox geometry: per-submesh buffers, outside the GPU-driven draw set.
+		void LoadSkyboxMeshes(vector<Handle<Core::Material>>& materials);
+		void LoadMeshes(vector<Handle<Core::Material>>& materials, GeometryStorage storage);
 		void LoadCameras();
 		void LoadNodes();
 		void ClearCaches();
-		shared_ptr<Core::Sampler> LoadSampler(Device& device, tinygltf::Sampler& sampler);
+		Handle<Core::Sampler> LoadSampler(Device& device, tinygltf::Sampler& sampler);
 	private:
 		Device& _device;
 		Scene& _scene;
-		TransferContext& _transferContext;
-		ResourceCache& _resourceCache;
+		ResourceManager& _resourceManager;
 		RenderContext* _renderContext = nullptr;
 
 		string _modelPath;

@@ -43,7 +43,7 @@ namespace Core
 
 		void Allocate(MemoryAllocation& outAllocation, VkDeviceSize size, bool needDedicated);
 		void Deallocate(MemoryAllocation& allocation);
-		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
+		void CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size);
 		void GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation);
 		void MapMemory(void** outMappedPtr, MemoryAllocation& allocation);
 		void UnmapMemory(MemoryAllocation& allocation);
@@ -85,7 +85,7 @@ namespace Core
 		void MapMemory(void** outMappedPtr, MemoryAllocation& allocation);
 		void UnmapMemory(MemoryAllocation& allocation);
 
-		void CopyBuffer(void* srcData, MemoryAllocation& allocation);
+		void CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size);
 	private:
 		Device& _device;
 		unordered_map<MemoryType, MemoryAllocator*> _memoryAllocators;

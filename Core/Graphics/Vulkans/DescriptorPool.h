@@ -18,6 +18,15 @@ namespace Core
 	// ============================================
 	// Descriptor Set Resources
 	// ============================================
+	//
+	// A non-owning view of what a descriptor set is bound to.
+	//
+	// Nothing here owns the memory it points at:
+	//  - descriptorSet is owned by the DescriptorPool it was allocated from
+	//    (or by BindlessTextureManager, for the bindless set),
+	//  - uniformBuffers / storageBuffers point at buffers whose lifetime is
+	//    managed by whoever created them.
+	// Reset() therefore only drops the references; it never frees anything.
 	struct DescriptorSetResources
 	{
 		// Descriptor set
@@ -25,31 +34,19 @@ namespace Core
 		uint32_t setIndex = 0;
 		bool isDescriptorSetUpdated = false;
 
-		// Buffers: [binding] -> Buffer*
-		unordered_map<uint32_t, UniformBuffer*> uniformBuffers;
+		unordered_map<uint32_t, UniformBuffer> uniformBuffers;
 		unordered_map<uint32_t, TextureBuffer> textureBuffers;
-		unordered_map<uint32_t, StorageBuffer*> storageBuffers;
+		unordered_map<uint32_t, StorageBuffer> storageBuffers;
 
-		void CleanupBuffers()
+		// Drop all references. Does not destroy any buffer or descriptor set.
+		void Reset()
 		{
-			// Cleanup uniform buffers
-			for (auto& [binding, buffer] : uniformBuffers)
-			{
-				delete buffer;
-			}
 			uniformBuffers.clear();
-			
-			// Cleanup texture buffers
 			textureBuffers.clear();
-			
-			// Cleanup storage buffers
-			for (auto& [binding, buffer] : storageBuffers)
-			{
-				delete buffer;
-			}
 			storageBuffers.clear();
-			
+
 			descriptorSet = VK_NULL_HANDLE;
+			isDescriptorSetUpdated = false;
 		}
 	};
 
@@ -116,7 +113,6 @@ namespace Core
 		void CreatePool(const vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets);
 		void Reset();
 		
-		// Descriptor set วาด็
 		VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
 		vector<VkDescriptorSet> AllocateDescriptorSets(
 			const vector<VkDescriptorSetLayout>& layouts);

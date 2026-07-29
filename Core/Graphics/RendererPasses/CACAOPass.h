@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
 #include "ResolvePass.h"
 
@@ -56,7 +57,7 @@ namespace Core
         VkExtent2D _screenExtent;
         VkSampleCountFlagBits _msaaSamples;
 
-        shared_ptr<Texture> _aoTexture;
+        Handle<Texture> _aoTexture;
 
         unordered_map<RenderFrame*, FFX_CACAO_VkContext*> m_cacaoContexts;
 

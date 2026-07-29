@@ -3,26 +3,15 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/DescriptorPool.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 namespace Core
 {
-	Material::Material(Device& device, string shaderName, string materialName)
-		:_device(device), _name(materialName)
+	Material::Material(Device& device, Handle<Shader> shader, string materialName)
+		:_device(device), _shader(shader), _name(materialName)
 	{
-		_shader = device.GetResourceCache().RequestShader(shaderName);
-
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().GetDefaultTexture());
-	}
-
-	Material::Material(Device& device, string materialName, string vertPath, string fragPath)
-		:_device(device), _name(materialName)
-	{
-		_shader = device.GetResourceCache().RequestShader(vertPath, fragPath);
-
-		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().GetDefaultTexture());
+		SetDefault(device.GetResourceManager().GetDefaultTextureHandle());
 	}
 
 	Material::Material(const Material& other)
@@ -33,8 +22,7 @@ namespace Core
 		  _alphaMode(other._alphaMode),
 		  _isAlphaCutoff(other._isAlphaCutoff),
 		  _buffers(other._buffers),
-		  _textures(other._textures),
-		  _bindlessTextureHandles(other._bindlessTextureHandles) // Copy bindless handles
+		  _textures(other._textures)
 	{
 	}
 
@@ -49,7 +37,6 @@ namespace Core
 			_isAlphaCutoff = other._isAlphaCutoff;
 			_buffers = other._buffers;
 			_textures = other._textures;
-			_bindlessTextureHandles = other._bindlessTextureHandles; // Copy bindless handles
 		}
 		return *this;
 	}
@@ -61,24 +48,19 @@ namespace Core
 		_textures.clear();
 	}
 
-	Shader& Core::Material::GetShader() const
-	{
-		return *_shader;
-	}
-
-	shared_ptr<Texture> Material::GetTexture(uint32_t binding)
+	Handle<Texture> Material::GetTexture(uint32_t binding)
 	{
 		auto setIt = _textures.find(binding);
 		if (setIt != _textures.end())
 		{
 			return setIt->second;
 		}
-		return nullptr;
+		return Handle<Texture>{};
 	}
 
-	void Material::SetDefault(shared_ptr<Texture> defaultTexture)
+	void Material::SetDefault(Handle<Texture> defaultTexture)
 	{
-		auto& layouts = _shader->GetDescriptorSetLayouts();
+		auto& layouts = _shader.Get().GetDescriptorSetLayouts();
 		
 		// Iterate through all descriptor set layouts
 		for (auto& [setIndex, descriptorLayout] : layouts)

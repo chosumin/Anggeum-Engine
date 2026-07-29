@@ -9,15 +9,14 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
 Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-	Scene& scene, VkFormat depthFormat, 
-	ShadowUniform& shadowBuffer)
+	Scene& scene, VkFormat depthFormat)
 	: RendererPass(device, workerThreadManager)
-	, _scene(scene), _msaaSamples(VK_SAMPLE_COUNT_1_BIT), _shadowBuffer(shadowBuffer)
+	, _scene(scene), _msaaSamples(VK_SAMPLE_COUNT_1_BIT)
 {
 	_shadowExtent = { SHADOW_MAP_DIM, SHADOW_MAP_DIM };
 
@@ -29,11 +28,13 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 	auto& rasterization = _pipelineState->GetRasterizationStateCreateInfo();
 	rasterization.depthBiasEnable = VK_TRUE;
 
-	_shadowMaterial = _device.GetResourceCache().RequestMaterial("shadow", "Shadow");
-	_shadowShader = _shadowMaterial->GetShaderPtr().lock();
+	// The material is registered in the cache/material table; we only need its
+	// shader handle here, so it isn't kept as a member.
+	auto shadowMaterial = _device.GetResourceManager().LoadMaterial("shadow", "Shadow");
+	_shadowShader = shadowMaterial.Get().GetShaderHandle();
 
 	// Create Pipeline for this pass
-	_pipeline = new Pipeline(device, *_renderPass, *_shadowShader, *_pipelineState);
+	_pipeline = new Pipeline(device, *_renderPass, _shadowShader.Get(), *_pipelineState);
 }
 
 Core::ShadowPass::~ShadowPass()
@@ -224,7 +225,7 @@ void Core::ShadowPass::EnsureRenderTargets(RenderFrame& renderFrame)
 	depthDesc.arrayLayers = SHADOW_MAP_CASCADE_COUNT;
 	depthDesc.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY; // Always 2D_ARRAY for sampler2DArray
 
-	renderFrame.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
+	renderFrame.GetResources().GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 }
 
 void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
@@ -279,18 +280,19 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 	ImGui::SeparatorText("Cascaded Shadow Maps");
 	{
-		auto shadowTexture = renderFrame.GetRenderTarget(RT_SHADOW_DEPTH);
+		auto shadowTexture = renderFrame.GetResources().GetRenderTarget(RT_SHADOW_DEPTH);
 
-		if (shadowTexture)
+		if (shadowTexture.IsValid())
 		{
 			if (!_csmDescriptorsCreated)
 			{
-				auto sampler = shadowTexture->GetSampler();
+				auto& shadowTex = shadowTexture.Get();
+				auto vkSampler = shadowTex.GetVkSampler();
 				for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 				{
-					VkImageView layerView = shadowTexture->GetLayerImageView(i);
+					VkImageView layerView = shadowTex.GetLayerImageView(i);
 					_csmDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
-						sampler->GetSampler(),
+						vkSampler,
 						layerView,
 						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				}
@@ -320,19 +322,25 @@ void Core::ShadowPass::OnGUI(RenderFrame& renderFrame)
 
 void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+	auto& frameResources = renderFrame.GetResources();
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
 		return;
 
 	UpdateCascades(camera);
 
-	auto shader = _shadowMaterial->GetShaderPtr().lock();
+	// ShadowPass produces the shared shadow block; GeometryPass runs later in the
+	// pass order and only reads it.
+	auto& shadowBuffer = frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW).Get();
+	shadowBuffer.Update(_shadowBuffer);
+
+	auto& shader = _shadowShader.Get();
 
 	for (uint32_t cascadeIndex = 0; cascadeIndex < SHADOW_MAP_CASCADE_COUNT; ++cascadeIndex)
 	{
 		string fbName = "ShadowPass_Cascade" + std::to_string(cascadeIndex);
 
-		auto* framebuffer = renderFrame.GetOrCreateFramebuffer(
+		auto* framebuffer = frameResources.GetOrCreateFramebuffer(
 			fbName, *_renderPass, { RT_SHADOW_DEPTH }, cascadeIndex);
 
 		if (!framebuffer)
@@ -352,8 +360,14 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 			continue;
 		}
 
-		auto builder = renderFrame.CreateDescriptorSetBuilder(*shader, 0);
-		builder.SetUniformBuffer(0, &_cascadeViews[cascadeIndex]);
+		// Each cascade binds binding 0 with a different view, and all four
+		// descriptor sets are consumed after submit, so they need separate buffers.
+		auto& cascadeBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(
+			"ShadowPass.Cascade" + std::to_string(cascadeIndex)).Get();
+		cascadeBuffer.Update(_cascadeViews[cascadeIndex]);
+
+		auto builder = frameResources.CreateDescriptorSetBuilder(shader, 0);
+		builder.SetUniformBuffer(0, cascadeBuffer);
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
 		commandBuffer.BeginDebugMarker(passName.c_str());
@@ -365,7 +379,7 @@ void Core::ShadowPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		auto& executor = renderFrame.GetRenderExecutor();
 		executor.FrustumCullAndDraw(commandBuffer,
 			*_renderPass, *framebuffer,
-			*_shadowShader, *_pipeline,
+			_shadowShader.Get(), *_pipeline,
 			builder,
 			_cascadeViews[cascadeIndex],
 			nullptr);

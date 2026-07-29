@@ -6,7 +6,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "AmbientOcclusionPass.h"
 using namespace Core;
 
@@ -20,8 +20,8 @@ DFAOPass::DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     , _msaaSamples(msaaSamples)
     , _sdfGenerator(sdfGenerator)
 {
-    _dfaoShader   = _device.GetResourceCache().RequestShader("Shaders/dfao.comp.spv");
-    _dfaoPipeline = make_unique<Pipeline>(_device, *_dfaoShader);
+    _dfaoShader   = _device.GetResourceManager().LoadShader("Shaders/dfao.comp.spv");
+    _dfaoPipeline = make_unique<Pipeline>(_device, _dfaoShader.Get());
 }
 
 DFAOPass::~DFAOPass()
@@ -41,7 +41,7 @@ void DFAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = renderFrame.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = renderFrame.GetResources().GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void DFAOPass::UpdateParams()
@@ -73,13 +73,13 @@ void DFAOPass::UpdateGUI()
         ImGui::SliderFloat("Contact Threshold", &_contactThreshold, 0.01f, 0.5f, "%.3f");
     }
 
-    if (_aoTexture && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
+    if (_aoTexture.IsValid() && ImGui::CollapsingHeader("AO Map", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (_aoImGuiDS == VK_NULL_HANDLE)
         {
             _aoImGuiDS = ImGui_ImplVulkan_AddTexture(
-                _aoTexture->GetSampler()->GetSampler(),
-                _aoTexture->GetImageView(),
+                _aoTexture.Get().GetVkSampler(),
+                _aoTexture.Get().GetImageView(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         float    aspect   = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -91,38 +91,44 @@ void DFAOPass::UpdateGUI()
 
 void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
 {
+    auto& frameResources = renderFrame.GetResources();
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return;
 
     auto  sdfTexture   = _sdfGenerator->GetSDFTexture();
     auto* boundsBuffer = _sdfGenerator->GetBoundsBuffer();
-    if (!sdfTexture || !boundsBuffer)
+    if (!sdfTexture.IsValid() || !boundsBuffer)
         return;
 
     UpdateParams();
     commandBuffer.BeginDebugMarker("DFAO");
 
-    auto depthForSampling = renderFrame.GetCurrentDepth();
-    auto normalForSampling = renderFrame.GetCurrentNormal();
-    if (!depthForSampling || !normalForSampling)
+    auto depthForSampling = frameResources.GetCurrentDepth();
+    auto normalForSampling = frameResources.GetCurrentNormal();
+    if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
         return;
 
-    auto& aoImage = *_aoTexture->GetImage().lock();
-    commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_aoTexture.Get(),
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL)
+        .Submit();
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     glm::mat4 invProj = glm::inverse(camera->Matrices.Projection);
     glm::mat4 invView = glm::inverse(camera->Matrices.View);
 
-    auto builder = renderFrame.CreateDescriptorSetBuilder(*_dfaoShader, 0);
+    auto& dfaoShader = _dfaoShader.Get();
+    auto builder = frameResources.CreateDescriptorSetBuilder(dfaoShader, 0);
     builder.SetTextureBuffer(0, depthForSampling);
     builder.SetTextureBuffer(1, normalForSampling);
     builder.SetTextureBuffer(2, sdfTexture);
     builder.SetTextureBuffer(3, _aoTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-    builder.SetStorageBuffer(4, boundsBuffer);
-    builder.SetUniformBuffer(5, &_params);
+    auto& paramsBuffer = frameResources.GetOrCreateUniformBuffer<DFAOUniform>("DFAOPass.Params").Get();
+    paramsBuffer.Update(_params);
+
+    builder.SetStorageBuffer(4, *boundsBuffer);
+    builder.SetUniformBuffer(5, paramsBuffer);
     auto& resources = builder.Build();
 
     struct DFAOPushConstants
@@ -141,16 +147,18 @@ void DFAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint
 
     commandBuffer.BindPipeline(_dfaoPipeline.get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-        *_dfaoShader, resources);
-    commandBuffer.PushConstants(*_dfaoShader, 0, pc);
+        dfaoShader, resources);
+    commandBuffer.PushConstants(dfaoShader, 0, pc);
 
     commandBuffer.Dispatch(
         (_screenExtent.width + 7) / 8,
         (_screenExtent.height + 7) / 8, 1);
 
-    commandBuffer.TransitionImageLayout(aoImage,
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(_aoTexture.Get(),
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 
     commandBuffer.EndDebugMarker();
 }

@@ -30,7 +30,7 @@ namespace Core
 	class CommandPool;
 	class CommandBuffer;
 	class MemoryAllocatorManager;
-	class ResourceCache;
+	class ResourceManager;
 	class Device
 	{
 	public:
@@ -69,7 +69,7 @@ namespace Core
 			return _queueFamilyIndices;
 		}
 
-		ResourceCache& GetResourceCache() const { return *_resourceCache; }
+		ResourceManager& GetResourceManager() const { return *_resourceManager; }
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
 
@@ -99,7 +99,7 @@ namespace Core
 		VkQueue _presentQueue;
 		VkQueue _transferQueue;
 
-		ResourceCache* _resourceCache;
+		ResourceManager* _resourceManager;
 
 		VkSurfaceKHR _surface;
 

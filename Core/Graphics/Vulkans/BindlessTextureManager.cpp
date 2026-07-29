@@ -18,6 +18,13 @@ namespace Core
 			_freeTexture2DSlots.push_back(i);
 			_freeCubemapSlots.push_back(i);
 		}
+
+		CreateDescriptorSetLayout();
+		CreateDescriptorPool();
+		AllocateDescriptorSet();
+
+		cout << "Bindless texture system initialized with "
+			<< _maxTextures << " slots" << endl;
 	}
 
 	BindlessTextureManager::~BindlessTextureManager()
@@ -33,99 +40,67 @@ namespace Core
 		}
 	}
 
-	void BindlessTextureManager::Initialize()
+	uint32_t BindlessTextureManager::RegisterTexture(Handle<Texture> texture)
 	{
-		CreateDescriptorSetLayout();
-		CreateDescriptorPool();
-		AllocateDescriptorSet();
-	}
-
-	TextureHandle BindlessTextureManager::RegisterTexture(shared_ptr<Texture> texture)
-	{
-		if (!texture)
+		Texture* resolved = texture.TryGet();
+		if (!resolved)
 		{
 			throw runtime_error("Cannot register null texture to bindless manager");
 		}
 
 		// Detect if cubemap or 2D
-		bool isCubemap = texture->GetLayers() == 6;
-		
+		bool isCubemap = resolved->GetLayers() == 6;
+
 		uint32_t slotIndex = AllocateSlot(isCubemap);
-		
+
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 		slot.textureBuffer.texture = texture;
-		slot.generation++;
 		slot.isActive = true;
-		
+
 		if (isCubemap)
 			_activeCubemapCount++;
 		else
 			_activeTexture2DCount++;
-		
-		_pendingUpdates.push_back(slotIndex | (isCubemap ? 0x80000000 : 0)); // MSB indicates cubemap
+
+		uint32_t bindlessIndex = slotIndex | (isCubemap ? BindlessCubemapFlag : 0);
+		_pendingUpdates.push_back(bindlessIndex);
 		_needsUpdate = true;
 
-		TextureHandle handle;
-		handle.index = slotIndex | (isCubemap ? 0x80000000 : 0); // MSB = cubemap flag
-		handle.generation = slot.generation;
-		
-		return handle;
+		return bindlessIndex;
 	}
 
-	void BindlessTextureManager::UnregisterTexture(TextureHandle handle)
+	void BindlessTextureManager::UnregisterTexture(uint32_t bindlessIndex)
 	{
-		if (!handle.IsValid())
+		if (bindlessIndex == InvalidBindlessIndex)
 			return;
 
-		bool isCubemap = (handle.index & 0x80000000) != 0;
-		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
-		
+		bool isCubemap = (bindlessIndex & BindlessCubemapFlag) != 0;
+		uint32_t slotIndex = bindlessIndex & ~BindlessCubemapFlag;
+
 		if (slotIndex >= _maxTextures)
 			return;
 
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		
-		if (slot.generation != handle.generation || !slot.isActive)
+
+		if (!slot.isActive)
 			return;
 
-		slot.textureBuffer.texture = nullptr;
+		slot.textureBuffer.texture = Handle<Texture>{};
 		slot.textureBuffer.mipLevel = 0;
 		slot.isActive = false;
-		
+
 		FreeSlot(slotIndex, isCubemap);
-		
+
 		if (isCubemap)
 			_activeCubemapCount--;
 		else
 			_activeTexture2DCount--;
-		
-		_pendingUpdates.push_back(handle.index);
+
+		_pendingUpdates.push_back(bindlessIndex);
 		_needsUpdate = true;
 	}
 
-	void BindlessTextureManager::UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture)
-	{
-		if (!handle.IsValid() || !texture)
-			return;
-
-		bool isCubemap = (handle.index & 0x80000000) != 0;
-		uint32_t slotIndex = handle.index & 0x7FFFFFFF;
-		
-		if (slotIndex >= _maxTextures)
-			return;
-
-		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		
-		if (slot.generation != handle.generation || !slot.isActive)
-			return;
-
-		slot.textureBuffer.texture = texture;
-		
-		_pendingUpdates.push_back(handle.index);
-		_needsUpdate = true;
-	}
-
-	void BindlessTextureManager::UpdateDescriptorSet()
+	void BindlessTextureManager::Sync()
 	{
 		if (!_needsUpdate || _pendingUpdates.empty())
 			return;
@@ -141,15 +116,15 @@ namespace Core
 
 		for (uint32_t packedIndex : _pendingUpdates)
 		{
-			bool isCubemap = (packedIndex & 0x80000000) != 0;
-			uint32_t slotIndex = packedIndex & 0x7FFFFFFF;
+			bool isCubemap = (packedIndex & BindlessCubemapFlag) != 0;
+			uint32_t slotIndex = packedIndex & ~BindlessCubemapFlag;
 			
 			auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
 			
 			uint binding = isCubemap ? 1 : 0;
 
 			VkDescriptorImageInfo imageInfo{};
-			if (slot.isActive && slot.textureBuffer.texture)
+			if (slot.isActive && slot.textureBuffer.texture.IsValid())
 			{
 				auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 				write.dstSet = _descriptorSet;

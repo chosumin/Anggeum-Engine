@@ -9,7 +9,7 @@
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Utils/Utility.h"
 
 using namespace Core;
@@ -24,8 +24,8 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device,
     , _colorRenderTarget(offscreen)
     , _irradianceCubemap(irradianceCubemap)
     , _prefilteredCubemap(prefilteredCubemap)
-    , _irradianceMaterial(device.GetResourceCache().RequestMaterial("irradiance", "Irradiance"))
-    , _prefilteredMaterial(device.GetResourceCache().RequestMaterial("prefiltered", "Prefiltered"))
+    , _irradianceShader(&device.GetResourceManager().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
+    , _prefilteredShader(&device.GetResourceManager().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
 {
     _renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
     _renderPass->CreateRenderPass();
@@ -45,20 +45,20 @@ void Core::PreEnvironmentPass::Initialize()
 
     auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
     {
-        auto material = mesh->GetMaterials()[0];
-        auto& shader = material->GetShader();
+        auto& material = mesh->GetMaterials()[0].Get();
+        auto& shader = material.GetShaderHandle().Get();
         return shader.GetPass() == "Skybox";
     });
 
-    shared_ptr<Texture> skyCubemap;
+    Handle<Texture> skyCubemap;
 
     if (it != meshes.end())
     {
         auto skybox = *it;
         
-        _sky = skybox->GetSubMeshes()[0];
-        auto material = skybox->GetMaterials()[0];
-        skyCubemap = material->GetTexture(1);
+        _sky = &skybox->GetSubMeshes()[0].Get();
+        auto& material = skybox->GetMaterials()[0].Get();
+        skyCubemap = material.GetTexture(1);
 
         auto pipelineState = *_pipelineState;
 
@@ -66,8 +66,15 @@ void Core::PreEnvironmentPass::Initialize()
         depthInfo.depthWriteEnable = VK_FALSE;
         depthInfo.depthTestEnable = VK_FALSE;
 
-        _irradiancePipeline = new Pipeline(_device, *_renderPass, _irradianceMaterial->GetShader(), pipelineState);
-        _prefilteredPipeline = new Pipeline(_device, *_renderPass, _prefilteredMaterial->GetShader(), pipelineState);
+        _irradiancePipeline = new Pipeline(_device, *_renderPass, *_irradianceShader, pipelineState);
+        _prefilteredPipeline = new Pipeline(_device, *_renderPass, *_prefilteredShader, pipelineState);
+
+        // Resolve the sky's vertex/index buffers here (main thread) so Draw() on the
+        // worker thread binds raw pointers instead of resolving pool handles.
+        _irradianceVertexBuffers = _sky->GetVertexBuffers(_irradianceShader->GetVertexAttirbuteNames());
+        _prefilteredVertexBuffers = _sky->GetVertexBuffers(_prefilteredShader->GetVertexAttirbuteNames());
+        _skyIndexBuffer = &_sky->GetIndexBuffer();
+        _skyIndexType = _sky->GetIndexType();
     }
 
     _mvpMatrices = {
@@ -93,9 +100,13 @@ void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, CommandBuffer& com
 
 void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    auto& shader = *_irradianceShader;
+
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_irradianceCubemap,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Submit();
 
     uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
     uint32_t layers = _irradianceCubemap->GetLayers();
@@ -117,49 +128,57 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
             commandBuffer.BeginRenderPass(beginInfo);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
-            commandBuffer.PushConstants(_irradianceMaterial->GetShader(), 0, viewProjection);
-            commandBuffer.PushConstants(_irradianceMaterial->GetShader(), 1, _delta);
+            commandBuffer.PushConstants(shader, 0, viewProjection);
+            commandBuffer.PushConstants(shader, 1, _delta);
 
             commandBuffer.BindPipeline(_irradiancePipeline);
 
-            auto irradianceBuilder = renderFrame.CreateDescriptorSetBuilder(_irradianceMaterial->GetShader(), 0);
+            auto irradianceBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader, 0);
             irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& irradianceResources = irradianceBuilder.Build();
             commandBuffer.BindDescriptorSet(
                 _irradiancePipeline->GetPipelineBindPoint(),
-                _irradianceMaterial->GetShader(), irradianceResources);
+                shader, irradianceResources);
 
-            auto vertexAttibuteNames = _irradianceMaterial->GetShader().GetVertexAttirbuteNames();
-
-            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
-            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.BindVertexBuffers(_irradianceVertexBuffers, 0);
+            commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
-                *_irradianceCubemap->GetImage().lock(), 0, 0, m, layer);
+            commandBuffer.CopyImage(*_colorRenderTarget, 
+                *_irradianceCubemap, 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                .Submit();
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_irradianceCubemap->GetImage().lock(),
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_irradianceCubemap,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
 {
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    auto& shader = *_prefilteredShader;
+
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_prefilteredCubemap,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Submit();
 
     uint32_t mipLevels = _prefilteredCubemap->GetMipLevels();
     uint32_t layers = _prefilteredCubemap->GetLayers();
@@ -181,44 +200,48 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             commandBuffer.BeginRenderPass(beginInfo);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
-            commandBuffer.PushConstants(_prefilteredMaterial->GetShader(), 0, viewProjection);
+            commandBuffer.PushConstants(shader, 0, viewProjection);
 
             _prefilterEnv.Roughness = (float)m / (float)(mipLevels - 1);
-            commandBuffer.PushConstants(_prefilteredMaterial->GetShader(), 1, _prefilterEnv);
+            commandBuffer.PushConstants(shader, 1, _prefilterEnv);
 
             commandBuffer.BindPipeline(_prefilteredPipeline);
 
-            auto prefilteredBuilder = renderFrame.CreateDescriptorSetBuilder(_prefilteredMaterial->GetShader(), 0);
+            auto prefilteredBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader, 0);
             prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& prefilteredResources = prefilteredBuilder.Build();
             commandBuffer.BindDescriptorSet(
                 _prefilteredPipeline->GetPipelineBindPoint(),
-                _prefilteredMaterial->GetShader(), prefilteredResources);
+                shader, prefilteredResources);
 
-            auto vertexAttibuteNames = _prefilteredMaterial->GetShader().GetVertexAttirbuteNames();
-
-            commandBuffer.BindVertexBuffers(_sky->GetVertexBuffers(vertexAttibuteNames), 0);
-            commandBuffer.BindIndexBuffer(_sky->GetIndexBuffer(), _sky->GetIndexType());
+            commandBuffer.BindVertexBuffers(_prefilteredVertexBuffers, 0);
+            commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
             commandBuffer.EndRenderPass();
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+                .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget->GetImage().lock(), 
-                *_prefilteredCubemap->GetImage().lock(), 0, 0, m, layer);
+            commandBuffer.CopyImage(*_colorRenderTarget, 
+                *_prefilteredCubemap, 0, 0, m, layer);
 
-            commandBuffer.TransitionImageLayout(*_colorRenderTarget->GetImage().lock(),
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            commandBuffer.CreateBarrierBatch()
+                .Image(*_colorRenderTarget,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                .Submit();
         }
     }
 
-    commandBuffer.TransitionImageLayout(*_prefilteredCubemap->GetImage().lock(),
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    commandBuffer.CreateBarrierBatch()
+        .Image(*_prefilteredCubemap,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .Submit();
 }
 
 Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& pass)

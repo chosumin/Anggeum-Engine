@@ -10,7 +10,7 @@
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "MeshBufferManager.h"
 #include "RenderFrame.h"
-#include "ResourceCache.h"
+#include "ResourceManager.h"
 #include "TransferJob.h"
 #include "Utils/FileSystem.h"
 
@@ -36,10 +36,10 @@ namespace
 	class SDFDownloadJob : public Job
 	{
 	public:
-		SDFDownloadJob(Device& device, Image& image, Buffer& boundsBuffer,
+		SDFDownloadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
 			uint32_t resolution, Buffer** outImageStaging, Buffer** outBoundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _image(image), _boundsBuffer(boundsBuffer)
+			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
 			, _outImageStaging(outImageStaging)
 			, _outBoundsStaging(outBoundsStaging)
@@ -56,9 +56,11 @@ namespace
 				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::STAGE);
 
 			// Image: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
-			commandBuffer->TransitionImageLayout(_image,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+				.Submit();
 
 			VkBufferImageCopy region{};
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -66,13 +68,15 @@ namespace
 			region.imageExtent = { _resolution, _resolution, _resolution };
 
 			vkCmdCopyImageToBuffer(commandBuffer->GetHandle(),
-				_image.GetImage(),
+				_texture.GetImage().GetImage(),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				imageStaging->GetBuffer(), 1, &region);
 
-			commandBuffer->TransitionImageLayout(_image,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				.Submit();
 
 			// Bounds buffer: storage -> staging
 			VkBufferCopy bcopy{};
@@ -88,7 +92,7 @@ namespace
 
 	private:
 		Device& _device;
-		Image& _image;
+		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
 		Buffer** _outImageStaging;
@@ -99,11 +103,11 @@ namespace
 	class SDFUploadJob : public Job
 	{
 	public:
-		SDFUploadJob(Device& device, Image& image, Buffer& boundsBuffer,
+		SDFUploadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
 			uint32_t resolution,
 			Buffer* imageStaging, Buffer* boundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _image(image), _boundsBuffer(boundsBuffer)
+			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
 			, _imageStaging(imageStaging), _boundsStaging(boundsStaging)
 		{
@@ -111,9 +115,11 @@ namespace
 
 		void Execute() override
 		{
-			commandBuffer->TransitionImageLayout(_image,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+				.Submit();
 
 			VkBufferImageCopy region{};
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -122,13 +128,15 @@ namespace
 
 			vkCmdCopyBufferToImage(commandBuffer->GetHandle(),
 				_imageStaging->GetBuffer(),
-				_image.GetImage(),
+				_texture.GetImage().GetImage(),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1, &region);
 
-			commandBuffer->TransitionImageLayout(_image,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			commandBuffer->CreateBarrierBatch()
+				.Image(_texture,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				.Submit();
 
 			VkBufferCopy bcopy{};
 			bcopy.size = _boundsStaging->GetSize();
@@ -141,7 +149,7 @@ namespace
 
 	private:
 		Device& _device;
-		Image& _image;
+		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
 		Buffer* _imageStaging;
@@ -160,32 +168,32 @@ static uint32_t FloatToSortableUint(float f)
 SDFGenerator::SDFGenerator(Device& device)
 	: _device(device)
 {
-	_sdfGenerateShader = _device.GetResourceCache().RequestShader("Shaders/sdfGenerate.comp.spv");
-	_sdfGeneratePipeline = make_unique<Pipeline>(_device, *_sdfGenerateShader);
+	_sdfGenerateShader = _device.GetResourceManager().LoadShader("Shaders/sdfGenerate.comp.spv");
+	_sdfGeneratePipeline = make_unique<Pipeline>(_device, _sdfGenerateShader.Get());
 
-	_boundsReduceShader = _device.GetResourceCache().RequestShader("Shaders/sdfBoundsReduce.comp.spv");
-	_boundsReducePipeline = make_unique<Pipeline>(_device, *_boundsReduceShader);
+	_boundsReduceShader = _device.GetResourceManager().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
+	_boundsReducePipeline = make_unique<Pipeline>(_device, _boundsReduceShader.Get());
 
-	_triLookupShader = _device.GetResourceCache().RequestShader("Shaders/sdfTriLookup.comp.spv");
-	_triLookupPipeline = make_unique<Pipeline>(_device, *_triLookupShader);
+	_triLookupShader = _device.GetResourceManager().LoadShader("Shaders/sdfTriLookup.comp.spv");
+	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
 
-	// Initialize bounds buffer
+	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
 	uint32_t posInf = FloatToSortableUint(1e20f);
 	uint32_t negInf = FloatToSortableUint(-1e20f);
 	vector<uint32_t> initData = { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
 
-	VkBufferJob<uint32_t> boundsJob(_device,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-		| VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		&_boundsBuffer, initData, 0);
+	_boundsBuffer = _device.GetResourceManager().LoadBuffer(
+		{ initData.size() * sizeof(uint32_t),
+		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		  MemoryType::DEVICE_LOCAL },
+		"SDF.Bounds");
+
+	VkBufferCopyJob<uint32_t> boundsJob(_device, _boundsBuffer.Get(), move(initData), 0);
 	CommandBuffer::ImmediateSubmit(_device, boundsJob);
 }
 
-SDFGenerator::~SDFGenerator()
-{
-	if (_boundsBuffer) delete _boundsBuffer;
-	if (_triLookupBuffer) delete _triLookupBuffer;
-}
+SDFGenerator::~SDFGenerator() = default;
 
 void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 {
@@ -202,66 +210,88 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = make_shared<Image>(_device, imageInfo,
+	auto image = make_unique<Image>(_device, imageInfo,
 		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
 
-	auto sampler = _device.GetResourceCache().RequestSampler(DEFAULT_SAMPLER);
-	_sdfTexture = make_shared<Texture>("SDFVolume", image, sampler);
+	auto sampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
+	_sdfTexture = _device.GetResourceManager().LoadTexture("SDFVolume", std::move(image), sampler);
 }
 
 void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	Buffer* objectDataBuffer, Buffer* transformBuffer,
+	Buffer& objectDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_TRANSFER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_TRANSFER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	// Make the transfer-uploaded inputs (and the initialized bounds buffer) visible
+	// to the reduce kernel. Scoped to the buffers it reads rather than all memory.
+	commandBuffer.CreateBarrierBatch()
+		.Buffer(objectDataBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Buffer(transformBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Buffer(_boundsBuffer.Get(),
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+		.Submit();
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(*_boundsReduceShader, 0);
+	auto& boundsReduceShader = _boundsReduceShader.Get();
+	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(boundsReduceShader, 0);
 	builder.SetStorageBuffer(0, objectDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
-	builder.SetStorageBuffer(2, _boundsBuffer);
+	builder.SetStorageBuffer(2, _boundsBuffer.Get());
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(_boundsReducePipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_boundsReduceShader,
+		boundsReduceShader,
 		resources);
-	commandBuffer.PushConstants(*_boundsReduceShader, 0, instanceCount);
+	commandBuffer.PushConstants(boundsReduceShader, 0, instanceCount);
 
 	uint32_t groupCount = (instanceCount + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT);
+	// The reduce kernel writes the bounds buffer; the SDF generate pass reads it.
+	commandBuffer.CreateBarrierBatch()
+		.Buffer(_boundsBuffer.Get(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Submit();
 }
 
 void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+	Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
-	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex)
+	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex).
+	// It grows with triangle count: first allocation adds a slot, a later grow swaps
+	// the backing buffer in place (Replace) so the handle stays valid.
 	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
 
-	if (!_triLookupBuffer || _triLookupBuffer->GetSize() < requiredSize)
+	auto& resourceManager = _device.GetResourceManager();
+	BufferDesc triLookupDesc{ requiredSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL };
+	if (!_triLookupBuffer.IsValid())
 	{
-		if (_triLookupBuffer)
-			delete _triLookupBuffer;
-		_triLookupBuffer = new Buffer(_device,
-			requiredSize,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			MemoryType::DEVICE_LOCAL);
+		_triLookupBuffer = resourceManager.LoadBuffer(triLookupDesc, "SDF.TriLookup");
+	}
+	else if (_triLookupBuffer.Get().GetSize() < requiredSize)
+	{
+		resourceManager.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
 	}
 
-	auto builder = renderFrame.CreateDescriptorSetBuilder(*_triLookupShader, 0);
+	auto& triLookupShader = _triLookupShader.Get();
+	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
 	builder.SetStorageBuffer(1, objectDataBuffer);
-	builder.SetStorageBuffer(2, _triLookupBuffer);
+	builder.SetStorageBuffer(2, _triLookupBuffer.Get());
 	auto& resources = builder.Build();
 
 	struct TriLookupPushConstants {
@@ -271,33 +301,36 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 
 	commandBuffer.BindPipeline(_triLookupPipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_triLookupShader,
+		triLookupShader,
 		resources);
-	commandBuffer.PushConstants(*_triLookupShader, 0, pc);
+	commandBuffer.PushConstants(triLookupShader, 0, pc);
 
 	uint32_t groupCount = (totalTriangles + 63) / 64;
 	commandBuffer.Dispatch(groupCount, 1, 1);
 
-	commandBuffer.Barrier(
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		VK_ACCESS_SHADER_WRITE_BIT,
-		VK_ACCESS_SHADER_READ_BIT);
+	// The lookup kernel writes the triangle-lookup buffer; the SDF generate pass reads it.
+	commandBuffer.CreateBarrierBatch()
+		.Buffer(_triLookupBuffer.Get(),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT)
+		.Submit();
 }
 
 void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
 	MeshBufferManager& meshBufferManager,
 	uint32_t resolution)
 {
-	if (!_sdfTexture)
+	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(resolution);
 
 	auto batch = renderFrame.GetRenderExecutor().GetRendererBatch();
-	auto objectDataBuffer = batch->GetObjectDataBuffer();
-	auto indirectCommandBuffer = batch->GetIndirectCommandBuffer();
+	auto& objectDataBuffer = batch->GetObjectDataBuffer();
+	auto& indirectCommandBuffer = batch->GetIndirectCommandBuffer();
 	auto drawCommandCount = batch->GetDrawCommandCount();
 	auto instanceCount = batch->GetInstanceCount();
-	auto transformBuffer = batch->GetTransformBatch()->TransformBuffer;
+	auto& transformBuffer = batch->GetTransformBatch().TransformBuffer.Get();
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 
@@ -311,10 +344,11 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume
-	auto& sdfImage = *_sdfTexture->GetImage().lock();
-	commandBuffer.TransitionImageLayout(sdfImage,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_GENERAL);
+	commandBuffer.CreateBarrierBatch()
+		.Image(_sdfTexture.Get(),
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_GENERAL)
+		.Submit();
 
 	SDFGeneratePushConstants pc{};
 	pc.resolution = resolution;
@@ -322,39 +356,40 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	pc.paddingFactor = _paddingFactor;
 	pc.useUint16Indices = (meshBufferManager.GetIndexType() == VK_INDEX_TYPE_UINT16) ? 1 : 0;
 
-	auto sdfBuilder = renderFrame.CreateDescriptorSetBuilder(*_sdfGenerateShader, 0);
-	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0]);
-	sdfBuilder.SetStorageBuffer(1, &meshBufferManager.GetIndexBuffer());
+	auto& sdfGenerateShader = _sdfGenerateShader.Get();
+	auto sdfBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(sdfGenerateShader, 0);
+	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0].Get());
+	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer().Get());
 	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
-	sdfBuilder.SetStorageBuffer(3, _boundsBuffer);
-	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer);
+	sdfBuilder.SetStorageBuffer(3, _boundsBuffer.Get());
+	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer.Get());
 	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
 	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
-		*_sdfGenerateShader,
+		sdfGenerateShader,
 		sdfResources);
-	commandBuffer.PushConstants(*_sdfGenerateShader, 0, pc);
+	commandBuffer.PushConstants(sdfGenerateShader, 0, pc);
 
 	uint32_t groups = (resolution + 3) / 4;
 	commandBuffer.Dispatch(groups, groups, groups);
 
-	commandBuffer.TransitionImageLayout(sdfImage,
-		VK_IMAGE_LAYOUT_GENERAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	commandBuffer.CreateBarrierBatch()
+		.Image(_sdfTexture.Get(),
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		.Submit();
 
 	_generated = true;
 }
 
 bool SDFGenerator::SaveToFile(uint32_t resolution)
 {
-	if (!_sdfTexture || !_boundsBuffer)
+	if (!_sdfTexture.IsValid() || !_boundsBuffer.IsValid())
 		return false;
 
-	auto image = _sdfTexture->GetImage().lock();
-	if (!image)
-		return false;
+	auto& texture = _sdfTexture.Get();
 
 	// The SDF generation commands were recorded into a frame command buffer that
 	// may still be executing (or not yet started) on the GPU. The download job
@@ -366,7 +401,7 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	Buffer* imageStaging = nullptr;
 	Buffer* boundsStaging = nullptr;
 
-	SDFDownloadJob job(_device, *image, *_boundsBuffer, resolution,
+	SDFDownloadJob job(_device, texture, _boundsBuffer.Get(), resolution,
 		&imageStaging, &boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 
@@ -453,25 +488,19 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	imageStaging->Unmap();
 
 	// Bounds staging
-	auto* boundsStaging = new Buffer(_device, _boundsBuffer->GetSize(),
+	auto* boundsStaging = new Buffer(_device, _boundsBuffer.Get().GetSize(),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
 	void* boundsMapped = nullptr;
 	boundsStaging->Map(&boundsMapped);
 	memcpy(boundsMapped, header.rawBounds, sizeof(header.rawBounds));
 	boundsStaging->Unmap();
 
-	if (!_sdfTexture)
+	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(header.resolution);
 
-	auto image = _sdfTexture->GetImage().lock();
-	if (!image)
-	{
-		delete imageStaging;
-		delete boundsStaging;
-		return false;
-	}
+	auto& texture = _sdfTexture.Get();
 
-	SDFUploadJob job(_device, *image, *_boundsBuffer, header.resolution,
+	SDFUploadJob job(_device, texture, _boundsBuffer.Get(), header.resolution,
 		imageStaging, boundsStaging);
 	CommandBuffer::ImmediateSubmit(_device, job);
 

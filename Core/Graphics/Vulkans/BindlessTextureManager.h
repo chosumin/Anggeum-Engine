@@ -4,21 +4,15 @@
 
 namespace Core
 {
-	// Texture handle with validation
-	struct TextureHandle
-	{
-		uint32_t index = UINT32_MAX;
-		uint32_t generation = 0;
-		
-		bool IsValid() const { return index != UINT32_MAX; }
-	};
+	// Packed bindless slot index: low 31 bits are the array index, the MSB flags a
+	// cubemap (binding 1) vs a 2D texture (binding 0). UINT32_MAX means "none".
+	inline constexpr uint32_t InvalidBindlessIndex = UINT32_MAX;
+	inline constexpr uint32_t BindlessCubemapFlag = 0x80000000u;
 
 	// Internal texture slot
 	struct TextureSlot
 	{
-		//shared_ptr<Texture> texture;
 		TextureBuffer textureBuffer;
-		uint32_t generation = 0;
 		bool isActive = false;
 	};
 
@@ -33,15 +27,16 @@ namespace Core
 		BindlessTextureManager(BindlessTextureManager&&) = delete;
 		BindlessTextureManager& operator=(BindlessTextureManager&&) = delete;
 
-		void Initialize();
-
-		// Texture registration (auto-detects 2D vs Cubemap)
-		TextureHandle RegisterTexture(shared_ptr<Texture> texture);
-		void UnregisterTexture(TextureHandle handle);
-		void UpdateTexture(TextureHandle handle, shared_ptr<Texture> texture);
+		// Texture registration (auto-detects 2D vs Cubemap). Takes a Handle<Texture>
+		// and returns the packed bindless slot index (see BindlessCubemapFlag).
+		// Slot lifetime is driven by the cache that owns the texture, so the slot
+		// needs no generation of its own.
+		uint32_t RegisterTexture(Handle<Texture> texture);
+		void UnregisterTexture(uint32_t bindlessIndex);
 
 		// Descriptor management
-		void UpdateDescriptorSet();
+		// Flush pending descriptor writes; no-op when nothing was registered/freed.
+		void Sync();
 		VkDescriptorSet GetDescriptorSet() const { return _descriptorSet; }
 		VkDescriptorSetLayout GetDescriptorSetLayout() const { return _descriptorSetLayout; }
 		
@@ -51,7 +46,6 @@ namespace Core
 		uint32_t GetActiveTextureCount() const { return _activeTexture2DCount + _activeCubemapCount; }
 		uint32_t GetActive2DTextureCount() const { return _activeTexture2DCount; }
 		uint32_t GetActiveCubemapCount() const { return _activeCubemapCount; }
-		uint32_t GetMaxTextures() const { return _maxTextures; }
 		float GetUsagePercentage() const 
 		{ 
 			return (GetActiveTextureCount() * 100.0f) / (_maxTextures * 2); 

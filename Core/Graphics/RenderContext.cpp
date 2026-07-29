@@ -7,6 +7,7 @@
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
+#include "RendererBatch.h"
 using namespace Core;
 
 vector<function<void(SwapChain&)>> RenderContext::_resizeCallbacks;
@@ -29,19 +30,11 @@ void RenderContext::RemoveResizeCallback(function<void(SwapChain&)> callback)
 	}
 }
 
-RenderContext::RenderContext(Device& device)
+RenderContext::RenderContext(Device& device, RenderScene& renderScene)
 	: _device(device)
+	, _renderScene(renderScene)
 {
 	_swapChain = new SwapChain(device);
-
-	// Create bindless texture manager if supported
-	if (device.SupportsDescriptorIndexing())
-	{
-		_bindlessTextureManager = make_unique<BindlessTextureManager>(device, 4096);
-	}
-
-	_meshBufferManager = make_unique<MeshBufferManager>(_device);
-	_materialManager = make_unique<MaterialManager>();
 
 	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 
@@ -53,21 +46,13 @@ RenderContext::RenderContext(Device& device)
 	_queueTimer = make_unique<GpuQueueTimer>(device);
 
 	CreateRenderFrames();
-
-	if (_bindlessTextureManager)
-	{
-		_bindlessTextureManager->Initialize();
-		cout << "Bindless texture system initialized with "
-			<< _bindlessTextureManager->GetMaxTextures() << " slots" << endl;
-	}
 }
 
 RenderContext::~RenderContext()
 {
-	_meshBufferManager.reset();
-	_materialManager.reset();
-
-	// Clean up frames
+	// Clean up frames first: their per-frame Cullers hold references to the shared
+	// RendererBatch, so the managers (destroyed with _gpuManagers after this dtor
+	// body) must outlive them.
 	_frames.clear();
 
 	// Clean up sync primitives (must outlive frames only for wait; frames already destroyed)
@@ -88,10 +73,7 @@ void RenderContext::CreateRenderFrames()
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		_frames[i] = make_unique<RenderFrame>(_device, _bindlessTextureManager.get());
-
-		_frames[i]->SetMeshBufferManager(_meshBufferManager.get());
-		_frames[i]->SetMaterialManager(_materialManager.get());
+		_frames[i] = make_unique<RenderFrame>(_device, _renderScene);
 	}
 }
 
@@ -119,37 +101,46 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 
 	uint32_t prevIndex = (_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
 	_previousFrameDepth = _frameDepthBuffers[prevIndex];
-	currentFrame.SetPreviousDepthBuffer(_previousFrameDepth);
+	currentFrame.GetResources().SetPreviousDepthBuffer(_previousFrameDepth);
 
 	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
-
-	if (_bindlessTextureManager)
-		_bindlessTextureManager->UpdateDescriptorSet();
-
-	_materialManager->RefreshDirtyMaterials();
-
-	// Initialize batches once per frame
-	currentFrame.InitializeBatches(scene, extents);
 }
 
 void RenderContext::Submit()
 {
 	auto& currentFrame = GetCurrentFrame();
+	auto& frameResources = currentFrame.GetResources();
 
-	auto currentResolvedDepth = currentFrame.GetRenderTarget("ResolvedDepth");
+	auto currentResolvedDepth = frameResources.GetRenderTarget("ResolvedDepth");
 
-	if (currentResolvedDepth)
+	if (currentResolvedDepth.IsValid())
 		_frameDepthBuffers[_currentFrame] = currentResolvedDepth;
 	else
 	{
-		auto currentDepth = currentFrame.GetRenderTarget("MainDepth");
+		auto currentDepth = frameResources.GetRenderTarget("MainDepth");
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
 
 	auto& submission = currentFrame.GetSubmission();
 
 	auto submitStart = std::chrono::steady_clock::now();
+
+	// Resource-init work the passes queued while recording (initial layout
+	// transitions, initial buffer fills) goes out first, as one command buffer on
+	// the graphics queue. SubmitToQueues gates the frame's first submit per queue
+	// on the timeline value it signals.
+	if (frameResources.HasPendingInit())
+	{
+		auto& initCommandBuffer = RequestCommandBuffer();
+		initCommandBuffer.BeginCommandBuffer(true);
+
+		frameResources.ExecutePendingInit(initCommandBuffer);
+
+		initCommandBuffer.EndCommandBuffer();
+
+		_syncContext->SubmitResourceInit(initCommandBuffer.GetHandle());
+	}
 
 	// Submit all queues with semaphore injection
 	_syncContext->SubmitToQueues(

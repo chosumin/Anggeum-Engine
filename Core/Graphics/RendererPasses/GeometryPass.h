@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -23,8 +24,7 @@ namespace Core
 
         GeometryPass(Device& device, WorkerThreadManager& workerThreadManager,
             Scene& scene, SwapChain& swapChain, VkFormat depthFormat,
-            VkSampleCountFlagBits msaaSamples, ShadowUniform& shadowBuffer,
-            Buffer* lightVisibilityBuffer, ivec2 tileNums);
+            VkSampleCountFlagBits msaaSamples, ivec2 tileNums);
         ~GeometryPass();
 
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
@@ -36,7 +36,6 @@ namespace Core
 
         void PreparePregenerationSkybox(RenderFrame& renderFrame);
         void DrawSkybox(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-        void UpdateLightBuffer();
 
         Pipeline* GetOrCreatePipeline(Shader& shader);
 
@@ -51,17 +50,14 @@ namespace Core
         unordered_map<Shader*, Pipeline*> _pipelineCache;
 
         GI _giBuffer;
-        ShadowUniform& _shadowBuffer;
-        LightBuffer _lightBuffer;
-        Buffer* _lightVisibilityBuffer;
         TileInfo _tileInfo;
 
         bool _iblGenerated = false;
 
-        shared_ptr<Texture> _offscreenTexture;
-        shared_ptr<Texture> _irradianceCubemap;
-        shared_ptr<Texture> _prefilteredCubemap;
-        shared_ptr<Texture> _brdfLut;
+        Handle<Texture> _offscreenTexture;
+        Handle<Texture> _irradianceCubemap;
+        Handle<Texture> _prefilteredCubemap;
+        Handle<Texture> _brdfLut;
 
         // Pass 2 RenderPass (color LOAD, depth LOAD)
         RenderPass* _renderPassPass2 = nullptr;

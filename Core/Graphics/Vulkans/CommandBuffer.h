@@ -1,5 +1,6 @@
 #pragma once
 #include "CommandPool.h"
+#include "BarrierBatch.h"
 #include "Graphics/SyncContext.h"
 
 namespace Core
@@ -11,6 +12,7 @@ namespace Core
 	class Buffer;
 	class Shader;
 	class Image;
+	class Texture;
 	class Job;
 	class Framebuffer;
 	class MeshBufferManager;
@@ -62,29 +64,16 @@ namespace Core
 
 		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
 
-		void Barrier(
-			VkPipelineStageFlags srcStageMask,
-			VkPipelineStageFlags dstStageMask,
-			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask);
+		BarrierBatch CreateBarrierBatch();
 
-		void BufferBarrier(
-			Buffer& buffer,
-			VkPipelineStageFlags srcStageMask,
-			VkPipelineStageFlags dstStageMask,
-			VkAccessFlags srcAccessMask,
-			VkAccessFlags dstAccessMask,
-			QueueType destQueue = QueueType::None);
+		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer,
+			VkDeviceSize dstOffset = 0, VkDeviceSize srcOffset = 0, VkDeviceSize size = 0);
 
-		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer, VkDeviceSize dstOffset);
-		void CopyImage(Image& srcImage, Image& dstImage, 
-			uint32_t srcMipLevel, uint32_t srcLayer, 
+		void CopyImage(Texture& srcTexture, Texture& dstTexture,
+			uint32_t srcMipLevel, uint32_t srcLayer,
 			uint32_t dstMipLevel, uint32_t dstLayer);
-		void CopyBufferToImage(Buffer& buffer, Image& image, uint32_t width, uint32_t height);
-		void TransitionImageLayout(Image& image, 
-			VkImageLayout oldLayout, VkImageLayout newLayout,
-			QueueType destQueue = QueueType::None);
-		void GenerateMipmaps(Image& image, uint32_t mipLevels);
+		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height);
+		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
 		void EndRenderPass();
 		void EndCommandBuffer();
 
@@ -105,8 +94,6 @@ namespace Core
 		}
 	private:
 		void PushConstantsInternal(Shader& shader, uint32_t index, const void* data, uint32_t size);
-		void GetAccessAndStageMask(const VkImageLayout& inImageLayout, VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags);
-		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
 	private:
 		Device& _device;
 		VkCommandBuffer _commandBuffer;

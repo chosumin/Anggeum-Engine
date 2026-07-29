@@ -3,19 +3,10 @@
 #include "Buffer.h"
 #include "MemoryAllocator.h"
 
-Core::StorageBuffer::StorageBuffer()
-	: _buffer(nullptr)
+void Core::StorageBuffer::SetBuffer(Buffer& data)
 {
-}
-
-Core::StorageBuffer::~StorageBuffer()
-{
-}
-
-void Core::StorageBuffer::SetBuffer(Buffer* data)
-{
-	_buffer = data;
-	_bufferInfo.range = data->GetSize();
+	_buffer = &data;
+	_bufferInfo.range = data.GetSize();
 }
 
 VkWriteDescriptorSet Core::StorageBuffer::CreateWriteDescriptorSet(uint32_t binding)

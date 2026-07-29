@@ -1,27 +1,43 @@
 #include "stdafx.h"
 #include "MaterialManager.h"
 #include "Material.h"
+#include "ResourcePool.h"
+#include "ResourceManager.h"
+#include "Vulkans/Buffer.h"
+#include "Vulkans/MemoryAllocator.h"
+#include "Vulkans/Device.h"
 
 using namespace Core;
 
-MaterialManager::MaterialManager()
+MaterialManager::MaterialManager(Device& device)
+	: _device(device)
 {
 	for (auto& data : _materialData)
 	{
 		data = GPUMaterialData{};
 	}
+
+	_materialDataBuffer = _device.GetResourceManager().LoadBuffer(
+		{ sizeof(MaterialTable), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM },
+		"MaterialTable");
+
+	// Seed the GPU copy so a frame that draws before any material is registered
+	// still reads defined data.
+	_materialDataBuffer.Get().Update(_materialData);
 }
+
+MaterialManager::~MaterialManager() = default;
 
 void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 {
-	auto& material = _materials[materialIndex];
-	if (material.expired())
+	Material* material = _materials[materialIndex].TryGet();
+	if (!material)
 		return;
 
 	GPUMaterialData& data = _materialData[materialIndex];
-	
+
 	//todo: cast out of this function if material is not PBR
-	auto pbrBuffer = material.lock()->GetBufferConst<PBRBuffer>(1);
+	auto pbrBuffer = material->GetBufferConst<PBRBuffer>(1);
 	if (pbrBuffer)
 	{
 		data.albedo = pbrBuffer->Albedo;
@@ -43,7 +59,7 @@ void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 	data.flags = 1;  // Enabled
 }
 
-uint32_t MaterialManager::RegisterMaterial(shared_ptr<Material> material)
+uint32_t MaterialManager::RegisterMaterial(Handle<Material> material)
 {
 	uint32_t index;
 
@@ -62,7 +78,7 @@ uint32_t MaterialManager::RegisterMaterial(shared_ptr<Material> material)
 	}
 
 	_materials[index] = material;
-	material->SetMaterialIndex(index);
+	material.Get().SetMaterialIndex(index);
 
 	_dirtyMaterials.set(index);
 	_anyDirty = true;
@@ -75,7 +91,7 @@ void MaterialManager::UnregisterMaterial(uint32_t materialIndex)
 	if (materialIndex >= MAX_MATERIALS)
 		return;
 
-	_materials[materialIndex].reset();
+	_materials[materialIndex] = Handle<Material>{};
 	_materialData[materialIndex] = GPUMaterialData{};
 	_freeIndices.push_back(materialIndex);
 
@@ -92,7 +108,7 @@ void MaterialManager::MarkDirty(uint32_t materialIndex)
 	}
 }
 
-void MaterialManager::RefreshDirtyMaterials()
+void MaterialManager::Sync()
 {
 	if (!_anyDirty)
 		return;
@@ -107,4 +123,6 @@ void MaterialManager::RefreshDirtyMaterials()
 
 	_dirtyMaterials.reset();
 	_anyDirty = false;
+
+	_materialDataBuffer.Get().Update(_materialData);
 }

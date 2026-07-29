@@ -50,12 +50,32 @@ Core::Buffer::~Buffer()
 
 void Core::Buffer::CopyBuffer(void* data, VkDeviceSize size)
 {
-	_allocator->CopyBuffer(data, *_allocation);
+	_allocator->CopyBuffer(data, *_allocation, size);
 }
 
 void Core::Buffer::GetMappedPtr(void** data)
 {
 	_allocator->GetMappedPtr(data, *_allocation);
+}
+
+void Core::Buffer::UpdateRaw(const void* data, VkDeviceSize size)
+{
+	assert(size <= _size && "update larger than the buffer");
+
+	memcpy(GetPersistentMappedPtr(), data, static_cast<size_t>(size));
+}
+
+void* Core::Buffer::GetPersistentMappedPtr()
+{
+	if (_mapped == nullptr)
+	{
+		assert(_allocation->type == MemoryType::UNIFORM &&
+			"Update requires a persistently mapped memory type");
+
+		_allocator->GetMappedPtr(&_mapped, *_allocation);
+	}
+
+	return _mapped;
 }
 
 void Core::Buffer::Map(void** data)

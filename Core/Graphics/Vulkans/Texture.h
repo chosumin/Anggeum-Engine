@@ -1,6 +1,7 @@
 #pragma once
 #include "Image.h"
 #include "Sampler.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -10,10 +11,12 @@ namespace Core
 	class Texture
 	{
 	public:
-		Texture(string name, shared_ptr<Image> image, shared_ptr<Sampler> sampler);
+		// Texture owns its Image 1:1. The image is built by the creator (cache,
+		// render target, pass) and moved in. The sampler is a cache handle.
+		Texture(string name, unique_ptr<Image> image, Handle<Sampler> sampler);
 		~Texture();
 
-		weak_ptr<Image> GetImage() { return _image; }
+		Image& GetImage() { return *_image; }
 
 		uint32_t GetMipLevels() const;
 		uint32_t GetLayers() const;
@@ -43,18 +46,26 @@ namespace Core
 			return _image->GetExtent();
 		}
 
-		shared_ptr<Sampler> GetSampler() { return _sampler; }
+		// Delegates to the owned sampler, mirroring GetImageView(). Callers only
+		// need the VkSampler, so the Core::Sampler wrapper is not exposed.
+		VkSampler GetVkSampler();
+
+		// Bindless slot index (with the manager's cubemap MSB flag), assigned when
+		// the cache registers this texture. UINT32_MAX until then.
+		void SetBindlessIndex(uint32_t index) { _bindlessIndex = index; }
+		uint32_t GetBindlessIndex() const { return _bindlessIndex; }
 
 		string& GetName() { return _name; }
 	private:
 		string _name;
-		shared_ptr<Image> _image;
-		shared_ptr<Sampler> _sampler;
+		uint32_t _bindlessIndex = UINT32_MAX;
+		unique_ptr<Image> _image;
+		Handle<Sampler> _sampler;
 	};
 
 	struct TextureBuffer
 	{
-		shared_ptr<Texture> texture;
+		Handle<Texture> texture;
 		uint mipLevel;
 		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		VkDescriptorImageInfo imageInfo{};

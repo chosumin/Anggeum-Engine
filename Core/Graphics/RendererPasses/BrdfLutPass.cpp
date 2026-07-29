@@ -3,6 +3,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Material.h"
+#include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
@@ -25,7 +26,8 @@ Core::BrdfLutPass::~BrdfLutPass()
 
 void Core::BrdfLutPass::Initialize()
 {
-    _brdfMaterial = new Material(_device, "BRDF", "brdf lut");
+    auto shaderHandle = _device.GetResourceManager().LoadShader("BRDF");
+    _brdfMaterial = new Material(_device, shaderHandle, "brdf lut");
 
     auto pipelineState = *_pipelineState;
 
@@ -36,7 +38,7 @@ void Core::BrdfLutPass::Initialize()
     depthInfo.depthWriteEnable = VK_FALSE;
     depthInfo.depthTestEnable = VK_FALSE;
 
-    _brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShader(), pipelineState);
+    _brdfPipeline = new Pipeline(_device, *_renderPass, _brdfMaterial->GetShaderHandle().Get(), pipelineState);
 }
 
 void Core::BrdfLutPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)

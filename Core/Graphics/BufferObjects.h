@@ -141,6 +141,23 @@ struct VisibleLightsForTile
 	std::array<uint32_t, MAX_POINT_LIGHT_PER_TILE> lightindices;
 };
 
+// Uniform blocks shared by every pass in a frame.
+inline constexpr const char* UB_CAMERA = "Camera";
+inline constexpr const char* UB_LIGHTS = "Lights";
+inline constexpr const char* UB_SHADOW = "Shadow";
+
+// Per-tile light lists: written by LightCullingPass (compute), read by
+// GeometryPass (fragment) in the same frame. Owned per frame-in-flight by
+// RenderFrame, so producer and consumer must agree on name and size.
+inline constexpr const char* SB_LIGHT_VISIBILITY = "LightVisibility";
+
+inline VkDeviceSize GetLightVisibilityBufferSize(ivec2 tileNums)
+{
+	return sizeof(VisibleLightsForTile)
+		* static_cast<VkDeviceSize>(tileNums.x)
+		* static_cast<VkDeviceSize>(tileNums.y);
+}
+
 struct TileInfo
 {
 	ivec2 viewportSize;
@@ -185,4 +202,12 @@ struct alignas(16) GPUCullData
 	uint32_t drawCount;
 	uint32_t hiZMipLevels;
 	uint32_t enableOcclusionCulling;
+};
+
+struct alignas(16) GPUFrustumCullData
+{
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::vec4 frustumPlanes[6];
+	uint32_t drawCount;
 };

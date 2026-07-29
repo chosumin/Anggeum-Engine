@@ -4,14 +4,13 @@
 namespace Core
 {
 	class GLTFLoader;
-	class TransferContext;
 	class RenderContext;
 }
 
 class SampleScene : public Core::Scene
 {
 public:
-	SampleScene(Core::Device& device, float width, float height, Core::TransferContext* transferContext, Core::RenderContext* renderContext);
+	SampleScene(Core::Device& device, float width, float height, Core::RenderContext* renderContext);
 	~SampleScene();
 
 	virtual void Update() override;

@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RendererPass.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -18,24 +19,24 @@ namespace Core
         void EnsureRenderTargets(RenderFrame& renderFrame) override;
         void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
 
-        static shared_ptr<Texture> ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            shared_ptr<Texture> msaaDepth, QueueType destQueue = QueueType::None);
+        static Handle<Texture> ResolveDepth(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+            Handle<Texture> msaaDepth, QueueType destQueue = QueueType::None);
     private:
         void ResolveNormal(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            shared_ptr<Texture> msaaNormal);
+            Handle<Texture> msaaNormal);
         
-        static shared_ptr<Texture> GetResolvedDepthTarget(RenderFrame& renderFrame);
+        static Handle<Texture> GetResolvedDepthTarget(RenderFrame& renderFrame);
     private:
         VkSampleCountFlagBits _msaaSamples;
 
-        shared_ptr<Texture> _resolvedDepthTexture;
-        shared_ptr<Texture> _resolvedNormalTexture;
+        Handle<Texture> _resolvedDepthTexture;
+        Handle<Texture> _resolvedNormalTexture;
 
-        shared_ptr<Shader> _normalResolveShader;
+        Handle<Shader> _normalResolveShader;
         unique_ptr<Pipeline> _normalResolvePipeline;
 
         static VkExtent2D _screenExtent;
-        static shared_ptr<Shader> _depthResolveShader;
+        static Handle<Shader> _depthResolveShader;
         static unique_ptr<Pipeline> _depthResolvePipeline;
     };
 }

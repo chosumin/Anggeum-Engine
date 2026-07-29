@@ -4,11 +4,14 @@
 #include "Foundation/WorkerThread.h"
 #include "Foundation/Entity.h"
 #include "Components/Mesh.h"
+#include "Components/Light.h"
+#include "Components/PerspectiveCamera.h"
+#include "Graphics/RenderFrame.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/TransferJob.h"
 #include "Graphics/Vulkans/SubmitInfo.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"
@@ -41,7 +44,6 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	ivec2 tileNums = ivec2(
 		(extent.width - 1) / TILE_SIZE + 1,
 		(extent.height - 1) / TILE_SIZE + 1);
-	CreateLightCullingBuffer(extent, tileNums);
 
 	auto depthFormat = _device.FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -57,11 +59,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		AddRendererPass(resolvePass);
 	}
 
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums, _lightBuffer);
+	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums);
 	AddRendererPass(lightCullingPass);
 
 	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, depthFormat, _shadowBuffer);
+		device, workerThreadManager, scene, depthFormat);
 	AddRendererPass(shadowPass);
 
 	auto sdfShadowPass = new SDFShadowPass(
@@ -76,8 +78,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	auto geometryPass = new GeometryPass(
 		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
-		_shadowBuffer,
-		_lightBuffer, tileNums);
+		tileNums);
 	AddRendererPass(geometryPass);
 
 	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
@@ -93,9 +94,7 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 		delete(rendererPass);
 	}
 
-	delete(_lightBuffer);
-
-		auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
+	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
 }
 
@@ -103,6 +102,8 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 {
 	auto& queueTimer = renderContext.GetQueueTimer();
 	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
+
+	UploadSharedUniforms(renderFrame);
 
 	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
 	{
@@ -143,6 +144,45 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
 		commandBuffer.EndCommandBuffer();
 	}
+}
+
+void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
+{
+	auto& frameResources = renderFrame.GetResources();
+	if (auto* camera = _scene.GetMainCamera())
+	{
+		auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+		cameraBuffer.Update(camera->Matrices);
+	}
+
+	// Built CPU-side and assigned once: the mapping is uncached, so writing the
+	// light array field by field into it would be slow.
+	LightBuffer lights{};
+
+	auto sceneLights = _scene.GetComponents<Light>();
+	uint32_t count = std::min((uint32_t)sceneLights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		auto* light = sceneLights[i];
+
+		auto& properties = light->GetProperties();
+		auto& transform = light->GetEntity().GetTransform();
+
+		LightInfo lightInfo{};
+		lightInfo.Position = vec4(transform.GetTranslation(),
+			static_cast<float>(light->GetLightType()));
+		lightInfo.Color = vec4(properties.Color, properties.Intensity);
+
+		auto direction = transform.GetRotation() * properties.Direction;
+		lightInfo.Direction = vec4(direction, properties.Range);
+		lightInfo.Info = vec2(properties.InnerConeAngle, properties.OuterConeAngle);
+
+		lights.Light[i] = lightInfo;
+	}
+	lights.Count = count;
+
+	auto& lightBuffer = frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
+	lightBuffer.Update(lights);
 }
 
 void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)
@@ -193,16 +233,4 @@ VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
 	if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
 
 	return VK_SAMPLE_COUNT_1_BIT;
-}
-
-void Core::ForwardRenderPipeline::CreateLightCullingBuffer(VkExtent2D extent, ivec2 tileNums)
-{
-	u32 lightVisiblityBufferSize = sizeof(VisibleLightsForTile) * tileNums.x * tileNums.y;
-
-	auto lightVisibilityBuffer = new Core::Buffer(_device,
-		lightVisiblityBufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		MemoryType::DEVICE_LOCAL);
-
-	_lightBuffer = lightVisibilityBuffer;
 }

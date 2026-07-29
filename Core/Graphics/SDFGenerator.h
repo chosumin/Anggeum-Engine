@@ -1,5 +1,7 @@
 #pragma once
 #include "BufferObjects.h"
+#include "Graphics/ResourceHandle.h"
+#include "Graphics/ResourcePool.h"
 
 namespace Core
 {
@@ -40,34 +42,38 @@ namespace Core
 		void SetCachePath(const std::string& path) { _sdfCachePath = path; }
 		const std::string& GetCachePath() const { return _sdfCachePath; }
 
-		shared_ptr<Texture> GetSDFTexture() const { return _sdfTexture; }
-		Buffer* GetBoundsBuffer() const { return _boundsBuffer; }
+		Handle<Texture> GetSDFTexture() const { return _sdfTexture; }
+		Buffer* GetBoundsBuffer() const { return &_boundsBuffer.Get(); }
 		bool IsGenerated() const { return _generated; }
 
 	private:
 		void CreateSDFTexture(uint32_t resolution);
 		void ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			Buffer* objectDataBuffer, Buffer* transformBuffer,
+			Buffer& objectDataBuffer, Buffer& transformBuffer,
 			uint32_t instanceCount);
 		void BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			Buffer* objectDataBuffer, Buffer* drawCommandBuffer,
+			Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 			uint32_t drawCommandCount, uint32_t totalTriangles);
 
 	private:
 		Device& _device;
 
-		shared_ptr<Texture> _sdfTexture;
-		shared_ptr<Shader> _sdfGenerateShader;
+		// GPU-generated volume texture. App-lifetime, so it lives in the
+		// ResourceManager texture pool; this generator just holds the handle.
+		Handle<Texture> _sdfTexture;
+		Handle<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 
-		shared_ptr<Shader> _boundsReduceShader;
+		// Bounds/triLookup are app-lifetime, so they live in the ResourceManager global
+		// buffer pool (via CreateBuffer/ResizeBuffer); held here by handle.
+		Handle<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;
-		Buffer* _boundsBuffer = nullptr;
+		Handle<Buffer> _boundsBuffer;
 
 		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
-		shared_ptr<Shader> _triLookupShader;
+		Handle<Shader> _triLookupShader;
 		unique_ptr<Pipeline> _triLookupPipeline;
-		Buffer* _triLookupBuffer = nullptr;
+		Handle<Buffer> _triLookupBuffer;
 
 		std::string _sdfCachePath = "Assets/Cache/sdf_volume.sdfvol";
 		float _paddingFactor = 0.1f;

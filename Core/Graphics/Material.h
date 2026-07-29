@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -17,9 +18,8 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, string shaderName, string materialName);
-		Material(Device& device, string materialName, string vertPath, string fragPath);
-		Material(const Material& other); 
+		Material(Device& device, Handle<Shader> shader, string materialName);
+		Material(const Material& other);
 
 		Material& operator=(const Material& other);
 
@@ -27,17 +27,7 @@ namespace Core
 
 		const string GetName() const { return _name; }
 
-		Shader& GetShader() const;
-		weak_ptr<Shader> GetShaderPtr() const { return _shader; }
-
-		void* GetBuffer(uint32_t binding)
-		{
-			auto setIt = _buffers.find(binding);
-			if (setIt == _buffers.end())
-				return nullptr;
-
-			return setIt->second;
-		}
+		Handle<Shader> GetShaderHandle() const { return _shader; }
 
 		template <typename T>
 		const T* GetBufferConst(uint32_t binding) const
@@ -49,69 +39,36 @@ namespace Core
 			return static_cast<const T*>(setIt->second);
 		}
 
-		shared_ptr<Texture> GetTexture(uint32_t binding);
+		Handle<Texture> GetTexture(uint32_t binding);
 
 		void AddBuffer(uint32_t binding, void* data)
 		{
 			_buffers[binding] = data;
 		}
 
-		void AddTexture(uint32_t binding, shared_ptr<Texture> texture)
+		// True once bound buffers have been added. The loader uses this to skip
+		// re-configuring a material it already built, now that the pool owns it for
+		// the app's lifetime.
+		bool HasBuffers() const { return !_buffers.empty(); }
+
+		void AddTexture(uint32_t binding, Handle<Texture> texture)
 		{
 			_textures[binding] = texture;
 		}
 
-		// Bindless texture methods (no binding index needed)
-		void AddBindlessTexture(TextureHandle handle)
-		{
-			_bindlessTextureHandles.push_back(handle);
-		}
-
-		void SetBindlessTexture(size_t index, TextureHandle handle)
-		{
-			if (index >= _bindlessTextureHandles.size())
-			{
-				_bindlessTextureHandles.resize(index + 1);
-			}
-			_bindlessTextureHandles[index] = handle;
-		}
-
-		TextureHandle GetBindlessTexture(size_t index) const
-		{
-			if (index >= _bindlessTextureHandles.size())
-				return TextureHandle{};
-			return _bindlessTextureHandles[index];
-		}
-
-		const vector<TextureHandle>& GetBindlessTexturesVector() const
-		{
-			return _bindlessTextureHandles;
-		}
-
-		size_t GetBindlessTextureCount() const
-		{
-			return _bindlessTextureHandles.size();
-		}
-
-		void ClearBindlessTextures()
-		{
-			_bindlessTextureHandles.clear();
-		}
-
-		const unordered_map<uint32_t, void*>& GetBuffersMap() const { return _buffers; }
-		const unordered_map<uint32_t, shared_ptr<Texture>>& GetTexturesMap() const { return _textures; }
+		const unordered_map<uint32_t, Handle<Texture>>& GetTexturesMap() const { return _textures; }
 
 		// GPU Driven Rendering material
 		void SetMaterialIndex(uint32_t index) { _materialIndex = index; }
 		uint32_t GetMaterialIndex() const { return _materialIndex; }
 		bool HasMaterialIndex() const { return _materialIndex != UINT32_MAX; }
 
-		void SetShader(shared_ptr<Shader> shader) { _shader = shader; }
+		void SetShader(Handle<Shader> shader) { _shader = shader; }
 	private:
-		void SetDefault(shared_ptr<Texture> defaultTexture);
+		void SetDefault(Handle<Texture> defaultTexture);
 	protected:
 		Device& _device;
-		shared_ptr<Shader> _shader;
+		Handle<Shader> _shader;
 
 	private:
 		string _name;
@@ -122,11 +79,7 @@ namespace Core
 
 		// Legacy bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
-		unordered_map<uint32_t, shared_ptr<Texture>> _textures;
-
-		// Bindless texture handles (Set 2, Binding 0)
-		// Just store handles in order, no binding index needed
-		vector<TextureHandle> _bindlessTextureHandles;
+		unordered_map<uint32_t, Handle<Texture>> _textures;
 
 		// GPU Driven Rendering material index
 		uint32_t _materialIndex = UINT32_MAX;

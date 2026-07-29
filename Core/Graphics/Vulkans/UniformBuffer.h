@@ -3,23 +3,21 @@
 namespace Core
 {
 	class Buffer;
+
+	// Non-owning view over a Buffer, used to produce a uniform-buffer descriptor
+	// write. The referenced Buffer is owned elsewhere and must outlive any
+	// descriptor set this view was written into.
 	class UniformBuffer
 	{
 	public:
-		UniformBuffer(Device& device, VkDeviceSize bufferSize);
-		~UniformBuffer();
+		UniformBuffer() = default;
 
-		void Update(void* data);
-		void Update(void* data, VkDeviceSize offset, VkDeviceSize size);
+		void SetBuffer(Buffer* data);
 
 		VkWriteDescriptorSet CreateWriteDescriptorSet(uint32_t binding);
 	private:
-		void CreateUniformBuffer(VkDeviceSize bufferSize);
-	private:
-		Device& _device;
-		void* _uniformBufferMapped;
-		unique_ptr<Buffer> _buffer;
-		VkDescriptorBufferInfo _bufferInfo;
+		Buffer* _buffer = nullptr;
+		VkDescriptorBufferInfo _bufferInfo{};
 	};
 
 	struct UniformBufferLayoutBinding
@@ -32,4 +30,3 @@ namespace Core
 		VkDeviceSize BufferSize;
 	};
 }
-
