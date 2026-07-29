@@ -41,12 +41,17 @@ Toy 3D rendering engine for studying Vulkan API.
    - Runtime mipmap generation
    - Cubemap loading and processing
 
-### Memory Management
+### Resource Management
 
 **Custom Memory Allocators**
    - Vertex and Index buffers
    - Staging / Uniform buffers
    - Device local buffers (Storage, Image, Dedicated memory)
+
+**Generational Handle System**
+   - Pool-owned resources referenced via `Handle<T>` (index + generation)
+   - Stale handles resolve to null instead of aliasing recycled slots
+   - In-place buffer replacement keeps held handles valid across resizes/rebuilds
 
 ### Multithreading
 
