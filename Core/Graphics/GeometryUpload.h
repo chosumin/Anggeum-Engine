@@ -54,7 +54,7 @@ namespace Core
 		out.max = max;
 	}
 
-	// Raw geometry for one submesh, handed to ResourceCache at load time. Space is
+	// Raw geometry for one submesh, handed to ResourceManager at load time. Space is
 	// reserved immediately (so the SubMesh is fully formed), and only the data copy
 	// is deferred — the same shape as a bindless texture getting its slot up front.
 	struct SubMeshGeometry
@@ -90,7 +90,7 @@ namespace Core
 		SubMesh* boundsTarget = nullptr;
 	};
 
-	// One-shot hand-off from resource loading to the GPU upload: ResourceCache pushes
+	// One-shot hand-off from resource loading to the GPU upload: ResourceManager pushes
 	// resolved copies here, RenderScene::Sync turns them into transfer jobs. A
 	// non-empty queue is the "geometry needs uploading" dirty state.
 	class GeometryCopyQueue

@@ -9,7 +9,7 @@
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Utils/Utility.h"
 
 using namespace Core;
@@ -24,8 +24,8 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device,
     , _colorRenderTarget(offscreen)
     , _irradianceCubemap(irradianceCubemap)
     , _prefilteredCubemap(prefilteredCubemap)
-    , _irradianceShader(&device.GetResourceCache().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
-    , _prefilteredShader(&device.GetResourceCache().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
+    , _irradianceShader(&device.GetResourceManager().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
+    , _prefilteredShader(&device.GetResourceManager().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
 {
     _renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
     _renderPass->CreateRenderPass();

@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "ResourceCache.h"
+#include "ResourceManager.h"
 #include "Utils/Utility.h"
 #include "Graphics/TransferJob.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -7,7 +7,7 @@
 
 namespace Core
 {
-	ResourceCache::ResourceCache(Device& device)
+	ResourceManager::ResourceManager(Device& device)
 		: _device(device)
 	{
 		ImageCreateInfo imageCreateInfo{};
@@ -20,19 +20,19 @@ namespace Core
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}
 
-	ResourceCache::~ResourceCache() = default;
+	ResourceManager::~ResourceManager() = default;
 
-	void ResourceCache::Prepare(RenderContext& renderContext)
+	void ResourceManager::Prepare(RenderContext& renderContext)
 	{
 		_renderContext = &renderContext;
 		
 		if (_renderContext->HasBindlessSupport())
 		{
-			cout << "ResourceCache: Bindless texture support enabled" << endl;
+			cout << "ResourceManager: Bindless texture support enabled" << endl;
 		}
 	}
 
-	Handle<Material> ResourceCache::LoadMaterial(const string materialName,
+	Handle<Material> ResourceManager::LoadMaterial(const string materialName,
 		const string& shaderName)
 	{
 		lock_guard<mutex> guard(_materialMutex);
@@ -53,7 +53,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Shader> ResourceCache::LoadShader(const string& shaderName)
+	Handle<Shader> ResourceManager::LoadShader(const string& shaderName)
 	{
 		lock_guard<mutex> guard(_shaderMutex);
 
@@ -76,7 +76,7 @@ namespace Core
 		return StoreShader(shaderName, std::move(shader));
 	}
 
-	Handle<Shader> ResourceCache::LoadShader(const string& vertPath, const string& fragPath)
+	Handle<Shader> ResourceManager::LoadShader(const string& vertPath, const string& fragPath)
 	{
 		lock_guard<mutex> guard(_shaderMutex);
 
@@ -91,7 +91,7 @@ namespace Core
 		return StoreShader(name, std::move(shader));
 	}
 
-	Handle<Shader> ResourceCache::StoreShader(const string& name, shared_ptr<Shader> shader)
+	Handle<Shader> ResourceManager::StoreShader(const string& name, shared_ptr<Shader> shader)
 	{
 		// Set bindless descriptor set layout BEFORE CreatePipelineLayout
 		if (_renderContext && _renderContext->HasBindlessSupport() && shader->UsesBindlessTextures())
@@ -109,7 +109,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Sampler> ResourceCache::LoadSampler(const SamplerCreateInfo info)
+	Handle<Sampler> ResourceManager::LoadSampler(const SamplerCreateInfo info)
 	{
 		lock_guard<mutex> guard(_samplerMutex);
 
@@ -122,7 +122,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Texture> ResourceCache::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
+	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 
@@ -155,7 +155,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Texture> ResourceCache::LoadTexture(const string& name,
+	Handle<Texture> ResourceManager::LoadTexture(const string& name,
 		unique_ptr<Image> image, Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
@@ -180,7 +180,7 @@ namespace Core
 		return static_cast<uint32_t>(geometry.indexData.size() / stride);
 	}
 
-	Handle<Core::SubMesh> ResourceCache::LoadSubMesh(const string& name, SubMeshGeometry&& geometry)
+	Handle<Core::SubMesh> ResourceManager::LoadSubMesh(const string& name, SubMeshGeometry&& geometry)
 	{
 		lock_guard<mutex> guard(_subMeshMutex);
 
@@ -208,7 +208,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Core::SubMesh> ResourceCache::LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry)
+	Handle<Core::SubMesh> ResourceManager::LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry)
 	{
 		Handle<SubMesh> handle;
 		Core::SubMesh* subMesh = nullptr;
@@ -260,7 +260,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Buffer> ResourceCache::LoadBuffer(const BufferDesc& desc, const string& debugName)
+	Handle<Buffer> ResourceManager::LoadBuffer(const BufferDesc& desc, const string& debugName)
 	{
 		lock_guard<mutex> guard(_bufferMutex);
 
@@ -275,7 +275,7 @@ namespace Core
 		return _bufferPool.Add(buffer);
 	}
 
-	void ResourceCache::ResizeBuffer(Handle<Buffer> handle, const BufferDesc& desc, const string& debugName)
+	void ResourceManager::ResizeBuffer(Handle<Buffer> handle, const BufferDesc& desc, const string& debugName)
 	{
 		lock_guard<mutex> guard(_bufferMutex);
 
@@ -290,7 +290,7 @@ namespace Core
 		_bufferPool.Replace(handle, buffer);
 	}
 
-	void Core::ResourceCache::GetShaderFiles(const uint32_t hash,
+	void Core::ResourceManager::GetShaderFiles(const uint32_t hash,
 		string& pass, string& vert, string& frag)
 	{
 		switch (hash)

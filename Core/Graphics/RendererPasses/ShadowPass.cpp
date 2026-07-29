@@ -9,7 +9,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
@@ -30,7 +30,7 @@ Core::ShadowPass::ShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 
 	// The material is registered in the cache/material table; we only need its
 	// shader handle here, so it isn't kept as a member.
-	auto shadowMaterial = _device.GetResourceCache().LoadMaterial("shadow", "Shadow");
+	auto shadowMaterial = _device.GetResourceManager().LoadMaterial("shadow", "Shadow");
 	_shadowShader = shadowMaterial.Get().GetShaderHandle();
 
 	// Create Pipeline for this pass

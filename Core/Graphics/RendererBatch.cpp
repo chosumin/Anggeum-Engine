@@ -5,7 +5,7 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Buffer.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Foundation/Entity.h"
 #include "Foundation/Scene.h"
 #include "Components/Mesh.h"
@@ -88,7 +88,7 @@ void Core::RendererBatch::InitializeFromScene(Scene& scene)
 Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> current,
     const BufferDesc& desc, const string& name)
 {
-    auto& cache = _device.GetResourceCache();
+    auto& cache = _device.GetResourceManager();
     if (current.IsValid())
     {
         cache.ResizeBuffer(current, desc, name);

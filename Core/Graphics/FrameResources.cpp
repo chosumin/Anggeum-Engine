@@ -8,7 +8,7 @@
 #include "Vulkans/Shader.h"
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/DescriptorSetBuilder.h"
-#include "ResourceCache.h"
+#include "ResourceManager.h"
 #include "Foundation/Job.h"
 #include "TransferJob.h"
 
@@ -18,7 +18,7 @@ FrameResources::FrameResources(Device& device)
 	: _device(device)
 {
 	CreateDescriptorPool();
-	_defaultSampler = device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
+	_defaultSampler = device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
 }
 
 FrameResources::~FrameResources()

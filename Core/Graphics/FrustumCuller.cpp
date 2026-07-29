@@ -5,7 +5,7 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
@@ -14,12 +14,12 @@ Core::FrustumCuller::FrustumCuller(Device& device, RenderFrame& renderFrame,
     : Culler(device, rendererBatch, id)
 {
     auto& frameResources = renderFrame.GetResources();
-    auto& resourceCache = device.GetResourceCache();
+    auto& resourceManager = device.GetResourceManager();
 
-    _cullingShader = resourceCache.LoadShader("Shaders/frustumCulling.comp.spv");
+    _cullingShader = resourceManager.LoadShader("Shaders/frustumCulling.comp.spv");
     _cullingPipeline = make_unique<Pipeline>(device, _cullingShader.Get());
 
-    _resetDrawCommandsShader = resourceCache.LoadShader("Shaders/resetDrawCommandsSimple.comp.spv");
+    _resetDrawCommandsShader = resourceManager.LoadShader("Shaders/resetDrawCommandsSimple.comp.spv");
     _resetDrawCommandsPipeline = make_unique<Pipeline>(device, _resetDrawCommandsShader.Get());
 
     _cullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUFrustumCullData>(

@@ -5,7 +5,7 @@
 #include "Graphics/RenderContext.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/RenderScene.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Foundation/Scene.h"
 #include "Graphics/ForwardRenderPipeline.h"
 #include "Sample/SampleScene.h"
@@ -24,8 +24,8 @@ Core::Engine::Engine(const EngineOptions& options)
     _renderContext = new Core::RenderContext(*_device, *_renderScene);
     _status = make_unique<Core::Status>(*_renderContext);
 
-    auto& resourceCache = _device->GetResourceCache();
-    resourceCache.Prepare(*_renderContext);
+    auto& resourceManager = _device->GetResourceManager();
+    resourceManager.Prepare(*_renderContext);
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();

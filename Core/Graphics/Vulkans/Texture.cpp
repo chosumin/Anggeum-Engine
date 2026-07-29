@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "Texture.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 Core::Texture::Texture(string name, unique_ptr<Image> image, Handle<Sampler> sampler)
 	:_name(name), _image(std::move(image)), _sampler(sampler)

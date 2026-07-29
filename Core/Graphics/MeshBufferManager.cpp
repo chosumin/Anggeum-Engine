@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "MeshBufferManager.h"
 #include "Graphics/Vulkans/Buffer.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/Device.h"
 
 using namespace Core;
@@ -149,7 +149,7 @@ Handle<Buffer> MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 	}
 
 	_indexType = indexType;
-	_indexBufferHandle = _device.GetResourceCache().LoadBuffer(
+	_indexBufferHandle = _device.GetResourceManager().LoadBuffer(
 		{ _maxIndices * size,
 		  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		  MemoryType::DEVICE_LOCAL },
@@ -169,7 +169,7 @@ Core::MeshBufferRegion Core::MeshBufferManager::Allocate(const std::string& name
 {
 	if (_vertexBufferHandles.find(name) == _vertexBufferHandles.end())
 	{
-		_vertexBufferHandles[name] = _device.GetResourceCache().LoadBuffer(
+		_vertexBufferHandles[name] = _device.GetResourceManager().LoadBuffer(
 			{ _maxVertices * stride,
 			  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			  MemoryType::DEVICE_LOCAL },

@@ -6,7 +6,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "AmbientOcclusionPass.h"
 using namespace Core;
 
@@ -20,7 +20,7 @@ DFAOPass::DFAOPass(Device& device, WorkerThreadManager& workerThreadManager,
     , _msaaSamples(msaaSamples)
     , _sdfGenerator(sdfGenerator)
 {
-    _dfaoShader   = _device.GetResourceCache().LoadShader("Shaders/dfao.comp.spv");
+    _dfaoShader   = _device.GetResourceManager().LoadShader("Shaders/dfao.comp.spv");
     _dfaoPipeline = make_unique<Pipeline>(_device, _dfaoShader.Get());
 }
 

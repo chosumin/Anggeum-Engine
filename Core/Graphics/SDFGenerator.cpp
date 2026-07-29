@@ -10,7 +10,7 @@
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "MeshBufferManager.h"
 #include "RenderFrame.h"
-#include "ResourceCache.h"
+#include "ResourceManager.h"
 #include "TransferJob.h"
 #include "Utils/FileSystem.h"
 
@@ -168,13 +168,13 @@ static uint32_t FloatToSortableUint(float f)
 SDFGenerator::SDFGenerator(Device& device)
 	: _device(device)
 {
-	_sdfGenerateShader = _device.GetResourceCache().LoadShader("Shaders/sdfGenerate.comp.spv");
+	_sdfGenerateShader = _device.GetResourceManager().LoadShader("Shaders/sdfGenerate.comp.spv");
 	_sdfGeneratePipeline = make_unique<Pipeline>(_device, _sdfGenerateShader.Get());
 
-	_boundsReduceShader = _device.GetResourceCache().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
+	_boundsReduceShader = _device.GetResourceManager().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
 	_boundsReducePipeline = make_unique<Pipeline>(_device, _boundsReduceShader.Get());
 
-	_triLookupShader = _device.GetResourceCache().LoadShader("Shaders/sdfTriLookup.comp.spv");
+	_triLookupShader = _device.GetResourceManager().LoadShader("Shaders/sdfTriLookup.comp.spv");
 	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
 
 	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
@@ -182,7 +182,7 @@ SDFGenerator::SDFGenerator(Device& device)
 	uint32_t negInf = FloatToSortableUint(-1e20f);
 	vector<uint32_t> initData = { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
 
-	_boundsBuffer = _device.GetResourceCache().LoadBuffer(
+	_boundsBuffer = _device.GetResourceManager().LoadBuffer(
 		{ initData.size() * sizeof(uint32_t),
 		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -213,8 +213,8 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 	auto image = make_unique<Image>(_device, imageInfo,
 		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
 
-	auto sampler = _device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
-	_sdfTexture = _device.GetResourceCache().LoadTexture("SDFVolume", std::move(image), sampler);
+	auto sampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
+	_sdfTexture = _device.GetResourceManager().LoadTexture("SDFVolume", std::move(image), sampler);
 }
 
 void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
@@ -276,15 +276,15 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	// the backing buffer in place (Replace) so the handle stays valid.
 	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
 
-	auto& resourceCache = _device.GetResourceCache();
+	auto& resourceManager = _device.GetResourceManager();
 	BufferDesc triLookupDesc{ requiredSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL };
 	if (!_triLookupBuffer.IsValid())
 	{
-		_triLookupBuffer = resourceCache.LoadBuffer(triLookupDesc, "SDF.TriLookup");
+		_triLookupBuffer = resourceManager.LoadBuffer(triLookupDesc, "SDF.TriLookup");
 	}
 	else if (_triLookupBuffer.Get().GetSize() < requiredSize)
 	{
-		resourceCache.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
+		resourceManager.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
 	}
 
 	auto& triLookupShader = _triLookupShader.Get();

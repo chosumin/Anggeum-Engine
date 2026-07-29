@@ -17,11 +17,11 @@ namespace Core
 	class Image;
 	class RenderContext;
 
-	class ResourceCache
+	class ResourceManager
 	{
 	public:
-		ResourceCache(Device& device);
-		~ResourceCache();
+		ResourceManager(Device& device);
+		~ResourceManager();
 
 		void Prepare(RenderContext& renderContext);
 

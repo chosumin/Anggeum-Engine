@@ -3,7 +3,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "DepthPrePass.h"
 
 using namespace Core;
@@ -20,10 +20,10 @@ ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManage
 {
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        _depthResolveShader = _device.GetResourceCache().LoadShader("Shaders/depthResolve.comp.spv");
+        _depthResolveShader = _device.GetResourceManager().LoadShader("Shaders/depthResolve.comp.spv");
         _depthResolvePipeline = make_unique<Pipeline>(_device, _depthResolveShader.Get());
 
-        _normalResolveShader = _device.GetResourceCache().LoadShader("Shaders/normalResolve.comp.spv");
+        _normalResolveShader = _device.GetResourceManager().LoadShader("Shaders/normalResolve.comp.spv");
         _normalResolvePipeline = make_unique<Pipeline>(_device, _normalResolveShader.Get());
 
         _screenExtent = screenExtent;

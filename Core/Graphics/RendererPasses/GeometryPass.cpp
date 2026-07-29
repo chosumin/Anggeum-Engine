@@ -15,7 +15,7 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/RendererBatch.h"
 #include "PreEnvironmentPass.h"
 #include "BrdfLutPass.h"

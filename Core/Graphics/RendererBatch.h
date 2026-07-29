@@ -16,7 +16,7 @@ namespace Core
 
 	struct TransformBatch
 	{
-		// Persistent (handle pattern), owned via ResourceCache; resolve with .Get().
+		// Persistent (handle pattern), owned via ResourceManager; resolve with .Get().
 		Handle<Buffer> TransformBuffer;
 	};
 
@@ -86,7 +86,7 @@ namespace Core
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		// Persistent GPU buffers (handle pattern), owned via ResourceCache.
+		// Persistent GPU buffers (handle pattern), owned via ResourceManager.
 		Handle<Buffer> _instanceBuffer;
 		uint _instanceCount = 0;
 

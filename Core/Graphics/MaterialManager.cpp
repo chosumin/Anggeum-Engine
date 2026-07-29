@@ -2,7 +2,7 @@
 #include "MaterialManager.h"
 #include "Material.h"
 #include "ResourcePool.h"
-#include "ResourceCache.h"
+#include "ResourceManager.h"
 #include "Vulkans/Buffer.h"
 #include "Vulkans/MemoryAllocator.h"
 #include "Vulkans/Device.h"
@@ -17,7 +17,7 @@ MaterialManager::MaterialManager(Device& device)
 		data = GPUMaterialData{};
 	}
 
-	_materialDataBuffer = _device.GetResourceCache().LoadBuffer(
+	_materialDataBuffer = _device.GetResourceManager().LoadBuffer(
 		{ sizeof(MaterialTable), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM },
 		"MaterialTable");
 

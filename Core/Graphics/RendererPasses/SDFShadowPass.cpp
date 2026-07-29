@@ -9,7 +9,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "ShadowPass.h"
 using namespace Core;
 
@@ -26,10 +26,10 @@ SDFShadowPass::SDFShadowPass(Device& device, WorkerThreadManager& workerThreadMa
 {
     _sdfGenerator = make_unique<SDFGenerator>(device);
 
-    _sdfShadowShader = _device.GetResourceCache().LoadShader("Shaders/sdfShadow.comp.spv");
+    _sdfShadowShader = _device.GetResourceManager().LoadShader("Shaders/sdfShadow.comp.spv");
     _sdfShadowPipeline = make_unique<Pipeline>(_device, _sdfShadowShader.Get());
 
-    _volumeSliceShader = _device.GetResourceCache().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
+    _volumeSliceShader = _device.GetResourceManager().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
     _volumeSlicePipeline = make_unique<Pipeline>(_device, _volumeSliceShader.Get());
 }
 

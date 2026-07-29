@@ -11,7 +11,7 @@
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/TransferJob.h"
 #include "Graphics/Vulkans/SubmitInfo.h"
 #include "Graphics/RendererPasses/DepthPrePass.h"

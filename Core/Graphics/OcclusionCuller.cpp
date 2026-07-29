@@ -5,7 +5,7 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Vulkans/Texture.h"
 
 using namespace Core;
@@ -15,17 +15,17 @@ Core::OcclusionCuller::OcclusionCuller(Device& device, RenderFrame& renderFrame,
     : Culler(device, rendererBatch, id)
 {
     auto& frameResources = renderFrame.GetResources();
-    auto& resourceCache = device.GetResourceCache();
+    auto& resourceManager = device.GetResourceManager();
 
     PrepareHiZResources(device, renderFrame, rendererBatch.GetExtents());
 
-    _cullingShader = resourceCache.LoadShader("Shaders/gpuCulling.comp.spv");
+    _cullingShader = resourceManager.LoadShader("Shaders/gpuCulling.comp.spv");
     _cullingPipeline = make_unique<Pipeline>(device, _cullingShader.Get());
 
-    _pass2CullingShader = resourceCache.LoadShader("Shaders/gpuCullingPass2.comp.spv");
+    _pass2CullingShader = resourceManager.LoadShader("Shaders/gpuCullingPass2.comp.spv");
     _pass2CullingPipeline = make_unique<Pipeline>(device, _pass2CullingShader.Get());
 
-    _resetDrawCommandsShader = resourceCache.LoadShader("Shaders/resetDrawCommands.comp.spv");
+    _resetDrawCommandsShader = resourceManager.LoadShader("Shaders/resetDrawCommands.comp.spv");
     _resetDrawCommandsPipeline = make_unique<Pipeline>(device, _resetDrawCommandsShader.Get());
 
     _pass1CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(_namePrefix + "Pass1CullData");
@@ -222,12 +222,12 @@ void Core::OcclusionCuller::PrepareHiZResources(Device& device, RenderFrame& ren
     hiZDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     hiZDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     hiZDesc.mipLevels = _hiZMipLevels;
-    hiZDesc.sampler = device.GetResourceCache().LoadSampler(samplerDesc);
+    hiZDesc.sampler = device.GetResourceManager().LoadSampler(samplerDesc);
 
     _hiZTexture = renderFrame.GetResources().GetOrCreateRenderTarget(_namePrefix + "HiZ", hiZDesc);
 
     // Load shaders
-    _hiZGenerateShader = device.GetResourceCache().LoadShader("Shaders/hiZGenerate.comp.spv");
+    _hiZGenerateShader = device.GetResourceManager().LoadShader("Shaders/hiZGenerate.comp.spv");
     _hiZPipeline = make_unique<Pipeline>(device, _hiZGenerateShader.Get());
 }
 

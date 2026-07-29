@@ -4,7 +4,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/SubMesh.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/TransferJob.h"
 #include "Foundation/Scene.h"

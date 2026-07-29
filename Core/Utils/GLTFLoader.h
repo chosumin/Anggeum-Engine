@@ -20,7 +20,7 @@ namespace Core
 	class Mesh;
 	class PerspectiveCamera;
 	class Light;
-	class ResourceCache;
+	class ResourceManager;
 	class RenderContext;
 
 	/**
@@ -65,7 +65,7 @@ namespace Core
 		// set) or buffers of its own.
 		enum class GeometryStorage { Global, Standalone };
 
-		// Reads a primitive's attributes + indices into the form ResourceCache takes.
+		// Reads a primitive's attributes + indices into the form ResourceManager takes.
 		SubMeshGeometry ReadGeometry(const tinygltf::Primitive& primitive);
 		// Scene geometry: handed to the render side's global mesh buffers.
 		void LoadMeshes(vector<Handle<Core::Material>>& materials);
@@ -79,7 +79,7 @@ namespace Core
 	private:
 		Device& _device;
 		Scene& _scene;
-		ResourceCache& _resourceCache;
+		ResourceManager& _resourceManager;
 		RenderContext* _renderContext = nullptr;
 
 		string _modelPath;

@@ -4,7 +4,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/Light.h"
 #include "Foundation/Scene.h"
@@ -12,7 +12,7 @@
 Core::LightCullingPass::LightCullingPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene, VkExtent2D swapChainExtents, ivec2 tileNums)
 	:RendererPass(device, workerThreadManager), _scene(scene)
 {
-	_computeMaterial = device.GetResourceCache().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
+	_computeMaterial = device.GetResourceManager().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
 	_computePipeline = make_unique<Core::Pipeline>(device, _computeMaterial.Get().GetShaderHandle().Get());
 
 	_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);

@@ -59,12 +59,12 @@ namespace Core
 		Device& _device;
 
 		// GPU-generated volume texture. App-lifetime, so it lives in the
-		// ResourceCache texture pool; this generator just holds the handle.
+		// ResourceManager texture pool; this generator just holds the handle.
 		Handle<Texture> _sdfTexture;
 		Handle<Shader> _sdfGenerateShader;
 		unique_ptr<Pipeline> _sdfGeneratePipeline;
 
-		// Bounds/triLookup are app-lifetime, so they live in the ResourceCache global
+		// Bounds/triLookup are app-lifetime, so they live in the ResourceManager global
 		// buffer pool (via CreateBuffer/ResizeBuffer); held here by handle.
 		Handle<Shader> _boundsReduceShader;
 		unique_ptr<Pipeline> _boundsReducePipeline;

@@ -5,7 +5,7 @@
 namespace Core
 {
 	/*
-	 * Slot-based owning storage behind ResourceCache.
+	 * Slot-based owning storage behind ResourceManager.
 	 *
 	 * Callers keep a Handle<T> and resolve it through Get(). A freed slot bumps its
 	 * generation, so a handle kept past Remove() resolves to nullptr instead of
@@ -15,7 +15,7 @@ namespace Core
 	 * while a resource type is migrated onto handles. Once nothing else holds the
 	 * resource, the pool is its sole owner and Remove() destroys it.
 	 *
-	 * Not thread-safe on its own: ResourceCache serialises access with the mutex
+	 * Not thread-safe on its own: ResourceManager serialises access with the mutex
 	 * it already keeps per resource type.
 	 */
 	template<typename T>

@@ -8,7 +8,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/Material.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
@@ -51,7 +51,7 @@ Core::DepthPrePass::DepthPrePass(Device& device, WorkerThreadManager& workerThre
     _renderPassPass2->CreateRenderPass();
 
     // Get the DepthNormal shader
-    _depthNormalShader = _device.GetResourceCache().LoadShader("DepthNormal");
+    _depthNormalShader = _device.GetResourceManager().LoadShader("DepthNormal");
 
     // Create Pipeline for this pass
     _pipeline = new Pipeline(device, *_renderPass, _depthNormalShader.Get(), *_pipelineState);

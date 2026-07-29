@@ -7,7 +7,7 @@ namespace Core
 	class CommandBuffer;
 	class CommandPool;
 
-	// Buffer creation parameters, shared by the ResourceCache global buffer pool
+	// Buffer creation parameters, shared by the ResourceManager global buffer pool
 	// and the FrameResources per-frame pool.
 	struct BufferDesc
 	{

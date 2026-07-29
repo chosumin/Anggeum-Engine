@@ -3,7 +3,7 @@
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/DescriptorPool.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 
 namespace Core
 {
@@ -11,7 +11,7 @@ namespace Core
 		:_device(device), _shader(shader), _name(materialName)
 	{
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceCache().GetDefaultTextureHandle());
+		SetDefault(device.GetResourceManager().GetDefaultTextureHandle());
 	}
 
 	Material::Material(const Material& other)

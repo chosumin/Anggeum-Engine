@@ -9,7 +9,7 @@
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/GeometryUpload.h"
-#include "Graphics/ResourceCache.h"
+#include "Graphics/ResourceManager.h"
 #include "Components/Mesh.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
@@ -257,7 +257,7 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 
 Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
 	: _device(device), _scene(scene),
-	_resourceCache(device.GetResourceCache())
+	_resourceManager(device.GetResourceManager())
 {
 	_model = new tinygltf::Model();
 }
@@ -299,10 +299,10 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		VK_FORMAT_R16G16B16A16_SFLOAT 
 	};
 
-	auto texture = _resourceCache.LoadTexture(textureName,
-		imageCreateInfo, _resourceCache.LoadSampler(DEFAULT_SAMPLER));
+	auto texture = _resourceManager.LoadTexture(textureName,
+		imageCreateInfo, _resourceManager.LoadSampler(DEFAULT_SAMPLER));
 
-	auto material = _resourceCache.LoadMaterial("skybox", "Skybox");
+	auto material = _resourceManager.LoadMaterial("skybox", "Skybox");
 	material.Get().AddTexture(1, texture);
 
 	vector<Handle<Material>> materials = { material };
@@ -501,7 +501,7 @@ Core::Handle<Core::Sampler> Core::GLTFLoader::LoadSampler(
 	samplerCreateInfo.wrapT = FindWrapMode(gltfSampler.wrapT);
 	samplerCreateInfo.mipmapMode = FindMipmapMode(gltfSampler.minFilter);
 
-	return _resourceCache.LoadSampler(samplerCreateInfo);
+	return _resourceManager.LoadSampler(samplerCreateInfo);
 }
 
 vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
@@ -521,7 +521,7 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
 
 		auto texture =
-			_resourceCache.LoadTexture(_model->textures[i].name,
+			_resourceManager.LoadTexture(_model->textures[i].name,
 				imageCreateInfo, samplers[samplerIndex]);
 
 		textures[i] = texture;
@@ -536,7 +536,7 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 
 	vector<Handle<Core::Material>> materials(size);
 	
-	// Textures are registered to the bindless array by ResourceCache at load time;
+	// Textures are registered to the bindless array by ResourceManager at load time;
 	// here we only read each texture's assigned index.
 	bool useBindless = (_renderContext && _renderContext->HasBindlessSupport());
 
@@ -548,7 +548,7 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			_modelPath + to_string(i) : gltfMaterial.name;
 
 		//FIXME : hardcoded shader and should use lightweight pattern.
-		auto material = _resourceCache.LoadMaterial(matName, "PBR");
+		auto material = _resourceManager.LoadMaterial(matName, "PBR");
 		auto& mat = material.Get();
 
 		//Already configured (deduped by name)
@@ -738,7 +738,7 @@ void Core::GLTFLoader::LoadSkyboxMeshes(vector<Handle<Core::Material>>& material
 void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
 	GeometryStorage storage)
 {
-	// ResourceCache reserves space for the geometry as it is registered and defers the
+	// ResourceManager reserves space for the geometry as it is registered and defers the
 	// copy (RenderScene::Sync); the only difference between the two storage modes is
 	// which buffers that space comes from.
 	for (auto& gltfMesh : _model->meshes)
@@ -752,8 +752,8 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
 			string subMeshName = MakeSubMeshName(meshName, primitive);
 
 			auto subMesh = (storage == GeometryStorage::Global)
-				? _resourceCache.LoadSubMesh(subMeshName, ReadGeometry(primitive))
-				: _resourceCache.LoadStandaloneSubMesh(subMeshName, ReadGeometry(primitive));
+				? _resourceManager.LoadSubMesh(subMeshName, ReadGeometry(primitive))
+				: _resourceManager.LoadStandaloneSubMesh(subMeshName, ReadGeometry(primitive));
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
