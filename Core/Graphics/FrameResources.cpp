@@ -9,6 +9,8 @@
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "ResourceCache.h"
+#include "Foundation/Job.h"
+#include "TransferJob.h"
 
 using namespace Core;
 
@@ -19,7 +21,14 @@ FrameResources::FrameResources(Device& device)
 	_defaultSampler = device.GetResourceCache().LoadSampler(DEFAULT_SAMPLER);
 }
 
-FrameResources::~FrameResources() = default;
+FrameResources::~FrameResources()
+{
+	// RenderContext::Submit is the only thing that runs init work, so a frame that
+	// never goes through it (the temp frames used for IBL prefiltering) must not
+	// queue any: it would be dropped instead of recorded.
+	assert(_pendingTransitions.empty() && AllInitJobsExecuted() &&
+		"frame init work was queued but never executed");
+}
 
 void FrameResources::Reset()
 {
@@ -28,6 +37,55 @@ void FrameResources::Reset()
 
 	_currentDepth = Handle<Texture>{};
 	_currentNormal = Handle<Texture>{};
+
+	// Reached only after the GPU finished this slot's previous frame, so the
+	// staging buffers these jobs own are no longer being read. Anything still
+	// unexecuted was queued after Submit already ran, and dropping it here would
+	// be silent, so catch it instead.
+	assert(AllInitJobsExecuted() && "frame init work was queued but never executed");
+	_pendingInitJobs.clear();
+}
+
+bool FrameResources::HasPendingInit() const
+{
+	// Reset() empties the job list at the top of the frame, so anything in it here
+	// was queued by this frame's passes and has not run yet.
+	return !_pendingTransitions.empty() || !_pendingInitJobs.empty();
+}
+
+void FrameResources::ExecutePendingInit(CommandBuffer& commandBuffer)
+{
+	if (!_pendingTransitions.empty())
+	{
+		auto barriers = commandBuffer.CreateBarrierBatch();
+		for (auto& transition : _pendingTransitions)
+		{
+			barriers.Image(transition.texture.Get(),
+				VK_IMAGE_LAYOUT_UNDEFINED, transition.targetLayout);
+		}
+		barriers.Submit();
+
+		_pendingTransitions.clear();
+	}
+
+	// The jobs stay in the list rather than being consumed here: each owns the
+	// staging buffer its copy reads from, which the GPU is still going to read.
+	for (auto& job : _pendingInitJobs)
+	{
+		job->commandBuffer = &commandBuffer;
+		job->Execute();
+	}
+}
+
+bool FrameResources::AllInitJobsExecuted() const
+{
+	for (auto& job : _pendingInitJobs)
+	{
+		if (job->status != JobStatus::COMPLETE)
+			return false;
+	}
+
+	return true;
 }
 
 void FrameResources::CreateDescriptorPool()
@@ -152,21 +210,17 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
 		(uint64_t)imagePtr->GetOrCreateImageView(0), (name + " View").c_str());
 
-	// Move the target from UNDEFINED into its requested starting layout. This is a
-	// fenced single-time submit, so it fully completes before any frame work
-	// touches the target and cannot race with the per-frame transitions.
-	if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-	{
-		auto& commandBuffer = _device.BeginSingleTimeCommands();
-		commandBuffer.CreateBarrierBatch()
-			.Image(*texture,
-				VK_IMAGE_LAYOUT_UNDEFINED, desc.initialLayout)
-			.Submit();
-		_device.EndSingleTimeCommands(commandBuffer);
-	}
-
 	Handle<Texture> handle = _renderTargetPool.Add(texture);
 	_renderTargets[name] = handle;
+
+	// Move the target from UNDEFINED into its requested starting layout. Deferred
+	// into this frame's resource-init command buffer rather than submitted here:
+	// that buffer runs on the graphics queue ahead of every pass in the frame, so
+	// the target is in its starting layout before anything reads it, and creating
+	// a target no longer costs a submit and a fence wait mid-recording.
+	if (desc.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+		_pendingTransitions.push_back({ handle, desc.initialLayout });
+
 	return handle;
 }
 
@@ -184,6 +238,23 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 
 	Handle<Buffer> handle = _bufferPool.Add(buffer);
 	_storageBufferHandles[name] = handle;
+	return handle;
+}
+
+Handle<Buffer> FrameResources::GetOrCreateFilledStorageBuffer(const string& name,
+	const BufferDesc& desc, vector<uint8_t>&& initialData)
+{
+	// Checked before creating so the fill is queued only for a buffer this call
+	// actually made; an existing one keeps whatever the frame has written into it.
+	bool exists = _storageBufferHandles.find(name) != _storageBufferHandles.end();
+
+	Handle<Buffer> handle = GetOrCreateStorageBuffer(name, desc);
+	if (exists)
+		return handle;
+
+	_pendingInitJobs.push_back(make_unique<VkBufferCopyJob<uint8_t>>(
+		_device, handle.Get(), std::move(initialData), 0));
+
 	return handle;
 }
 

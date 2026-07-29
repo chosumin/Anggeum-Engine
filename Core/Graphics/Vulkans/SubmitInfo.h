@@ -30,6 +30,16 @@ namespace Core
             _signalValues.push_back(v);
         }
 
+        // Timeline semaphore wait at an explicit value, for timelines that are not
+        // tied to a queue's own (e.g. the resource-init timeline).
+        void AddTimelineWaitSemaphore(VkSemaphore semaphore, uint64_t value,
+            VkPipelineStageFlags stage)
+        {
+            _waitSemaphores.push_back(semaphore);
+            _waitStages.push_back(stage);
+            _waitValues.push_back(value);
+        }
+
         // Binary semaphore wait (e.g. swapchain imageAvailable)
         void AddBinaryWaitSemaphore(VkSemaphore semaphore, VkPipelineStageFlags stage)
         {

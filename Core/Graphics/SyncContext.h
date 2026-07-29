@@ -41,6 +41,11 @@ namespace Core
         // Frame slot snapshots (for reusing a frame slot safely)
         void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
 
+        // Submits this frame's resource-init work. It signals its own timeline
+        // rather than a queue timeline, so the next SubmitToQueues can gate the
+        // first submit of *both* queues on it.
+        void SubmitResourceInit(VkCommandBuffer commandBuffer);
+
         // Injects the frame-level semaphores and submits the frame
         void SubmitToQueues(deque<SubmitInfo>& submitInfos,
                             vector<VkSubmitInfo>& scratch,
@@ -55,8 +60,14 @@ namespace Core
 
         VkSemaphore _graphicsSemaphore = VK_NULL_HANDLE;
         VkSemaphore _computeSemaphore = VK_NULL_HANDLE;
+        VkSemaphore _resourceSemaphore = VK_NULL_HANDLE;
 
         u64 _graphicsSemaphoreValue = 0;
         u64 _computeSemaphoreValue = 0;
+        u64 _resourceSemaphoreValue = 0;
+
+        // Value the next SubmitToQueues must wait on, or 0 when no resource-init
+        // work was submitted for this frame. Cleared once the wait is injected.
+        u64 _pendingResourceWait = 0;
     };
 }

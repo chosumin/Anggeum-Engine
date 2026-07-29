@@ -42,7 +42,11 @@ void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D exten
 		_bindless->Sync();
 
 	_material->Sync();
-	_batch->Sync(scene, extents);
+
+	// The batch enqueues its own buffer fills rather than submitting them, so flush
+	// once more: the passes read the draw set on the GPU during this frame.
+	_batch->Sync(scene, transfer, extents);
+	transfer.Wait();
 }
 
 void RenderScene::UploadQueuedTextures(TransferContext& transfer)

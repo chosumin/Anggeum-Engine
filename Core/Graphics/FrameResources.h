@@ -13,6 +13,8 @@ namespace Core
 	class Shader;
 	class DescriptorPool;
 	class DescriptorSetBuilder;
+	class CommandBuffer;
+	class Job;
 
 	struct RenderTargetDesc
 	{
@@ -69,6 +71,19 @@ namespace Core
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc);
 
+		// Same, for a buffer that has to start out holding something.
+		template<typename T>
+		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc,
+			const vector<T>& initialData)
+		{
+			static_assert(std::is_trivially_copyable<T>::value,
+				"Buffer contents must be trivially copyable");
+
+			const auto* bytes = reinterpret_cast<const uint8_t*>(initialData.data());
+			return GetOrCreateFilledStorageBuffer(name, desc,
+				vector<uint8_t>(bytes, bytes + initialData.size() * sizeof(T)));
+		}
+
 		// Uniform data for this frame. Each frame-in-flight owns its own buffer per
 		// name. A name identifies one value within a frame and may be shared by any
 		// number of passes; T fixes the size, so the producer and every consumer
@@ -91,6 +106,11 @@ namespace Core
 		// allocates from this frame's descriptor pool, which Reset() recycles.
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
+		// One-off GPU work a resource needs before the frame's passes can touch it.
+		// Creating a resource therefore costs no submit and no fence wait of its own.
+		bool HasPendingInit() const;
+		void ExecutePendingInit(CommandBuffer& commandBuffer);
+
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
@@ -104,7 +124,14 @@ namespace Core
 		// from a real C++ type rather than a hand-written byte count.
 		Handle<Buffer> GetOrCreateUniformBuffer(const string& name, VkDeviceSize size);
 
+		// Type-erased half of the templated overload above, so the job types stay out
+		// of this header.
+		Handle<Buffer> GetOrCreateFilledStorageBuffer(const string& name,
+			const BufferDesc& desc, vector<uint8_t>&& initialData);
+
 		void CreateDescriptorPool();
+
+		bool AllInitJobsExecuted() const;
 
 	private:
 		Device& _device;
@@ -127,5 +154,20 @@ namespace Core
 		Handle<Sampler> _defaultSampler;
 
 		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
+
+		// UNDEFINED -> requested starting layout for targets created this frame.
+		// Cleared as they are recorded.
+		struct PendingLayoutTransition
+		{
+			Handle<Texture> texture;
+			VkImageLayout targetLayout;
+		};
+		vector<PendingLayoutTransition> _pendingTransitions;
+
+		// This frame's init jobs, from enqueue until the GPU is done with them: an
+		// executed job still owns the staging buffer its copy reads from, so it
+		// outlives the recording. Released by Reset(), which only runs once this
+		// frame slot's previous submission has completed.
+		vector<unique_ptr<Job>> _pendingInitJobs;
 	};
 }

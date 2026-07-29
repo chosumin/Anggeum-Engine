@@ -126,6 +126,22 @@ void RenderContext::Submit()
 
 	auto submitStart = std::chrono::steady_clock::now();
 
+	// Resource-init work the passes queued while recording (initial layout
+	// transitions, initial buffer fills) goes out first, as one command buffer on
+	// the graphics queue. SubmitToQueues gates the frame's first submit per queue
+	// on the timeline value it signals.
+	if (frameResources.HasPendingInit())
+	{
+		auto& initCommandBuffer = RequestCommandBuffer();
+		initCommandBuffer.BeginCommandBuffer(true);
+
+		frameResources.ExecutePendingInit(initCommandBuffer);
+
+		initCommandBuffer.EndCommandBuffer();
+
+		_syncContext->SubmitResourceInit(initCommandBuffer.GetHandle());
+	}
+
 	// Submit all queues with semaphore injection
 	_syncContext->SubmitToQueues(
 		submission.submitInfos,

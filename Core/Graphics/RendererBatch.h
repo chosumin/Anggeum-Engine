@@ -12,6 +12,7 @@ namespace Core
 	class Transform;
 	class Buffer;
 	class Scene;
+	class TransferContext;
 
 	struct TransformBatch
 	{
@@ -48,8 +49,9 @@ namespace Core
 		void MarkDirty() { _dirty = true; }
 
 		// Rebuild the whole draw set from the current scene membership. Self-gated;
-		// no-op when clean.
-		void Sync(Scene& scene, VkExtent2D extents);
+		// no-op when clean. The buffer fills are enqueued on `transfer`, so the
+		// caller has to flush it before the frame reads the draw set.
+		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
@@ -64,7 +66,7 @@ namespace Core
 	private:
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
 		void InitializeFromScene(Scene& scene);
-		void RebuildGpuBuffers();
+		void RebuildGpuBuffers(TransferContext& transfer);
 
 		// Create the buffer on first use, resize it in place afterwards so the handle
 		// stays valid. Callers must ensure no frame is in flight when resizing.

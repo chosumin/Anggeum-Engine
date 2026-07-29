@@ -7,7 +7,6 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceCache.h"
 #include "Vulkans/Texture.h"
-#include "TransferJob.h"
 
 using namespace Core;
 
@@ -55,8 +54,6 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, RenderFrame& re
     rejectedCountDesc.memoryType = MemoryType::DEVICE_LOCAL;
     _rejectedCountBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "RejectedCount", rejectedCountDesc);
 
-    // Indirect command buffers: allocate from the pool, then fill with the initial
-    // draw commands via a copy job (the buffers are pool-owned, not job-owned).
     const auto& drawCommands = indirectDrawBuffer.GetDrawCommands();
 
     BufferDesc indirectDesc{};
@@ -65,21 +62,11 @@ void Core::Culler::PrepareCullingResources(Core::Device& device, RenderFrame& re
         | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     indirectDesc.memoryType = MemoryType::DEVICE_LOCAL;
 
-    _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "Pass1Indirect", indirectDesc);
-    {
-        Core::VkBufferCopyJob<DrawIndexedIndirectCommand> pass1Job(device,
-            _indirectCommandBuffer.Get(),
-            vector<DrawIndexedIndirectCommand>(drawCommands), 0);
-        Core::CommandBuffer::ImmediateSubmit(device, pass1Job);
-    }
+    _indirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(
+        namePrefix + "Pass1Indirect", indirectDesc, drawCommands);
 
-    _pass2IndirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(namePrefix + "Pass2Indirect", indirectDesc);
-    {
-        Core::VkBufferCopyJob<DrawIndexedIndirectCommand> pass2Job(device,
-            _pass2IndirectCommandBuffer.Get(),
-            vector<DrawIndexedIndirectCommand>(drawCommands), 0);
-        Core::CommandBuffer::ImmediateSubmit(device, pass2Job);
-    }
+    _pass2IndirectCommandBuffer = frameResources.GetOrCreateStorageBuffer(
+        namePrefix + "Pass2Indirect", indirectDesc, drawCommands);
 
     _pass2CullingShader = device.GetResourceCache().LoadShader("Shaders/gpuCullingPass2.comp.spv");
     _pass2CullingPipeline = make_unique<Pipeline>(device, _pass2CullingShader.Get());
