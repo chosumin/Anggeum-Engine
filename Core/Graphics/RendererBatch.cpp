@@ -225,26 +225,26 @@ void Core::RendererBatch::RebuildGpuBuffers(TransferContext& transfer)
     // Enqueued rather than submitted here: the jobs stage their data on worker
     // threads and go out as one submit when the caller flushes the TransferContext,
     // instead of blocking this thread on a fence per buffer.
-    transfer.Enqueue(new Core::VkBufferCopyJob<DrawIndexedIndirectCommand>(_device,
+    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<DrawIndexedIndirectCommand>>(_device,
         _indirectCommandBuffer.Get(), vector<DrawIndexedIndirectCommand>(drawCommands), 0),
         "RendererBatch.IndirectCommand");
 
-    transfer.Enqueue(new Core::VkBufferCopyJob<uint32_t>(_device,
+    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<uint32_t>>(_device,
         _materialIndexBuffer.Get(), vector<uint32_t>(materialIndices), 0),
         "RendererBatch.MaterialIndex");
 
-    transfer.Enqueue(new Core::VkBufferCopyJob<GPUObjectData>(_device,
+    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<GPUObjectData>>(_device,
         _objectDataBuffer.Get(), move(objectData), 0),
         "RendererBatch.ObjectData");
 
-    transfer.Enqueue(new Core::VkBufferCopyJob<uint>(_device,
+    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<uint>>(_device,
         _instanceBuffer.Get(), move(instanceData), 0),
         "RendererBatch.Instance");
 
     // A transform buffer job only exists when there were transforms to upload.
     if (anyTransform)
     {
-        transfer.Enqueue(new Core::VkBufferCopyJob<mat4>(_device,
+        transfer.Enqueue(make_unique<Core::VkBufferCopyJob<mat4>>(_device,
             _transformBatch.TransformBuffer.Get(), move(transforms), 0),
             "RendererBatch.Transform");
     }

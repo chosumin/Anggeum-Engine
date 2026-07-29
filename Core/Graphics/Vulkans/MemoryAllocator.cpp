@@ -167,11 +167,11 @@ bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair,
 {
 	for (size_t i = 0; i < _blocks.size(); ++i)
 	{
-		auto block = _blocks[i];
+		auto& block = _blocks[i];
 
 		for (size_t j = 0; j < block.freeMemories.size(); ++j)
 		{
-			auto offsetSizePair = block.freeMemories[j];
+			const auto& offsetSizePair = block.freeMemories[j];
 
 			bool validOffset = needsWholePage ? offsetSizePair.offset == 0 : true;
 

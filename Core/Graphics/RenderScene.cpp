@@ -59,7 +59,7 @@ void RenderScene::UploadQueuedTextures(TransferContext& transfer)
 	for (auto& request : _textureUploads.Take())
 	{
 		auto& texture = request.texture.Get();
-		transfer.Enqueue(new VkImageJob(*_device, texture, request.filePath),
+		transfer.Enqueue(make_unique<VkImageJob>(*_device, texture, request.filePath),
 			texture.GetName());
 	}
 }
@@ -92,7 +92,7 @@ void RenderScene::UploadQueuedGeometry(TransferContext& transfer)
 		}
 
 		transfer.Enqueue(
-			new VkBufferCopyBatchJob(*_device, move(copies), move(boundsTasks)),
+			make_unique<VkBufferCopyBatchJob>(*_device, move(copies), move(boundsTasks)),
 			batch.debugName + "_" + std::to_string(batchIndex));
 
 		++batchIndex;

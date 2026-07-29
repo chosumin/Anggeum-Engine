@@ -126,7 +126,7 @@ namespace Core
 			: Job(JobType::TRANSFER)
 			, _device(device)
 			, _destination(dstBuffer)
-			, _bufferData(bufferData)
+			, _bufferData(std::move(bufferData))
 			, _dstOffset(dstOffset)
 		{
 		}

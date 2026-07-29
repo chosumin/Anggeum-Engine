@@ -37,15 +37,17 @@ void Core::TransferContext::UpdateFrame(uint32_t frame)
 	_currentFrame = frame;
 }
 
-void Core::TransferContext::Enqueue(Job* job, const string& jobName)
+void Core::TransferContext::Enqueue(unique_ptr<Job> job, const string& jobName)
 {
-	//Alrady enqueued
+	//Already enqueued: the pending job covers the request; this one is destroyed.
 	if (_pendingJobs.find(jobName) != _pendingJobs.end())
 		return;
 
-	_pendingJobs.insert({ jobName, job });
-	job->completionWait = &_fenceWait;
-	_workerThreadManager.Enqueue(job);
+	Job* raw = job.get();
+	raw->completionWait = &_fenceWait;
+
+	_pendingJobs.insert({ jobName, std::move(job) });
+	_workerThreadManager.Enqueue(raw);
 }
 
 void Core::TransferContext::Wait()
@@ -76,9 +78,9 @@ void Core::TransferContext::Wait()
 
 	size_t commandBufferCount = _pendingJobs.size();
 	vector<CommandBuffer*> secondaryCommands(commandBufferCount);
-	transform(_pendingJobs.begin(), _pendingJobs.end(), 
+	transform(_pendingJobs.begin(), _pendingJobs.end(),
 		secondaryCommands.begin(),
-		[](pair<string, Job*> job) { return job.second->commandBuffer; });
+		[](const auto& job) { return job.second->commandBuffer; });
 
 	primary.ExecuteCommands(secondaryCommands);
 
@@ -105,13 +107,7 @@ void Core::TransferContext::Wait()
 
 void Core::TransferContext::ClearJobs()
 {
-	for (auto&& job : _pendingJobs)
-	{
-		if (job.second->status == JobStatus::COMPLETE)
-		{
-			delete(job.second);
-		}
-	}
-
+	// Wait() only reaches here after every job reported COMPLETE and the GPU fence
+	// signaled, so destroying them (and the staging buffers they own) is safe.
 	_pendingJobs.clear();
 }
