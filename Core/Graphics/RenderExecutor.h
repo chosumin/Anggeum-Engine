@@ -14,15 +14,17 @@ namespace Core
     class DescriptorSetBuilder;
     class Scene;
 
-    // Key for culler cache: combination of camera pointer and batch pointer
+    // Key for the culler cache. The concrete type is part of the key so the same
+    // camera can own.
     struct CullerKey
     {
         const CameraBuffer* Camera;
         RendererBatch* Batch;
+        type_index Type;
 
         bool operator==(const CullerKey& other) const
         {
-            return Camera == other.Camera && Batch == other.Batch;
+            return Camera == other.Camera && Batch == other.Batch && Type == other.Type;
         }
     };
 
@@ -33,6 +35,7 @@ namespace Core
             size_t h = 0;
             h ^= std::hash<const CameraBuffer*>{}(key.Camera);
             h ^= std::hash<RendererBatch*>{}(key.Batch) << 1;
+            h ^= key.Type.hash_code() << 2;
             return h;
         }
     };
@@ -71,7 +74,35 @@ namespace Core
         void ResetFrame();
 
     private:
-        Culler* GetOrCreateCuller(RendererBatch& batch, const CameraBuffer& camera);
+        // Returns the cached culler for (camera, batch, T), creating it on first
+        // use. T's constructor must take (Device&, RenderFrame&, RendererBatch&,
+        // uint32_t id) — instantiated in the .cpp, where the derived headers are
+        // included.
+        template<typename T>
+        T* GetOrCreateCuller(RendererBatch& batch, const CameraBuffer& camera)
+        {
+            CullerKey key{ &camera, &batch, type_index(typeid(T)) };
+            auto it = _cullers.find(key);
+            if (it != _cullers.end())
+            {
+                // The key carries the concrete type, so this cast cannot be wrong.
+                T* culler = static_cast<T*>(it->second.get());
+
+                // The batch is a single shared instance, so its address stays put
+                // across a rebuild and the key alone cannot tell us the culler went
+                // stale. Its buffers are sized from the draw set, so a rebuild has
+                // to be picked up before anything records against them.
+                if (culler->GetBatchRevision() != batch.GetRevision())
+                    culler->OnBatchRebuilt(_renderFrame);
+
+                return culler;
+            }
+
+            auto culler = make_unique<T>(_device, _renderFrame, batch, _nextCullerId++);
+            T* result = culler.get();
+            _cullers[key] = std::move(culler);
+            return result;
+        }
 
         void DrawIndirectInternal(CommandBuffer& commandBuffer,
             Shader& shader, Pipeline& pipeline,

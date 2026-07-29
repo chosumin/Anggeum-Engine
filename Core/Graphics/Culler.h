@@ -16,68 +16,50 @@ namespace Core
     class DescriptorSetBuilder;
     class RendererBatch;
 
-    // GPU-driven culling helper.
-    // Owns the compute resources used for frustum/occlusion culling (culling
-    // pipelines, the Hi-Z pyramid and the 2-pass buffers) and dispatches the
-    // culling passes that populate the indirect draw command buffers created by
-    // RendererBatch. The draw buffers themselves stay owned by RendererBatch
-    // and are only referenced here.
+    // GPU-driven culling base.
     class Culler
     {
     public:
-        // Builds every culling resource up front. The batch supplies the geometry
-        // being culled and must outlive this Culler. Buffers and the Hi-Z texture are
-        // allocated from the frame's FrameResources pool; this Culler keeps only
-        // handles. `id` is a per-frame unique index (from RenderExecutor) used to
-        // give this Culler's resources unique names so cullers don't collide.
-        Culler(Device& device, RenderFrame& renderFrame, RendererBatch& rendererBatch, uint32_t id);
-        ~Culler();
+        virtual ~Culler();
 
         bool IsUsedThisFrame() const { return _markUsedThisFrame; }
-		void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
+        void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
 
-        // Resets per-frame instance counts before the 2-pass culling runs.
-        void ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+        // Revision of the batch this Culler's buffers and counts were built against.
+        uint64_t GetBatchRevision() const { return _batchRevision; }
 
-        // Frustum + occlusion culling into the primary indirect command buffer (Pass 1).
-        void DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, Handle<Texture> depth);
-
-        // Frustum + occlusion culling of the objects rejected by Pass 1 (Pass 2).
-        void DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, Handle<Texture> depth);
-
-        // Frustum-only culling into the primary indirect command buffer.
-        // The builder must be created for the frustum culling shader so a fresh
-        // descriptor set is used per call (multiple cullers share the shader).
-        void DispatchFrustumOnlyCulling(RenderFrame& renderFrame,
-            CommandBuffer& commandBuffer, DescriptorSetBuilder& builder,
-            const CameraBuffer& camera);
+        // Re-point this Culler at the batch's current contents after the draw set was
+        // rebuilt. The per-draw buffers are swapped in place, so handles already
+        // handed out stay valid. Must run before anything records against them this
+        // frame.
+        void OnBatchRebuilt(RenderFrame& renderFrame);
 
         Buffer* GetIndirectCommandBuffer() const { return &_indirectCommandBuffer.Get(); }
-        Buffer* GetPass2IndirectCommandBuffer() const { return &_pass2IndirectCommandBuffer.Get(); }
 
-        // Shader used for frustum-only culling (needed to build its descriptor set).
-        Shader& GetFrustumCullingShader() const;
+    protected:
+        // The batch supplies the geometry being culled and must outlive this Culler.
+        // `id` is used to give this Culler's FrameResources entries unique names so cullers don't collide.
+        Culler(Device& device, RendererBatch& rendererBatch, uint32_t id);
 
-    private:
-        void PrepareCullingResources(Device& device, RenderFrame& renderFrame, const string& namePrefix, const IndirectDrawBuffer& indirectDrawBuffer);
-        void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
+        // Everything sized from or filled with the batch's draw set. Runs from the
+        // derived constructor and again on every rebuild (via OnBatchRebuilt), while
+        // the shaders and pipelines around it do not. Overrides extend it with their
+        // own batch-sized buffers and must call the base version first.
+        virtual void PrepareBatchResources(RenderFrame& renderFrame);
 
-        void PrepareHiZResources(Device& device, RenderFrame& renderFrame, const string& namePrefix, VkExtent2D extents);
-        void GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth);
+        static void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
-        void DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-            const CameraBuffer& camera, Handle<Texture> depth,
-            Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
-            Shader& cullingShader, Pipeline* cullingPipeline);
-
-    private:
+    protected:
         Device& _device;
 
-        // The geometry being culled. 
+        // The geometry being culled.
         // Owns the object/instance/transform buffers this Culler reads.
         RendererBatch& _rendererBatch;
+
+        // Names this Culler's FrameResources entries. Kept so a rebuild reuses the
+        // same names and replaces the buffers instead of leaking new ones.
+        string _namePrefix;
+        uint64_t _batchRevision = 0;
 
         // Pass 1 indirect command buffer (one per Culler so multiple cullers don't
         // overwrite each other). Pool-owned by FrameResources; held here by handle.
@@ -85,43 +67,7 @@ namespace Core
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;
 
-        // Culling pipeline (Pass 1)
-        Handle<Shader> _cullingShader;
-        unique_ptr<Pipeline> _cullingPipeline;
-
-        // Hi-Z Resources. Pass-temp texture, pool-owned by FrameResources (like the
-        // buffers) and referred to here by handle.
-        Handle<Texture> _hiZTexture;
-        Handle<Shader> _hiZGenerateShader;
-        unique_ptr<Pipeline> _hiZPipeline;
-        uint32_t _hiZMipLevels = 0;
-        VkExtent2D _screenExtent = {};
-
-        bool _hiZInitialized = false;
-
-        // Culling parameters, one buffer per dispatch site. Pool-owned by
-        // FrameResources (a Culler lives per frame-in-flight:
-        // RenderFrame -> RenderExecutor -> Culler); held here by handle.
-        Handle<Buffer> _pass1CullDataBuffer;
-        Handle<Buffer> _pass2CullDataBuffer;
-        Handle<Buffer> _frustumCullDataBuffer;
-
-        // 2-Pass Resources
-        Handle<Buffer> _rejectedIndicesBuffer;
-        Handle<Buffer> _rejectedCountBuffer;
-        Handle<Buffer> _pass2IndirectCommandBuffer;
-
-        Handle<Shader> _pass2CullingShader;
-        unique_ptr<Pipeline> _pass2CullingPipeline;
-        Handle<Shader> _resetDrawCommandsShader;
-        unique_ptr<Pipeline> _resetDrawCommandsPipeline;
-
-        // Frustum-only culling resources
-        Handle<Shader> _frustumCullingShader;
-        unique_ptr<Pipeline> _frustumCullingPipeline;
-        Handle<Shader> _resetDrawCommandsSimpleShader;
-        unique_ptr<Pipeline> _resetDrawCommandsSimplePipeline;
-
-		bool _markUsedThisFrame = false;
+    private:
+        bool _markUsedThisFrame = false;
     };
 }

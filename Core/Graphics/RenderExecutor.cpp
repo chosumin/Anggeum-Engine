@@ -2,7 +2,8 @@
 #include "RenderExecutor.h"
 #include "RenderFrame.h"
 #include "RendererBatch.h"
-#include "Culler.h"
+#include "OcclusionCuller.h"
+#include "FrustumCuller.h"
 #include "Vulkans/Shader.h"
 #include "Vulkans/Pipeline.h"
 #include "Vulkans/RenderPass.h"
@@ -40,19 +41,6 @@ void RenderExecutor::ResetFrame()
     }
 }
 
-Culler* RenderExecutor::GetOrCreateCuller(RendererBatch& batch, const CameraBuffer& camera)
-{
-    CullerKey key{ &camera, &batch };
-    auto it = _cullers.find(key);
-    if (it != _cullers.end())
-        return it->second.get();
-
-    auto culler = make_unique<Culler>(_device, _renderFrame, batch, _nextCullerId++);
-    auto* result = culler.get();
-    _cullers[key] = std::move(culler);
-    return result;
-}
-
 void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     Shader& shader, Pipeline& pipeline,
     CameraBuffer& camera,
@@ -68,7 +56,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     if (!batch || batch->GetDrawCommandCount() == 0)
         return;
 
-    auto* culler = GetOrCreateCuller(*batch, camera);
+    auto* culler = GetOrCreateCuller<OcclusionCuller>(*batch, camera);
 
     bool cullerAlreadyUsed = culler->IsUsedThisFrame();
 
@@ -153,11 +141,11 @@ void RenderExecutor::FrustumCullAndDraw(CommandBuffer& commandBuffer,
     if (!batch || batch->GetDrawCommandCount() == 0)
         return;
 
-    auto* culler = GetOrCreateCuller(*batch, camera);
+    auto* culler = GetOrCreateCuller<FrustumCuller>(*batch, camera);
 
     // Frustum culling dispatch
-    auto cullingBuilder = _renderFrame.GetResources().CreateDescriptorSetBuilder(culler->GetFrustumCullingShader());
-    culler->DispatchFrustumOnlyCulling(_renderFrame, commandBuffer, cullingBuilder, camera);
+    auto cullingBuilder = _renderFrame.GetResources().CreateDescriptorSetBuilder(culler->GetCullingShader());
+    culler->Dispatch(_renderFrame, commandBuffer, cullingBuilder, camera);
 
     commandBuffer.BeginRenderPass(renderPass.CreateRenderPassBeginInfo(framebuffer));
 

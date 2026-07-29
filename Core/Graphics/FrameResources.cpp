@@ -241,16 +241,30 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 	return handle;
 }
 
-Handle<Buffer> FrameResources::GetOrCreateFilledStorageBuffer(const string& name,
+Handle<Buffer> FrameResources::CreateOrReplaceStorageBuffer(const string& name,
+	const BufferDesc& desc)
+{
+	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+
+	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
+		(uint64_t)buffer->GetBuffer(), name.c_str());
+
+	auto it = _storageBufferHandles.find(name);
+	if (it != _storageBufferHandles.end())
+	{
+		_bufferPool.Replace(it->second, buffer);
+		return it->second;
+	}
+
+	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	_storageBufferHandles[name] = handle;
+	return handle;
+}
+
+Handle<Buffer> FrameResources::CreateOrReplaceFilledStorageBuffer(const string& name,
 	const BufferDesc& desc, vector<uint8_t>&& initialData)
 {
-	// Checked before creating so the fill is queued only for a buffer this call
-	// actually made; an existing one keeps whatever the frame has written into it.
-	bool exists = _storageBufferHandles.find(name) != _storageBufferHandles.end();
-
-	Handle<Buffer> handle = GetOrCreateStorageBuffer(name, desc);
-	if (exists)
-		return handle;
+	Handle<Buffer> handle = CreateOrReplaceStorageBuffer(name, desc);
 
 	_pendingInitJobs.push_back(make_unique<VkBufferCopyJob<uint8_t>>(
 		_device, handle.Get(), std::move(initialData), 0));

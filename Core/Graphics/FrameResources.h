@@ -71,16 +71,23 @@ namespace Core
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc);
 
+		// Creates the buffer, or swaps a fresh one under an existing name. The handle
+		// survives the swap (ResourcePool::Replace keeps index and generation), so
+		// holders keep working. Use this when the data behind a per-frame buffer was
+		// rebuilt and the old contents or size no longer apply; use
+		// GetOrCreateStorageBuffer when you only need it to exist.
+		Handle<Buffer> CreateOrReplaceStorageBuffer(const string& name, const BufferDesc& desc);
+
 		// Same, for a buffer that has to start out holding something.
 		template<typename T>
-		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc,
+		Handle<Buffer> CreateOrReplaceStorageBuffer(const string& name, const BufferDesc& desc,
 			const vector<T>& initialData)
 		{
 			static_assert(std::is_trivially_copyable<T>::value,
 				"Buffer contents must be trivially copyable");
 
 			const auto* bytes = reinterpret_cast<const uint8_t*>(initialData.data());
-			return GetOrCreateFilledStorageBuffer(name, desc,
+			return CreateOrReplaceFilledStorageBuffer(name, desc,
 				vector<uint8_t>(bytes, bytes + initialData.size() * sizeof(T)));
 		}
 
@@ -107,7 +114,6 @@ namespace Core
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
 		// One-off GPU work a resource needs before the frame's passes can touch it.
-		// Creating a resource therefore costs no submit and no fence wait of its own.
 		bool HasPendingInit() const;
 		void ExecutePendingInit(CommandBuffer& commandBuffer);
 
@@ -126,7 +132,7 @@ namespace Core
 
 		// Type-erased half of the templated overload above, so the job types stay out
 		// of this header.
-		Handle<Buffer> GetOrCreateFilledStorageBuffer(const string& name,
+		Handle<Buffer> CreateOrReplaceFilledStorageBuffer(const string& name,
 			const BufferDesc& desc, vector<uint8_t>&& initialData);
 
 		void CreateDescriptorPool();

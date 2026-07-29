@@ -48,6 +48,10 @@ namespace Core
 		// and it keeps every manager owning its own dirty state.
 		void MarkDirty() { _dirty = true; }
 
+		// Bumped every time the draw set is rebuilt. Holders that sized themselves
+		// against the batch (Cullers) compare this to notice they went stale
+		uint64_t GetRevision() const { return _revision; }
+
 		// Rebuild the whole draw set from the current scene membership. Self-gated;
 		// no-op when clean. The buffer fills are enqueued on `transfer`, so the
 		// caller has to flush it before the frame reads the draw set.
@@ -95,6 +99,7 @@ namespace Core
 
 		bool _hasGpuBuffers = false; // GPU buffers created at least once
 		bool _dirty = false;         // scene membership changed since the last rebuild
+		uint64_t _revision = 0;      // incremented on every rebuild
 
 		// Screen extents for Culler initialization
 		VkExtent2D _extents = {};

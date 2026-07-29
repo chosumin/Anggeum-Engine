@@ -99,6 +99,10 @@ Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> curre
 
 void Core::RendererBatch::RebuildGpuBuffers(TransferContext& transfer)
 {
+    // Bumped before the early-out below so an empty rebuild still counts: the draw
+    // set changed either way, and Cullers have to notice.
+    ++_revision;
+
     // Replacing a live buffer frees the old one immediately, so make sure no frame is
     // still reading it. The very first build happens before any frame is in flight.
     if (_hasGpuBuffers)
