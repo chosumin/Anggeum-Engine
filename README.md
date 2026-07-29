@@ -61,7 +61,7 @@ Toy 3D rendering engine for studying Vulkan API.
 
 **Worker Threads (CPU)**
    - Thread pool recording secondary command buffers off the main thread
-   - Buffer and image uploads staged through a transfer context
+   - Buffer and image uploads staged on worker threads and submitted as a single batch through a transfer context
 
 ### Shader System
 
@@ -99,7 +99,6 @@ Toy 3D rendering engine for studying Vulkan API.
 **Bindless Texture System**
 - Graceful fallback when hardware doesn't support bindless
 - Up to 4096 textures per type (2D and Cubemap arrays)
-- Generation-based handle validation for safe texture lifetime
 - Automatic detection via SPIR-V reflection
 
 ---
