@@ -26,6 +26,7 @@ namespace Core
 
 	enum class MemoryType;
 
+	struct DeviceFeatureChain;
 	class Window;
 	class CommandPool;
 	class CommandBuffer;
@@ -79,11 +80,11 @@ namespace Core
 	private:
 		void CreateInstance();
 		vector<const char*> GetRequiredExtensions();
-		void PickPhysicalDevice();
+		void PickPhysicalDevice(DeviceFeatureChain& outFeatureChain);
 		QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
-		bool IsDeviceSuitable(VkPhysicalDevice device);
+		bool IsDeviceSuitable(VkPhysicalDevice device, DeviceFeatureChain& outFeatureChain);
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
-		void CreateLogicalDevice();
+		void CreateLogicalDevice(const DeviceFeatureChain& featureChain);
 		SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 
 		void CheckDescriptorIndexingSupport(VkPhysicalDevice device);

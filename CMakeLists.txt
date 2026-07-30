@@ -16,7 +16,7 @@ if(DEFINED ENV{VULKAN_SDK})
     set(VULKAN_SDK $ENV{VULKAN_SDK})
 else()
     # Update this path as needed
-    set(VULKAN_SDK "C:/VulkanSDK/1.3.275.0")
+    set(VULKAN_SDK "C:/VulkanSDK/1.4.357.0")
 endif()
 
 # Verify Vulkan SDK exists

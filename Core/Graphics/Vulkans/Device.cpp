@@ -7,22 +7,52 @@
 
 namespace Core
 {
+	struct DeviceFeatureChain
+	{
+		VkPhysicalDeviceVulkan13Features features13{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+		VkPhysicalDeviceVulkan12Features features12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+
+		DeviceFeatureChain() = default;
+		DeviceFeatureChain(const DeviceFeatureChain&) = delete;
+		DeviceFeatureChain& operator=(const DeviceFeatureChain&) = delete;
+
+		// Fills every supported feature bit for `device`.
+		void Query(VkPhysicalDevice device)
+		{
+			features12.pNext = &features13;
+			features2.pNext = &features12;
+			vkGetPhysicalDeviceFeatures2(device, &features2);
+		}
+
+		bool HasRequiredFeatures() const
+		{
+			return features2.features.samplerAnisotropy &&
+				features12.timelineSemaphore &&
+				features13.dynamicRendering &&
+				features13.synchronization2;
+		}
+	};
+
 	Device::Device(Window& window)
 		:_device(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(),
 		_deviceExtensions{
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+			// Timeline semaphores and descriptor indexing are core since 1.2
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		}
 	{
 	    CreateInstance();
 
 	    window.CreateSurface(_instance, &_surface);
-	    PickPhysicalDevice();
+
+		// Filled for the picked device during selection; CreateLogicalDevice
+		// enables the same chain, so the features are queried exactly once.
+		DeviceFeatureChain featureChain;
+	    PickPhysicalDevice(featureChain);
 
 		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
 
-		CreateLogicalDevice();
+		CreateLogicalDevice(featureChain);
 
 		_debugUtils.Initialize(_instance, _device);
 
@@ -136,7 +166,7 @@ namespace Core
 	    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	    appInfo.pEngineName = "Anggeum Engine";
 	    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	    appInfo.apiVersion = VK_API_VERSION_1_3;
+	    appInfo.apiVersion = VK_API_VERSION_1_4;
 
 	    VkInstanceCreateInfo createInfo{};
 	    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -186,7 +216,7 @@ namespace Core
 	    return extensions;
 	}
 
-	void Device::PickPhysicalDevice()
+	void Device::PickPhysicalDevice(DeviceFeatureChain& outFeatureChain)
 	{
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
@@ -199,7 +229,7 @@ namespace Core
 
 		for (const auto& device : devices)
 		{
-			if (IsDeviceSuitable(device))
+			if (IsDeviceSuitable(device, outFeatureChain))
 			{
 				_physicalDevice = device;
 
@@ -270,7 +300,7 @@ namespace Core
 		return indices;
 	}
 
-	bool Device::IsDeviceSuitable(VkPhysicalDevice device)
+	bool Device::IsDeviceSuitable(VkPhysicalDevice device, DeviceFeatureChain& outFeatureChain)
 	{
 	    QueueFamilyIndices indices = FindQueueFamilies(device);
 
@@ -285,11 +315,14 @@ namespace Core
 	            !swapChainSupport.PresentModes.empty();
 	    }
 
-	    VkPhysicalDeviceFeatures supportedFeatures;
-	    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+	    VkPhysicalDeviceProperties properties;
+	    vkGetPhysicalDeviceProperties(device, &properties);
+
+	    outFeatureChain.Query(device);
 
 	    return indices.IsComplete() && extensionsSupported && swapChainAdequate &&
-	        supportedFeatures.samplerAnisotropy;
+	        properties.apiVersion >= VK_API_VERSION_1_4 &&
+	        outFeatureChain.HasRequiredFeatures();
 	}
 
 	bool Device::CheckDeviceExtensionSupport(VkPhysicalDevice device)
@@ -310,35 +343,9 @@ namespace Core
 	    return requiredExtensions.empty();
 	}
 
-	void Device::CreateLogicalDevice()
+	void Device::CreateLogicalDevice(const DeviceFeatureChain& featureChain)
 	{
-	    // ============================================
-	    // Step 2: Create logical device with requested features
-	    // ============================================
-	    VkPhysicalDeviceFeatures2 physicalFeatures2{};
-	    physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
-	    VkPhysicalDeviceFeatures deviceFeatures{};
-	    deviceFeatures.samplerAnisotropy = VK_TRUE;
-	    deviceFeatures.sampleRateShading = VK_TRUE;
-	    deviceFeatures.fillModeNonSolid = VK_TRUE;
-	    physicalFeatures2.features = deviceFeatures;
-
-		VkPhysicalDeviceTimelineSemaphoreFeatures timelineSempahoreFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
-	    physicalFeatures2.pNext = &timelineSempahoreFeatures;
-
-		// Enable descriptor indexing features if supported
-		if (_supportsDescriptorIndexing)
-		{
-			_descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-			_descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-			_descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-			_descriptorIndexingFeatures.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
-
-			timelineSempahoreFeatures.pNext = &_descriptorIndexingFeatures;
-		}
-
-		vkGetPhysicalDeviceFeatures2(_physicalDevice, &physicalFeatures2);
+		assert(featureChain.HasRequiredFeatures());
 
 	    vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	    set<uint32_t> uniqueQueueFamilies = {
@@ -364,7 +371,7 @@ namespace Core
 	    createInfo.pQueueCreateInfos = queueCreateInfos.data();
 	    createInfo.enabledExtensionCount = static_cast<uint32_t>(_deviceExtensions.size());
 	    createInfo.ppEnabledExtensionNames = _deviceExtensions.data();
-	    createInfo.pNext = &physicalFeatures2;
+	    createInfo.pNext = &featureChain.features2;
 
 	    const auto& validationLayers = _debugUtils.GetValidationLayers();
 	    if (_debugUtils.IsValidationLayerEnabled())
