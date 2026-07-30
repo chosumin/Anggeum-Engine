@@ -17,13 +17,27 @@ namespace Core
 	public:
 		friend class Texture;
 	public:
+		// Tag for the transient/aliased path: the VkImage is created without
+		// memory.
+		struct Unbound {};
+
 		Image(Device& device, ImageCreateInfo imageCreateInfo);
 
 		//Creates a render target image
-		Image(Device& device, VkImageCreateInfo& imageInfo, 
+		Image(Device& device, VkImageCreateInfo& imageInfo,
 			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D);
 
+		Image(Device& device, VkImageCreateInfo& imageInfo,
+			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType, Unbound);
+
 		~Image();
+
+		VkMemoryRequirements GetMemoryRequirements() const;
+		
+		// Binds at an explicit offset into caller-owned memory (transient heap)
+		// and creates the default image view. The memory must outlive this image;
+		// the destructor does not free it.
+		void BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset);
 
 		VkFormat GetFormat() { return _format; }
 		VkImage& GetImage() { return _image; }
@@ -70,7 +84,11 @@ namespace Core
 		VkImageViewType _viewType;
 
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocatorManager* _allocator;
+		MemoryAllocatorManager* _allocator = nullptr;
+
+		// Aspect requested at construction for the deferred-bind (Unbound) path;
+		// the default view is created with it in BindMemoryAt.
+		VkImageAspectFlags _deferredAspectFlags = 0;
 
 		string _filePath;
 	};

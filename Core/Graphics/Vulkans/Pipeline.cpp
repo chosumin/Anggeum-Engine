@@ -8,14 +8,26 @@ Core::Pipeline::Pipeline(Device& device,
 	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
 	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 {
-	CreateGraphicsPipeline(renderPass, shader, pipelineState);
+	CreateGraphicsPipeline(renderPass.GetHandle(), nullptr, shader, pipelineState);
+}
+
+Core::Pipeline::Pipeline(Device& device,
+	const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState)
+	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
+{
+	VkPipelineRenderingCreateInfo renderingInfo{};
+	renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	renderingInfo.colorAttachmentCount = static_cast<uint32_t>(renderingDesc.colorFormats.size());
+	renderingInfo.pColorAttachmentFormats = renderingDesc.colorFormats.data();
+	renderingInfo.depthAttachmentFormat = renderingDesc.depthFormat;
+	renderingInfo.stencilAttachmentFormat = renderingDesc.stencilFormat;
+
+	CreateGraphicsPipeline(VK_NULL_HANDLE, &renderingInfo, shader, pipelineState);
 }
 
 Core::Pipeline::Pipeline(Device& device, Shader& shader)
-	:_device(device)
+	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_COMPUTE)
 {
-	_pipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
-
 	VkComputePipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipelineInfo.layout = shader.GetPipelineLayout();
@@ -32,7 +44,9 @@ Core::Pipeline::~Pipeline()
 	vkDestroyPipeline(device, _pipeline, nullptr);
 }
 
-void Core::Pipeline::CreateGraphicsPipeline(RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
+void Core::Pipeline::CreateGraphicsPipeline(VkRenderPass renderPass,
+	const VkPipelineRenderingCreateInfo* renderingInfo,
+	Shader& shader, PipelineState& pipelineState)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
 	auto vertexInputState =
@@ -42,13 +56,19 @@ void Core::Pipeline::CreateGraphicsPipeline(RenderPass& renderPass, Shader& shad
 	auto viewportState = GetViewportStateCreateInfo();
 
 	auto depthStencilState = pipelineState.GetDepthStencilStateCreateInfo();
-	auto colorBlendAttachment = GetColorBlendAttachmentState();
-	auto colorBlendState = GetColorBlendStateCreateInfo(colorBlendAttachment);
+
+	const uint32_t colorAttachmentCount =
+		renderingInfo != nullptr ? renderingInfo->colorAttachmentCount : 1;
+	vector<VkPipelineColorBlendAttachmentState> blendAttachments(
+		colorAttachmentCount, GetColorBlendAttachmentState());
+	auto colorBlendState = GetColorBlendStateCreateInfo(blendAttachments);
+
 	auto dynamicState = GetDynamicStateCreateInfo();
 	auto pipelineLayout = shader.GetPipelineLayout();
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext = renderingInfo;
 	pipelineInfo.stageCount = 2;
 	pipelineInfo.pStages = shaderStage.data();
 	pipelineInfo.pVertexInputState = &vertexInputState;
@@ -60,7 +80,7 @@ void Core::Pipeline::CreateGraphicsPipeline(RenderPass& renderPass, Shader& shad
 	pipelineInfo.pColorBlendState = &colorBlendState;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.layout = pipelineLayout;
-	pipelineInfo.renderPass = renderPass.GetHandle();
+	pipelineInfo.renderPass = renderPass;
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;
@@ -80,14 +100,14 @@ VkPipelineViewportStateCreateInfo Core::Pipeline::GetViewportStateCreateInfo()
 }
 
 VkPipelineColorBlendStateCreateInfo Core::Pipeline::GetColorBlendStateCreateInfo(
-	VkPipelineColorBlendAttachmentState& colorBlendAttachment)
+	const vector<VkPipelineColorBlendAttachmentState>& blendAttachments)
 {
 	VkPipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable = VK_FALSE;
 	colorBlending.logicOp = VK_LOGIC_OP_COPY;
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.attachmentCount = static_cast<uint32_t>(blendAttachments.size());
+	colorBlending.pAttachments = blendAttachments.data();
 	colorBlending.blendConstants[0] = 0.0f;
 	colorBlending.blendConstants[1] = 0.0f;
 	colorBlending.blendConstants[2] = 0.0f;

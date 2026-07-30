@@ -1,6 +1,7 @@
 #pragma once
 #include "CommandPool.h"
 #include "BarrierBatch.h"
+#include "BarrierBatch2.h"
 #include "Graphics/SyncContext.h"
 
 namespace Core
@@ -33,6 +34,8 @@ namespace Core
 		void BeginCommandBuffer(bool isSingleTime = false);
 		void ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers);
 		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
+		void BeginRendering(const VkRenderingInfo& renderingInfo);
+		void EndRendering();
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);
 		
@@ -65,6 +68,7 @@ namespace Core
 		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
 
 		BarrierBatch CreateBarrierBatch();
+		BarrierBatch2 CreateBarrierBatch2();
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer,
 			VkDeviceSize dstOffset = 0, VkDeviceSize srcOffset = 0, VkDeviceSize size = 0);

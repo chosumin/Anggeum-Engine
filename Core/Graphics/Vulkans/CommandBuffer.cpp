@@ -97,6 +97,16 @@ void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)
     vkCmdBeginRenderPass(_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
+void Core::CommandBuffer::BeginRendering(const VkRenderingInfo& renderingInfo)
+{
+    vkCmdBeginRendering(_commandBuffer, &renderingInfo);
+}
+
+void Core::CommandBuffer::EndRendering()
+{
+    vkCmdEndRendering(_commandBuffer);
+}
+
 void Core::CommandBuffer::BindPipeline(const Pipeline* pipeline)
 {
     vkCmdBindPipeline(_commandBuffer, pipeline->GetPipelineBindPoint(), pipeline->GetPipeline());
@@ -437,6 +447,11 @@ void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDevi
 Core::BarrierBatch Core::CommandBuffer::CreateBarrierBatch()
 {
 	return BarrierBatch(*this, _device, _queueFamilyIndex);
+}
+
+Core::BarrierBatch2 Core::CommandBuffer::CreateBarrierBatch2()
+{
+	return BarrierBatch2(*this, _device, _queueFamilyIndex);
 }
 
 void Core::CommandBuffer::BeginDebugMarker(const char* markerName, float r, float g, float b, float a)

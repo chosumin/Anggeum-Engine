@@ -41,6 +41,39 @@ Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo,
         aspectFlags, 0);
 }
 
+Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo,
+	VkImageAspectFlags aspectFlags, VkImageViewType imageViewType, Unbound)
+	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
+	_layer(imageInfo.arrayLayers), _viewType(imageViewType),
+	_image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE), _deferredAspectFlags(aspectFlags)
+{
+	CreateImage(
+		VK_IMAGE_TILING_OPTIMAL,
+		_usageFlags,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		imageInfo.flags);
+}
+
+VkMemoryRequirements Core::Image::GetMemoryRequirements() const
+{
+	VkMemoryRequirements requirements{};
+	vkGetImageMemoryRequirements(_device.GetDevice(), _image, &requirements);
+	return requirements;
+}
+
+void Core::Image::BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset)
+{
+	assert(_allocation == nullptr && "image already owns a managed allocation");
+	assert(_imageView == VK_NULL_HANDLE && "image memory already bound");
+
+	if (vkBindImageMemory(_device.GetDevice(), _image, memory, offset) != VK_SUCCESS)
+		throw runtime_error("failed to bind image memory at offset!");
+
+	// Views require bound memory, so the default view is created here rather
+	// than in the constructor.
+	_imageView = CreateImageView(_mipLevels, _viewType, _deferredAspectFlags, 0);
+}
+
 Core::Image::~Image()
 {
     auto device = _device.GetDevice();
@@ -225,10 +258,8 @@ void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
     _extent.height = static_cast<uint32_t>(height);
     _layer = 1;
 
-    // HDR는 채널당 32bit float 포맷 사용
     _format = VK_FORMAT_R32G32B32A32_SFLOAT;
 
-    // float 픽셀 데이터를 uint8_t 바이트 스트림으로 복사
     const size_t byteSize = static_cast<size_t>(width) * height * reqComp * sizeof(float);
     const uint8_t* byteData = reinterpret_cast<const uint8_t*>(pixels);
     outData = { byteData, byteData + byteSize };
@@ -328,7 +359,24 @@ void Core::Image::CreateImage(VkImageTiling tiling,
     //VK_IMAGE_LAYOUT_PREINITIALIZED, the first transition will preserve the texels.
     imageInfo.initialLayout = initialLayout;
     imageInfo.usage = usage;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // CONCURRENT across graphics+compute when the families differ, 
+    // so cross-queue access needs no ownership transfers.
+    const auto& qfi = _device.GetQueueFamilyIndices();
+    uint32_t queueFamilies[2] = {
+        qfi.GraphicsFamily.value(),
+        qfi.ComputeFamily.value()
+    };
+    if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 2;
+        imageInfo.pQueueFamilyIndices = queueFamilies;
+    }
+    else
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     //related to sparse images, such as 3D texture for a voxel terrain.
     imageInfo.flags = flags;
