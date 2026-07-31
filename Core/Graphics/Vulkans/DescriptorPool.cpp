@@ -158,7 +158,7 @@ namespace Core
 		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 		poolInfo.pPoolSizes = poolSizes.data();
 		poolInfo.maxSets = maxSets;
-		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // 개별 해제 가능
+		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
 		if (vkCreateDescriptorPool(_device.GetDevice(), &poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS)
 		{
@@ -171,7 +171,6 @@ namespace Core
 		if (_descriptorPool == VK_NULL_HANDLE)
 			return;
 
-		// 모든 descriptor sets를 한 번에 해제 (매우 효율적)
 		vkResetDescriptorPool(_device.GetDevice(), _descriptorPool, 0);
 	}
 
@@ -184,6 +183,9 @@ namespace Core
 		allocInfo.pSetLayouts = &layout;
 
 		VkDescriptorSet descriptorSet;
+
+		lock_guard<mutex> lock(_allocateMutex);
+
 		VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, &descriptorSet);
 
 		if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
@@ -200,33 +202,5 @@ namespace Core
 		}
 
 		return descriptorSet;
-	}
-
-	vector<VkDescriptorSet> DescriptorPool::AllocateDescriptorSets(
-		const vector<VkDescriptorSetLayout>& layouts)
-	{
-		VkDescriptorSetAllocateInfo allocInfo{};
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = _descriptorPool;
-		allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
-		allocInfo.pSetLayouts = layouts.data();
-
-		vector<VkDescriptorSet> descriptorSets(layouts.size());
-		VkResult result = vkAllocateDescriptorSets(_device.GetDevice(), &allocInfo, descriptorSets.data());
-
-		if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
-		{
-			throw runtime_error("Descriptor pool out of memory!");
-		}
-		else if (result == VK_ERROR_FRAGMENTED_POOL)
-		{
-			throw runtime_error("Descriptor pool fragmented!");
-		}
-		else if (result != VK_SUCCESS)
-		{
-			throw runtime_error("Failed to allocate descriptor sets!");
-		}
-
-		return descriptorSets;
 	}
 }

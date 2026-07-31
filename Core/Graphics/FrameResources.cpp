@@ -9,6 +9,7 @@
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "ResourceManager.h"
+#include "FrameGraph/TransientResourceAllocator.h"
 #include "Foundation/Job.h"
 #include "TransferJob.h"
 
@@ -19,6 +20,14 @@ FrameResources::FrameResources(Device& device)
 {
 	CreateDescriptorPool();
 	_defaultSampler = device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
+}
+
+TransientResourceAllocator& FrameResources::GetTransientAllocator()
+{
+	if (_transientAllocator == nullptr)
+		_transientAllocator = make_unique<TransientResourceAllocator>(_device);
+
+	return *_transientAllocator;
 }
 
 FrameResources::~FrameResources()
@@ -131,6 +140,8 @@ Handle<Texture> FrameResources::GetOrCreateRenderTarget(const string& name,
 Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	const RenderTargetDesc& desc)
 {
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	VkFormat format = desc.format;
 
 	// Depth format fallback if undefined and aspect includes depth
@@ -231,6 +242,8 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 	if (it != _storageBufferHandles.end())
 		return it->second;
 
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
@@ -244,6 +257,8 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 Handle<Buffer> FrameResources::CreateOrReplaceStorageBuffer(const string& name,
 	const BufferDesc& desc)
 {
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
@@ -286,6 +301,8 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 		return it->second;
 	}
 
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, size,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
 
@@ -303,6 +320,8 @@ Framebuffer* FrameResources::GetOrCreateFramebuffer(const string& name,
 	auto it = _framebuffers.find(name);
 	if (it != _framebuffers.end())
 		return it->second.get();
+
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
 
 	vector<VkImageView> imageViews;
 	VkExtent2D extent = { 0, 0 };

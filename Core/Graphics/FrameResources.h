@@ -15,6 +15,7 @@ namespace Core
 	class DescriptorSetBuilder;
 	class CommandBuffer;
 	class Job;
+	class TransientResourceAllocator;
 
 	struct RenderTargetDesc
 	{
@@ -113,9 +114,20 @@ namespace Core
 		// allocates from this frame's descriptor pool, which Reset() recycles.
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
+		DescriptorPool& GetDescriptorPool() { return *_descriptorPool; }
+
+		// This frame slot's transient aliasing heap, driven by the frame graph's
+		// compile output.
+		TransientResourceAllocator& GetTransientAllocator();
+
 		// One-off GPU work a resource needs before the frame's passes can touch it.
 		bool HasPendingInit() const;
 		void ExecutePendingInit(CommandBuffer& commandBuffer);
+
+		// Recording-window guard: while frame graph passes record on worker
+		// threads the resource pools are frozen (the main thread only waits).
+		static void SetRecordingGuard(bool recording) { _recordingGuard = recording; }
+		static bool IsRecordingGuardActive() { return _recordingGuard; }
 
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
@@ -142,7 +154,12 @@ namespace Core
 	private:
 		Device& _device;
 
+		static inline atomic<bool> _recordingGuard = false;
+
 		unique_ptr<DescriptorPool> _descriptorPool;
+
+		// Frame graph transients (placed/aliased); see GetTransientAllocator.
+		unique_ptr<TransientResourceAllocator> _transientAllocator;
 
 		ResourcePool<Texture> _renderTargetPool;
 		unordered_map<string, Handle<Texture>> _renderTargets;

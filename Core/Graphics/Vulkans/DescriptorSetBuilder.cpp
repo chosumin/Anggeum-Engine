@@ -43,6 +43,19 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
 	return *this;
 }
 
+Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
+	uint32_t binding, Texture& texture, uint32_t mipLevel,
+	VkImageLayout layout)
+{
+	TextureBuffer texBuffer{};
+	texBuffer.rawTexture = &texture;
+	texBuffer.mipLevel = mipLevel;
+	texBuffer.imageLayout = layout;
+
+	_resources.textureBuffers[binding] = texBuffer;
+	return *this;
+}
+
 Core::DescriptorSetResources& Core::DescriptorSetBuilder::Build()
 {
 	// 1. Allocate descriptor set

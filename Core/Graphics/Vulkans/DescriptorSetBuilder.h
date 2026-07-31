@@ -37,6 +37,12 @@ namespace Core
 			uint32_t mipLevel = 0,
 			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
+		// --- Texture: combined image sampler ---
+		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding,
+			Texture& texture,
+			uint32_t mipLevel = 0,
+			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
 		// --- Build: allocate descriptor set and update all bindings ---
 		DescriptorSetResources& Build();
 
