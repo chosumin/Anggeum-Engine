@@ -24,7 +24,6 @@
 #include "Foundation/Scene.h"
 #include "Components/PerspectiveCamera.h"
 #include "Components/Mesh.h"
-#include "Utils/timer.h"
 
 using namespace Core;
 
@@ -114,25 +113,6 @@ void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
     _brdfLut = frameResources.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
 }
 
-void FGGeometryPass::GenerateIBLResources()
-{
-    Core::Timer timer;
-    timer.tick();
-
-    auto preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _scene,
-        &_offscreenTexture.Get(), &_irradianceCubemap.Get(), &_prefilteredCubemap.Get());
-    auto brdfLutPass = make_unique<BrdfLutPass>(_device, &_brdfLut.Get());
-
-    PreEnvironmentJob preEnvironmentJob(_device, *preEnvironmentPass);
-    BrdfLutJob brdfLutJob(_device, *brdfLutPass);
-
-    vector<Job*> jobs = { &preEnvironmentJob, &brdfLutJob };
-    CommandBuffer::ImmediateSubmit(_device, jobs);
-
-    auto deltaTime = static_cast<float>(timer.tick<Core::Timer::Seconds>());
-    std::cout << "Generation IBL resources time : " << deltaTime << endl;
-}
-
 void FGGeometryPass::RegisterGiTexturesToBindless(FrameResources& frameResources,
     RenderExecutor& renderExecutor)
 {
@@ -217,13 +197,19 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
     colorDesc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     auto colorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 
-    // IBL resources are generated once at startup (own synchronous submit).
     EnsureIBLResources(frameResources);
     if (!_iblGenerated)
     {
-        GenerateIBLResources();
+        _preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _scene,
+            &_offscreenTexture.Get(), &_irradianceCubemap.Get(), &_prefilteredCubemap.Get());
+        _preEnvironmentPass->Initialize();
+
+        _brdfLutPass = make_unique<BrdfLutPass>(_device, &_brdfLut.Get());
+        _brdfLutPass->Initialize();
+
         RegisterGiTexturesToBindless(frameResources, renderExecutor);
         _iblGenerated = true;
+        _recordIBL = true;
     }
 
     _mainColor = builder.ImportTexture(RT_MAIN_COLOR, colorTexture,
@@ -325,6 +311,16 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
 void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
+    // One-time IBL generation, recorded ahead of the draws that sample it.
+    if (_recordIBL)
+    {
+        _recordIBL = false;
+        commandBuffer.BeginDebugMarker("IBL Generation");
+        _preEnvironmentPass->Record(context, commandBuffer);
+        _brdfLutPass->Record(commandBuffer);
+        commandBuffer.EndDebugMarker();
+    }
+
     // Nothing to draw this frame (no camera, no shader, or no batch).
     if (_culler == nullptr || _geometryShader == nullptr)
         return;

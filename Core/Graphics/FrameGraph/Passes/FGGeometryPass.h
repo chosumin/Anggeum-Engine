@@ -15,6 +15,8 @@ namespace Core
     class SubMesh;
     class Buffer;
     class OcclusionCuller;
+    class PreEnvironmentPass;
+    class BrdfLutPass;
 
     class FGGeometryPass : public FrameGraphPass
     {
@@ -38,10 +40,6 @@ namespace Core
 
     private:
         void EnsureIBLResources(FrameResources& frameResources);
-
-        // One-time IBL generation: records the pre-environment/BRDF jobs into a
-        // single-time command buffer and waits (main thread, startup only).
-        void GenerateIBLResources();
         void RegisterGiTexturesToBindless(FrameResources& frameResources,
             RenderExecutor& renderExecutor);
 
@@ -68,12 +66,15 @@ namespace Core
 
         bool _iblGenerated = false;
 
-        // App-lifetime IBL resources: created once, consumed only on the main
-        // thread (one-time generation + bindless registration in Setup).
+        // App-lifetime IBL resources: created once, registered to bindless in
+        // Setup.
         Handle<Texture> _offscreenTexture;
         Handle<Texture> _irradianceCubemap;
         Handle<Texture> _prefilteredCubemap;
         Handle<Texture> _brdfLut;
+        unique_ptr<PreEnvironmentPass> _preEnvironmentPass;
+        unique_ptr<BrdfLutPass> _brdfLutPass;
+        bool _recordIBL = false;
 
         FGTexture _mainColor;
         FGTexture _mainDepth;

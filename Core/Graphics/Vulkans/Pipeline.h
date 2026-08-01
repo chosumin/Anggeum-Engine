@@ -2,7 +2,6 @@
 
 namespace Core
 {
-	class RenderPass;
 	class Shader;
 	class PipelineState;
 
@@ -18,7 +17,6 @@ namespace Core
 	class Pipeline
 	{
 	public:
-		Pipeline(Device& device, RenderPass& renderPass, Shader& shader, PipelineState& pipelineState);
 		Pipeline(Device& device, const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState);
 		Pipeline(Device& device, Shader& shader);
 		~Pipeline();

@@ -9,8 +9,6 @@ namespace Core
     class CommandBuffer;
     class Shader;
     class Pipeline;
-    class RenderPass;
-    class Framebuffer;
     class DescriptorSetBuilder;
     class Scene;
     class Texture;

@@ -1,13 +1,10 @@
 #pragma once
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
-#include "Graphics/RenderFrame.h"
-#include "Graphics/Vulkans/RenderPass.h"
-#include "Graphics/Vulkans/Framebuffer.h"
-#include "Foundation/Job.h"
 
 namespace Core
 {
+    class Device;
     class Scene;
     class Pipeline;
     class PipelineState;
@@ -16,7 +13,12 @@ namespace Core
     class Texture;
     class Shader;
     class Buffer;
+    class CommandBuffer;
+    class FrameGraphPassContext;
 
+    // One-time IBL generator: renders the sky into the
+    // offscreen target per cubemap face/mip and copies it into the irradiance
+    // and prefiltered cubemaps.
     class PreEnvironmentPass
     {
     public:
@@ -25,37 +27,30 @@ namespace Core
         ~PreEnvironmentPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex);
+        void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
 
     private:
-        void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
-        void DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
+        void RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+        void RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+
+        void BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent);
 
     private:
         Device& _device;
         Scene& _scene;
 
-        unique_ptr<RenderPass> _renderPass;
         unique_ptr<PipelineState> _pipelineState;
 
         Texture* _colorRenderTarget;
         Texture* _irradianceCubemap;
         Texture* _prefilteredCubemap;
 
-        // Resolved on the main thread in the ctor; Draw() runs on a worker thread,
-        // so it must not resolve a handle through the pool. The pool owns the
-        // shaders for the app's lifetime, so these pointers stay valid. The
-        // materials are only needed for their shaders, so we keep just those.
         Shader* _irradianceShader = nullptr;
         Shader* _prefilteredShader = nullptr;
 
-        Pipeline* _irradiancePipeline = nullptr;
-        Pipeline* _prefilteredPipeline = nullptr;
+        unique_ptr<Pipeline> _irradiancePipeline;
+        unique_ptr<Pipeline> _prefilteredPipeline;
 
-        // Resolved from a Handle<SubMesh> on the main thread in Initialize(); Draw()
-        // runs on a worker thread, so it must not resolve the handle through the pool.
-        // The sky's vertex/index buffers are resolved to raw pointers there too (the
-        // SubMesh now holds Handle<Buffer>, so resolving in Draw would touch the pool).
         SubMesh* _sky = nullptr;
         vector<Buffer*> _irradianceVertexBuffers;
         vector<Buffer*> _prefilteredVertexBuffers;
@@ -66,20 +61,5 @@ namespace Core
         vector<mat4> _mvpMatrices;
         IrradianceDelta _delta;
         PrefilterEnv _prefilterEnv;
-
-        unique_ptr<Framebuffer> _framebuffer;
-    };
-
-    class PreEnvironmentJob : public Job
-    {
-    public:
-        PreEnvironmentJob(Device& device, PreEnvironmentPass& pass);
-        ~PreEnvironmentJob();
-
-        void Execute() override;
-
-    private:
-        PreEnvironmentPass& _pass;
-        RenderFrame _tempRenderFrame;
     };
 }

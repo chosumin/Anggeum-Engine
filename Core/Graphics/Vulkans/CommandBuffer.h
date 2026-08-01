@@ -1,13 +1,11 @@
 #pragma once
 #include "CommandPool.h"
 #include "BarrierBatch.h"
-#include "BarrierBatch2.h"
 #include "Graphics/SyncContext.h"
 
 namespace Core
 {
 	class Device;
-	class RenderPass;
 	class Pipeline;
 	class RenderFrame;
 	class Buffer;
@@ -15,7 +13,6 @@ namespace Core
 	class Image;
 	class Texture;
 	class Job;
-	class Framebuffer;
 	class MeshBufferManager;
 	struct DescriptorSetResources;
 
@@ -28,12 +25,8 @@ namespace Core
 		const VkCommandBuffer& GetHandle() const { return _commandBuffer; }
 
 		void ResetCommandBuffer();
-		void BeginCommandBuffer(VkCommandBufferUsageFlags flags, 
-			const RenderPass* renderPass, const Framebuffer* framebuffer, 
-			uint32_t subpassIndex, uint32_t imageIndex);
-		void BeginCommandBuffer(bool isSingleTime = false);
+		void BeginCommandBuffer(VkCommandBufferUsageFlags flags = 0);
 		void ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers);
-		void BeginRenderPass(VkRenderPassBeginInfo renderPassInfo);
 		void BeginRendering(const VkRenderingInfo& renderingInfo);
 		void EndRendering();
 		void BindPipeline(const Pipeline* pipeline);
@@ -68,7 +61,6 @@ namespace Core
 		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
 
 		BarrierBatch CreateBarrierBatch();
-		BarrierBatch2 CreateBarrierBatch2();
 
 		void CopyBuffer(Buffer& srcBuffer, Buffer& dstBuffer,
 			VkDeviceSize dstOffset = 0, VkDeviceSize srcOffset = 0, VkDeviceSize size = 0);
@@ -78,7 +70,6 @@ namespace Core
 			uint32_t dstMipLevel, uint32_t dstLayer);
 		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height);
 		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
-		void EndRenderPass();
 		void EndCommandBuffer();
 
 		void UpdateFrame(uint64_t frame) { _frame = frame; }

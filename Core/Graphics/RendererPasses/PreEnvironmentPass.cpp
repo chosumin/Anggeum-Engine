@@ -9,6 +9,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
+#include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Material.h"
 #include "Graphics/ResourceManager.h"
@@ -22,7 +23,6 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene,
     Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
     : _device(device)
     , _scene(scene)
-    , _renderPass(make_unique<RenderPass>(device))
     , _pipelineState(make_unique<PipelineState>())
     , _colorRenderTarget(offscreen)
     , _irradianceCubemap(irradianceCubemap)
@@ -30,17 +30,9 @@ Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene,
     , _irradianceShader(&device.GetResourceManager().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
     , _prefilteredShader(&device.GetResourceManager().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
 {
-    _renderPass->CreateColorAttachment(offscreen, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
-    _renderPass->CreateRenderPass();
-
-    _framebuffer = make_unique<Framebuffer>(_device, *_renderPass, vector<Texture*>{ offscreen });
 }
 
-Core::PreEnvironmentPass::~PreEnvironmentPass()
-{
-    delete(_irradiancePipeline);
-    delete(_prefilteredPipeline);
-}
+Core::PreEnvironmentPass::~PreEnvironmentPass() = default;
 
 void Core::PreEnvironmentPass::Initialize()
 {
@@ -58,7 +50,7 @@ void Core::PreEnvironmentPass::Initialize()
     if (it != meshes.end())
     {
         auto skybox = *it;
-        
+
         _sky = &skybox->GetSubMeshes()[0].Get();
         auto& material = skybox->GetMaterials()[0].Get();
         skyCubemap = material.GetTexture(1);
@@ -69,11 +61,14 @@ void Core::PreEnvironmentPass::Initialize()
         depthInfo.depthWriteEnable = VK_FALSE;
         depthInfo.depthTestEnable = VK_FALSE;
 
-        _irradiancePipeline = new Pipeline(_device, *_renderPass, *_irradianceShader, pipelineState);
-        _prefilteredPipeline = new Pipeline(_device, *_renderPass, *_prefilteredShader, pipelineState);
+        PipelineRenderingDesc renderingDesc;
+        renderingDesc.colorFormats = { _colorRenderTarget->GetFormat() };
 
-        // Resolve the sky's vertex/index buffers here (main thread) so Draw() on the
-        // worker thread binds raw pointers instead of resolving pool handles.
+        _irradiancePipeline = make_unique<Pipeline>(_device, renderingDesc, *_irradianceShader, pipelineState);
+        _prefilteredPipeline = make_unique<Pipeline>(_device, renderingDesc, *_prefilteredShader, pipelineState);
+
+        // Resolve the sky's vertex/index buffers here (main thread) so Record() on
+        // the worker thread binds raw pointers instead of resolving pool handles.
         _irradianceVertexBuffers = _sky->GetVertexBuffers(_irradianceShader->GetVertexAttirbuteNames());
         _prefilteredVertexBuffers = _sky->GetVertexBuffers(_prefilteredShader->GetVertexAttirbuteNames());
         _skyIndexBuffer = &_sky->GetIndexBuffer();
@@ -95,13 +90,36 @@ void Core::PreEnvironmentPass::Initialize()
     _skyCubemap = skyCubemap;
 }
 
-void Core::PreEnvironmentPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+void Core::PreEnvironmentPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-    DrawIrradiance(renderFrame, commandBuffer);
-    DrawPrefiltered(renderFrame, commandBuffer);
+    if (_sky == nullptr)
+        return;
+
+    RecordIrradiance(context, commandBuffer);
+    RecordPrefiltered(context, commandBuffer);
 }
 
-void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
+void Core::PreEnvironmentPass::BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent)
+{
+    VkRenderingAttachmentInfo colorAttachment{};
+    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachment.imageView = _colorRenderTarget->GetImageView();
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea = { { 0, 0 }, extent };
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
+
+    commandBuffer.BeginRendering(renderingInfo);
+}
+
+void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     auto& shader = *_irradianceShader;
 
@@ -109,6 +127,9 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
         .Image(*_irradianceCubemap,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .Image(*_colorRenderTarget,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
         .Submit();
 
     uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
@@ -127,16 +148,15 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
 
             commandBuffer.SetViewportAndScissor(mipExtent);
 
-            auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
-            commandBuffer.BeginRenderPass(beginInfo);
+            BeginOffscreenRendering(commandBuffer, mipExtent);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
             commandBuffer.PushConstants(shader, 0, viewProjection);
             commandBuffer.PushConstants(shader, 1, _delta);
 
-            commandBuffer.BindPipeline(_irradiancePipeline);
+            commandBuffer.BindPipeline(_irradiancePipeline.get());
 
-            auto irradianceBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader, 0);
+            auto irradianceBuilder = context.CreateDescriptorSetBuilder(shader, 0);
             irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& irradianceResources = irradianceBuilder.Build();
             commandBuffer.BindDescriptorSet(
@@ -147,7 +167,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
             commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
-            commandBuffer.EndRenderPass();
+            commandBuffer.EndRendering();
 
             commandBuffer.CreateBarrierBatch()
                 .Image(*_colorRenderTarget,
@@ -155,7 +175,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
                 .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget, 
+            commandBuffer.CopyImage(*_colorRenderTarget,
                 *_irradianceCubemap, 0, 0, m, layer);
 
             commandBuffer.CreateBarrierBatch()
@@ -173,7 +193,7 @@ void Core::PreEnvironmentPass::DrawIrradiance(RenderFrame& renderFrame, CommandB
         .Submit();
 }
 
-void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
+void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     auto& shader = *_prefilteredShader;
 
@@ -199,8 +219,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
 
             commandBuffer.SetViewportAndScissor(mipExtent);
 
-            auto beginInfo = _renderPass->CreateRenderPassBeginInfo(*_framebuffer);
-            commandBuffer.BeginRenderPass(beginInfo);
+            BeginOffscreenRendering(commandBuffer, mipExtent);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
             commandBuffer.PushConstants(shader, 0, viewProjection);
@@ -208,9 +227,9 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             _prefilterEnv.Roughness = (float)m / (float)(mipLevels - 1);
             commandBuffer.PushConstants(shader, 1, _prefilterEnv);
 
-            commandBuffer.BindPipeline(_prefilteredPipeline);
+            commandBuffer.BindPipeline(_prefilteredPipeline.get());
 
-            auto prefilteredBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(shader, 0);
+            auto prefilteredBuilder = context.CreateDescriptorSetBuilder(shader, 0);
             prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
             auto& prefilteredResources = prefilteredBuilder.Build();
             commandBuffer.BindDescriptorSet(
@@ -221,7 +240,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             commandBuffer.BindIndexBuffer(*_skyIndexBuffer, _skyIndexType);
             commandBuffer.DrawIndexed(_sky->GetIndexCount(), 1);
 
-            commandBuffer.EndRenderPass();
+            commandBuffer.EndRendering();
 
             commandBuffer.CreateBarrierBatch()
                 .Image(*_colorRenderTarget,
@@ -229,7 +248,7 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
                 .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget, 
+            commandBuffer.CopyImage(*_colorRenderTarget,
                 *_prefilteredCubemap, 0, 0, m, layer);
 
             commandBuffer.CreateBarrierBatch()
@@ -245,23 +264,4 @@ void Core::PreEnvironmentPass::DrawPrefiltered(RenderFrame& renderFrame, Command
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         .Submit();
-}
-
-Core::PreEnvironmentJob::PreEnvironmentJob(Device& device, PreEnvironmentPass& pass)
-    : Job(JobType::GRAPHICS_PRIMARY)
-    , _pass(pass)
-    , _tempRenderFrame(device)
-{
-    _pass.Initialize();
-}
-
-Core::PreEnvironmentJob::~PreEnvironmentJob()
-{
-}
-
-void Core::PreEnvironmentJob::Execute()
-{
-    _pass.Draw(_tempRenderFrame, *commandBuffer, 0);
-
-    status = JobStatus::COMPLETE;
 }

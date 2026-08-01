@@ -5,8 +5,6 @@
 #include "Shader.h"
 #include "Buffer.h"
 #include "Texture.h"
-#include "RenderPass.h"
-#include "Framebuffer.h"
 #include "Image.h"
 #include "BindlessTextureManager.h"
 #include "DescriptorPool.h"
@@ -37,26 +35,18 @@ void Core::CommandBuffer::ResetCommandBuffer()
     vkResetCommandBuffer(_commandBuffer, 0);
 }
 
-void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, const RenderPass* renderPass, const Framebuffer* framebuffer, uint32_t subpassIndex, uint32_t imageIndex)
+void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = flags;
 
+	// Secondary command buffers are only recorded outside render/rendering
+	// scopes (transfer jobs), so the inheritance info carries no render pass.
 	VkCommandBufferInheritanceInfo inheritanceInfo = {};
 	if (_level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)
 	{
 		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-
-		inheritanceInfo.renderPass = renderPass != nullptr ?
-			renderPass->GetHandle() : VK_NULL_HANDLE;
-		inheritanceInfo.framebuffer = framebuffer != nullptr ?
-			framebuffer->GetHandle() : VK_NULL_HANDLE;
-		inheritanceInfo.subpass = subpassIndex;
-		inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-		inheritanceInfo.queryFlags = 0;
-		inheritanceInfo.pipelineStatistics = 0;
-
 		beginInfo.pInheritanceInfo = &inheritanceInfo;
 	}
 
@@ -65,18 +55,6 @@ void Core::CommandBuffer::BeginCommandBuffer(VkCommandBufferUsageFlags flags, co
 		throw std::runtime_error("failed to begin recording command buffer!");
 }
 
-void Core::CommandBuffer::BeginCommandBuffer(bool isSingleTime)
-{
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-	if (isSingleTime)
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	auto result = vkBeginCommandBuffer(_commandBuffer, &beginInfo);
-	if (result != VK_SUCCESS)
-		throw std::runtime_error("failed to begin recording command buffer!");
-}
 
 void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers)
 {
@@ -92,10 +70,6 @@ void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryComma
         secondaries.data());
 }
 
-void Core::CommandBuffer::BeginRenderPass(VkRenderPassBeginInfo renderPassInfo)
-{
-    vkCmdBeginRenderPass(_commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-}
 
 void Core::CommandBuffer::BeginRendering(const VkRenderingInfo& renderingInfo)
 {
@@ -384,10 +358,6 @@ void Core::CommandBuffer::GenerateMipmaps(Texture& texture, uint32_t mipLevels)
         1, &barrier);
 }
 
-void Core::CommandBuffer::EndRenderPass()
-{
-    vkCmdEndRenderPass(_commandBuffer);
-}
 
 void Core::CommandBuffer::EndCommandBuffer()
 {
@@ -447,11 +417,6 @@ void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDevi
 Core::BarrierBatch Core::CommandBuffer::CreateBarrierBatch()
 {
 	return BarrierBatch(*this, _device, _queueFamilyIndex);
-}
-
-Core::BarrierBatch2 Core::CommandBuffer::CreateBarrierBatch2()
-{
-	return BarrierBatch2(*this, _device, _queueFamilyIndex);
 }
 
 void Core::CommandBuffer::BeginDebugMarker(const char* markerName, float r, float g, float b, float a)

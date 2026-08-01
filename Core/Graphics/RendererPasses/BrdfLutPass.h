@@ -1,15 +1,16 @@
 #pragma once
-#include "Graphics/RenderFrame.h"
-#include "Graphics/Vulkans/RenderPass.h"
-#include "Graphics/Vulkans/Framebuffer.h"
-#include "Foundation/Job.h"
 
 namespace Core
 {
+    class Device;
+    class Texture;
     class Material;
     class Pipeline;
     class PipelineState;
+    class CommandBuffer;
 
+    // One-time BRDF LUT generator (dynamic rendering): fullscreen triangle into
+    // the LUT target.
     class BrdfLutPass
     {
     public:
@@ -17,29 +18,15 @@ namespace Core
         ~BrdfLutPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex);
+        void Record(CommandBuffer& commandBuffer);
 
     private:
         Device& _device;
+        Texture* _brdfLut;
 
-        unique_ptr<RenderPass> _renderPass;
         unique_ptr<PipelineState> _pipelineState;
-        unique_ptr<Framebuffer> _framebuffer;
 
         Material* _brdfMaterial = nullptr;
-        Pipeline* _brdfPipeline = nullptr;
-    };
-
-    class BrdfLutJob : public Job
-    {
-    public:
-        BrdfLutJob(Device& device, BrdfLutPass& pass);
-        ~BrdfLutJob();
-
-        void Execute() override;
-
-    private:
-        BrdfLutPass& _pass;
-        RenderFrame _tempRenderFrame;
+        unique_ptr<Pipeline> _brdfPipeline;
     };
 }

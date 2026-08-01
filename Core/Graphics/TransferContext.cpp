@@ -73,8 +73,7 @@ void Core::TransferContext::Wait()
 	vkResetFences(_device.GetDevice(), 1, &_inFlightFences[_currentFrame]);
 
 	auto& primary = _primaryCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-		nullptr, nullptr, 0, _currentFrame);
+	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 	size_t commandBufferCount = _pendingJobs.size();
 	vector<CommandBuffer*> secondaryCommands(commandBufferCount);

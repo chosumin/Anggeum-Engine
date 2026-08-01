@@ -99,7 +99,7 @@ namespace Core
 	{
 	    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
-	    commandBuffer.BeginCommandBuffer(true);
+	    commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 	    return commandBuffer;
 	}

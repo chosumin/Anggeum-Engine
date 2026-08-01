@@ -133,7 +133,7 @@ void RenderContext::Submit()
 	if (frameResources.HasPendingInit())
 	{
 		auto& initCommandBuffer = RequestCommandBuffer();
-		initCommandBuffer.BeginCommandBuffer(true);
+		initCommandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 		frameResources.ExecutePendingInit(initCommandBuffer);
 

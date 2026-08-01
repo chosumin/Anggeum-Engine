@@ -7,8 +7,6 @@ namespace Core
 {
 	class Device;
 	class Texture;
-	class Framebuffer;
-	class RenderPass;
 	class Sampler;
 	class Shader;
 	class DescriptorPool;
@@ -105,10 +103,6 @@ namespace Core
 			return GetOrCreateUniformBuffer(name, sizeof(T));
 		}
 
-		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
-			const vector<string>& attachmentNames, int32_t layerIndex = -1);
-		Framebuffer* GetFramebuffer(const string& name) const;
-		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);
 
 		// Create a DescriptorSetBuilder for the given shader and set index. It
 		// allocates from this frame's descriptor pool, which Reset() recycles.
@@ -176,7 +170,6 @@ namespace Core
 
 		Handle<Sampler> _defaultSampler;
 
-		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
 
 		// UNDEFINED -> requested starting layout for targets created this frame.
 		// Cleared as they are recorded.

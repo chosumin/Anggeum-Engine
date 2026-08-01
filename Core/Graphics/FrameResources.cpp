@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "FrameResources.h"
 #include "Vulkans/Buffer.h"
-#include "Vulkans/Framebuffer.h"
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/Image.h"
 #include "Vulkans/Texture.h"
@@ -314,64 +313,3 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 	return handle;
 }
 
-Framebuffer* FrameResources::GetOrCreateFramebuffer(const string& name,
-	RenderPass& renderPass, const vector<string>& attachmentNames, int32_t layerIndex)
-{
-	auto it = _framebuffers.find(name);
-	if (it != _framebuffers.end())
-		return it->second.get();
-
-	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
-
-	vector<VkImageView> imageViews;
-	VkExtent2D extent = { 0, 0 };
-
-	for (const auto& attachmentName : attachmentNames)
-	{
-		auto textureHandle = GetRenderTarget(attachmentName);
-		if (textureHandle.IsValid())
-		{
-			auto& texture = textureHandle.Get();
-			if (layerIndex >= 0)
-			{
-				// Use single layer image view for array textures
-				imageViews.push_back(texture.GetLayerImageView(
-					static_cast<uint32_t>(layerIndex)));
-			}
-			else
-			{
-				// Use full image view (default behavior)
-				imageViews.push_back(texture.GetImageView());
-			}
-
-			if (extent.width == 0)
-			{
-				auto texExtent = texture.GetExtent();
-				extent = { texExtent.width, texExtent.height };
-			}
-		}
-	}
-
-	if (imageViews.empty())
-		return nullptr;
-
-	// Create framebuffer with explicit image views
-	auto framebuffer = make_unique<Framebuffer>(_device, renderPass, imageViews, extent);
-
-	auto* result = framebuffer.get();
-	_framebuffers[name] = std::move(framebuffer);
-	return result;
-}
-
-Framebuffer* FrameResources::GetFramebuffer(const string& name) const
-{
-	auto it = _framebuffers.find(name);
-	if (it != _framebuffers.end())
-		return it->second.get();
-	return nullptr;
-}
-
-void FrameResources::RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer)
-{
-	_framebuffers[name] = std::move(framebuffer);
-}

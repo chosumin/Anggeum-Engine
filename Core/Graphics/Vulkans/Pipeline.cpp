@@ -1,15 +1,7 @@
 #include "stdafx.h"
 #include "Pipeline.h"
-#include "RenderPass.h"
 #include "Shader.h"
 #include "PipelineState.h"
-
-Core::Pipeline::Pipeline(Device& device,
-	RenderPass& renderPass, Shader& shader, PipelineState& pipelineState)
-	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
-{
-	CreateGraphicsPipeline(renderPass.GetHandle(), nullptr, shader, pipelineState);
-}
 
 Core::Pipeline::Pipeline(Device& device,
 	const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState)
