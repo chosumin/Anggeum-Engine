@@ -70,6 +70,8 @@ void Core::WorkerThread::Run()
 
 			commandBuffer->EndCommandBuffer();
 
+			pendingJob->status = JobStatus::COMPLETE;
+
 			pendingJob->completionWait->notify_one();
 		}
 	}

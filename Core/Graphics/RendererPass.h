@@ -6,10 +6,11 @@
 #include "RenderFrame.h"
 #include "SyncContext.h"
 #include "Foundation/WorkerThread.h"
+#include "Foundation/Threadable.h"
 
 namespace Core
 {
-	class RendererPass
+	class RendererPass : public Threadable
 	{
 	public:
 		RendererPass(Device& device, WorkerThreadManager& workerThreadManager);
@@ -21,18 +22,13 @@ namespace Core
 
 		virtual QueueType GetQueueType() const { return QueueType::Graphics; }
 	protected:
-		void Enqueue(Job* job);
+		// Threadable::WaitForJobs plus the pass-side generation timer.
 		void Wait();
 	protected:
 		Device& _device;
 		RenderPass* _renderPass;
 		PipelineState* _pipelineState;
 
-		vector<Job*> _pendingJobs;
-		WorkerThreadManager& _workerThreadManager;
 		Core::Timer _timer;
-	private:
-		condition_variable _fenceWait;
-		mutex _lock;
 	};
 }

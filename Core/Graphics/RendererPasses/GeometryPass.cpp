@@ -279,21 +279,19 @@ namespace Core
     {
         _timer.tick();
 
-        auto preEnvironmentPass = new PreEnvironmentPass(_device, _workerThreadManager, _scene, 
+        auto preEnvironmentPass = new PreEnvironmentPass(_device, GetWorkerThreadManager(), _scene,
             &_offscreenTexture.Get(), &_irradianceCubemap.Get(), &_prefilteredCubemap.Get());
-        auto preEnvironmentJob = new PreEnvironmentJob(_device, *preEnvironmentPass);
-        Enqueue(preEnvironmentJob);
+        Enqueue(make_unique<PreEnvironmentJob>(_device, *preEnvironmentPass));
 
-        auto brdf = new BrdfLutPass(_device, _workerThreadManager, &_brdfLut.Get());
-        auto brdfJob = new BrdfLutJob(_device, *brdf);
-        Enqueue(brdfJob);
+        auto brdf = new BrdfLutPass(_device, GetWorkerThreadManager(), &_brdfLut.Get());
+        Enqueue(make_unique<BrdfLutJob>(_device, *brdf));
 
         Wait();
 
         const size_t commandSize = 2;
         vector<VkCommandBuffer> commands(commandSize);
-        commands[0] = preEnvironmentJob->commandBuffer->GetHandle();
-        commands[1] = brdfJob->commandBuffer->GetHandle();
+        commands[0] = GetJob(0)->commandBuffer->GetHandle();
+        commands[1] = GetJob(1)->commandBuffer->GetHandle();
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -317,9 +315,11 @@ namespace Core
         vkDestroyFence(_device.GetDevice(), fence, nullptr);
 
         delete(brdf);
-        delete(brdfJob);
         delete(preEnvironmentPass);
-        delete(preEnvironmentJob);
+
+        // The fence wait above guarantees the GPU is done with the jobs'
+        // command buffers, so the Threadable-owned jobs can go now.
+        ClearJobs();
     }
 
     void GeometryPass::RegisterGiTexturesToBindless(RenderFrame& renderFrame)

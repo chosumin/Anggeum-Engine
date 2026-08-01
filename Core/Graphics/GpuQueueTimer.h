@@ -64,6 +64,12 @@ namespace Core
 			uint32_t passIndex, QueueType queue, const char* name);
 		void EndPass(CommandBuffer& commandBuffer, uint32_t frameIndex, uint32_t passIndex);
 
+		// Multithreaded recording split: the main thread registers the pass slot
+		// (mutates the frame record), workers only write the command-buffer-local
+		// timestamps.
+		void RegisterPass(uint32_t frameIndex, uint32_t passIndex, QueueType queue, const char* name);
+		void WriteBeginTimestamp(CommandBuffer& commandBuffer, uint32_t frameIndex, uint32_t passIndex);
+
 		// Only meaningful once this slot's GPU work is known to have completed.
 		QueueTimings Resolve(uint32_t frameIndex);
 
