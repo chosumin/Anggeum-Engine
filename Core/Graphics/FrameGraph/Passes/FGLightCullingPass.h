@@ -34,17 +34,9 @@ namespace Core
 		Handle<Material> _computeMaterial;
 		unique_ptr<Pipeline> _computePipeline;
 
-		// Refreshed by Setup every frame.
 		FGTexture _depth;
 		FGBuffer _lightVisibility;
-
-		// Migration bridge: duplicates _depth only because the depth target is a
-		// FrameResources-owned import (legacy consumers) and DescriptorSetBuilder
-		// wants a pool handle. Goes away when the resource becomes a graph
-		// transient/history resource.
-		Handle<Texture> _depthHandle;
-		Buffer* _lightVisibilityBuffer = nullptr;
-		Buffer* _cameraBuffer = nullptr;
-		Buffer* _lightBuffer = nullptr;
+		FGBuffer _camera;
+		FGBuffer _lights;
 	};
 }

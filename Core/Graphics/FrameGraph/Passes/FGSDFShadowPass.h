@@ -58,7 +58,6 @@ namespace Core
 		FGShadowPass& _shadowPass;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
-		Handle<Texture> _sdfShadowTexture;
 
 		Handle<Shader> _sdfShadowShader;
 		unique_ptr<Pipeline> _sdfShadowPipeline;
@@ -66,16 +65,14 @@ namespace Core
 		// Volume visualization
 		Handle<Shader> _volumeSliceShader;
 		unique_ptr<Pipeline> _volumeSlicePipeline;
-		Handle<Texture> _volumeSliceTexture;
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
 
-		// Stashed per frame in Setup, consumed by Execute on the worker.
 		FGTexture _sdfShadow;
 		FGTexture _volumeSlice;
-		Handle<Texture> _depthHandle;
-		Buffer* _cameraBuffer = nullptr;
-		Buffer* _sdfParamsBuffer = nullptr;
+		FGTexture _depth;
+		FGBuffer _camera;
+		FGBuffer _sdfParamsBuffer;
 		VolumeRaytracePushConstants _slicePushConstants{};
 		bool _sliceReady = false;
 

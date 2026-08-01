@@ -51,10 +51,9 @@ namespace Core
 		ShadowUniform _shadowBuffer;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeViews{};
 
-		// Stashed per frame in Setup, consumed by Execute on the worker.
 		FGTexture _shadowDepth;
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
 		array<FrustumCuller*, SHADOW_MAP_CASCADE_COUNT> _cullers{};
-		array<Buffer*, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;

@@ -127,10 +127,10 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	sdfShadowDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 	sdfShadowDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 	
-	// This may be sampled before the first compute production, 
+	// This may be sampled before the first compute production,
 	// so start it in the layout the consumer expects.
 	sdfShadowDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	_sdfShadowTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
+	auto sdfShadowTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_SHADOW, sdfShadowDesc);
 
 	// Volume raytrace debug texture - match screen aspect ratio
 	float aspect = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
@@ -143,7 +143,7 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	sliceDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 	sliceDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 	sliceDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	_volumeSliceTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
+	auto volumeSliceTexture = frameResources.GetOrCreateRenderTarget(RT_SDF_VOLUME_SLICE, sliceDesc);
 
 	// No SDF volume yet (no cache file and the batch wasn't ready): declare
 	// nothing so the pass culls itself this frame.
@@ -155,29 +155,30 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	const char* depthName = _msaaSamples != VK_SAMPLE_COUNT_1_BIT
 		? FGResolvePass::RT_RESOLVED_DEPTH
 		: FGDepthPrePass::RT_MAIN_DEPTH;
-	_depthHandle = frameResources.GetRenderTarget(depthName);
-	builder.Read(builder.GetTexture(depthName), TextureAccess::SampledCompute);
+	_depth = builder.GetTexture(depthName);
+	builder.Read(_depth, TextureAccess::SampledCompute);
 
-	// Legacy GeometryPass samples the mask assuming SHADER_READ_ONLY, so the
-	// graph exports it back to that layout after the storage write.
-	_sdfShadow = builder.ImportTexture(RT_SDF_SHADOW, _sdfShadowTexture,
+	_sdfShadow = builder.ImportTexture(RT_SDF_SHADOW, sdfShadowTexture,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	builder.Write(_sdfShadow, TextureAccess::StorageComputeWrite);
 
 	UpdateSDFParams();
 
-	_cameraBuffer = &frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+	_camera = builder.ImportBuffer(UB_CAMERA,
+		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
+	builder.Read(_camera, BufferAccess::UniformCompute);
 
-	auto& sdfParamsBuffer =
-		frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params").Get();
-	sdfParamsBuffer.Update(_sdfParams);
-	_sdfParamsBuffer = &sdfParamsBuffer;
+	auto sdfParamsHandle =
+		frameResources.GetOrCreateUniformBuffer<SDFShadowUniform>("SDFShadowPass.Params");
+	sdfParamsHandle.Get().Update(_sdfParams);
+	_sdfParamsBuffer = builder.ImportBuffer("SDFShadowPass.Params", sdfParamsHandle);
+	builder.Read(_sdfParamsBuffer, BufferAccess::UniformCompute);
 
 	// Volume raytrace debug view (ImGui samples it in the GUI pass).
 	if (PerspectiveCamera* camera = _scene.GetMainCamera())
 	{
-		_volumeSlice = builder.ImportTexture(RT_SDF_VOLUME_SLICE, _volumeSliceTexture,
+		_volumeSlice = builder.ImportTexture(RT_SDF_VOLUME_SLICE, volumeSliceTexture,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		builder.Write(_volumeSlice, TextureAccess::StorageComputeWrite);
@@ -210,11 +211,11 @@ void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 	// GENERAL and made the depth visible to compute.
 	auto& sdfShadowShader = _sdfShadowShader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(sdfShadowShader, 0);
-	builder.SetUniformBuffer(0, *_cameraBuffer);
+	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 	builder.SetTextureBuffer(1, sdfTexture);
-	builder.SetUniformBuffer(2, *_sdfParamsBuffer);
-	builder.SetTextureBuffer(3, _depthHandle);
-	builder.SetTextureBuffer(4, _sdfShadowTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetUniformBuffer(2, context.GetBuffer(_sdfParamsBuffer));
+	builder.SetTextureBuffer(3, context.GetTexture(_depth));
+	builder.SetTextureBuffer(4, context.GetTexture(_sdfShadow), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetStorageBuffer(5, *_sdfGenerator->GetBoundsBuffer());
 	auto& resources = builder.Build();
 
@@ -234,7 +235,7 @@ void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 		auto& volumeSliceShader = _volumeSliceShader.Get();
 		auto sliceBuilder = context.CreateDescriptorSetBuilder(volumeSliceShader, 0);
 		sliceBuilder.SetTextureBuffer(0, sdfTexture);
-		sliceBuilder.SetTextureBuffer(1, _volumeSliceTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+		sliceBuilder.SetTextureBuffer(1, context.GetTexture(_volumeSlice), 0, VK_IMAGE_LAYOUT_GENERAL);
 		sliceBuilder.SetStorageBuffer(2, *_sdfGenerator->GetBoundsBuffer());
 		auto& sliceResources = sliceBuilder.Build();
 
@@ -272,26 +273,30 @@ void FGSDFShadowPass::OnGUI(RenderFrame& renderFrame)
 	float aspect     = static_cast<float>(_screenExtent.width) / static_cast<float>(_screenExtent.height);
 	float previewWidth = DEBUG_SLICE_HEIGHT * aspect;
 
-	if (_sdfShadowTexture.IsValid() && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
+	// Preview targets are looked up by name: the pass keeps no pool handles.
+	auto sdfShadowTexture = renderFrame.GetResources().GetRenderTarget(RT_SDF_SHADOW);
+	auto volumeSliceTexture = renderFrame.GetResources().GetRenderTarget(RT_SDF_VOLUME_SLICE);
+
+	if (sdfShadowTexture.IsValid() && ImGui::CollapsingHeader("Shadow Map", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		if (_sdfShadowImGuiDS == VK_NULL_HANDLE)
 		{
 			_sdfShadowImGuiDS = ImGui_ImplVulkan_AddTexture(
-				_sdfShadowTexture.Get().GetVkSampler(),
-				_sdfShadowTexture.Get().GetImageView(),
+				sdfShadowTexture.Get().GetVkSampler(),
+				sdfShadowTexture.Get().GetImageView(),
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 		ImGui::Image(static_cast<ImTextureID>(_sdfShadowImGuiDS),
 			ImVec2(previewWidth, DEBUG_SLICE_HEIGHT));
 	}
 
-	if (_volumeSliceTexture.IsValid() && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
+	if (volumeSliceTexture.IsValid() && ImGui::CollapsingHeader("Volume Raytrace", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		if (_volumeSliceImGuiDS == VK_NULL_HANDLE)
 		{
 			_volumeSliceImGuiDS = ImGui_ImplVulkan_AddTexture(
-				_volumeSliceTexture.Get().GetVkSampler(),
-				_volumeSliceTexture.Get().GetImageView(),
+				volumeSliceTexture.Get().GetVkSampler(),
+				volumeSliceTexture.Get().GetImageView(),
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 		ImGui::SliderFloat("Hit Threshold", &_debugHitThreshold, 0.001f, 0.1f, "%.4f");

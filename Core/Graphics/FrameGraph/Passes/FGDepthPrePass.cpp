@@ -127,7 +127,11 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	builder.SetManualRendering();
 	builder.SetSideEffect();
 
-	_cameraBuffer = &frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
+	// CPU-written frame input, imported so Execute can resolve it through the
+	// context like every other resource.
+	_camera = builder.ImportBuffer(UB_CAMERA,
+		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
+	builder.Read(_camera, BufferAccess::UniformVertex);
 
 	// Stashed per frame:
 	// the executor caches one culler per (camera, batch), so the pass keeps its
@@ -147,7 +151,7 @@ void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
 	auto& depthNormalShader = _depthNormalShader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
-	builder.SetUniformBuffer(0, *_cameraBuffer);
+	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 
 	auto& executor = context.GetRenderExecutor();
 	executor.OcclusionCullAndDraw(

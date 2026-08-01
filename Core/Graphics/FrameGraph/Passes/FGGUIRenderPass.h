@@ -31,7 +31,6 @@ namespace Core
 
         VkDescriptorPool _pool = VK_NULL_HANDLE;
 
-        // Stashed per frame in Setup, consumed by Execute on the worker.
-        Handle<Texture> _mainColorTexture;
+        FGTexture _mainColor;
     };
 }

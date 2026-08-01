@@ -89,12 +89,12 @@ void FGGUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
     colorDesc.samples = _msaaSamples;
     colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     colorDesc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    _mainColorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+    auto mainColorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 
-    FGTexture mainColor = builder.ImportTexture(RT_MAIN_COLOR, _mainColorTexture,
+    _mainColor = builder.ImportTexture(RT_MAIN_COLOR, mainColorTexture,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    builder.Write(mainColor, TextureAccess::ColorLoadWrite);
+    builder.Write(_mainColor, TextureAccess::ColorLoadWrite);
 
     // The resolve target is the raw swapchain image (no graph declaration) and
     // ImGui's draw data is external state.
@@ -123,7 +123,7 @@ void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = _mainColorTexture.Get().GetImageView();
+    colorAttachment.imageView = context.GetTexture(_mainColor).GetImageView();
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

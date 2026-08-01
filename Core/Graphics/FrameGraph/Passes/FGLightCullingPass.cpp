@@ -38,23 +38,23 @@ void FGLightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frame
 		? FGResolvePass::RT_RESOLVED_DEPTH
 		: FGDepthPrePass::RT_MAIN_DEPTH;
 
-	_depthHandle = frameResources.GetRenderTarget(depthName);
 	_depth = builder.GetTexture(depthName);
 	builder.Read(_depth, TextureAccess::SampledCompute);
 
 	BufferDesc desc{};
 	desc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
 	auto lightVisibilityHandle = frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, desc);
-	_lightVisibilityBuffer = &lightVisibilityHandle.Get();
 
-	// Legacy GeometryPass consumes this buffer with its own acquire barrier and
-	// compute-timeline wait, so no export barrier is needed — importing it keeps
-	// the pass alive and lets the registry carry cross-frame write state.
 	_lightVisibility = builder.ImportBuffer(SB_LIGHT_VISIBILITY, lightVisibilityHandle);
 	builder.Write(_lightVisibility, BufferAccess::StorageComputeWrite);
 
-	_cameraBuffer = &frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
-	_lightBuffer = &frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
+	_camera = builder.ImportBuffer(UB_CAMERA,
+		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
+	builder.Read(_camera, BufferAccess::UniformCompute);
+
+	_lights = builder.ImportBuffer(UB_LIGHTS,
+		frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS));
+	builder.Read(_lights, BufferAccess::UniformCompute);
 }
 
 void FGLightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -62,10 +62,10 @@ void FGLightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& 
 	auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();
 
 	auto builder = context.CreateDescriptorSetBuilder(computeShader, 0);
-	builder.SetUniformBuffer(0, *_cameraBuffer);
-	builder.SetStorageBuffer(1, *_lightVisibilityBuffer);
-	builder.SetTextureBuffer(2, _depthHandle);
-	builder.SetUniformBuffer(3, *_lightBuffer);
+	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
+	builder.SetStorageBuffer(1, context.GetBuffer(_lightVisibility));
+	builder.SetTextureBuffer(2, context.GetTexture(_depth));
+	builder.SetUniformBuffer(3, context.GetBuffer(_lights));
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(_computePipeline.get());

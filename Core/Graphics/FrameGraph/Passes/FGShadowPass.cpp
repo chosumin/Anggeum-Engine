@@ -258,10 +258,12 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	{
 		// Each cascade binds binding 0 with a different view, and all four
 		// descriptor sets are consumed after submit, so they need separate buffers.
-		auto& cascadeBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(
-			"ShadowPass.Cascade" + std::to_string(i)).Get();
-		cascadeBuffer.Update(_cascadeViews[i]);
-		_cascadeBuffers[i] = &cascadeBuffer;
+		string cascadeName = "ShadowPass.Cascade" + std::to_string(i);
+		auto cascadeHandle = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(cascadeName);
+		cascadeHandle.Get().Update(_cascadeViews[i]);
+
+		_cascadeBuffers[i] = builder.ImportBuffer(cascadeName, cascadeHandle);
+		builder.Read(_cascadeBuffers[i], BufferAccess::UniformVertex);
 
 		_cullers[i] = renderExecutor.PrepareFrustumCuller(_cascadeViews[i]);
 	}
@@ -304,7 +306,7 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 		}
 
 		auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-		builder.SetUniformBuffer(0, *_cascadeBuffers[cascadeIndex]);
+		builder.SetUniformBuffer(0, context.GetBuffer(_cascadeBuffers[cascadeIndex]));
 
 		string passName = "Shadow Cascade " + std::to_string(cascadeIndex);
 		commandBuffer.BeginDebugMarker(passName.c_str());

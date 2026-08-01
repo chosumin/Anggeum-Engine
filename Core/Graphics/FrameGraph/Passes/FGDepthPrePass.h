@@ -38,11 +38,10 @@ namespace Core
 		unique_ptr<PipelineState> _pipelineState;
 		unique_ptr<Pipeline> _pipeline;
 
-		// Refreshed by Setup every frame.
 		FGTexture _mainNormal;
 		FGTexture _mainDepth;
 		FGTexture _resolvedDepth;
-		Buffer* _cameraBuffer = nullptr;
+		FGBuffer _camera;
 
 		// Prepared on the main thread by Setup (culler creation mutates resource
 		// pools); nullptr when there is nothing to draw this frame.

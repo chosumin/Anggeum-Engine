@@ -35,19 +35,9 @@ namespace Core
 		Handle<Shader> _normalResolveShader;
 		unique_ptr<Pipeline> _normalResolvePipeline;
 
-		// Refreshed by Setup every frame.
 		FGTexture _mainDepth;
 		FGTexture _mainNormal;
 		FGTexture _resolvedDepth;
 		FGTexture _resolvedNormal;
-
-		// Migration bridge: these duplicate the FGTexture handles above only
-		// because the resources are FrameResources-owned imports (legacy passes
-		// still consume them by name) and DescriptorSetBuilder wants pool
-		// handles. They disappear once every consumer is migrated and the
-		// resources become graph transients.
-		Handle<Texture> _mainDepthHandle;
-		Handle<Texture> _resolvedDepthHandle;
-		Handle<Texture> _resolvedNormalHandle;
 	};
 }

@@ -254,34 +254,45 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
     // Inputs produced by the earlier graph passes. The compile derives the
     // graphics<-compute waits from these (replacing the legacy manual
     // semaphore waits and acquire barriers).
-    builder.Read(builder.GetTexture(FGShadowPass::RT_SHADOW_DEPTH), TextureAccess::SampledFragment);
+    _shadow = builder.GetTexture(FGShadowPass::RT_SHADOW_DEPTH);
+    builder.Read(_shadow, TextureAccess::SampledFragment);
+
+    _sdfShadow = FGTexture{};
     if (builder.HasTexture(FGSDFShadowPass::RT_SDF_SHADOW))
-        builder.Read(builder.GetTexture(FGSDFShadowPass::RT_SDF_SHADOW), TextureAccess::SampledFragment);
-    builder.Read(builder.GetTexture(FGAmbientOcclusionPass::RT_AO), TextureAccess::SampledFragment);
-    builder.Read(builder.GetBuffer(SB_LIGHT_VISIBILITY), BufferAccess::StorageFragmentRead);
+    {
+        _sdfShadow = builder.GetTexture(FGSDFShadowPass::RT_SDF_SHADOW);
+        builder.Read(_sdfShadow, TextureAccess::SampledFragment);
+    }
+
+    _ao = builder.GetTexture(FGAmbientOcclusionPass::RT_AO);
+    builder.Read(_ao, TextureAccess::SampledFragment);
+
+    _lightVisibility = builder.GetBuffer(SB_LIGHT_VISIBILITY);
+    builder.Read(_lightVisibility, BufferAccess::StorageFragmentRead);
 
     // Two-phase occlusion flow interleaves compute culling and rendering, and
     // it writes external state (indirect draw buffers, Hi-Z pyramid).
     builder.SetManualRendering();
     builder.SetSideEffect();
 
-    // Descriptor inputs, stashed for the worker.
-    _shadowTarget = frameResources.GetRenderTarget(FGShadowPass::RT_SHADOW_DEPTH);
-    _sdfShadowTarget = frameResources.GetRenderTarget(FGSDFShadowPass::RT_SDF_SHADOW);
-    _aoTarget = frameResources.GetRenderTarget(FGAmbientOcclusionPass::RT_AO);
+    // CPU-written frame inputs, imported so Execute can resolve them through
+    // the context like every other resource.
+    _camera = builder.ImportBuffer(UB_CAMERA,
+        frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
+    builder.Read(_camera, BufferAccess::UniformVertex);
 
-    BufferDesc lightVisibilityDesc{};
-    lightVisibilityDesc.size = GetLightVisibilityBufferSize(_tileInfo.tileNums);
-    _lightVisibilityBuffer =
-        &frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY, lightVisibilityDesc).Get();
+    _lights = builder.ImportBuffer(UB_LIGHTS,
+        frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS));
+    builder.Read(_lights, BufferAccess::UniformFragment);
 
-    _cameraBuffer = &frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
-    _lightBuffer = &frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS).Get();
-    _shadowBuffer = &frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW).Get();
+    _shadowUB = builder.ImportBuffer(UB_SHADOW,
+        frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW));
+    builder.Read(_shadowUB, BufferAccess::UniformFragment);
 
-    auto& giBuffer = frameResources.GetOrCreateUniformBuffer<GI>("GeometryPass.GI").Get();
-    giBuffer.Update(_giBuffer);
-    _giBufferUB = &giBuffer;
+    auto giHandle = frameResources.GetOrCreateUniformBuffer<GI>("GeometryPass.GI");
+    giHandle.Get().Update(_giBuffer);
+    _gi = builder.ImportBuffer("GeometryPass.GI", giHandle);
+    builder.Read(_gi, BufferAccess::UniformFragment);
 
     // Get a geometry shader for rendering (use first mesh's material shader)
     _geometryShader = nullptr;
@@ -321,18 +332,17 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
     commandBuffer.SetViewportAndScissor(context.GetRenderArea(0));
 
     auto builder = context.CreateDescriptorSetBuilder(*_geometryShader, 0);
-    builder.SetUniformBuffer(0, *_cameraBuffer);
-    builder.SetUniformBuffer(3, *_giBufferUB);
-    builder.SetUniformBuffer(4, *_shadowBuffer);
-    builder.SetUniformBuffer(5, *_lightBuffer);
-    builder.SetStorageBuffer(6, *_lightVisibilityBuffer);
-    builder.SetTextureBuffer(7, _shadowTarget);
+    builder.SetUniformBuffer(0, context.GetBuffer(_camera));
+    builder.SetUniformBuffer(3, context.GetBuffer(_gi));
+    builder.SetUniformBuffer(4, context.GetBuffer(_shadowUB));
+    builder.SetUniformBuffer(5, context.GetBuffer(_lights));
+    builder.SetStorageBuffer(6, context.GetBuffer(_lightVisibility));
+    builder.SetTextureBuffer(7, context.GetTexture(_shadow));
 
-    if (_sdfShadowTarget.IsValid())
-        builder.SetTextureBuffer(10, _sdfShadowTarget);
+    if (_sdfShadow.IsValid())
+        builder.SetTextureBuffer(10, context.GetTexture(_sdfShadow));
 
-    if (_aoTarget.IsValid())
-        builder.SetTextureBuffer(11, _aoTarget);
+    builder.SetTextureBuffer(11, context.GetTexture(_ao));
 
     auto perShaderHook = [&](Shader& shader)
     {
@@ -356,7 +366,7 @@ void FGGeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer&
         return;
 
     auto skyBuilder0 = context.CreateDescriptorSetBuilder(*_skyboxShader, 0);
-    skyBuilder0.SetUniformBuffer(0, *_cameraBuffer);
+    skyBuilder0.SetUniformBuffer(0, context.GetBuffer(_camera));
     auto& skyResources0 = skyBuilder0.Build();
 
     auto skyBuilder1 = context.CreateDescriptorSetBuilder(*_skyboxShader, 1);

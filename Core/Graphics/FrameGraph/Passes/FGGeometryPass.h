@@ -68,22 +68,23 @@ namespace Core
 
         bool _iblGenerated = false;
 
+        // App-lifetime IBL resources: created once, consumed only on the main
+        // thread (one-time generation + bindless registration in Setup).
         Handle<Texture> _offscreenTexture;
         Handle<Texture> _irradianceCubemap;
         Handle<Texture> _prefilteredCubemap;
         Handle<Texture> _brdfLut;
 
-        // Stashed per frame in Setup, consumed by Execute on the worker.
         FGTexture _mainColor;
         FGTexture _mainDepth;
-        Handle<Texture> _shadowTarget;
-        Handle<Texture> _sdfShadowTarget;
-        Handle<Texture> _aoTarget;
-        Buffer* _cameraBuffer = nullptr;
-        Buffer* _lightBuffer = nullptr;
-        Buffer* _shadowBuffer = nullptr;
-        Buffer* _giBufferUB = nullptr;
-        Buffer* _lightVisibilityBuffer = nullptr;
+        FGTexture _shadow;
+        FGTexture _sdfShadow;
+        FGTexture _ao;
+        FGBuffer _camera;
+        FGBuffer _lights;
+        FGBuffer _shadowUB;
+        FGBuffer _gi;
+        FGBuffer _lightVisibility;
         Shader* _geometryShader = nullptr;
         Pipeline* _geometryPipeline = nullptr;
         OcclusionCuller* _culler = nullptr;
