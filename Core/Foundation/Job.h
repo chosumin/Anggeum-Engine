@@ -20,7 +20,8 @@ namespace Core
 		virtual ~Job() = default;
 
 		JobType type;
-		JobStatus status = JobStatus::PENDING;
+
+		atomic<JobStatus> status = JobStatus::PENDING;
 		Job* next = nullptr;
 		condition_variable* completionWait;
 
