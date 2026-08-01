@@ -173,7 +173,7 @@ namespace Core
 			for (const auto& access : passes[i].accesses)
 			{
 				const uint32_t resourceIndex = access.resource;
-				const FGAccessInfo& info = access.info;
+				const FGAccessInfo& accessInfo = access.info;
 				const bool isImage = resources[resourceIndex].isTexture;
 				Track& track = tracks[resourceIndex];
 
@@ -191,18 +191,18 @@ namespace Core
 				{
 					FGPassSync& sync = out.passSync[i];
 					sync.waitPass = std::max(sync.waitPass, track.lastAccessPass);
-					sync.waitStages |= ToSync1Stage(info.stage);
+					sync.waitStages |= ToSync1Stage(accessInfo.stage);
 					lifetime.crossQueue = true;
 				}
 
 				// Manual-barrier accesses: the pass transitions the resource
 				// itself; the graph only adopts the declared final state.
-				if (info.manualBarriers)
+				if (accessInfo.manualBarriers)
 				{
 					if (isImage)
-						track.layout = info.layout;
-					track.lastWriteStage = info.stage;
-					track.lastWriteAccess = info.access;
+						track.layout = accessInfo.layout;
+					track.lastWriteStage = accessInfo.stage;
+					track.lastWriteAccess = accessInfo.access;
 					track.readStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleAccess = VK_ACCESS_2_NONE;
@@ -212,15 +212,15 @@ namespace Core
 
 				// Does this access need a barrier?
 				bool needBarrier = false;
-				if (isImage && info.layout != track.layout)
+				if (isImage && accessInfo.layout != track.layout)
 					needBarrier = true;
-				else if (info.isWrite)
+				else if (accessInfo.isWrite)
 					needBarrier = true;
 				else
 				{
 					const bool visible =
-						(info.stage & ~track.visibleStages) == 0 &&
-						(info.access & ~track.visibleAccess) == 0;
+						(accessInfo.stage & ~track.visibleStages) == 0 &&
+						(accessInfo.access & ~track.visibleAccess) == 0;
 					needBarrier = !visible;
 				}
 
@@ -240,15 +240,15 @@ namespace Core
 					else
 					{
 						plan.srcStage = track.lastWriteStage |
-							(info.isWrite ? track.readStages : VK_PIPELINE_STAGE_2_NONE);
+							(accessInfo.isWrite ? track.readStages : VK_PIPELINE_STAGE_2_NONE);
 						plan.srcAccess = track.lastWriteAccess;
 					}
-					plan.dstStage = info.stage;
-					plan.dstAccess = info.access;
+					plan.dstStage = accessInfo.stage;
+					plan.dstAccess = accessInfo.access;
 					if (isImage)
 					{
 						plan.oldLayout = track.layout;
-						plan.newLayout = info.layout;
+						plan.newLayout = accessInfo.layout;
 					}
 					out.preBarriers[i].push_back(plan);
 
@@ -262,12 +262,12 @@ namespace Core
 				}
 
 				// State update.
-				if (info.isWrite)
+				if (accessInfo.isWrite)
 				{
 					if (isImage)
-						track.layout = info.layout;
-					track.lastWriteStage = info.stage;
-					track.lastWriteAccess = info.access;
+						track.layout = accessInfo.layout;
+					track.lastWriteStage = accessInfo.stage;
+					track.lastWriteAccess = accessInfo.access;
 					track.readStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleAccess = VK_ACCESS_2_NONE;
@@ -275,10 +275,10 @@ namespace Core
 				else
 				{
 					if (isImage)
-						track.layout = info.layout;
-					track.readStages |= info.stage;
-					track.visibleStages |= info.stage;
-					track.visibleAccess |= info.access;
+						track.layout = accessInfo.layout;
+					track.readStages |= accessInfo.stage;
+					track.visibleStages |= accessInfo.stage;
+					track.visibleAccess |= accessInfo.access;
 				}
 				track.lastAccessPass = static_cast<int32_t>(i);
 			}
@@ -372,7 +372,7 @@ namespace Core
 			_passDecls[p].queue = _passes[p]->GetQueueType();
 
 			FrameGraphBuilder builder(*this, static_cast<uint32_t>(p));
-			_passes[p]->Setup(builder, renderFrame);
+			_passes[p]->Setup(builder, renderFrame.GetResources(), renderFrame.GetRenderExecutor());
 		}
 
 		vector<FGResourceState> entryStates;

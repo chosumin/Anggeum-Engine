@@ -13,6 +13,7 @@ namespace Core
 	class TransferContext;
 	class Buffer;
 	class RenderContext;
+	class FrameGraph;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
@@ -46,6 +47,8 @@ namespace Core
 		Device& _device;
 		Scene& _scene;
 		VkExtent2D _swapChainExtents;
+
+		unique_ptr<FrameGraph> _frameGraph;
 		vector<RendererPass*> _rendererPasses;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 	};

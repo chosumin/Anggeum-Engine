@@ -13,6 +13,9 @@ namespace Core
     class Framebuffer;
     class DescriptorSetBuilder;
     class Scene;
+    class Texture;
+    class FrameGraphPassContext;
+    class OcclusionCuller;
 
     // Key for the culler cache. The concrete type is part of the key so the same
     // camera can own.
@@ -60,6 +63,16 @@ namespace Core
             Framebuffer& framebuffer,
             DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
             function<void()> postDraw);
+
+        void OcclusionCullAndDraw(CommandBuffer& commandBuffer,
+            Shader& shader, Pipeline& pipeline,
+            OcclusionCuller& culler,
+            FrameGraphPassContext& context,
+            Texture& colorTarget, Texture& depthTarget,
+            DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
+            function<void()> postDraw);
+
+        OcclusionCuller* PrepareOcclusionCuller(CameraBuffer& camera);
 
         // Frustum-only culling + draw (e.g. shadow passes)
         void FrustumCullAndDraw(CommandBuffer& commandBuffer,

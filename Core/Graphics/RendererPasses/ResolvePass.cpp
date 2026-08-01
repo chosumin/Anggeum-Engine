@@ -20,17 +20,30 @@ ResolvePass::ResolvePass(Device& device, WorkerThreadManager& workerThreadManage
 {
     if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
     {
-        _depthResolveShader = _device.GetResourceManager().LoadShader("Shaders/depthResolve.comp.spv");
-        _depthResolvePipeline = make_unique<Pipeline>(_device, _depthResolveShader.Get());
+        InitializeStatics(device, screenExtent);
 
         _normalResolveShader = _device.GetResourceManager().LoadShader("Shaders/normalResolve.comp.spv");
         _normalResolvePipeline = make_unique<Pipeline>(_device, _normalResolveShader.Get());
-
-        _screenExtent = screenExtent;
     }
 }
 
+void ResolvePass::InitializeStatics(Device& device, VkExtent2D screenExtent)
+{
+    if (_depthResolvePipeline == nullptr)
+    {
+        _depthResolveShader = device.GetResourceManager().LoadShader("Shaders/depthResolve.comp.spv");
+        _depthResolvePipeline = make_unique<Pipeline>(device, _depthResolveShader.Get());
+    }
+
+    _screenExtent = screenExtent;
+}
+
 ResolvePass::~ResolvePass()
+{
+    DestroyStatics();
+}
+
+void ResolvePass::DestroyStatics()
 {
     _depthResolvePipeline.reset();
     _depthResolveShader = Handle<Shader>{};

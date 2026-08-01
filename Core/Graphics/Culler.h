@@ -25,6 +25,15 @@ namespace Core
         bool IsUsedThisFrame() const { return _markUsedThisFrame; }
         void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
 
+        // The camera this Culler was created for. The culler cache keys on the
+        // camera, so the pair is permanently 1:1.
+        void SetCamera(CameraBuffer& camera) { _camera = &camera; }
+        CameraBuffer& GetCamera() const
+        {
+            assert(_camera != nullptr && "culler was never prepared with a camera");
+            return *_camera;
+        }
+
         // Revision of the batch this Culler's buffers and counts were built against.
         uint64_t GetBatchRevision() const { return _batchRevision; }
 
@@ -60,6 +69,9 @@ namespace Core
         // same names and replaces the buffers instead of leaking new ones.
         string _namePrefix;
         uint64_t _batchRevision = 0;
+
+        // See SetCamera/GetCamera.
+        CameraBuffer* _camera = nullptr;
 
         // Pass 1 indirect command buffer (one per Culler so multiple cullers don't
         // overwrite each other). Pool-owned by FrameResources; held here by handle.

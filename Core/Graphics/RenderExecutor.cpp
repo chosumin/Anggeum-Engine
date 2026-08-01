@@ -17,6 +17,7 @@
 #include "Material.h"
 #include "TransferJob.h"
 #include "RendererPasses/ResolvePass.h"
+#include "FrameGraph/FrameGraphPass.h"
 
 using namespace Core;
 
@@ -121,6 +122,115 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     }
 
     commandBuffer.EndRenderPass();
+    commandBuffer.EndDebugMarker();
+
+    if (!cullerAlreadyUsed)
+    {
+        culler->MarkUsedThisFrame(true);
+    }
+}
+
+Core::OcclusionCuller* RenderExecutor::PrepareOcclusionCuller(CameraBuffer& camera)
+{
+    auto* batch = GetRendererBatch();
+    if (!batch || batch->GetDrawCommandCount() == 0)
+        return nullptr;
+
+    auto* culler = GetOrCreateCuller<OcclusionCuller>(*batch, camera);
+    culler->SetCamera(camera);
+    return culler;
+}
+
+void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
+    Shader& shader, Pipeline& pipeline,
+    OcclusionCuller& occlusionCuller,
+    FrameGraphPassContext& context,
+    Texture& colorTarget, Texture& depthTarget,
+    DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
+    function<void()> postDraw)
+{
+    auto& frameResources = _renderFrame.GetResources();
+    auto* culler = &occlusionCuller;
+    CameraBuffer& camera = culler->GetCamera();
+
+    bool cullerAlreadyUsed = culler->IsUsedThisFrame();
+
+    if (!cullerAlreadyUsed)
+    {
+        auto prevDepth = frameResources.GetPreviousDepthBuffer();
+
+        commandBuffer.BeginDebugMarker("Reset Draw Commands");
+        culler->ResetDrawCommands(_renderFrame, commandBuffer);
+        commandBuffer.EndDebugMarker();
+
+        commandBuffer.BeginDebugMarker("Pass 1 Culling");
+        culler->DispatchPass1Culling(_renderFrame, commandBuffer, camera, prevDepth);
+        commandBuffer.EndDebugMarker();
+    }
+
+    const char* pass1Label = cullerAlreadyUsed ? "Pass 1 Render Visible Objects (Reuse)" : "Pass 1 Render Visible Objects";
+    commandBuffer.BeginDebugMarker(pass1Label);
+    context.BeginRendering(commandBuffer, 0);
+    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetIndirectCommandBuffer(), builder, perShaderHook);
+    context.EndRendering(commandBuffer);
+    commandBuffer.EndDebugMarker();
+
+    // The two legacy VkRenderPasses ordered phase 1 against phase 2 through
+    // their external subpass dependencies; with dynamic rendering the
+    // attachment barriers are explicit.
+    commandBuffer.CreateBarrierBatch2()
+        .Image(colorTarget,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+        .Image(depthTarget,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+        .Submit();
+
+    if (!cullerAlreadyUsed)
+    {
+        commandBuffer.BeginDebugMarker("Resolve Depth for Pass 2");
+        auto msaaDepth = frameResources.GetRenderTarget("MainDepth");
+
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .Submit();
+
+        auto curDepth = ResolvePass::ResolveDepth(_renderFrame, commandBuffer, msaaDepth);
+
+        commandBuffer.CreateBarrierBatch()
+            .Image(msaaDepth.Get(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+            .Submit();
+
+        commandBuffer.EndDebugMarker();
+
+        commandBuffer.BeginDebugMarker("Pass 2 Culling");
+        culler->DispatchPass2Culling(_renderFrame, commandBuffer, camera, curDepth);
+        commandBuffer.EndDebugMarker();
+    }
+
+    const char* pass2Label = cullerAlreadyUsed ? "Pass 2 Render Newly Visible Objects (Reuse)" : "Pass 2 Render Newly Visible Objects";
+    commandBuffer.BeginDebugMarker(pass2Label);
+    context.BeginRendering(commandBuffer, 1);
+    DrawIndirectInternal(commandBuffer, shader, pipeline, *culler->GetPass2IndirectCommandBuffer(), builder, perShaderHook);
+
+    if (postDraw)
+    {
+        commandBuffer.BeginDebugMarker("Post Draw");
+        postDraw();
+        commandBuffer.EndDebugMarker();
+    }
+
+    context.EndRendering(commandBuffer);
     commandBuffer.EndDebugMarker();
 
     if (!cullerAlreadyUsed)

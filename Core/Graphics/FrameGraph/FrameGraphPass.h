@@ -10,6 +10,7 @@ namespace Core
 	class Buffer;
 	class FrameGraph;
 	class FrameGraphBuilder;
+	class FrameResources;
 	class RenderExecutor;
 	class DescriptorPool;
 	class DescriptorSetBuilder;
@@ -102,7 +103,8 @@ namespace Core
 		virtual const char* GetName() const = 0;
 		virtual QueueType GetQueueType() const { return QueueType::Graphics; }
 
-		virtual void Setup(FrameGraphBuilder& builder, RenderFrame& renderFrame) = 0;
+		virtual void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+			RenderExecutor& renderExecutor) = 0;
 		virtual void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) = 0;
 		virtual void OnGUI(RenderFrame& renderFrame) {}
 	};

@@ -24,6 +24,10 @@
 #include "Graphics/RendererPasses/GUIRenderPass.h"
 #include "Graphics/RendererPasses/AmbientOcclusionPass.h"
 #include "Graphics/RendererPasses/ResolvePass.h"
+#include "Graphics/FrameGraph/FrameGraph.h"
+#include "Graphics/FrameGraph/Passes/FGDepthPrePass.h"
+#include "Graphics/FrameGraph/Passes/FGResolvePass.h"
+#include "Graphics/FrameGraph/Passes/FGLightCullingPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -50,17 +54,17 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples);
-	AddRendererPass(depthPrePass);
-
+	// Migrated passes live in the frame graph; declaration order is execution
+	// order and matches the legacy prefix (DepthPre → Resolve → LightCulling).
+	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
+	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples));
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-	{
-		auto resolvePass = new ResolvePass(device, workerThreadManager, extent, _msaaSamples);
-		AddRendererPass(resolvePass);
-	}
+		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples));
+	_frameGraph->AddPass(make_unique<FGLightCullingPass>(device, scene, extent, tileNums, _msaaSamples));
 
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums);
-	AddRendererPass(lightCullingPass);
+	// RenderExecutor's mid-pass Hi-Z resolve still uses ResolvePass's static
+	// shader/pipeline; no ResolvePass instance exists anymore to set them up.
+	ResolvePass::InitializeStatics(device, extent);
 
 	auto shadowPass = new ShadowPass(
 		device, workerThreadManager, scene, depthFormat);
@@ -89,6 +93,10 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
 
+	// The mid-pass depth-resolve pipeline is a ResolvePass static; without this
+	// it would be destroyed at static-destruction time, after the device.
+	ResolvePass::DestroyStatics();
+
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		delete(rendererPass);
@@ -104,6 +112,9 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
 
 	UploadSharedUniforms(renderFrame);
+
+	_frameGraph->SetupAndCompile(renderFrame, frameIndex, imageIndex);
+	const uint32_t graphPassCount = _frameGraph->Execute(renderContext, renderFrame);
 
 	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
 	{
@@ -132,7 +143,7 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 
 		commandBuffer.BeginCommandBuffer();
 		queueTimer.BeginPass(commandBuffer, frameIndex,
-			static_cast<uint32_t>(passIndex), queueType, simpleName);
+			graphPassCount + static_cast<uint32_t>(passIndex), queueType, simpleName);
 
 		commandBuffer.BeginDebugMarker(simpleName);
 
@@ -141,7 +152,7 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 
 		commandBuffer.EndDebugMarker();
 
-		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
+		queueTimer.EndPass(commandBuffer, frameIndex, graphPassCount + static_cast<uint32_t>(passIndex));
 		commandBuffer.EndCommandBuffer();
 	}
 }
@@ -188,6 +199,10 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)
 {
 	ImGui::Begin("Renderer Passes");
+
+	_frameGraph->OnDebugGUI();
+	_frameGraph->OnGUI(renderFrame);
+
 	for (auto&& rendererPass : _rendererPasses)
 	{
 		// Get class name from typeid
@@ -214,7 +229,7 @@ void Core::ForwardRenderPipeline::Resize(SwapChain& swapChain)
 {
 	Cleanup();
 
-	VkExtent2D extent = swapChain.GetSwapChainExtent();
+	_frameGraph->Invalidate();
 }
 
 VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()
