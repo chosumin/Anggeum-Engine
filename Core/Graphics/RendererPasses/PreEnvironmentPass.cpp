@@ -4,6 +4,8 @@
 #include "Foundation/Entity.h"
 #include "Components/Mesh.h"
 #include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/PipelineState.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
@@ -16,11 +18,12 @@ using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
-Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, 
-    WorkerThreadManager& workerThreadManager, Scene& scene,
+Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene,
     Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
-    : RendererPass(device, workerThreadManager)
+    : _device(device)
     , _scene(scene)
+    , _renderPass(make_unique<RenderPass>(device))
+    , _pipelineState(make_unique<PipelineState>())
     , _colorRenderTarget(offscreen)
     , _irradianceCubemap(irradianceCubemap)
     , _prefilteredCubemap(prefilteredCubemap)

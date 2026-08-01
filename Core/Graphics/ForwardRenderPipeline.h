@@ -6,7 +6,6 @@
 
 namespace Core
 {
-	class RendererPass;
 	class Scene;
 	class SwapChain;
 	class WorkerThreadManager;
@@ -35,11 +34,6 @@ namespace Core
 	private:
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
 
-		void AddRendererPass(RendererPass* renderPass)
-		{
-			_rendererPasses.push_back(renderPass);
-		}
-
 		// Fills the uniform blocks every pass in this frame shares.
 		void UploadSharedUniforms(RenderFrame& renderFrame);
 
@@ -49,7 +43,6 @@ namespace Core
 		VkExtent2D _swapChainExtents;
 
 		unique_ptr<FrameGraph> _frameGraph;
-		vector<RendererPass*> _rendererPasses;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 	};
 }

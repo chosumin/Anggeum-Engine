@@ -16,6 +16,7 @@ namespace Core
 
 		size_t GetSwapChainCount() const { return _swapChainImages.size(); }
 		VkImageView GetImageView(size_t swapChainIndex) const;
+		VkImage GetImage(size_t swapChainIndex) const { return _swapChainImages[swapChainIndex]; }
 		VkFormat GetImageFormat() const 
 		{
 			return _swapChainImageFormat;

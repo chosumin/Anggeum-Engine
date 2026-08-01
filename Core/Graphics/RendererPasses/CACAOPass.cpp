@@ -2,25 +2,25 @@
 #include "CACAOPass.h"
 #include "Foundation/Scene.h"
 #include "Graphics/ResourceManager.h"
-#include "Graphics/Vulkans/Pipeline.h"
-#include "Graphics/Vulkans/DescriptorSetBuilder.h"
+#include "Graphics/FrameResources.h"
+#include "Graphics/Vulkans/Device.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Components/PerspectiveCamera.h"
-#include "AmbientOcclusionPass.h"
+#include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
 
 #include "ffx_cacao_impl.h"
 
 using namespace Core;
 
-CACAOPass::CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
-    Scene& scene, VkExtent2D screenExtent,
+CACAOPass::CACAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
     VkSampleCountFlagBits msaaSamples)
-    : RendererPass(device, workerThreadManager)
+    : _device(device)
     , _scene(scene)
     , _screenExtent(screenExtent)
     , _msaaSamples(msaaSamples)
 {
     // CACAO contexts are created lazily in GetOrCreateCacaoContext(),
-    // one per swap chain image slot, so we don't allocate anything here.
+    // one per frame-in-flight slot, so we don't allocate anything here.
 }
 
 CACAOPass::~CACAOPass()
@@ -42,7 +42,7 @@ CACAOPass::~CACAOPass()
 }
 
 FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
-    RenderFrame* frameKey,
+    FrameResources* frameKey,
     VkImageView depthView,
     VkImageView normalsView,
     VkImage outputImage,
@@ -86,18 +86,23 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     return ctx;
 }
 
-void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex)
+bool CACAOPass::Prepare(FrameResources& frameResources)
 {
-    auto& frameResources = renderFrame.GetResources();
+    _currentContext = nullptr;
+
     auto depthForSampling = frameResources.GetCurrentDepth();
     auto normalForSampling = frameResources.GetCurrentNormal();
     if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
-        return;
+        return false;
+
+    PerspectiveCamera* camera = _scene.GetMainCamera();
+    if (!camera)
+        return false;
 
     auto& aoImage = _aoTexture.Get().GetImage();
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
-        &renderFrame,
+        &frameResources,
         depthForSampling.Get().GetImageView(),
         normalForSampling.Get().GetImageView(),
         aoImage.GetImage(),
@@ -123,8 +128,6 @@ void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uin
 
     FFX_CACAO_VkUpdateSettings(ctx, &cacaoSettings);
 
-    PerspectiveCamera* camera = _scene.GetMainCamera();
-    
     mat4 projMatrix = camera->Matrices.Projection;
     projMatrix[1][1] = -projMatrix[1][1];
 
@@ -139,14 +142,20 @@ void CACAOPass::Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uin
     zFlip[2][2] = -1.0f;
     mat4 normalsWorldToView = glm::inverse(viewMatrix) * zFlip;
 
-    FFX_CACAO_Matrix4x4 proj, normalsToView;
-    memcpy(proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
-    memcpy(normalsToView.elements, glm::value_ptr(normalsWorldToView), sizeof(float) * 16);
+    memcpy(_proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
+    memcpy(_normalsToView.elements, glm::value_ptr(normalsWorldToView), sizeof(float) * 16);
 
-    FFX_CACAO_VkDraw(ctx, commandBuffer.GetHandle(), &proj, &normalsToView);
+    _currentContext = ctx;
+    return true;
 }
 
-void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
+void CACAOPass::Record(CommandBuffer& commandBuffer)
+{
+    assert(_currentContext != nullptr && "Record without a successful Prepare");
+    FFX_CACAO_VkDraw(_currentContext, commandBuffer.GetHandle(), &_proj, &_normalsToView);
+}
+
+void CACAOPass::EnsureRenderTargets(FrameResources& frameResources)
 {
     RenderTargetDesc aoDesc{};
     aoDesc.extent  = { _screenExtent.width, _screenExtent.height };
@@ -157,7 +166,7 @@ void CACAOPass::EnsureRenderTargets(RenderFrame& renderFrame)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = renderFrame.GetResources().GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = frameResources.GetOrCreateRenderTarget(FGAmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void CACAOPass::UpdateGUI()

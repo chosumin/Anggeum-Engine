@@ -14,20 +14,15 @@
 #include "Graphics/ResourceManager.h"
 #include "Graphics/TransferJob.h"
 #include "Graphics/Vulkans/SubmitInfo.h"
-#include "Graphics/RendererPasses/DepthPrePass.h"
-#include "Graphics/RendererPasses/LightCullingPass.h"
-#include "Graphics/RendererPasses/GeometryPass.h"
-#include "Graphics/RendererPasses/ShadowPass.h"
-#include "Graphics/RendererPasses/SDFShadowPass.h"
-#include "Graphics/RendererPasses/DFAOPass.h"
-#include "Graphics/RendererPasses/CACAOPass.h"
-#include "Graphics/RendererPasses/GUIRenderPass.h"
-#include "Graphics/RendererPasses/AmbientOcclusionPass.h"
-#include "Graphics/RendererPasses/ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraph.h"
 #include "Graphics/FrameGraph/Passes/FGDepthPrePass.h"
 #include "Graphics/FrameGraph/Passes/FGResolvePass.h"
 #include "Graphics/FrameGraph/Passes/FGLightCullingPass.h"
+#include "Graphics/FrameGraph/Passes/FGShadowPass.h"
+#include "Graphics/FrameGraph/Passes/FGSDFShadowPass.h"
+#include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
+#include "Graphics/FrameGraph/Passes/FGGeometryPass.h"
+#include "Graphics/FrameGraph/Passes/FGGUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -62,45 +57,28 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples));
 	_frameGraph->AddPass(make_unique<FGLightCullingPass>(device, scene, extent, tileNums, _msaaSamples));
 
-	// RenderExecutor's mid-pass Hi-Z resolve still uses ResolvePass's static
-	// shader/pipeline; no ResolvePass instance exists anymore to set them up.
-	ResolvePass::InitializeStatics(device, extent);
+	auto fgShadowPass = make_unique<FGShadowPass>(device, scene, depthFormat);
+	FGShadowPass* fgShadowPassPtr = fgShadowPass.get();
+	_frameGraph->AddPass(std::move(fgShadowPass));
 
-	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, depthFormat);
-	AddRendererPass(shadowPass);
+	auto fgSdfShadowPass = make_unique<FGSDFShadowPass>(
+		device, scene, extent, _msaaSamples, *fgShadowPassPtr);
+	FGSDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
+	_frameGraph->AddPass(std::move(fgSdfShadowPass));
 
-	auto sdfShadowPass = new SDFShadowPass(
-		device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
-	AddRendererPass(sdfShadowPass);
+	_frameGraph->AddPass(make_unique<FGAmbientOcclusionPass>(
+		device, scene, extent, _msaaSamples,
+		fgSdfShadowPassPtr->GetSDFGenerator()));
 
-	auto ambientOcclusionPass = new AmbientOcclusionPass(
-		device, workerThreadManager, scene,
-		extent, _msaaSamples,
-		sdfShadowPass->GetSDFGenerator());
-	AddRendererPass(ambientOcclusionPass);
+	_frameGraph->AddPass(make_unique<FGGeometryPass>(
+		device, scene, swapChain, depthFormat, _msaaSamples, tileNums));
 
-	auto geometryPass = new GeometryPass(
-		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
-		tileNums);
-	AddRendererPass(geometryPass);
-
-	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
-	AddRendererPass(guiPass);
+	_frameGraph->AddPass(make_unique<FGGUIRenderPass>(device, swapChain, _msaaSamples));
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
-
-	// The mid-pass depth-resolve pipeline is a ResolvePass static; without this
-	// it would be destroyed at static-destruction time, after the device.
-	ResolvePass::DestroyStatics();
-
-	for (auto&& rendererPass : _rendererPasses)
-	{
-		delete(rendererPass);
-	}
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
@@ -108,53 +86,10 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 
 void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto& queueTimer = renderContext.GetQueueTimer();
-	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
-
 	UploadSharedUniforms(renderFrame);
 
 	_frameGraph->SetupAndCompile(renderFrame, imageIndex);
-	const uint32_t graphPassCount = _frameGraph->Execute(renderContext, renderFrame);
-
-	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
-	{
-		auto&& rendererPass = _rendererPasses[passIndex];
-
-		// Get class name from typeid
-		const char* className = typeid(*rendererPass).name();
-
-		// Remove "class Core::" prefix if present
-		const char* simpleName = className;
-		const char* prefix = "class Core::";
-		if (strncmp(className, prefix, strlen(prefix)) == 0)
-		{
-			simpleName = className + strlen(prefix);
-		}
-
-		// Request command buffer based on queue type
-		QueueType queueType = rendererPass->GetQueueType();
-		CommandBuffer& commandBuffer = (queueType == QueueType::Compute)
-			? renderContext.RequestComputeCommandBuffer()
-			: renderContext.RequestCommandBuffer();
-
-		// Register SubmitInfo before Draw so the pass can inject wait/signal semaphores
-		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(),
-			renderContext.GetSyncContext());
-
-		commandBuffer.BeginCommandBuffer();
-		queueTimer.BeginPass(commandBuffer, frameIndex,
-			graphPassCount + static_cast<uint32_t>(passIndex), queueType, simpleName);
-
-		commandBuffer.BeginDebugMarker(simpleName);
-
-		rendererPass->EnsureRenderTargets(renderFrame);
-		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
-
-		commandBuffer.EndDebugMarker();
-
-		queueTimer.EndPass(commandBuffer, frameIndex, graphPassCount + static_cast<uint32_t>(passIndex));
-		commandBuffer.EndCommandBuffer();
-	}
+	_frameGraph->Execute(renderContext, renderFrame);
 }
 
 void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
@@ -203,21 +138,6 @@ void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)
 	_frameGraph->OnDebugGUI();
 	_frameGraph->OnGUI(renderFrame);
 
-	for (auto&& rendererPass : _rendererPasses)
-	{
-		// Get class name from typeid
-		const char* className = typeid(*rendererPass).name();
-
-		// Remove "class Core::" prefix if present
-		const char* simpleName = className;
-		const char* prefix = "class Core::";
-		if (strncmp(className, prefix, strlen(prefix)) == 0)
-		{
-			simpleName = className + strlen(prefix);
-		}
-
-		rendererPass->OnGUI(renderFrame);
-	}
 	ImGui::End();
 }
 

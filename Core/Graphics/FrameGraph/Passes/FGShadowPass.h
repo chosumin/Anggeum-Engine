@@ -1,29 +1,36 @@
 #pragma once
-#include "Graphics/RendererPass.h"
+#include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/BufferObjects.h"
 #include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
+	class Device;
 	class Scene;
-	class SwapChain;
-	class Material;
+	class Shader;
+	class Pipeline;
+	class PipelineState;
 	class PerspectiveCamera;
-	class RendererBatch;
+	class FrustumCuller;
 
-	class ShadowPass : public RendererPass
+	// Cascaded shadow maps: renders each active cascade into one layer of the
+	// ShadowDepth 2D-array target with frustum-culled indirect draws.
+	class FGShadowPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
-		ShadowPass(Device& device, WorkerThreadManager& workerThreadManager,
-			Scene& scene, VkFormat depthFormat);
-		~ShadowPass();
+		FGShadowPass(Device& device, Scene& scene, VkFormat depthFormat);
+		~FGShadowPass();
 
-		void EnsureRenderTargets(RenderFrame& renderFrame) override;
-		void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+		const char* GetName() const override { return "FGShadowPass"; }
+
+		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+			RenderExecutor& renderExecutor) override;
+		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 		void OnGUI(RenderFrame& renderFrame) override;
 
+		// CPU-side shadow block shared with SDFShadowPass (transition distances).
 		ShadowUniform* GetShadowBuffer() { return &_shadowBuffer; }
 
 	private:
@@ -33,16 +40,21 @@ namespace Core
 		std::array<glm::vec3, 8> GetFrustumCornersWorldSpace(const glm::mat4& viewProj);
 
 	private:
+		Device& _device;
 		Scene& _scene;
 		VkExtent2D _shadowExtent;
 
 		Handle<Shader> _shadowShader;
-		Pipeline* _pipeline = nullptr;
+		unique_ptr<PipelineState> _pipelineState;
+		unique_ptr<Pipeline> _pipeline;
 
 		ShadowUniform _shadowBuffer;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeViews{};
 
-		VkSampleCountFlagBits _msaaSamples;
+		// Stashed per frame in Setup, consumed by Execute on the worker.
+		FGTexture _shadowDepth;
+		array<FrustumCuller*, SHADOW_MAP_CASCADE_COUNT> _cullers{};
+		array<Buffer*, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;
@@ -57,4 +69,3 @@ namespace Core
 		bool _csmDescriptorsCreated = false;
 	};
 }
-

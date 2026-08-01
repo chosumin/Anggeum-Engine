@@ -1,15 +1,18 @@
 #include "stdafx.h"
 #include "BrdfLutPass.h"
 #include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/PipelineState.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Material.h"
 #include "Graphics/ResourceManager.h"
 
 using namespace Core;
 
-Core::BrdfLutPass::BrdfLutPass(Device& device, WorkerThreadManager& workerThreadManager,
-    Texture* brdfLut)
-    : RendererPass(device, workerThreadManager)
+Core::BrdfLutPass::BrdfLutPass(Device& device, Texture* brdfLut)
+    : _device(device)
+    , _renderPass(make_unique<RenderPass>(device))
+    , _pipelineState(make_unique<PipelineState>())
 {
     _renderPass->CreateColorAttachment(brdfLut, VK_ATTACHMENT_LOAD_OP_CLEAR, 
         VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

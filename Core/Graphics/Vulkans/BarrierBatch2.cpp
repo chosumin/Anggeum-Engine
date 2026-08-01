@@ -63,6 +63,33 @@ Core::BarrierBatch2& Core::BarrierBatch2::Image(Core::Texture& texture,
 	return *this;
 }
 
+Core::BarrierBatch2& Core::BarrierBatch2::Image(VkImage image, VkImageAspectFlags aspect,
+	VkImageLayout oldLayout, VkImageLayout newLayout,
+	VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+	VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
+{
+	VkImageMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	barrier.srcStageMask = srcStage;
+	barrier.srcAccessMask = srcAccess;
+	barrier.dstStageMask = dstStage;
+	barrier.dstAccessMask = dstAccess;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = aspect;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	_imageBarriers.push_back(barrier);
+
+	return *this;
+}
+
 void Core::BarrierBatch2::Submit()
 {
 	if (Empty())

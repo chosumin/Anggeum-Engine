@@ -1,8 +1,6 @@
 #pragma once
-#include "Graphics/RendererPass.h"
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
-#include "ResolvePass.h"
 
 #define FFX_CACAO_ENABLE_VULKAN 1
 #include "ffx_cacao.h"
@@ -11,23 +9,28 @@ struct FFX_CACAO_VkContext;
 
 namespace Core
 {
+    class Device;
     class Scene;
-    class CACAOPass : public RendererPass
+    class Texture;
+    class FrameResources;
+    class CommandBuffer;
+
+    class CACAOPass
     {
     public:
-        CACAOPass(Device& device, WorkerThreadManager& workerThreadManager,
-            Scene& scene, VkExtent2D screenExtent,
+        CACAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples);
         ~CACAOPass();
 
-        void EnsureRenderTargets(RenderFrame& renderFrame) override;
-        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void EnsureRenderTargets(FrameResources& frameResources);
 
+        bool Prepare(FrameResources& frameResources);
+        void Record(CommandBuffer& commandBuffer);
         void UpdateGUI();
 
     private:
         FFX_CACAO_VkContext* GetOrCreateCacaoContext(
-            RenderFrame* frameKey,
+            FrameResources* frameKey,
             VkImageView depthView,
             VkImageView normalsView,
             VkImage outputImage,
@@ -53,15 +56,21 @@ namespace Core
         };
 
     private:
+        Device& _device;
         Scene& _scene;
         VkExtent2D _screenExtent;
         VkSampleCountFlagBits _msaaSamples;
 
         Handle<Texture> _aoTexture;
 
-        unordered_map<RenderFrame*, FFX_CACAO_VkContext*> m_cacaoContexts;
+        unordered_map<FrameResources*, FFX_CACAO_VkContext*> m_cacaoContexts;
 
         Settings m_settings;
+
+        // Stashed by Prepare, consumed by Record.
+        FFX_CACAO_VkContext* _currentContext = nullptr;
+        FFX_CACAO_Matrix4x4 _proj{};
+        FFX_CACAO_Matrix4x4 _normalsToView{};
 
         VkDescriptorSet _aoImGuiDS = VK_NULL_HANDLE;
     };

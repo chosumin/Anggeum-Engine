@@ -1,34 +1,42 @@
 #pragma once
-#include "Graphics/RendererPass.h"
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/RenderFrame.h"
+#include "Graphics/Vulkans/RenderPass.h"
+#include "Graphics/Vulkans/Framebuffer.h"
+#include "Foundation/Job.h"
 
 namespace Core
 {
     class Scene;
     class Pipeline;
+    class PipelineState;
     class Material;
     class SubMesh;
     class Texture;
     class Shader;
     class Buffer;
 
-    class PreEnvironmentPass : public RendererPass
+    class PreEnvironmentPass
     {
     public:
-        PreEnvironmentPass(Device& device, WorkerThreadManager& workerThreadManager, Scene& scene,
+        PreEnvironmentPass(Device& device, Scene& scene,
             Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap);
         ~PreEnvironmentPass();
 
         void Initialize();
-        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex) override;
+        void Draw(RenderFrame& renderFrame, CommandBuffer& commandBuffer, uint32_t imageIndex);
 
     private:
         void DrawIrradiance(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
         void DrawPrefiltered(RenderFrame& renderFrame, CommandBuffer& commandBuffer);
 
     private:
+        Device& _device;
         Scene& _scene;
+
+        unique_ptr<RenderPass> _renderPass;
+        unique_ptr<PipelineState> _pipelineState;
 
         Texture* _colorRenderTarget;
         Texture* _irradianceCubemap;

@@ -14,7 +14,8 @@ namespace Core
 	class Pipeline;
 	class Shader;
 	class CommandBuffer;
-	class RenderFrame;
+	class FrameResources;
+	class RenderExecutor;
 
 	struct SDFGeneratePushConstants
 	{
@@ -30,8 +31,12 @@ namespace Core
 		SDFGenerator(Device& device);
 		~SDFGenerator();
 
-		void Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			MeshBufferManager& meshBufferManager,
+		// Records the full generation (bounds reduce, triangle lookup, volume
+		// dispatch) into the given command buffer. Creates/resizes pool-owned
+		// resources, so it must run on the main thread (e.g. a single-time
+		// command buffer submitted outside the frame graph's recording window).
+		void Generate(FrameResources& frameResources, RenderExecutor& renderExecutor,
+			CommandBuffer& commandBuffer,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
 		// Persistent storage. File format includes the bounds buffer so the
@@ -48,10 +53,10 @@ namespace Core
 
 	private:
 		void CreateSDFTexture(uint32_t resolution);
-		void ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+		void ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
 			Buffer& objectDataBuffer, Buffer& transformBuffer,
 			uint32_t instanceCount);
-		void BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+		void BuildTriangleLookup(FrameResources& frameResources, CommandBuffer& commandBuffer,
 			Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 			uint32_t drawCommandCount, uint32_t totalTriangles);
 

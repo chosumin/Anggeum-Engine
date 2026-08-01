@@ -16,6 +16,9 @@ namespace Core
     class Texture;
     class FrameGraphPassContext;
     class OcclusionCuller;
+    class FrustumCuller;
+    class MeshBufferManager;
+    class BindlessTextureManager;
 
     // Key for the culler cache. The concrete type is part of the key so the same
     // camera can own.
@@ -55,15 +58,12 @@ namespace Core
         // is owned by RenderContext and shared across frames; forwarded from the frame.
         RendererBatch* GetRendererBatch() const;
 
-        // Two-pass occlusion culling + draw
-        void OcclusionCullAndDraw(CommandBuffer& commandBuffer,
-            Shader& shader, Pipeline& pipeline,
-            CameraBuffer& camera,
-            Core::RenderPass& pass1RenderPass, Core::RenderPass& pass2RenderPass,
-            Framebuffer& framebuffer,
-            DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook,
-            function<void()> postDraw);
+        MeshBufferManager& GetMeshBufferManager() const;
 
+        bool HasBindlessSupport() const;
+        BindlessTextureManager* GetBindlessTextureManager() const;
+
+        // Two-pass occlusion culling + draw
         void OcclusionCullAndDraw(CommandBuffer& commandBuffer,
             Shader& shader, Pipeline& pipeline,
             OcclusionCuller& culler,
@@ -73,17 +73,15 @@ namespace Core
             function<void()> postDraw);
 
         OcclusionCuller* PrepareOcclusionCuller(CameraBuffer& camera);
+        FrustumCuller* PrepareFrustumCuller(CameraBuffer& camera);
 
-        // Frustum-only culling + draw (e.g. shadow passes)
         void FrustumCullAndDraw(CommandBuffer& commandBuffer,
-            Core::RenderPass& renderPass,
-            Framebuffer& framebuffer,
+            FrustumCuller& culler,
             Shader& shader,
             Pipeline& pipeline,
-            DescriptorSetBuilder& builder,
-            const CameraBuffer& camera, function<void(Shader&)> perShaderHook);
+            const VkRenderingInfo& renderingInfo,
+            DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook);
 
-        // Reset per-frame state (culler usage tracking)
         void ResetFrame();
 
     private:
@@ -122,9 +120,19 @@ namespace Core
             Core::Buffer& indirectCommandBuffer,
             DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook);
 
+        // Mid-pass Hi-Z input for phase-2 occlusion culling: resolves the MSAA
+        // depth (already shader-readable) into the ResolvedDepth target and
+        // leaves it shader-readable.
+        Handle<Texture> ResolveDepthForCulling(CommandBuffer& commandBuffer,
+            Handle<Texture> msaaDepth);
+
     private:
         Device& _device;
         RenderFrame& _renderFrame;
+
+        // Mid-pass depth resolve (see ResolveDepthForCulling).
+        Handle<Shader> _depthResolveShader;
+        unique_ptr<Pipeline> _depthResolvePipeline;
 
         // Per-camera/RendererBatch cullers, reused within a frame
         unordered_map<CullerKey, unique_ptr<Culler>, CullerKeyHash> _cullers;

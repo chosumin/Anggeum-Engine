@@ -564,7 +564,7 @@ namespace Core
 
 		for (size_t p = 0; p < _passDecls.size(); p++)
 		{
-			auto& decl = _passDecls[p];
+			auto& passDecl = _passDecls[p];
 
 			_contexts.push_back(FrameGraphPassContext(_device,
 				renderFrame.GetResources().GetDescriptorPool(),
@@ -573,7 +573,7 @@ namespace Core
 			auto& context = _contexts.back();
 
 			context._declared.assign(_resources.size(), 0);
-			for (const auto& access : decl.accesses)
+			for (const auto& access : passDecl.accesses)
 				context._declared[access.resource] = 1;
 
 			if (_compiled.culledPasses[p])
@@ -581,7 +581,7 @@ namespace Core
 
 			for (uint32_t variant = 0; variant < FrameGraphPassContext::MaxRenderingVariants; variant++)
 			{
-				if (!decl.hasRendering[variant])
+				if (!passDecl.hasRendering[variant])
 					continue;
 
 				auto& setup = context._rendering[variant];
@@ -589,48 +589,48 @@ namespace Core
 
 				VkExtent2D renderArea{ 0, 0 };
 
-				for (const auto& attachment : decl.colorAttachments[variant])
+				for (const auto& attachment : passDecl.colorAttachments[variant])
 				{
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
 
-					VkRenderingAttachmentInfo info{};
-					info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-					info.imageView = texture->GetImageView();
-					info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-					info.loadOp = attachment.loadOp;
-					info.storeOp = attachment.storeOp;
-					info.clearValue = attachment.clear;
+					VkRenderingAttachmentInfo attachmentInfo{};
+					attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+					attachmentInfo.imageView = texture->GetImageView();
+					attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+					attachmentInfo.loadOp = attachment.loadOp;
+					attachmentInfo.storeOp = attachment.storeOp;
+					attachmentInfo.clearValue = attachment.clear;
 
 					if (attachment.resolveTarget.IsValid())
 					{
 						Texture* resolve = _physicalTextures[attachment.resolveTarget.index];
 						assert(resolve != nullptr);
-						info.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-						info.resolveImageView = resolve->GetImageView();
-						info.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+						attachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+						attachmentInfo.resolveImageView = resolve->GetImageView();
+						attachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 					}
 
-					setup.colorAttachments.push_back(info);
+					setup.colorAttachments.push_back(attachmentInfo);
 
 					const auto& extent = texture->GetExtent();
 					renderArea = { extent.width, extent.height };
 				}
 
-				if (decl.hasDepth[variant])
+				if (passDecl.hasDepth[variant])
 				{
-					const auto& attachment = decl.depthAttachments[variant];
+					const auto& attachment = passDecl.depthAttachments[variant];
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
 
-					auto& info = setup.depthAttachment;
-					info = {};
-					info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-					info.imageView = texture->GetImageView();
-					info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-					info.loadOp = attachment.loadOp;
-					info.storeOp = attachment.storeOp;
-					info.clearValue = attachment.clear;
+					auto& attachmentInfo = setup.depthAttachment;
+					attachmentInfo = {};
+					attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+					attachmentInfo.imageView = texture->GetImageView();
+					attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+					attachmentInfo.loadOp = attachment.loadOp;
+					attachmentInfo.storeOp = attachment.storeOp;
+					attachmentInfo.clearValue = attachment.clear;
 					setup.hasDepth = true;
 
 					const auto& extent = texture->GetExtent();

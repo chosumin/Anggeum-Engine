@@ -21,6 +21,12 @@ namespace Core
 			VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
 			VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
 
+		// Raw-handle variant for images without an engine wrapper (swapchain).
+		BarrierBatch2& Image(VkImage image, VkImageAspectFlags aspect,
+			VkImageLayout oldLayout, VkImageLayout newLayout,
+			VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+			VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
+
 		// Records the accumulated barriers as one barrier call, then
 		// clears the batch so it can be reused. No-op if nothing has been recorded.
 		void Submit();
