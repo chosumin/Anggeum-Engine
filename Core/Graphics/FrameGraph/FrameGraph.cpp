@@ -69,8 +69,7 @@ namespace Core
 
 	void FrameGraph::Invalidate()
 	{
-		// The transient heaps live in each frame's FrameResources, which the
-		// graph does not own — each slot resets lazily on its next realize.
+		// The transient resets lazily on its next realize.
 		_invalidateEpoch++;
 		_compiledValid = false;
 	}
@@ -354,7 +353,7 @@ namespace Core
 	// ============================================================
 	// Per-frame driver (main thread)
 	// ============================================================
-	void FrameGraph::SetupAndCompile(RenderFrame& renderFrame, uint32_t frameSlot, uint32_t imageIndex)
+	void FrameGraph::SetupAndCompile(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		_passDecls.clear();
 		_resources.clear();
@@ -383,7 +382,7 @@ namespace Core
 		// part — transient realization — has its own unchanged-request skip.
 		CompileDeclarations(_passDecls, _resources, entryStates, _compiled);
 
-		RealizeTransients(renderFrame, frameSlot);
+		RealizeTransients(renderFrame);
 		ResolvePhysical();
 		BuildPassContexts(renderFrame, imageIndex);
 
@@ -428,7 +427,7 @@ namespace Core
 		}
 	}
 
-	void FrameGraph::RealizeTransients(RenderFrame& renderFrame, uint32_t frameSlot)
+	void FrameGraph::RealizeTransients(RenderFrame& renderFrame)
 	{
 		if (!_defaultSampler.IsValid())
 			_defaultSampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
@@ -437,34 +436,44 @@ namespace Core
 
 		// Lazy invalidation (resize etc.): this slot has not been realized since
 		// the last Invalidate().
-		if (_slotEpochs[frameSlot] != _invalidateEpoch)
+		if (transients.GetInvalidateEpoch() != _invalidateEpoch)
 		{
 			transients.Reset();
-			_slotEpochs[frameSlot] = _invalidateEpoch;
+			transients.SetInvalidateEpoch(_invalidateEpoch);
 		}
 
 		// Collect the surviving transients with their lifetimes; the allocator
 		// aliases resources whose pass intervals do not overlap.
 		vector<TransientResourceAllocator::Request> requests;
-		_transientResources.clear();
+		vector<uint32_t> transientResources;
 
-		for (size_t r = 0; r < _resources.size(); r++)
+		for (size_t i = 0; i < _resources.size(); i++)
 		{
-			auto& decl = _resources[r];
-			if (decl.imported || !_compiled.lifetimes[r].used)
+			auto& resource = _resources[i];
+			const auto& lifetime = _compiled.lifetimes[i];
+			if (resource.imported || !lifetime.used)
 				continue;
 
-			// Cross-queue-read resources are excluded from aliasing (their
-			// lifetime was already extended to the frame's end by the compile).
 			TransientResourceAllocator::Request request;
-			request.name = decl.name;
-			request.isTexture = decl.isTexture;
-			request.texDesc = decl.texDesc;
-			request.bufDesc = decl.bufDesc;
-			request.firstPass = _compiled.lifetimes[r].firstPass;
-			request.lastPass = _compiled.lifetimes[r].lastPass;
+			request.name = resource.name;
+			request.isTexture = resource.isTexture;
+			request.texDesc = resource.texDesc;
+			request.bufDesc = resource.bufDesc;
+			request.firstPass = lifetime.firstPass;
+			request.lastPass = lifetime.lastPass;
+			request.queue = _passDecls[lifetime.firstPass].queue;
+
+			// Multi-queue resources cannot alias at all: pass indices do not
+			// order execution across queues, so inflate the interval to the
+			// whole frame (blocks every memory-sharing candidate).
+			if (lifetime.crossQueue)
+			{
+				request.firstPass = 0;
+				request.lastPass = static_cast<uint32_t>(_passDecls.size() - 1);
+			}
+
 			requests.push_back(std::move(request));
-			_transientResources.push_back(static_cast<uint32_t>(r));
+			transientResources.push_back(static_cast<uint32_t>(i));
 		}
 
 		transients.Realize(requests, _defaultSampler);
@@ -483,20 +492,24 @@ namespace Core
 				if (!memoryOverlap)
 					continue;
 
-				const uint32_t resourceA = _transientResources[i];
-				const uint32_t resourceB = _transientResources[j];
+				const uint32_t resourceA = transientResources[i];
+				const uint32_t resourceB = transientResources[j];
 				const bool aFirst = _compiled.lifetimes[resourceA].lastPass <
 					_compiled.lifetimes[resourceB].firstPass;
 				const uint32_t earlier = aFirst ? resourceA : resourceB;
 				const uint32_t later = aFirst ? resourceB : resourceA;
 
 				auto& barriers = _compiled.preBarriers[_compiled.lifetimes[later].firstPass];
+				
 				bool patched = false;
+
 				for (auto& plan : barriers)
 				{
 					if (plan.resource != later)
 						continue;
+
 					assert(plan.oldLayout == VK_IMAGE_LAYOUT_UNDEFINED || !plan.isImage);
+					
 					plan.srcStage |= _compiled.finalStates[earlier].stage;
 					patched = true;
 					break;
@@ -517,25 +530,25 @@ namespace Core
 
 		for (size_t r = 0; r < _resources.size(); r++)
 		{
-			auto& decl = _resources[r];
+			auto& resource = _resources[r];
 			if (!_compiled.lifetimes[r].used)
 				continue;
 
-			if (decl.isTexture)
+			if (resource.isTexture)
 			{
-				if (decl.imported)
-					_physicalTextures[r] = decl.importedTexture.TryGet();
+				if (resource.imported)
+					_physicalTextures[r] = resource.importedTexture.TryGet();
 				else
-					_physicalTextures[r] = transients.GetTexture(decl.name);
+					_physicalTextures[r] = transients.GetTexture(resource.name);
 
 				assert(_physicalTextures[r] != nullptr);
 			}
 			else
 			{
-				if (decl.imported)
-					_physicalBuffers[r] = decl.importedBuffer.TryGet();
+				if (resource.imported)
+					_physicalBuffers[r] = resource.importedBuffer.TryGet();
 				else
-					_physicalBuffers[r] = transients.GetBuffer(decl.name);
+					_physicalBuffers[r] = transients.GetBuffer(resource.name);
 
 				assert(_physicalBuffers[r] != nullptr);
 			}

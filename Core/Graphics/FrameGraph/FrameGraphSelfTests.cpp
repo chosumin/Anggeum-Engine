@@ -71,6 +71,20 @@ namespace Core
 				assert(placements[0].offset == 0 && placements[1].offset == 0 && placements[2].offset == 0);
 			}
 
+			// Disjoint lifetimes on different queues must NOT share memory: pass
+			// indices do not order execution across queues, so the "earlier"
+			// resource may still be in flight when the "later" one writes.
+			{
+				vector<Allocator::PlaceInput> inputs = {
+					{ 100, 1, 0, 1, 0 },   // graphics
+					{ 100, 1, 2, 3, 1 },   // compute, lifetime disjoint
+				};
+				vector<Allocator::Placement> placements;
+				VkDeviceSize heapSize = Allocator::Place(inputs, placements);
+				assert(placements[0].offset != placements[1].offset);
+				assert(heapSize == 200);
+			}
+
 			printf("[TransientResourceAllocator] placement self-tests passed\n");
 		}
 	}

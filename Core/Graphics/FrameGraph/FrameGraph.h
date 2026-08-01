@@ -130,9 +130,9 @@ namespace Core
 
 		void OnGUI(RenderFrame& renderFrame);
 
-		// Setup sweep + compile + transient realization + 
+		// Setup sweep + compile + transient realization +
 		// physical resolution + per-pass context build.
-		void SetupAndCompile(RenderFrame& renderFrame, uint32_t frameSlot, uint32_t imageIndex);
+		void SetupAndCompile(RenderFrame& renderFrame, uint32_t imageIndex);
 
 		// Records every alive pass. 
 		// During the recording window the main thread only waits, 
@@ -167,7 +167,7 @@ namespace Core
 
 		// Capture the state of imported resources.
 		void CollectEntryStates(vector<FGResourceState>& outEntryStates);
-		void RealizeTransients(RenderFrame& renderFrame, uint32_t frameSlot);
+		void RealizeTransients(RenderFrame& renderFrame);
 		void ResolvePhysical();
 		void BuildPassContexts(RenderFrame& renderFrame, uint32_t imageIndex);
 
@@ -196,15 +196,8 @@ namespace Core
 		// FrameResources. Set by RealizeTransients each frame.
 		TransientResourceAllocator* _currentTransients = nullptr;
 
-		// Lazy invalidation: Invalidate() bumps the epoch, and each slot's
-		// allocator is Reset() the next time RealizeTransients touches it (the
-		// graph does not own the frames, so it cannot reach them eagerly).
+		// Reset-stamp for TransientResourceAllocator.
 		u64 _invalidateEpoch = 0;
-		array<u64, MAX_FRAMES_IN_FLIGHT> _slotEpochs{};
-
-		// Requests handed to the allocator this frame, aligned with the resource
-		// indices in _transientResources (for aliasing-barrier patching).
-		vector<uint32_t> _transientResources;
 
 		// Cross-frame state of imported resources.
 		FGResourceStateRegistry _registry;

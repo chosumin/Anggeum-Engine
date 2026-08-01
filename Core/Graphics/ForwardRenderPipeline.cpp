@@ -113,7 +113,7 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 
 	UploadSharedUniforms(renderFrame);
 
-	_frameGraph->SetupAndCompile(renderFrame, frameIndex, imageIndex);
+	_frameGraph->SetupAndCompile(renderFrame, imageIndex);
 	const uint32_t graphPassCount = _frameGraph->Execute(renderContext, renderFrame);
 
 	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
