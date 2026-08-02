@@ -43,9 +43,6 @@ void FrameResources::Reset()
 	if (_descriptorPool)
 		_descriptorPool->Reset();
 
-	_currentDepth = Handle<Texture>{};
-	_currentNormal = Handle<Texture>{};
-
 	// Reached only after the GPU finished this slot's previous frame, so the
 	// staging buffers these jobs own are no longer being read. Anything still
 	// unexecuted was queued after Submit already ran, and dropping it here would

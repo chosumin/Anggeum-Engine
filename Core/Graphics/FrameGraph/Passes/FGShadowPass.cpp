@@ -239,12 +239,7 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	depthDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	auto shadowTexture = frameResources.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 
-	// FGGeometryPass samples the map in-graph; its read leaves the image
-	// SHADER_READ_ONLY at frame end, which is exactly the entry layout, so no
-	// export barrier is needed.
-	_shadowDepth = builder.ImportTexture(RT_SHADOW_DEPTH, shadowTexture,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_UNDEFINED);
+	_shadowDepth = builder.ImportTexture(RT_SHADOW_DEPTH, shadowTexture);
 	builder.Write(_shadowDepth, TextureAccess::DepthWrite);
 
 	// Renders into one array layer at a time via per-cascade layer views, which

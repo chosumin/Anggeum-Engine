@@ -42,8 +42,7 @@ namespace Core
 		return FGBuffer{ _graph.DeclareResource(std::move(decl)) };
 	}
 
-	FGTexture FrameGraphBuilder::ImportTexture(const string& name, Handle<Texture> texture,
-		VkImageLayout entryLayout, VkImageLayout exportLayout)
+	FGTexture FrameGraphBuilder::ImportTexture(const string& name, Handle<Texture> texture)
 	{
 		auto it = _graph._resourceIndices.find(name);
 		if (it != _graph._resourceIndices.end())
@@ -59,8 +58,6 @@ namespace Core
 		decl.isTexture = true;
 		decl.imported = true;
 		decl.importedTexture = texture;
-		decl.entryLayout = entryLayout;
-		decl.exportLayout = exportLayout;
 
 		return FGTexture{ _graph.DeclareResource(std::move(decl)) };
 	}

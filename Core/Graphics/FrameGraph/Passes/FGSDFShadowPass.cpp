@@ -158,9 +158,7 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	_depth = builder.GetTexture(depthName);
 	builder.Read(_depth, TextureAccess::SampledCompute);
 
-	_sdfShadow = builder.ImportTexture(RT_SDF_SHADOW, sdfShadowTexture,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	_sdfShadow = builder.ImportTexture(RT_SDF_SHADOW, sdfShadowTexture);
 	builder.Write(_sdfShadow, TextureAccess::StorageComputeWrite);
 
 	UpdateSDFParams();
@@ -178,9 +176,7 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	// Volume raytrace debug view (ImGui samples it in the GUI pass).
 	if (PerspectiveCamera* camera = _scene.GetMainCamera())
 	{
-		_volumeSlice = builder.ImportTexture(RT_SDF_VOLUME_SLICE, volumeSliceTexture,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		_volumeSlice = builder.ImportTexture(RT_SDF_VOLUME_SLICE, volumeSliceTexture);
 		builder.Write(_volumeSlice, TextureAccess::StorageComputeWrite);
 
 		glm::mat4 viewMatrix = camera->Matrices.View;

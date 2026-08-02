@@ -86,13 +86,11 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     return ctx;
 }
 
-bool CACAOPass::Prepare(FrameResources& frameResources)
+bool CACAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal)
 {
     _currentContext = nullptr;
 
-    auto depthForSampling = frameResources.GetCurrentDepth();
-    auto normalForSampling = frameResources.GetCurrentNormal();
-    if (!depthForSampling.IsValid() || !normalForSampling.IsValid())
+    if (!depth.IsValid() || !normal.IsValid())
         return false;
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
@@ -103,8 +101,8 @@ bool CACAOPass::Prepare(FrameResources& frameResources)
 
     FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
         &frameResources,
-        depthForSampling.Get().GetImageView(),
-        normalForSampling.Get().GetImageView(),
+        depth.Get().GetImageView(),
+        normal.Get().GetImageView(),
         aoImage.GetImage(),
         _aoTexture.Get().GetImageView());
 

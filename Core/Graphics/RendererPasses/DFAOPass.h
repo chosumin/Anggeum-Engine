@@ -24,7 +24,8 @@ namespace Core
         ~DFAOPass();
 
         void EnsureRenderTargets(FrameResources& frameResources);
-        bool Prepare(FrameResources& frameResources);
+
+        bool Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal);
         void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
 
         void UpdateGUI();

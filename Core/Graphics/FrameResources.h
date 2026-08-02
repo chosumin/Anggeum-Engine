@@ -126,11 +126,6 @@ namespace Core
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
-		void SetCurrentDepth(Handle<Texture> depth) { _currentDepth = depth; }
-		Handle<Texture> GetCurrentDepth() const { return _currentDepth; }
-		void SetCurrentNormal(Handle<Texture> normal) { _currentNormal = normal; }
-		Handle<Texture> GetCurrentNormal() const { return _currentNormal; }
-
 	private:
 		// Only reachable through the typed overload, so a block's size always comes
 		// from a real C++ type rather than a hand-written byte count.
@@ -165,8 +160,6 @@ namespace Core
 		unordered_map<string, Handle<Buffer>> _uniformBufferHandles;
 
 		Handle<Texture> _previousDepthBuffer;
-		Handle<Texture> _currentDepth;
-		Handle<Texture> _currentNormal;
 
 		Handle<Sampler> _defaultSampler;
 

@@ -120,8 +120,7 @@ void FGGeometryPass::EnsureIBLResources(FrameGraphBuilder& builder, FrameResourc
     // emits no barriers and only needs them resolvable through the context.
     auto importManual = [&](const char* name, Handle<Texture> handle, TextureAccess finalState)
     {
-        FGTexture t = builder.ImportTexture(name, handle,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED);
+        FGTexture t = builder.ImportTexture(name, handle);
         builder.WriteManual(t, finalState);
         return t;
     };
@@ -212,22 +211,16 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
         static_cast<uint32_t>(_tileInfo.viewportSize.y)
     };
 
-    // MSAA color target; the legacy GUI pass loads it afterwards and resolves
-    // it into the swapchain image, so both entry and export stay ATTACHMENT.
-    RenderTargetDesc colorDesc{};
+    FGTextureDesc colorDesc{};
     colorDesc.extent = screenExtent;
     colorDesc.format = _swapChainFormat;
-    colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+    colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     colorDesc.samples = _msaaSamples;
     colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    colorDesc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    auto colorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+    _mainColor = builder.CreateTexture(RT_MAIN_COLOR, colorDesc);
 
     EnsureIBLResources(builder, frameResources, renderExecutor);
 
-    _mainColor = builder.ImportTexture(RT_MAIN_COLOR, colorTexture,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     _mainDepth = builder.GetTexture(RT_MAIN_DEPTH);
 
     // Variant 0: phase-1 render (color CLEAR, depth LOAD).

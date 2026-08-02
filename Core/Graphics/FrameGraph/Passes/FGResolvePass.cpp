@@ -51,16 +51,12 @@ void FGResolvePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 	resolvedNormalDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	auto resolvedNormalHandle = frameResources.GetOrCreateRenderTarget(RT_RESOLVED_NORMAL, resolvedNormalDesc);
 
-	frameResources.SetCurrentDepth(frameResources.GetRenderTarget(RT_RESOLVED_DEPTH));
-	frameResources.SetCurrentNormal(resolvedNormalHandle);
-
 	// FGDepthPrePass declared MainDepth/MainNormal/ResolvedDepth in its Setup
 	// (declaration order guarantees it ran first).
 	_mainDepth = builder.GetTexture(FGDepthPrePass::RT_MAIN_DEPTH);
 	_mainNormal = builder.GetTexture(FGDepthPrePass::RT_MAIN_NORMAL);
 	_resolvedDepth = builder.GetTexture(RT_RESOLVED_DEPTH);
-	_resolvedNormal = builder.ImportTexture(RT_RESOLVED_NORMAL, resolvedNormalHandle,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	_resolvedNormal = builder.ImportTexture(RT_RESOLVED_NORMAL, resolvedNormalHandle);
 
 	// The resolve shaders sample the MSAA targets from compute-stage dispatches
 	// recorded on the graphics queue.

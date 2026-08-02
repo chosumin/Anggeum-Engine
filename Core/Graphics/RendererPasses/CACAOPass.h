@@ -24,7 +24,7 @@ namespace Core
 
         void EnsureRenderTargets(FrameResources& frameResources);
 
-        bool Prepare(FrameResources& frameResources);
+        bool Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal);
         void Record(CommandBuffer& commandBuffer);
         void UpdateGUI();
 

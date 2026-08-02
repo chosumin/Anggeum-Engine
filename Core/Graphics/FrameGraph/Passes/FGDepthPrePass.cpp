@@ -59,8 +59,7 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 		normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		normalDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		normalTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
-		_mainNormal = builder.ImportTexture(RT_MAIN_NORMAL, normalTexture,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		_mainNormal = builder.ImportTexture(RT_MAIN_NORMAL, normalTexture);
 	}
 
 	RenderTargetDesc depthDesc{};
@@ -83,16 +82,8 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	resolvedDepthDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	auto resolvedDepthTexture = frameResources.GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, resolvedDepthDesc);
 
-	if (_msaaSamples == VK_SAMPLE_COUNT_1_BIT)
-	{
-		frameResources.SetCurrentDepth(depthTexture);
-		frameResources.SetCurrentNormal(normalTexture);
-	}
-
-	_mainDepth = builder.ImportTexture(RT_MAIN_DEPTH, depthTexture,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED);
-	_resolvedDepth = builder.ImportTexture(RT_RESOLVED_DEPTH, resolvedDepthTexture,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	_mainDepth = builder.ImportTexture(RT_MAIN_DEPTH, depthTexture);
+	_resolvedDepth = builder.ImportTexture(RT_RESOLVED_DEPTH, resolvedDepthTexture);
 
 	// Variant 0: CLEAR phase (occlusion pass 1). Variant 1: LOAD phase (pass 2).
 	FGAttachment color0;

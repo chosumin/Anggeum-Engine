@@ -31,14 +31,10 @@ namespace Core
 		FGTextureDesc texDesc{};
 		FGBufferDesc bufDesc{};
 
-		// Imported physical resources (FrameResources/ResourceManager-owned).
+		// Imported physical resources.
+		// Entry/final state is carried across frames by the FGResourceStateRegistry.
 		Handle<Texture> importedTexture;
 		Handle<Buffer> importedBuffer;
-
-		// Imported textures only: layout assumed on the first-ever frame, and the
-		// layout to leave behind for legacy consumers (UNDEFINED = don't care).
-		VkImageLayout entryLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout exportLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
 	struct FGAccessDecl
@@ -172,8 +168,6 @@ namespace Core
 		void BuildPassContexts(RenderFrame& renderFrame, uint32_t imageIndex);
 
 		void UpdateRegistry();
-
-		static FGAccessInfo GetExportAccessInfo(VkImageLayout layout);
 
 	private:
 		Device& _device;

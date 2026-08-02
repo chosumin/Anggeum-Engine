@@ -92,7 +92,7 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-bool DFAOPass::Prepare(FrameResources& frameResources)
+bool DFAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return false;
@@ -100,8 +100,8 @@ bool DFAOPass::Prepare(FrameResources& frameResources)
     if (!_sdfGenerator->GetSDFTexture().IsValid() || !_sdfGenerator->GetBoundsBuffer())
         return false;
 
-    _depthForSampling = frameResources.GetCurrentDepth();
-    _normalForSampling = frameResources.GetCurrentNormal();
+    _depthForSampling = depth;
+    _normalForSampling = normal;
     if (!_depthForSampling.IsValid() || !_normalForSampling.IsValid())
         return false;
 

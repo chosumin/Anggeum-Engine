@@ -288,65 +288,18 @@ namespace Core
 			if (sync.waitPass >= 0)
 				out.passSync[sync.waitPass].signals = true;
 
-		// ---- Export barriers for imported textures with a declared exit layout ----
+		// ---- Final states: fed back to the registry for imports (next frame's
+		// entry) ---- the last access already left the image in this layout, so
+		// no forced export barrier is needed.
 		for (size_t i = 0; i < resourceCount; i++)
 		{
 			if (!out.lifetimes[i].used)
 				continue;
 
-			Track& track = tracks[i];
-
-			if (resources[i].imported && resources[i].isTexture &&
-				resources[i].exportLayout != VK_IMAGE_LAYOUT_UNDEFINED &&
-				track.layout != resources[i].exportLayout)
-			{
-				const FGAccessInfo exportInfo = GetExportAccessInfo(resources[i].exportLayout);
-
-				FGBarrierPlan plan;
-				plan.resource = static_cast<uint32_t>(i);
-				plan.isImage = true;
-				plan.srcStage = track.lastWriteStage | track.readStages;
-				plan.srcAccess = track.lastWriteAccess;
-				plan.dstStage = exportInfo.stage;
-				plan.dstAccess = exportInfo.access;
-				plan.oldLayout = track.layout;
-				plan.newLayout = resources[i].exportLayout;
-				out.postBarriers[out.lifetimes[i].lastPass].push_back(plan);
-
-				track.layout = resources[i].exportLayout;
-				track.lastWriteStage = exportInfo.stage;
-				track.lastWriteAccess = exportInfo.access;
-				track.readStages = VK_PIPELINE_STAGE_2_NONE;
-			}
-
+			const Track& track = tracks[i];
 			out.finalStates[i].layout = track.layout;
 			out.finalStates[i].stage = track.lastWriteStage | track.readStages;
 			out.finalStates[i].access = track.lastWriteAccess;
-		}
-	}
-
-	FGAccessInfo FrameGraph::GetExportAccessInfo(VkImageLayout layout)
-	{
-		switch (layout)
-		{
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			return { VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, layout, false };
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			return { VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-				VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-				layout, true };
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			return { VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-				layout, true };
-		case VK_IMAGE_LAYOUT_GENERAL:
-			return { VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-				VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-				layout, true };
-		default:
-			return { VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT,
-				layout, false };
 		}
 	}
 
@@ -404,19 +357,10 @@ namespace Core
 				Texture* texture = decl.importedTexture.TryGet();
 				assert(texture != nullptr && "imported texture handle is dead");
 
-				// Bridge imports (explicit entryLayout) describe the steady-state
-				// layout legacy passes leave the image in each frame; the registry
-				// only decides for fully graph-owned imports (entryLayout UNDEFINED).
-				if (decl.entryLayout != VK_IMAGE_LAYOUT_UNDEFINED)
-				{
-					outEntryStates[r].layout = decl.entryLayout;
-					outEntryStates[r].stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-					outEntryStates[r].access = VK_ACCESS_2_MEMORY_WRITE_BIT;
-				}
-				else
-				{
-					outEntryStates[r] = _registry.GetTextureState(*texture, FGResourceState{});
-				}
+				// The registry is the sole entry-state authority: what last frame
+				// left the image in. Empty on the first frame -> UNDEFINED, which
+				// is a discard (correct, since every import's first access writes).
+				outEntryStates[r] = _registry.GetTextureState(*texture, FGResourceState{});
 			}
 			else
 			{

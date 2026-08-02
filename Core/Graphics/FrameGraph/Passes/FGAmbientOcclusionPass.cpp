@@ -45,11 +45,10 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
     builder.Read(builder.GetTexture(depthName), TextureAccess::SampledCompute);
     builder.Read(builder.GetTexture(normalName), TextureAccess::SampledCompute);
 
-    // Legacy GeometryPass samples the mask assuming SHADER_READ_ONLY.
-    FGTexture ao = builder.ImportTexture(RT_AO,
-        frameResources.GetRenderTarget(RT_AO),
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    auto depth = frameResources.GetRenderTarget(depthName);
+    auto normal = frameResources.GetRenderTarget(normalName);
+
+    FGTexture ao = builder.ImportTexture(RT_AO, frameResources.GetRenderTarget(RT_AO));
 
     switch (_activeMethod)
     {
@@ -57,14 +56,13 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
             // FFX manages the output's layout itself (discards via UNDEFINED, ends
             // at SHADER_READ_ONLY), so the graph only tracks the final state.
             builder.WriteManual(ao, TextureAccess::SampledCompute);
-            _ready = _cacaoPass->Prepare(frameResources);
+            _ready = _cacaoPass->Prepare(frameResources, depth, normal);
             break;
         case AOMethod::DFAO:
             builder.Write(ao, TextureAccess::StorageComputeWrite);
-            _ready = _dfaoPass->Prepare(frameResources);
+            _ready = _dfaoPass->Prepare(frameResources, depth, normal);
             break;
     }
-
 }
 
 void FGAmbientOcclusionPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)

@@ -82,21 +82,10 @@ FGGUIRenderPass::~FGGUIRenderPass()
 void FGGUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderExecutor& renderExecutor)
 {
-    RenderTargetDesc colorDesc{};
-    colorDesc.extent = _extent;
-    colorDesc.format = _swapChainFormat;
-    colorDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
-    colorDesc.samples = _msaaSamples;
-    colorDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    colorDesc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    auto mainColorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
+	_mainColor = builder.GetTexture(RT_MAIN_COLOR);
+	builder.Write(_mainColor, TextureAccess::ColorLoadWrite);
 
-    _mainColor = builder.ImportTexture(RT_MAIN_COLOR, mainColorTexture,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    builder.Write(_mainColor, TextureAccess::ColorLoadWrite);
-
-    // The resolve target is the raw swapchain image (no graph declaration) and
+	// The resolve target is the raw swapchain image (no graph declaration) and
     // ImGui's draw data is external state.
     builder.SetManualRendering();
     builder.SetSideEffect();

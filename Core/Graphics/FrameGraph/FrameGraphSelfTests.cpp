@@ -98,8 +98,6 @@ namespace Core
 		resources[1].name = "B"; resources[1].isTexture = true;
 		resources[2].name = "C"; resources[2].isTexture = true;
 		resources[2].imported = true;
-		resources[2].entryLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		resources[2].exportLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		resources[3].name = "D"; resources[3].isTexture = false;
 
 		auto makeAccess = [](uint32_t res, TextureAccess access) {
@@ -174,17 +172,13 @@ namespace Core
 			assert(found);
 		}
 
-		// Imported C: written as GENERAL by P1, exported back to SHADER_READ_ONLY
-		// via a post-barrier on its last accessing pass (P1).
+		// Imported C: written as GENERAL by P1 (its last access), so its final
+		// state flows to the registry as GENERAL with no forced export barrier —
+		// the registry is the sole cross-frame entry authority now.
 		{
-			bool found = false;
 			for (const auto& plan : out.postBarriers[1])
-				if (plan.resource == 2 &&
-					plan.oldLayout == VK_IMAGE_LAYOUT_GENERAL &&
-					plan.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-					found = true;
-			assert(found);
-			assert(out.finalStates[2].layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+				assert(plan.resource != 2 && "no export post-barrier expected");
+			assert(out.finalStates[2].layout == VK_IMAGE_LAYOUT_GENERAL);
 		}
 
 		// Re-running culling with no readers of D and no side effect.

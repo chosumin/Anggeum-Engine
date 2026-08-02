@@ -18,18 +18,8 @@ namespace Core
 		FGTexture CreateTexture(const string& name, const FGTextureDesc& desc);
 		FGBuffer CreateBuffer(const string& name, const FGBufferDesc& desc);
 
-		// Migration bridge: wraps a FrameResources/ResourceManager-owned resource.
-		// `entryLayout` is the steady-state layout legacy passes leave the image
-		// in at frame start (must match the RT desc's initialLayout so the first
-		// frame agrees); when UNDEFINED, the FGResourceStateRegistry decides.
-		// `exportLayout` is the layout the graph leaves the image in for legacy
-		// consumers (VK_IMAGE_LAYOUT_UNDEFINED = don't care).
-		// Both layout parameters are bridge-era: once every consumer is migrated
-		// the graph sees all accesses, the registry becomes the sole entry-state
-		// authority, and this signature collapses to ImportTexture(name, handle).
-		// Importing an already-imported name returns the existing virtual handle.
-		FGTexture ImportTexture(const string& name, Handle<Texture> texture,
-			VkImageLayout entryLayout, VkImageLayout exportLayout);
+		// Wraps a resource owned by different resource managers.
+		FGTexture ImportTexture(const string& name, Handle<Texture> texture);
 		FGBuffer ImportBuffer(const string& name, Handle<Buffer> buffer);
 
 		// Blackboard lookup for resources another pass declared earlier.
