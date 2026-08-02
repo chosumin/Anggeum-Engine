@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "FGShadowCullPass.h"
-#include "FGShadowPass.h"
+#include "ShadowCullPass.h"
+#include "ShadowPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/FrameResources.h"
@@ -16,9 +16,9 @@
 
 using namespace Core;
 
-FGShadowCullPass::FGShadowCullPass(Device& device, Scene& scene, FGShadowPass& shadowPass)
+ShadowCullPass::ShadowCullPass(Device& device, RenderScene& renderScene, ShadowPass& shadowPass)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 	, _shadowPass(shadowPass)
 {
 	auto& resourceManager = _device.GetResourceManager();
@@ -30,15 +30,15 @@ FGShadowCullPass::FGShadowCullPass(Device& device, Scene& scene, FGShadowPass& s
 	_resetPipeline = resourceManager.LoadComputePipeline("Shaders/resetDrawCommandsSimple.comp.spv");
 }
 
-FGShadowCullPass::~FGShadowCullPass() = default;
+ShadowCullPass::~ShadowCullPass() = default;
 
-void FGShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	_active = false;
 	_cascadeCount = 0;
 
-	PerspectiveCamera* camera = _scene.GetMainCamera();
+	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
 	if (!camera)
 		return; // declares nothing: the pass culls itself this frame
 
@@ -95,7 +95,7 @@ void FGShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRe
 	_active = true;
 }
 
-void FGShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	if (!_active)
 		return;

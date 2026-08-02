@@ -6,25 +6,25 @@
 namespace Core
 {
 	class Device;
-	class Scene;
+	class RenderScene;
 	class Shader;
 	class Pipeline;
 	class SDFGenerator;
-	class FGShadowPass;
+	class ShadowPass;
 
 	// Screen-space SDF shadow mask: ray-marches the scene's SDF
 	// volume blended with the cascaded shadow maps.
-	class FGSDFShadowPass : public FrameGraphPass
+	class SDFShadowPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_SDF_SHADOW       = "SDFShadow";
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
-		FGSDFShadowPass(Device& device, Scene& scene, VkExtent2D screenExtent,
-			VkSampleCountFlagBits msaaSamples, FGShadowPass& shadowPass);
-		~FGSDFShadowPass();
+		SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
+			VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass);
+		~SDFShadowPass();
 
-		const char* GetName() const override { return "FGSDFShadowPass"; }
+		const char* GetName() const override { return "SDFShadowPass"; }
 		QueueType GetQueueType() const override { return QueueType::Compute; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
@@ -52,10 +52,10 @@ namespace Core
 		};
 
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		VkExtent2D _screenExtent;
 		VkSampleCountFlagBits _msaaSamples;
-		FGShadowPass& _shadowPass;
+		ShadowPass& _shadowPass;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
 

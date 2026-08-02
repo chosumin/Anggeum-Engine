@@ -12,7 +12,7 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
+Core::Image::Image(Device& device, ImageCreateDesc imageCreateInfo)
     :_device(device), _sampleCount(imageCreateInfo.sampleCount), _createFlags(imageCreateInfo.flags), _viewType(imageCreateInfo.imageViewType),
 	_filePath(imageCreateInfo.filePath), _format(imageCreateInfo.format),
     _image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE)
@@ -24,35 +24,71 @@ Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
         VK_IMAGE_USAGE_STORAGE_BIT;
 }
 
-Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
-    VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
-	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
-	_layer(imageInfo.arrayLayers), _viewType(imageViewType)
+VkImageViewType Core::Image::DeriveViewType(const ImageDesc& desc)
+{
+	if (desc.viewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+		return desc.viewType;
+	if (desc.isCubemap)
+		return VK_IMAGE_VIEW_TYPE_CUBE;
+	if (desc.arrayLayers > 1)
+		return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+	if (desc.depth > 1)
+		return VK_IMAGE_VIEW_TYPE_3D;
+	return VK_IMAGE_VIEW_TYPE_2D;
+}
+
+Core::Image::Image(Device& device, const ImageDesc& desc)
+	:_device(device), _format(desc.format),
+	_extent{ desc.extent.width, desc.extent.height, desc.depth },
+	_sampleCount(desc.samples), _mipLevels(desc.mipLevels), _usageFlags(desc.usage),
+	_layer(desc.arrayLayers), _viewType(DeriveViewType(desc)),
+	_createFlags(desc.isCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
 {
 	CreateImage(
 		VK_IMAGE_TILING_OPTIMAL,
 		_usageFlags,
 		VK_IMAGE_LAYOUT_UNDEFINED,
-        imageInfo.flags);
+		_createFlags);
 
 	BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    _imageView = CreateImageView(_mipLevels,
-        imageViewType, 
-        aspectFlags, 0);
+	_imageView = CreateImageView(_mipLevels, _viewType, desc.aspect, 0);
 }
 
-Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo,
-	VkImageAspectFlags aspectFlags, VkImageViewType imageViewType, Unbound)
-	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
-	_layer(imageInfo.arrayLayers), _viewType(imageViewType),
-	_image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE), _deferredAspectFlags(aspectFlags)
+Core::Image::Image(Device& device, const ImageDesc& desc, Unbound)
+	:_device(device), _format(desc.format),
+	_extent{ desc.extent.width, desc.extent.height, desc.depth },
+	_sampleCount(desc.samples), _mipLevels(desc.mipLevels), _usageFlags(desc.usage),
+	_layer(desc.arrayLayers), _viewType(DeriveViewType(desc)),
+	_createFlags(desc.isCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0),
+	_image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE), _deferredAspectFlags(desc.aspect)
 {
 	CreateImage(
 		VK_IMAGE_TILING_OPTIMAL,
 		_usageFlags,
 		VK_IMAGE_LAYOUT_UNDEFINED,
-		imageInfo.flags);
+		_createFlags);
+}
+
+VkImageView Core::Image::CreateRawView(Device& device, VkImage image,
+	VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
+{
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = image;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = format;
+	viewInfo.subresourceRange.aspectMask = aspectFlags;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = mipLevels;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	VkImageView imageView;
+	if (vkCreateImageView(device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+		throw runtime_error("failed to create raw image view!");
+
+	return imageView;
 }
 
 VkMemoryRequirements Core::Image::GetMemoryRequirements() const

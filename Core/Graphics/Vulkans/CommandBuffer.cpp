@@ -71,9 +71,9 @@ void Core::CommandBuffer::ExecuteCommands(vector<CommandBuffer*>& secondaryComma
 }
 
 
-void Core::CommandBuffer::BeginRendering(const VkRenderingInfo& renderingInfo)
+void Core::CommandBuffer::BeginRendering(const RenderingSetup& setup)
 {
-    vkCmdBeginRendering(_commandBuffer, &renderingInfo);
+    vkCmdBeginRendering(_commandBuffer, &setup.Finalize());
 }
 
 void Core::CommandBuffer::EndRendering()

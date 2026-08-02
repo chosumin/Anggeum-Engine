@@ -29,7 +29,11 @@ namespace Core
 	class RenderScene
 	{
 	public:
-		explicit RenderScene(Device& device);
+		// The CPU scene this render scene mirrors. The scene object is created
+		// first (empty) and loaded later, so it can be a constructor argument.
+		RenderScene(Device& device, Scene& scene);
+
+		Scene& GetScene() const { return _scene; }
 
 		// Run every manager's self-gated sync, in dependency order.
 		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
@@ -67,6 +71,7 @@ namespace Core
 		};
 
 	private:
+		Scene& _scene;
 		unique_ptr<BindlessTextureManager> _bindless;
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;

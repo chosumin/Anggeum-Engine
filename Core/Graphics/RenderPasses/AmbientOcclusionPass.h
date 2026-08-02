@@ -5,7 +5,7 @@
 namespace Core
 {
     class Device;
-    class Scene;
+    class RenderScene;
     class Texture;
     class SDFGenerator;
     class CACAOPass;
@@ -20,17 +20,17 @@ namespace Core
     // Ambient occlusion (compute queue): dispatches to the active method's
     // helper (FFX CACAO or distance-field AO), both writing the shared AOResult
     // mask that GeometryPass samples.
-    class FGAmbientOcclusionPass : public FrameGraphPass
+    class AmbientOcclusionPass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_AO = "AOResult";
 
-        FGAmbientOcclusionPass(Device& device, Scene& scene, VkExtent2D screenExtent,
+        AmbientOcclusionPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples,
             SDFGenerator* sdfGenerator);
-        ~FGAmbientOcclusionPass();
+        ~AmbientOcclusionPass();
 
-        const char* GetName() const override { return "FGAmbientOcclusionPass"; }
+        const char* GetName() const override { return "AmbientOcclusionPass"; }
         QueueType GetQueueType() const override { return QueueType::Compute; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,

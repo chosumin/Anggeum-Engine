@@ -2,13 +2,33 @@
 
 namespace Core
 {
-	struct ImageCreateInfo
+	// Description for file-based asset textures (they carry a path, not a shape).
+	struct ImageCreateDesc
 	{
 		string filePath;
 		VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 		VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
 		VkImageCreateFlags flags = 0;
 		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+	};
+
+	// The one description for every engine-created image.
+	struct ImageDesc
+	{
+		VkExtent2D extent{};
+		uint32_t depth = 1; // > 1 makes a 3D image
+
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		uint32_t mipLevels = 1;
+		uint32_t arrayLayers = 1;
+		bool isCubemap = false;
+
+		// MAX_ENUM = derive: cube if isCubemap, 2D_ARRAY if arrayLayers > 1,
+		// 3D if depth > 1, else 2D.
+		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
 	};
 
 	struct MemoryAllocation;
@@ -21,16 +41,21 @@ namespace Core
 		// memory.
 		struct Unbound {};
 
-		Image(Device& device, ImageCreateInfo imageCreateInfo);
+		Image(Device& device, ImageCreateDesc imageCreateInfo);
 
-		//Creates a render target image
-		Image(Device& device, VkImageCreateInfo& imageInfo,
-			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D);
+		// The unified creation path for engine-made images: 
+		// bound device-local memory + default view.
+		Image(Device& device, const ImageDesc& desc);
 
-		Image(Device& device, VkImageCreateInfo& imageInfo,
-			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType, Unbound);
+		// Transient/aliased path:
+		// the default view is deferred to BindMemoryAt.
+		Image(Device& device, const ImageDesc& desc, Unbound);
 
 		~Image();
+
+		// View creation for images the engine does not own (the swapchain's).
+		static VkImageView CreateRawView(Device& device, VkImage image,
+			VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 
 		VkMemoryRequirements GetMemoryRequirements() const;
 		
@@ -68,6 +93,9 @@ namespace Core
 		// Labels a freshly created view for the validation layer.
 		void NameView(VkImageView view, const char* kind, uint32_t index) const;
 		VkImageView CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags);
+
+		// View-type derivation shared by both ctors (see ImageDesc::viewType).
+		static VkImageViewType DeriveViewType(const ImageDesc& desc);
 	private:
 		Device& _device;
 

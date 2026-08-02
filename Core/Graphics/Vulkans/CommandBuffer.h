@@ -1,6 +1,7 @@
 #pragma once
 #include "CommandPool.h"
 #include "BarrierBatch.h"
+#include "RenderingSetup.h"
 #include "Graphics/SyncContext.h"
 
 namespace Core
@@ -27,7 +28,7 @@ namespace Core
 		void ResetCommandBuffer();
 		void BeginCommandBuffer(VkCommandBufferUsageFlags flags = 0);
 		void ExecuteCommands(vector<CommandBuffer*>& secondaryCommandBuffers);
-		void BeginRendering(const VkRenderingInfo& renderingInfo);
+		void BeginRendering(const RenderingSetup& setup);
 		void EndRendering();
 		void BindPipeline(const Pipeline* pipeline);
 		void SetViewportAndScissor(VkExtent2D extent);

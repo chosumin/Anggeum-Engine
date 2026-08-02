@@ -1,26 +1,27 @@
 #include "stdafx.h"
-#include "FGAmbientOcclusionPass.h"
-#include "FGDepthPrePass.h"
-#include "FGResolvePass.h"
+#include "AmbientOcclusionPass.h"
+#include "DepthPrePass.h"
+#include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameResources.h"
-#include "Graphics/RendererPasses/CACAOPass.h"
-#include "Graphics/RendererPasses/DFAOPass.h"
+#include "Graphics/RenderScene.h"
+#include "Graphics/RenderPasses/CACAOPass.h"
+#include "Graphics/RenderPasses/DFAOPass.h"
 
 using namespace Core;
 
-FGAmbientOcclusionPass::FGAmbientOcclusionPass(Device& device, Scene& scene,
+AmbientOcclusionPass::AmbientOcclusionPass(Device& device, RenderScene& renderScene,
     VkExtent2D screenExtent, VkSampleCountFlagBits msaaSamples,
     SDFGenerator* sdfGenerator)
     : _msaaSamples(msaaSamples)
 {
-    _cacaoPass = make_unique<CACAOPass>(device, scene, screenExtent, msaaSamples);
-    _dfaoPass = make_unique<DFAOPass>(device, scene, screenExtent, msaaSamples, sdfGenerator);
+    _cacaoPass = make_unique<CACAOPass>(device, renderScene.GetScene(), screenExtent, msaaSamples);
+    _dfaoPass = make_unique<DFAOPass>(device, renderScene.GetScene(), screenExtent, msaaSamples, sdfGenerator);
 }
 
-FGAmbientOcclusionPass::~FGAmbientOcclusionPass() = default;
+AmbientOcclusionPass::~AmbientOcclusionPass() = default;
 
-void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void AmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
     switch (_activeMethod)
@@ -37,11 +38,11 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
     // earlier graph passes (resolved variants when MSAA is on).
     const bool msaa = _msaaSamples != VK_SAMPLE_COUNT_1_BIT;
     const char* depthName = msaa
-        ? FGResolvePass::RT_RESOLVED_DEPTH
-        : FGDepthPrePass::RT_MAIN_DEPTH;
+        ? ResolvePass::RT_RESOLVED_DEPTH
+        : DepthPrePass::RT_MAIN_DEPTH;
     const char* normalName = msaa
-        ? FGResolvePass::RT_RESOLVED_NORMAL
-        : FGDepthPrePass::RT_MAIN_NORMAL;
+        ? ResolvePass::RT_RESOLVED_NORMAL
+        : DepthPrePass::RT_MAIN_NORMAL;
     _depth = builder.GetTexture(depthName);
     _normal = builder.GetTexture(normalName);
     builder.Read(_depth, TextureAccess::SampledCompute);
@@ -66,7 +67,7 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
     }
 }
 
-void FGAmbientOcclusionPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void AmbientOcclusionPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     if (!_ready)
         return;
@@ -85,7 +86,7 @@ void FGAmbientOcclusionPass::Execute(FrameGraphPassContext& context, CommandBuff
     }
 }
 
-void FGAmbientOcclusionPass::OnGUI(RenderFrame& renderFrame)
+void AmbientOcclusionPass::OnGUI(RenderFrame& renderFrame)
 {
     if (!ImGui::CollapsingHeader("Ambient Occlusion"))
         return;

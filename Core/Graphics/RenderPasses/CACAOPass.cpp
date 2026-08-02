@@ -6,7 +6,7 @@
 #include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Components/PerspectiveCamera.h"
-#include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
+#include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 
 #include "ffx_cacao_impl.h"
 
@@ -165,7 +165,7 @@ void CACAOPass::EnsureRenderTargets(FrameResources& frameResources)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = frameResources.GetOrCreateRenderTarget(FGAmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = frameResources.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void CACAOPass::UpdateGUI()

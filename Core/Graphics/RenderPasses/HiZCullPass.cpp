@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "FGHiZCullPass.h"
-#include "FGResolvePass.h"
+#include "HiZCullPass.h"
+#include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/FrameResources.h"
@@ -17,10 +17,10 @@
 
 using namespace Core;
 
-FGHiZCullPass::FGHiZCullPass(Device& device, Scene& scene, Phase phase,
-    FGHiZCullPass* cull1)
+HiZCullPass::HiZCullPass(Device& device, RenderScene& renderScene, Phase phase,
+    HiZCullPass* cull1)
     : _device(device)
-    , _scene(scene)
+    , _renderScene(renderScene)
     , _phase(phase)
 {
     auto& resourceManager = _device.GetResourceManager();
@@ -50,14 +50,14 @@ FGHiZCullPass::FGHiZCullPass(Device& device, Scene& scene, Phase phase,
     _hiZPipeline = resourceManager.LoadComputePipeline("Shaders/hiZGenerate.comp.spv");
 }
 
-FGHiZCullPass::~FGHiZCullPass() = default;
+HiZCullPass::~HiZCullPass() = default;
 
-void FGHiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
     _active = false;
 
-    PerspectiveCamera* camera = _scene.GetMainCamera();
+    PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
     if (!camera)
         return; // declares nothing: the pass culls itself this frame
 
@@ -108,7 +108,7 @@ void FGHiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
         _indirect = builder.GetBuffer(SB_PASS2_INDIRECT);
         builder.Write(_indirect, BufferAccess::StorageComputeWrite);
 
-        _resolvedDepth = builder.GetTexture(FGResolvePass::RT_RESOLVED_DEPTH);
+        _resolvedDepth = builder.GetTexture(ResolvePass::RT_RESOLVED_DEPTH);
         builder.Read(_resolvedDepth, TextureAccess::SampledCompute);
 
         _hiZTexture = frameResources.GetRenderTarget(RT_HIZ);
@@ -127,7 +127,7 @@ void FGHiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
     _active = true;
 }
 
-void FGHiZCullPass::EnsureHiZTexture(FrameResources& frameResources, RendererBatch& batch)
+void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources, RendererBatch& batch)
 {
     _state->extent = batch.GetExtents();
 
@@ -159,7 +159,7 @@ void FGHiZCullPass::EnsureHiZTexture(FrameResources& frameResources, RendererBat
         hiZTexture.GetImage().GetOrCreateImageView(mip);
 }
 
-void FGHiZCullPass::EnsureBatchBuffers(FrameResources& frameResources, RendererBatch& batch,
+void HiZCullPass::EnsureBatchBuffers(FrameResources& frameResources, RendererBatch& batch,
     SlotState& slot, Handle<Buffer>& outPass1, Handle<Buffer>& outPass2,
     Handle<Buffer>& outRejectedIndices, Handle<Buffer>& outRejectedCount)
 {
@@ -206,7 +206,7 @@ void FGHiZCullPass::EnsureBatchBuffers(FrameResources& frameResources, RendererB
     outRejectedCount = frameResources.GetOrCreateStorageBuffer(SB_REJECTED_COUNT, rejectedCountDesc);
 }
 
-void FGHiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     if (!_active)
         return;
@@ -235,7 +235,7 @@ void FGHiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
     }
 }
 
-void FGHiZCullPass::ResetDrawCommands(FrameGraphPassContext& context,
+void HiZCullPass::ResetDrawCommands(FrameGraphPassContext& context,
     CommandBuffer& commandBuffer, RendererBatch& batch)
 {
     const uint32_t drawCount = batch.GetDrawCommandCount();
@@ -277,7 +277,7 @@ void FGHiZCullPass::ResetDrawCommands(FrameGraphPassContext& context,
         .Submit();
 }
 
-void FGHiZCullPass::DispatchCulling(FrameGraphPassContext& context,
+void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     CommandBuffer& commandBuffer, RendererBatch& batch, SlotState& slot, Texture* depth)
 {
     // Build the Hi-Z pyramid from the depth this dispatch was given. It is
@@ -330,7 +330,7 @@ void FGHiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     builder.SetStorageBuffer(2, batch.GetTransformBatch().TransformBuffer.Get());
     builder.SetStorageBuffer(3, batch.GetInstanceBuffer());
     builder.SetStorageBuffer(4, context.GetBuffer(_indirect));
-    builder.SetTextureBuffer(5, _hiZTexture);
+    builder.SetTextureBuffer(5, _hiZTexture.Get());
     builder.SetStorageBuffer(10, context.GetBuffer(_rejectedIndices));
     builder.SetStorageBuffer(11, context.GetBuffer(_rejectedCount));
     auto& resources = builder.Build();
@@ -353,7 +353,7 @@ void FGHiZCullPass::DispatchCulling(FrameGraphPassContext& context,
         .Submit();
 }
 
-void FGHiZCullPass::BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+void HiZCullPass::BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
     Texture& depth)
 {
     Texture& hiZTex = _hiZTexture.Get();
@@ -395,8 +395,8 @@ void FGHiZCullPass::BuildHiZ(FrameGraphPassContext& context, CommandBuffer& comm
 
             auto& hiZShader = _hiZShader.Get();
             auto builder = context.CreateDescriptorSetBuilder(hiZShader, 0);
-            builder.SetTextureBuffer(0, _hiZTexture, mip - 1, VK_IMAGE_LAYOUT_GENERAL);
-            builder.SetTextureBuffer(1, _hiZTexture, mip, VK_IMAGE_LAYOUT_GENERAL);
+            builder.SetTextureBuffer(0, _hiZTexture.Get(), mip - 1, VK_IMAGE_LAYOUT_GENERAL);
+            builder.SetTextureBuffer(1, _hiZTexture.Get(), mip, VK_IMAGE_LAYOUT_GENERAL);
             auto& resources = builder.Build();
 
             commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, hiZShader,

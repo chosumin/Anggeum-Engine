@@ -1,8 +1,8 @@
 #include "stdafx.h"
-#include "FGShadowPass.h"
+#include "ShadowPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "FGShadowCullPass.h"
+#include "ShadowCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -17,9 +17,9 @@
 
 using namespace Core;
 
-FGShadowPass::FGShadowPass(Device& device, Scene& scene, VkFormat depthFormat)
+ShadowPass::ShadowPass(Device& device, RenderScene& renderScene, VkFormat depthFormat)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 {
 	_shadowExtent = { SHADOW_MAP_DIM, SHADOW_MAP_DIM };
 
@@ -39,9 +39,9 @@ FGShadowPass::FGShadowPass(Device& device, Scene& scene, VkFormat depthFormat)
 	_pipeline = make_unique<Pipeline>(device, renderingDesc, _shadowShader.Get(), *_pipelineState);
 }
 
-FGShadowPass::~FGShadowPass() = default;
+ShadowPass::~ShadowPass() = default;
 
-std::array<glm::vec3, 8> FGShadowPass::GetFrustumCornersWorldSpace(const glm::mat4& viewProj)
+std::array<glm::vec3, 8> ShadowPass::GetFrustumCornersWorldSpace(const glm::mat4& viewProj)
 {
 	const glm::mat4 inv = glm::inverse(viewProj);
 
@@ -65,7 +65,7 @@ std::array<glm::vec3, 8> FGShadowPass::GetFrustumCornersWorldSpace(const glm::ma
 	return corners;
 }
 
-void FGShadowPass::UpdateCascades(PerspectiveCamera* camera)
+void ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 {
 	float nearClip = camera->GetNearPlane();
 	float farClip = camera->GetFarPlane();
@@ -110,7 +110,7 @@ void FGShadowPass::UpdateCascades(PerspectiveCamera* camera)
 	_shadowBuffer.CascadeCount = effectiveCascadeCount;
 
 	// Get light direction
-	auto lights = _scene.GetComponents<Light>();
+	auto lights = _renderScene.GetScene().GetComponents<Light>();
 	if (lights.empty())
 		return;
 
@@ -213,12 +213,12 @@ void FGShadowPass::UpdateCascades(PerspectiveCamera* camera)
 	}
 }
 
-void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void ShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	_cascadeIndirect.fill(FGBuffer{});
 
-	PerspectiveCamera* camera = _scene.GetMainCamera();
+	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
 	if (!camera)
 		return; // nothing declared: the pass culls itself this frame
 
@@ -260,7 +260,7 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 		_cascadeBuffers[i] = builder.ImportBuffer(cascadeName, cascadeHandle);
 		builder.Read(_cascadeBuffers[i], BufferAccess::UniformVertex);
 
-		string indirectName = FGShadowCullPass::IndirectName(i);
+		string indirectName = ShadowCullPass::IndirectName(i);
 		if (builder.HasBuffer(indirectName))
 		{
 			_cascadeIndirect[i] = builder.GetBuffer(indirectName);
@@ -269,7 +269,7 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	}
 }
 
-void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	auto& shadowTexture = context.GetTexture(_shadowDepth);
 	auto& shader = _shadowShader.Get();
@@ -279,19 +279,17 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 	for (uint32_t cascadeIndex = 0; cascadeIndex < SHADOW_MAP_CASCADE_COUNT; ++cascadeIndex)
 	{
-		VkRenderingAttachmentInfo depthAttachment{};
-		depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		depthAttachment.imageView = shadowTexture.GetLayerImageView(cascadeIndex);
-		depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depthAttachment.clearValue.depthStencil = { 1.0f, 0 };
-
-		VkRenderingInfo renderingInfo{};
-		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea = { { 0, 0 }, _shadowExtent };
-		renderingInfo.layerCount = 1;
-		renderingInfo.pDepthAttachment = &depthAttachment;
+		// Built by hand: renders into one array layer via a per-cascade layer
+		// view, which the typed helper (whole-texture views) cannot express.
+		RenderingSetup setup;
+		setup.renderArea = _shadowExtent;
+		setup.hasDepth = true;
+		setup.depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		setup.depthAttachment.imageView = shadowTexture.GetLayerImageView(cascadeIndex);
+		setup.depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		setup.depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		setup.depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		setup.depthAttachment.clearValue.depthStencil = { 1.0f, 0 };
 
 		// Skip cascades beyond the SDF transition zone but still clear them
 		// so stale depth doesn't show up in the debug viewer.
@@ -299,7 +297,7 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 		{
 			string clearName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Clear (skipped)";
 			commandBuffer.BeginDebugMarker(clearName.c_str());
-			commandBuffer.BeginRendering(renderingInfo);
+			commandBuffer.BeginRendering(setup);
 			commandBuffer.EndRendering();
 			commandBuffer.EndDebugMarker();
 			continue;
@@ -313,16 +311,16 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		commandBuffer.BeginRendering(renderingInfo);
+		commandBuffer.BeginRendering(setup);
 		renderFrame.DrawIndirect(commandBuffer, shader, *_pipeline,
-			context.GetBuffer(_cascadeIndirect[cascadeIndex]), builder, nullptr);
+			context.GetBuffer(_cascadeIndirect[cascadeIndex]), builder);
 		commandBuffer.EndRendering();
 
 		commandBuffer.EndDebugMarker();
 	}
 }
 
-void FGShadowPass::OnGUI(RenderFrame& renderFrame)
+void ShadowPass::OnGUI(RenderFrame& renderFrame)
 {
 	if (!ImGui::CollapsingHeader("Shadow Pass"))
 		return;

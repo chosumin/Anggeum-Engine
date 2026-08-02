@@ -41,7 +41,7 @@ namespace Core
 		assert(variant < MaxRenderingVariants);
 		assert(_rendering[variant].valid && "pass declared no attachments for this variant");
 
-		commandBuffer.BeginRendering(_rendering[variant].renderingInfo);
+		commandBuffer.BeginRendering(_rendering[variant]);
 	}
 
 	void FrameGraphPassContext::EndRendering(CommandBuffer& commandBuffer) const
@@ -52,6 +52,6 @@ namespace Core
 	VkExtent2D FrameGraphPassContext::GetRenderArea(uint32_t variant) const
 	{
 		assert(variant < MaxRenderingVariants && _rendering[variant].valid);
-		return _rendering[variant].renderingInfo.renderArea.extent;
+		return _rendering[variant].renderArea;
 	}
 }

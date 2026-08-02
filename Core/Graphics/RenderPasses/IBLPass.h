@@ -6,14 +6,14 @@
 namespace Core
 {
 	class Device;
-	class Scene;
+	class RenderScene;
 	class Texture;
 	class PreEnvironmentPass;
 	class BrdfLutPass;
 
 	// Builds the image-based-lighting inputs (irradiance + prefiltered cubemaps,
 	// BRDF LUT) from the scene's environment map.
-	class FGIBLPass : public FrameGraphPass
+	class IBLPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_OFFSCREEN = "Offscreen";
@@ -26,10 +26,10 @@ namespace Core
 		// slot owns its own copy of the buffer).
 		static constexpr const char* UB_GI = "IBL.GI";
 
-		FGIBLPass(Device& device, Scene& scene);
-		~FGIBLPass();
+		IBLPass(Device& device, RenderScene& renderScene);
+		~IBLPass();
 
-		const char* GetName() const override { return "FGIBLPass"; }
+		const char* GetName() const override { return "IBLPass"; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;
@@ -45,7 +45,7 @@ namespace Core
 			Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut);
 
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 
 		unique_ptr<PreEnvironmentPass> _preEnvironmentPass;
 		unique_ptr<BrdfLutPass> _brdfLutPass;

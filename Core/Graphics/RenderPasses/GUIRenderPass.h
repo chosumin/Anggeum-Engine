@@ -8,15 +8,15 @@ namespace Core
     class SwapChain;
     class Texture;
 
-    class FGGUIRenderPass : public FrameGraphPass
+    class GUIRenderPass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
 
-        FGGUIRenderPass(Device& device, SwapChain& swapChain, VkSampleCountFlagBits msaaSamples);
-        ~FGGUIRenderPass();
+        GUIRenderPass(Device& device, SwapChain& swapChain, VkSampleCountFlagBits msaaSamples);
+        ~GUIRenderPass();
 
-        const char* GetName() const override { return "FGGUIRenderPass"; }
+        const char* GetName() const override { return "GUIRenderPass"; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
             RenderFrame& renderFrame) override;

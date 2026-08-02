@@ -10,8 +10,13 @@ namespace Core
 class SampleScene : public Core::Scene
 {
 public:
-	SampleScene(Core::Device& device, float width, float height, Core::RenderContext* renderContext);
+	explicit SampleScene(Core::Device& device);
 	~SampleScene();
+
+	// Loading needs the render-side managers (reached through the RenderContext),
+	// which are constructed after the scene object so RenderScene can take the
+	// scene by reference. Engine calls this once everything is wired.
+	void Load(float width, float height, Core::RenderContext* renderContext);
 
 	virtual void Update() override;
 private:

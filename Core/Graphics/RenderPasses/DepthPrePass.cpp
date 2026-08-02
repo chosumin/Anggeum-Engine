@@ -1,8 +1,8 @@
 #include "stdafx.h"
-#include "FGDepthPrePass.h"
+#include "DepthPrePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "FGHiZCullPass.h"
+#include "HiZCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -14,10 +14,10 @@
 
 using namespace Core;
 
-FGDepthPrePass::FGDepthPrePass(Device& device, Scene& scene, VkExtent2D extent,
+DepthPrePass::DepthPrePass(Device& device, RenderScene& renderScene, VkExtent2D extent,
 	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 	, _extent(extent)
 	, _msaaSamples(msaaSamples)
 	, _phase(phase)
@@ -33,9 +33,9 @@ FGDepthPrePass::FGDepthPrePass(Device& device, Scene& scene, VkExtent2D extent,
 	_pipeline = make_unique<Pipeline>(device, renderingDesc, _depthNormalShader.Get(), *_pipelineState);
 }
 
-FGDepthPrePass::~FGDepthPrePass() = default;
+DepthPrePass::~DepthPrePass() = default;
 
-void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	if (_phase == Phase::First)
@@ -92,8 +92,8 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
 	_indirect = FGBuffer{};
 	const char* indirectName = _phase == Phase::First
-		? FGHiZCullPass::SB_PASS1_INDIRECT
-		: FGHiZCullPass::SB_PASS2_INDIRECT;
+		? HiZCullPass::SB_PASS1_INDIRECT
+		: HiZCullPass::SB_PASS2_INDIRECT;
 	if (builder.HasBuffer(indirectName))
 	{
 		_indirect = builder.GetBuffer(indirectName);
@@ -101,7 +101,7 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	}
 }
 
-void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	// Entered even with nothing to draw (no camera / no batch), so the declared
 	// loadOps still clear the targets for the passes that read them.
@@ -117,7 +117,7 @@ void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
 		auto& renderFrame = context.GetRenderFrame();
 		renderFrame.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
-			context.GetBuffer(_indirect), builder, nullptr);
+			context.GetBuffer(_indirect), builder);
 	}
 
 	context.EndRendering(commandBuffer);

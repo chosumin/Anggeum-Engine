@@ -10,7 +10,7 @@ namespace Core
 	ResourceManager::ResourceManager(Device& device)
 		: _device(device)
 	{
-		ImageCreateInfo imageCreateInfo{};
+		ImageCreateDesc imageCreateInfo{};
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
@@ -140,7 +140,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
+	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 

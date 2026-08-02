@@ -107,9 +107,11 @@ namespace Core
 			if (resources[i].imported)
 				refCount[i]++;
 		}
+		// Load-writes count as reads: they consume the previous contents, so the
+		// pass that produced them is needed.
 		for (const auto& pass : passes)
 			for (const auto& access : pass.accesses)
-				if (!access.info.isWrite)
+				if (!access.info.isWrite || access.info.loadsPrevious)
 					refCount[access.resource]++;
 
 		bool changed = true;
@@ -132,7 +134,7 @@ namespace Core
 					out.culledPasses[i] = 1;
 					changed = true;
 					for (const auto& access : passes[i].accesses)
-						if (!access.info.isWrite)
+						if (!access.info.isWrite || access.info.loadsPrevious)
 							refCount[access.resource]--;
 				}
 			}
@@ -529,37 +531,25 @@ namespace Core
 				if (!passRecord.hasRendering[variant])
 					continue;
 
+				// The setup does the VkRenderingAttachmentInfo boilerplate; this
+				// only resolves virtual handles to physical textures.
 				auto& setup = context._rendering[variant];
 				setup.valid = true;
-
-				VkExtent2D renderArea{ 0, 0 };
 
 				for (const auto& attachment : passRecord.colorAttachments[variant])
 				{
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
 
-					VkRenderingAttachmentInfo attachmentInfo{};
-					attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-					attachmentInfo.imageView = texture->GetImageView();
-					attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-					attachmentInfo.loadOp = attachment.loadOp;
-					attachmentInfo.storeOp = attachment.storeOp;
-					attachmentInfo.clearValue = attachment.clear;
-
+					Texture* resolve = nullptr;
 					if (attachment.resolveTarget.IsValid())
 					{
-						Texture* resolve = _physicalTextures[attachment.resolveTarget.index];
+						resolve = _physicalTextures[attachment.resolveTarget.index];
 						assert(resolve != nullptr);
-						attachmentInfo.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
-						attachmentInfo.resolveImageView = resolve->GetImageView();
-						attachmentInfo.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 					}
 
-					setup.colorAttachments.push_back(attachmentInfo);
-
-					const auto& extent = texture->GetExtent();
-					renderArea = { extent.width, extent.height };
+					setup.AddColorAttachment(*texture, attachment.loadOp,
+						attachment.storeOp, attachment.clear, resolve);
 				}
 
 				if (passRecord.hasDepth[variant])
@@ -568,28 +558,9 @@ namespace Core
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
 
-					auto& attachmentInfo = setup.depthAttachment;
-					attachmentInfo = {};
-					attachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-					attachmentInfo.imageView = texture->GetImageView();
-					attachmentInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-					attachmentInfo.loadOp = attachment.loadOp;
-					attachmentInfo.storeOp = attachment.storeOp;
-					attachmentInfo.clearValue = attachment.clear;
-					setup.hasDepth = true;
-
-					const auto& extent = texture->GetExtent();
-					renderArea = { extent.width, extent.height };
+					setup.SetDepthAttachment(*texture, attachment.loadOp,
+						attachment.storeOp, attachment.clear);
 				}
-
-				auto& renderingInfo = setup.renderingInfo;
-				renderingInfo = {};
-				renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-				renderingInfo.renderArea = { { 0, 0 }, renderArea };
-				renderingInfo.layerCount = 1;
-				renderingInfo.colorAttachmentCount = static_cast<uint32_t>(setup.colorAttachments.size());
-				renderingInfo.pColorAttachments = setup.colorAttachments.data();
-				renderingInfo.pDepthAttachment = setup.hasDepth ? &setup.depthAttachment : nullptr;
 			}
 		}
 	}

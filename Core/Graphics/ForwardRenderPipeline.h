@@ -6,7 +6,7 @@
 
 namespace Core
 {
-	class Scene;
+	class RenderScene;
 	class SwapChain;
 	class WorkerThreadManager;
 	class Buffer;
@@ -17,7 +17,7 @@ namespace Core
 	{
 	public:
 		ForwardRenderPipeline(Device& device, 
-			WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain);
+			WorkerThreadManager& workerThreadManager, RenderScene& renderScene, SwapChain& swapChain);
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex) override;
@@ -38,7 +38,7 @@ namespace Core
 
 	private:
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		VkExtent2D _swapChainExtents;
 
 		unique_ptr<FrameGraph> _frameGraph;

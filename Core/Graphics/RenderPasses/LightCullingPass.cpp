@@ -1,7 +1,7 @@
 #include "stdafx.h"
-#include "FGLightCullingPass.h"
-#include "FGDepthPrePass.h"
-#include "FGResolvePass.h"
+#include "LightCullingPass.h"
+#include "DepthPrePass.h"
+#include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceManager.h"
@@ -14,10 +14,10 @@
 
 using namespace Core;
 
-FGLightCullingPass::FGLightCullingPass(Device& device, Scene& scene,
+LightCullingPass::LightCullingPass(Device& device, RenderScene& renderScene,
 	VkExtent2D swapChainExtents, ivec2 tileNums, VkSampleCountFlagBits msaaSamples)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 	, _msaaSamples(msaaSamples)
 {
 	_computeMaterial = device.GetResourceManager().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
@@ -27,16 +27,16 @@ FGLightCullingPass::FGLightCullingPass(Device& device, Scene& scene,
 	_tileInfo.tileNums = tileNums;
 }
 
-FGLightCullingPass::~FGLightCullingPass() = default;
+LightCullingPass::~LightCullingPass() = default;
 
-void FGLightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void LightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	// The depth this pass consumes: the resolved depth when MSAA is on, the main
 	// depth otherwise. Both were declared by the earlier graph passes.
 	const char* depthName = _msaaSamples != VK_SAMPLE_COUNT_1_BIT
-		? FGResolvePass::RT_RESOLVED_DEPTH
-		: FGDepthPrePass::RT_MAIN_DEPTH;
+		? ResolvePass::RT_RESOLVED_DEPTH
+		: DepthPrePass::RT_MAIN_DEPTH;
 
 	_depth = builder.GetTexture(depthName);
 	builder.Read(_depth, TextureAccess::SampledCompute);
@@ -57,7 +57,7 @@ void FGLightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frame
 	builder.Read(_lights, BufferAccess::UniformCompute);
 }
 
-void FGLightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void LightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	auto& computeShader = _computeMaterial.Get().GetShaderHandle().Get();
 

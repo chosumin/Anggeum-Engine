@@ -5,19 +5,19 @@
 
 namespace Core
 {
-	class Scene;
+	class RenderScene;
 	class Device;
 	class Pipeline;
 	class Buffer;
 	class Material;
 	class Texture;
 
-	class FGLightCullingPass : public FrameGraphPass
+	class LightCullingPass : public FrameGraphPass
 	{
 	public:
-		FGLightCullingPass(Device& device, Scene& scene,
+		LightCullingPass(Device& device, RenderScene& renderScene,
 			VkExtent2D swapChainExtents, ivec2 tileNums, VkSampleCountFlagBits msaaSamples);
-		~FGLightCullingPass();
+		~LightCullingPass();
 
 		const char* GetName() const override { return "LightCullingPass"; }
 		QueueType GetQueueType() const override { return QueueType::Compute; }
@@ -27,7 +27,7 @@ namespace Core
 
 	private:
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		TileInfo _tileInfo;
 		VkSampleCountFlagBits _msaaSamples;
 

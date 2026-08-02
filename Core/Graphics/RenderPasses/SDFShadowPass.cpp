@@ -1,8 +1,8 @@
 #include "stdafx.h"
-#include "FGSDFShadowPass.h"
-#include "FGShadowPass.h"
-#include "FGDepthPrePass.h"
-#include "FGResolvePass.h"
+#include "SDFShadowPass.h"
+#include "ShadowPass.h"
+#include "DepthPrePass.h"
+#include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/RendererBatch.h"
@@ -22,10 +22,10 @@ using namespace Core;
 
 static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
 
-FGSDFShadowPass::FGSDFShadowPass(Device& device, Scene& scene, VkExtent2D screenExtent,
-	VkSampleCountFlagBits msaaSamples, FGShadowPass& shadowPass)
+SDFShadowPass::SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
+	VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 	, _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
 	, _shadowPass(shadowPass)
@@ -39,7 +39,7 @@ FGSDFShadowPass::FGSDFShadowPass(Device& device, Scene& scene, VkExtent2D screen
 	_volumeSlicePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfVolumeSlice.comp.spv");
 }
 
-FGSDFShadowPass::~FGSDFShadowPass()
+SDFShadowPass::~SDFShadowPass()
 {
 	if (_sdfShadowImGuiDS != VK_NULL_HANDLE)
 		ImGui_ImplVulkan_RemoveTexture(_sdfShadowImGuiDS);
@@ -47,9 +47,9 @@ FGSDFShadowPass::~FGSDFShadowPass()
 		ImGui_ImplVulkan_RemoveTexture(_volumeSliceImGuiDS);
 }
 
-void FGSDFShadowPass::UpdateSDFParams()
+void SDFShadowPass::UpdateSDFParams()
 {
-	auto lights = _scene.GetComponents<Light>();
+	auto lights = _renderScene.GetScene().GetComponents<Light>();
 	if (!lights.empty())
 	{
 		auto light = lights[0];
@@ -76,7 +76,7 @@ void FGSDFShadowPass::UpdateSDFParams()
 	_sdfParams.SDFTransitionRange    = shadowUniform->SDFTransitionRange;
 }
 
-void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	_sliceReady = false;
@@ -152,8 +152,8 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	// The depth this pass consumes: the resolved depth when MSAA is on, the main
 	// depth otherwise. Both were declared by the earlier graph passes.
 	const char* depthName = _msaaSamples != VK_SAMPLE_COUNT_1_BIT
-		? FGResolvePass::RT_RESOLVED_DEPTH
-		: FGDepthPrePass::RT_MAIN_DEPTH;
+		? ResolvePass::RT_RESOLVED_DEPTH
+		: DepthPrePass::RT_MAIN_DEPTH;
 	_depth = builder.GetTexture(depthName);
 	builder.Read(_depth, TextureAccess::SampledCompute);
 
@@ -175,7 +175,7 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	builder.Read(_sdfParamsBuffer, BufferAccess::UniformCompute);
 
 	// Volume raytrace debug view (ImGui samples it in the GUI pass).
-	if (PerspectiveCamera* camera = _scene.GetMainCamera())
+	if (PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera())
 	{
 		// Import: debug-only, sampled solely by ImGui — no in-graph reader, so a
 		// transient would be culled.
@@ -202,9 +202,9 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	}
 }
 
-void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void SDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-	auto sdfTexture = _sdfGenerator->GetSDFTexture();
+	Texture& sdfTexture = _sdfGenerator->GetSDFTexture().Get();
 
 	// SDF shadow mask dispatch. The graph already transitioned the mask to
 	// GENERAL and made the depth visible to compute.
@@ -251,7 +251,7 @@ void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 	}
 }
 
-void FGSDFShadowPass::OnGUI(RenderFrame& renderFrame)
+void SDFShadowPass::OnGUI(RenderFrame& renderFrame)
 {
 	if (!ImGui::CollapsingHeader("SDF Shadow"))
 		return;

@@ -62,15 +62,12 @@ void Core::BrdfLutPass::Record(CommandBuffer& commandBuffer, Texture& brdfLut)
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
 
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea = { { 0, 0 }, extent2D };
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
+    RenderingSetup setup;
+    setup.renderArea = extent2D;
+    setup.colorAttachments.push_back(colorAttachment);
 
     commandBuffer.SetViewportAndScissor(extent2D);
-    commandBuffer.BeginRendering(renderingInfo);
+    commandBuffer.BeginRendering(setup);
 
     commandBuffer.BindPipeline(_brdfPipeline.get());
     commandBuffer.Draw(3, 1);

@@ -1,11 +1,11 @@
 #include "stdafx.h"
-#include "FGGeometryPass.h"
-#include "FGDepthPrePass.h"
-#include "FGShadowPass.h"
-#include "FGSDFShadowPass.h"
-#include "FGAmbientOcclusionPass.h"
-#include "FGIBLPass.h"
-#include "FGHiZCullPass.h"
+#include "GeometryPass.h"
+#include "DepthPrePass.h"
+#include "ShadowPass.h"
+#include "SDFShadowPass.h"
+#include "AmbientOcclusionPass.h"
+#include "IBLPass.h"
+#include "HiZCullPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceManager.h"
@@ -23,10 +23,10 @@
 
 using namespace Core;
 
-FGGeometryPass::FGGeometryPass(Device& device, Scene& scene, SwapChain& swapChain,
+GeometryPass::GeometryPass(Device& device, RenderScene& renderScene, SwapChain& swapChain,
     VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums)
     : _device(device)
-    , _scene(scene)
+    , _renderScene(renderScene)
     , _msaaSamples(msaaSamples)
     , _swapChainFormat(swapChain.GetImageFormat())
     , _depthFormat(depthFormat)
@@ -42,9 +42,9 @@ FGGeometryPass::FGGeometryPass(Device& device, Scene& scene, SwapChain& swapChai
     _pipelineState->GetDepthStencilStateCreateInfo().depthWriteEnable = VK_FALSE;
 }
 
-FGGeometryPass::~FGGeometryPass() = default;
+GeometryPass::~GeometryPass() = default;
 
-Pipeline* FGGeometryPass::GetOrCreatePipeline(Shader& shader)
+Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)
 {
     auto it = _pipelineCache.find(&shader);
     if (it != _pipelineCache.end())
@@ -60,12 +60,12 @@ Pipeline* FGGeometryPass::GetOrCreatePipeline(Shader& shader)
     return result;
 }
 
-void FGGeometryPass::PrepareSkybox()
+void GeometryPass::PrepareSkybox()
 {
     if (_skyboxShader != nullptr)
         return;
 
-    auto meshes = _scene.GetComponents<Core::Mesh>();
+    auto meshes = _renderScene.GetScene().GetComponents<Core::Mesh>();
     auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
     {
         auto& material = mesh->GetMaterials()[0].Get();
@@ -91,13 +91,13 @@ void FGGeometryPass::PrepareSkybox()
     _skyboxPipeline = make_unique<Pipeline>(_device, renderingDesc, *_skyboxShader, pipelineState);
 }
 
-void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
     _pass1Indirect = FGBuffer{};
     _pass2Indirect = FGBuffer{};
 
-    PerspectiveCamera* camera = _scene.GetMainCamera();
+    PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
     if (!camera)
         return; // nothing declared: the pass culls itself this frame
 
@@ -132,17 +132,17 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
     // Inputs produced by the earlier graph passes. The compile derives the
     // graphics<-compute waits from these (replacing the legacy manual
     // semaphore waits and acquire barriers).
-    _shadow = builder.GetTexture(FGShadowPass::RT_SHADOW_DEPTH);
+    _shadow = builder.GetTexture(ShadowPass::RT_SHADOW_DEPTH);
     builder.Read(_shadow, TextureAccess::SampledFragment);
 
     _sdfShadow = FGTexture{};
-    if (builder.HasTexture(FGSDFShadowPass::RT_SDF_SHADOW))
+    if (builder.HasTexture(SDFShadowPass::RT_SDF_SHADOW))
     {
-        _sdfShadow = builder.GetTexture(FGSDFShadowPass::RT_SDF_SHADOW);
+        _sdfShadow = builder.GetTexture(SDFShadowPass::RT_SDF_SHADOW);
         builder.Read(_sdfShadow, TextureAccess::SampledFragment);
     }
 
-    _ao = builder.GetTexture(FGAmbientOcclusionPass::RT_AO);
+    _ao = builder.GetTexture(AmbientOcclusionPass::RT_AO);
     builder.Read(_ao, TextureAccess::SampledFragment);
 
     _lightVisibility = builder.GetBuffer(SB_LIGHT_VISIBILITY);
@@ -162,14 +162,14 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
         frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW));
     builder.Read(_shadowUB, BufferAccess::UniformFragment);
 
-    // Produced by FGIBLPass (bindless indices of the IBL maps).
-    _gi = builder.ImportBuffer(FGIBLPass::UB_GI,
-        frameResources.GetOrCreateUniformBuffer<GI>(FGIBLPass::UB_GI));
+    // Produced by IBLPass (bindless indices of the IBL maps).
+    _gi = builder.ImportBuffer(IBLPass::UB_GI,
+        frameResources.GetOrCreateUniformBuffer<GI>(IBLPass::UB_GI));
     builder.Read(_gi, BufferAccess::UniformFragment);
 
     // Get a geometry shader for rendering (use first mesh's material shader)
     _geometryShader = nullptr;
-    auto meshes = _scene.GetComponents<Core::Mesh>();
+    auto meshes = _renderScene.GetScene().GetComponents<Core::Mesh>();
     for (auto* mesh : meshes)
     {
         for (auto& materialHandle : mesh->GetMaterials())
@@ -191,17 +191,17 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
     PrepareSkybox();
 
-    if (builder.HasBuffer(FGHiZCullPass::SB_PASS1_INDIRECT))
+    if (builder.HasBuffer(HiZCullPass::SB_PASS1_INDIRECT))
     {
-        _pass1Indirect = builder.GetBuffer(FGHiZCullPass::SB_PASS1_INDIRECT);
+        _pass1Indirect = builder.GetBuffer(HiZCullPass::SB_PASS1_INDIRECT);
         builder.Read(_pass1Indirect, BufferAccess::IndirectRead);
 
-        _pass2Indirect = builder.GetBuffer(FGHiZCullPass::SB_PASS2_INDIRECT);
+        _pass2Indirect = builder.GetBuffer(HiZCullPass::SB_PASS2_INDIRECT);
         builder.Read(_pass2Indirect, BufferAccess::IndirectRead);
     }
 }
 
-void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     // Entered even with nothing to draw (no camera, no shader, or no batch), so
     // the declared loadOp still clears the colour target the GUI pass composites
@@ -229,24 +229,21 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
     builder.SetTextureBuffer(11, context.GetTexture(_ao));
 
-    auto perShaderHook = [&](Shader& shader)
-    {
-        commandBuffer.PushConstants(shader, 0, _tileInfo);
-    };
+    commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
 
     // Replay both culled draw lists, then the skybox, all in one scope.
     auto& renderFrame = context.GetRenderFrame();
     renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass1Indirect), builder, perShaderHook);
+        context.GetBuffer(_pass1Indirect), builder);
     renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass2Indirect), builder, perShaderHook);
+        context.GetBuffer(_pass2Indirect), builder);
 
     RecordSkybox(context, commandBuffer);
 
     context.EndRendering(commandBuffer);
 }
 
-void FGGeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void GeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     if (_skyboxShader == nullptr)
         return;
@@ -258,7 +255,7 @@ void FGGeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer&
     auto skyBuilder1 = context.CreateDescriptorSetBuilder(*_skyboxShader, 1);
     auto& textures = _skyboxMaterial->GetTexturesMap();
     for (auto& [binding, texture] : textures)
-        skyBuilder1.SetTextureBuffer(binding, texture);
+        skyBuilder1.SetTextureBuffer(binding, texture.Get());
     auto& skyResources1 = skyBuilder1.Build();
 
     commandBuffer.BindPipeline(_skyboxPipeline.get());

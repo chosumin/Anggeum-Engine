@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/Vulkans/Image.h"
 
 namespace Core
 {
@@ -55,21 +56,17 @@ namespace Core
 
 		// The pass records its own barriers for this access.
 		bool manualBarriers = false;
+
+		// A write that loads the previous contents (LOAD_OP_LOAD attachments).
+		// Counts as a read in pass culling: the previous producer is needed.
+		bool loadsPrevious = false;
 	};
 
 	FGAccessInfo GetAccessInfo(TextureAccess access);
 	FGAccessInfo GetAccessInfo(BufferAccess access);
 
-	struct FGTextureDesc
-	{
-		VkExtent2D extent{};
-		VkFormat format = VK_FORMAT_UNDEFINED;
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-	};
+	// Transients share the engine-wide image description.
+	using FGTextureDesc = ImageDesc;
 
 	struct FGBufferDesc
 	{

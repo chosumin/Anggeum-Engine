@@ -108,14 +108,11 @@ void Core::PreEnvironmentPass::BeginOffscreenRendering(CommandBuffer& commandBuf
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.clearValue.color = { {0.0f, 0.0f, 0.0f, 1.0f} };
 
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea = { { 0, 0 }, extent };
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
+    RenderingSetup setup;
+    setup.renderArea = extent;
+    setup.colorAttachments.push_back(colorAttachment);
 
-    commandBuffer.BeginRendering(renderingInfo);
+    commandBuffer.BeginRendering(setup);
 }
 
 void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
@@ -157,7 +154,7 @@ void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, 
             commandBuffer.BindPipeline(_irradiancePipeline.get());
 
             auto irradianceBuilder = context.CreateDescriptorSetBuilder(shader, 0);
-            irradianceBuilder.SetTextureBuffer(0, _skyCubemap);
+            irradianceBuilder.SetTextureBuffer(0, _skyCubemap.Get());
             auto& irradianceResources = irradianceBuilder.Build();
             commandBuffer.BindDescriptorSet(
                 _irradiancePipeline->GetPipelineBindPoint(),
@@ -231,7 +228,7 @@ void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context,
             commandBuffer.BindPipeline(_prefilteredPipeline.get());
 
             auto prefilteredBuilder = context.CreateDescriptorSetBuilder(shader, 0);
-            prefilteredBuilder.SetTextureBuffer(0, _skyCubemap);
+            prefilteredBuilder.SetTextureBuffer(0, _skyCubemap.Get());
             auto& prefilteredResources = prefilteredBuilder.Build();
             commandBuffer.BindDescriptorSet(
                 _prefilteredPipeline->GetPipelineBindPoint(),

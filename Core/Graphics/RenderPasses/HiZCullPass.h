@@ -6,7 +6,7 @@
 namespace Core
 {
     class Device;
-    class Scene;
+    class RenderScene;
     class Shader;
     class Pipeline;
     class Texture;
@@ -18,8 +18,8 @@ namespace Core
     // 
     // Cull1: reset counts + cull against the previous frame's Hi-Z.
     // Cull2: cull the objects pass 1 rejected against this frame's Hi-Z,
-    //  built from the depth DepthPre1 drew (FGResolvePass output).
-    class FGHiZCullPass : public FrameGraphPass
+    //  built from the depth DepthPre1 drew (ResolvePass output).
+    class HiZCullPass : public FrameGraphPass
     {
     public:
         enum class Phase { Cull1, Cull2 };
@@ -33,9 +33,9 @@ namespace Core
         static constexpr const char* RT_HIZ = "OcclusionCull.HiZ";
 
         // Cull2 takes the Cull1 instance to share its CPU state.
-        FGHiZCullPass(Device& device, Scene& scene, Phase phase,
-            FGHiZCullPass* cull1 = nullptr);
-        ~FGHiZCullPass();
+        HiZCullPass(Device& device, RenderScene& renderScene, Phase phase,
+            HiZCullPass* cull1 = nullptr);
+        ~HiZCullPass();
 
         const char* GetName() const override
         {
@@ -82,7 +82,7 @@ namespace Core
             Texture& depth);
 
         Device& _device;
-        Scene& _scene;
+        RenderScene& _renderScene;
         Phase _phase;
 
         // Created by the Cull1 instance, shared by reference with Cull2 — both
@@ -107,7 +107,7 @@ namespace Core
         Handle<Buffer> _cullData;
         Handle<Texture> _hiZTexture;
         Handle<Texture> _prevDepth;   // Cull1: previous frame's resolved depth
-        FGTexture _resolvedDepth;     // Cull2: this frame's depth, from FGResolvePass
+        FGTexture _resolvedDepth;     // Cull2: this frame's depth, from ResolvePass
         FGBuffer _indirect;           // the indirect buffer this phase's dispatch fills
         FGBuffer _pass2Indirect;      // Cull1: reset also clears the pass-2 buffer
         FGBuffer _rejectedIndices;

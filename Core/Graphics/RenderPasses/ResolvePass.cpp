@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "FGResolvePass.h"
-#include "FGDepthPrePass.h"
+#include "ResolvePass.h"
+#include "DepthPrePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceManager.h"
@@ -23,7 +23,7 @@ namespace
 	};
 }
 
-FGResolvePass::FGResolvePass(Device& device, VkExtent2D screenExtent,
+ResolvePass::ResolvePass(Device& device, VkExtent2D screenExtent,
 	VkSampleCountFlagBits msaaSamples, bool resolveNormal)
 	: _device(device)
 	, _screenExtent(screenExtent)
@@ -45,14 +45,14 @@ FGResolvePass::FGResolvePass(Device& device, VkExtent2D screenExtent,
 	}
 }
 
-FGResolvePass::~FGResolvePass() = default;
+ResolvePass::~ResolvePass() = default;
 
-void FGResolvePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void ResolvePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
-	// FGDepthPrePass declared the MSAA targets in its Setup (declaration order
+	// DepthPrePass declared the MSAA targets in its Setup (declaration order
 	// guarantees it ran first).
-	_mainDepth = builder.GetTexture(FGDepthPrePass::RT_MAIN_DEPTH);
+	_mainDepth = builder.GetTexture(DepthPrePass::RT_MAIN_DEPTH);
 
 	// Depth history: next frame's pass-1 Hi-Z reads this slot's image, so it is
 	// imported rather than a transient. Both instances declare it — ImportTexture
@@ -85,13 +85,13 @@ void FGResolvePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 	normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 	_resolvedNormal = builder.CreateTexture(RT_RESOLVED_NORMAL, normalDesc);
 
-	_mainNormal = builder.GetTexture(FGDepthPrePass::RT_MAIN_NORMAL);
+	_mainNormal = builder.GetTexture(DepthPrePass::RT_MAIN_NORMAL);
 
 	builder.Read(_mainNormal, TextureAccess::SampledCompute);
 	builder.Write(_resolvedNormal, TextureAccess::StorageComputeWrite);
 }
 
-void FGResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void ResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	// Layout transitions are the graph's job; the pass only dispatches.
 	{

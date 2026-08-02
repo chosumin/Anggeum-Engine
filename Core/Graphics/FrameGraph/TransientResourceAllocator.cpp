@@ -237,18 +237,7 @@ uint32_t TransientResourceAllocator::CreateUnboundResources(const vector<Request
 
 		if (request.isTexture)
 		{
-			VkImageCreateInfo imageInfo{};
-			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-			imageInfo.imageType = VK_IMAGE_TYPE_2D;
-			imageInfo.extent = { request.texDesc.extent.width, request.texDesc.extent.height, 1 };
-			imageInfo.mipLevels = request.texDesc.mipLevels;
-			imageInfo.arrayLayers = request.texDesc.arrayLayers;
-			imageInfo.format = request.texDesc.format;
-			imageInfo.samples = request.texDesc.samples;
-			imageInfo.usage = request.texDesc.usage;
-
-			outImages[i] = make_unique<Image>(_device, imageInfo,
-				request.texDesc.aspect, VK_IMAGE_VIEW_TYPE_2D, Image::Unbound{});
+			outImages[i] = make_unique<Image>(_device, request.texDesc, Image::Unbound{});
 			requirements = outImages[i]->GetMemoryRequirements();
 		}
 		else

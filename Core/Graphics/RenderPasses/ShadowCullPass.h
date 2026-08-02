@@ -6,13 +6,13 @@
 namespace Core
 {
 	class Device;
-	class Scene;
+	class RenderScene;
 	class Shader;
 	class Pipeline;
 	class FrameResources;
-	class FGShadowPass;
+	class ShadowPass;
 
-	class FGShadowCullPass : public FrameGraphPass
+	class ShadowCullPass : public FrameGraphPass
 	{
 	public:
 		// Frame-graph name of cascade i's culled draw list.
@@ -21,8 +21,8 @@ namespace Core
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Indirect";
 		}
 
-		FGShadowCullPass(Device& device, Scene& scene, FGShadowPass& shadowPass);
-		~FGShadowCullPass();
+		ShadowCullPass(Device& device, RenderScene& renderScene, ShadowPass& shadowPass);
+		~ShadowCullPass();
 
 		const char* GetName() const override { return "ShadowCullPass"; }
 
@@ -39,8 +39,8 @@ namespace Core
 		};
 
 		Device& _device;
-		Scene& _scene;
-		FGShadowPass& _shadowPass;
+		RenderScene& _renderScene;
+		ShadowPass& _shadowPass;
 
 		Handle<Shader> _cullShader;
 		Handle<Pipeline> _cullPipeline;

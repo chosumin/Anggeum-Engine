@@ -11,8 +11,9 @@
 
 using namespace Core;
 
-RenderScene::RenderScene(Device& device)
+RenderScene::RenderScene(Device& device, Scene& scene)
 	: _device(&device)
+	, _scene(scene)
 {
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())

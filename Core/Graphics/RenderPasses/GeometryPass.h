@@ -6,7 +6,7 @@
 namespace Core
 {
     class Device;
-    class Scene;
+    class RenderScene;
     class SwapChain;
     class Shader;
     class Pipeline;
@@ -15,17 +15,17 @@ namespace Core
     class SubMesh;
     class Buffer;
 
-    class FGGeometryPass : public FrameGraphPass
+    class GeometryPass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
         static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 
-        FGGeometryPass(Device& device, Scene& scene, SwapChain& swapChain,
+        GeometryPass(Device& device, RenderScene& renderScene, SwapChain& swapChain,
             VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums);
-        ~FGGeometryPass();
+        ~GeometryPass();
 
-        const char* GetName() const override { return "FGGeometryPass"; }
+        const char* GetName() const override { return "GeometryPass"; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
             RenderFrame& renderFrame) override;
@@ -39,7 +39,7 @@ namespace Core
 
     private:
         Device& _device;
-        Scene& _scene;
+        RenderScene& _renderScene;
         VkSampleCountFlagBits _msaaSamples;
         VkFormat _swapChainFormat;
         VkFormat _depthFormat;

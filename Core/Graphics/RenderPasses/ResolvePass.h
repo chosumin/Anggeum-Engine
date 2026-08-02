@@ -9,16 +9,16 @@ namespace Core
 	class Pipeline;
 	class Texture;
 
-	class FGResolvePass : public FrameGraphPass
+	class ResolvePass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_RESOLVED_DEPTH = "ResolvedDepth";
 		static constexpr const char* RT_RESOLVED_NORMAL = "ResolvedNormal";
 
 		// resolveNormal also resolves MainNormal into ResolvedNormal (MSAA only).
-		FGResolvePass(Device& device, VkExtent2D screenExtent,
+		ResolvePass(Device& device, VkExtent2D screenExtent,
 			VkSampleCountFlagBits msaaSamples, bool resolveNormal);
-		~FGResolvePass();
+		~ResolvePass();
 
 		const char* GetName() const override
 		{

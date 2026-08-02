@@ -10,25 +10,25 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/FrameGraph/FrameGraph.h"
-#include "Graphics/FrameGraph/Passes/FGHiZCullPass.h"
-#include "Graphics/FrameGraph/Passes/FGDepthPrePass.h"
-#include "Graphics/FrameGraph/Passes/FGResolvePass.h"
-#include "Graphics/FrameGraph/Passes/FGLightCullingPass.h"
-#include "Graphics/FrameGraph/Passes/FGShadowCullPass.h"
-#include "Graphics/FrameGraph/Passes/FGShadowPass.h"
-#include "Graphics/FrameGraph/Passes/FGSDFShadowPass.h"
-#include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
-#include "Graphics/FrameGraph/Passes/FGIBLPass.h"
-#include "Graphics/FrameGraph/Passes/FGGeometryPass.h"
-#include "Graphics/FrameGraph/Passes/FGGUIRenderPass.h"
+#include "Graphics/RenderPasses/HiZCullPass.h"
+#include "Graphics/RenderPasses/DepthPrePass.h"
+#include "Graphics/RenderPasses/ResolvePass.h"
+#include "Graphics/RenderPasses/LightCullingPass.h"
+#include "Graphics/RenderPasses/ShadowCullPass.h"
+#include "Graphics/RenderPasses/ShadowPass.h"
+#include "Graphics/RenderPasses/SDFShadowPass.h"
+#include "Graphics/RenderPasses/AmbientOcclusionPass.h"
+#include "Graphics/RenderPasses/IBLPass.h"
+#include "Graphics/RenderPasses/GeometryPass.h"
+#include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
 	WorkerThreadManager& workerThreadManager,
-	Scene& scene, SwapChain& swapChain)
+	RenderScene& renderScene, SwapChain& swapChain)
 	:_device(device)
-	,_scene(scene)
+	,_renderScene(renderScene)
 	,_swapChainExtents(swapChain.GetSwapChainExtent())
 {
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
@@ -52,46 +52,46 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	// Two-pass occlusion culling is interleaved (pass-2 culls against the depth
 	// pass 1 drew), so the depth prepass is split and every step between the two
 	// halves is its own pass:
-	using CullPhase = FGHiZCullPass::Phase;
-	using DepthPhase = FGDepthPrePass::Phase;
+	using CullPhase = HiZCullPass::Phase;
+	using DepthPhase = DepthPrePass::Phase;
 
 	// Cull1 owns the CPU state both culling phases share; Cull2 references it.
-	auto hiZCull1 = make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull1);
-	FGHiZCullPass* hiZCull1Ptr = hiZCull1.get();
+	auto hiZCull1 = make_unique<HiZCullPass>(device, renderScene, CullPhase::Cull1);
+	HiZCullPass* hiZCull1Ptr = hiZCull1.get();
 
 	_frameGraph->AddPass(std::move(hiZCull1));
-	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::First));
-	_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ false));
-	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull2, hiZCull1Ptr));
-	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::Second));
+	_frameGraph->AddPass(make_unique<DepthPrePass>(device, renderScene, extent, depthFormat, _msaaSamples, DepthPhase::First));
+	_frameGraph->AddPass(make_unique<ResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ false));
+	_frameGraph->AddPass(make_unique<HiZCullPass>(device, renderScene, CullPhase::Cull2, hiZCull1Ptr));
+	_frameGraph->AddPass(make_unique<DepthPrePass>(device, renderScene, extent, depthFormat, _msaaSamples, DepthPhase::Second));
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));
-	_frameGraph->AddPass(make_unique<FGLightCullingPass>(device, scene, extent, tileNums, _msaaSamples));
+		_frameGraph->AddPass(make_unique<ResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));
+	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
 
 	// The cull pass runs first but reads the cascade matrices off the shadow
 	// pass, so the shadow pass object is created before it and added after.
-	auto fgShadowPass = make_unique<FGShadowPass>(device, scene, depthFormat);
-	FGShadowPass* fgShadowPassPtr = fgShadowPass.get();
-	_frameGraph->AddPass(make_unique<FGShadowCullPass>(device, scene, *fgShadowPassPtr));
+	auto fgShadowPass = make_unique<ShadowPass>(device, renderScene, depthFormat);
+	ShadowPass* fgShadowPassPtr = fgShadowPass.get();
+	_frameGraph->AddPass(make_unique<ShadowCullPass>(device, renderScene, *fgShadowPassPtr));
 	_frameGraph->AddPass(std::move(fgShadowPass));
 
-	auto fgSdfShadowPass = make_unique<FGSDFShadowPass>(
-		device, scene, extent, _msaaSamples, *fgShadowPassPtr);
-	FGSDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
+	auto fgSdfShadowPass = make_unique<SDFShadowPass>(
+		device, renderScene, extent, _msaaSamples, *fgShadowPassPtr);
+	SDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
 	_frameGraph->AddPass(std::move(fgSdfShadowPass));
 
-	_frameGraph->AddPass(make_unique<FGAmbientOcclusionPass>(
-		device, scene, extent, _msaaSamples,
+	_frameGraph->AddPass(make_unique<AmbientOcclusionPass>(
+		device, renderScene, extent, _msaaSamples,
 		fgSdfShadowPassPtr->GetSDFGenerator()));
 
 	// Generates the IBL maps the geometry pass samples. Runs on the first frame
 	// only; after that it declares nothing and the graph culls it.
-	_frameGraph->AddPass(make_unique<FGIBLPass>(device, scene));
+	_frameGraph->AddPass(make_unique<IBLPass>(device, renderScene));
 
-	_frameGraph->AddPass(make_unique<FGGeometryPass>(
-		device, scene, swapChain, depthFormat, _msaaSamples, tileNums));
+	_frameGraph->AddPass(make_unique<GeometryPass>(
+		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
 
-	_frameGraph->AddPass(make_unique<FGGUIRenderPass>(device, swapChain, _msaaSamples));
+	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()
@@ -113,7 +113,7 @@ void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& rend
 void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 {
 	auto& frameResources = renderFrame.GetResources();
-	if (auto* camera = _scene.GetMainCamera())
+	if (auto* camera = _renderScene.GetScene().GetMainCamera())
 	{
 		auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 		cameraBuffer.Update(camera->Matrices);
@@ -123,7 +123,7 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 	// light array field by field into it would be slow.
 	LightBuffer lights{};
 
-	auto sceneLights = _scene.GetComponents<Light>();
+	auto sceneLights = _renderScene.GetScene().GetComponents<Light>();
 	uint32_t count = std::min((uint32_t)sceneLights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
 	for (uint32_t i = 0; i < count; ++i)
 	{

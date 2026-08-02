@@ -198,21 +198,15 @@ SDFGenerator::~SDFGenerator() = default;
 
 void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 {
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_3D;
-	imageInfo.extent = { resolution, resolution, resolution };
-	imageInfo.format = VK_FORMAT_R32_SFLOAT;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+	// depth > 1 makes the unified path create a 3D image (and a 3D view).
+	ImageDesc imageDesc{};
+	imageDesc.extent = { resolution, resolution };
+	imageDesc.depth = resolution;
+	imageDesc.format = VK_FORMAT_R32_SFLOAT;
+	imageDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = make_unique<Image>(_device, imageInfo,
-		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
+	auto image = make_unique<Image>(_device, imageDesc);
 
 	auto sampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
 	_sdfTexture = _device.GetResourceManager().LoadTexture("SDFVolume", std::move(image), sampler);
@@ -362,7 +356,7 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderF
 	auto sdfBuilder = frameResources.CreateDescriptorSetBuilder(sdfGenerateShader, 0);
 	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0].Get());
 	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer().Get());
-	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	sdfBuilder.SetTextureBuffer(2, _sdfTexture.Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	sdfBuilder.SetStorageBuffer(3, _boundsBuffer.Get());
 	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer.Get());
 	sdfBuilder.SetStorageBuffer(5, transformBuffer);

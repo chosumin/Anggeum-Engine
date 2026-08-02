@@ -54,7 +54,7 @@ namespace Core
 		uint32_t slotIndex = AllocateSlot(isCubemap);
 
 		auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-		slot.textureBuffer.texture = texture;
+		slot.texture = texture;
 		slot.isActive = true;
 
 		if (isCubemap)
@@ -85,7 +85,7 @@ namespace Core
 		if (!slot.isActive)
 			return;
 
-		slot.textureBuffer.texture = Handle<Texture>{};
+		slot.texture = Handle<Texture>{};
 		slot.textureBuffer.mipLevel = 0;
 		slot.isActive = false;
 
@@ -124,8 +124,9 @@ namespace Core
 			uint binding = isCubemap ? 1 : 0;
 
 			VkDescriptorImageInfo imageInfo{};
-			if (slot.isActive && slot.textureBuffer.texture.IsValid())
+			if (slot.isActive && slot.texture.IsValid())
 			{
+				slot.textureBuffer.rawTexture = &slot.texture.Get();
 				auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 				write.dstSet = _descriptorSet;
 				write.dstArrayElement = slotIndex;

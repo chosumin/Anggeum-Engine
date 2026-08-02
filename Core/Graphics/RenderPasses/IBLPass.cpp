@@ -1,24 +1,24 @@
 #include "stdafx.h"
-#include "FGIBLPass.h"
+#include "IBLPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
-#include "Graphics/RendererPasses/PreEnvironmentPass.h"
-#include "Graphics/RendererPasses/BrdfLutPass.h"
+#include "Graphics/RenderPasses/PreEnvironmentPass.h"
+#include "Graphics/RenderPasses/BrdfLutPass.h"
 #include "Foundation/Scene.h"
 
 using namespace Core;
 
-FGIBLPass::FGIBLPass(Device& device, Scene& scene)
+IBLPass::IBLPass(Device& device, RenderScene& renderScene)
 	: _device(device)
-	, _scene(scene)
+	, _renderScene(renderScene)
 {
 }
 
-FGIBLPass::~FGIBLPass() = default;
+IBLPass::~IBLPass() = default;
 
-void FGIBLPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void IBLPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	frameResources.GetOrCreateUniformBuffer<GI>(UB_GI).Get().Update(_giBuffer);
@@ -26,7 +26,7 @@ void FGIBLPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources
 	CreateResources(builder, frameResources, renderFrame);
 }
 
-void FGIBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& frameResources,
+void IBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
 	// After the one generating frame this declares nothing, so the graph culls the
@@ -93,7 +93,7 @@ void FGIBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& fram
 	// The results are consumed through bindless, which the graph cannot see.
 	builder.SetSideEffect();
 
-	_preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _scene, offscreenDesc.format);
+	_preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _renderScene.GetScene(), offscreenDesc.format);
 	_preEnvironmentPass->Initialize();
 
 	_brdfLutPass = make_unique<BrdfLutPass>(_device, brdfLutDesc.format);
@@ -109,7 +109,7 @@ void FGIBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& fram
 	_record = true;
 }
 
-void FGIBLPass::RegisterGiTexturesToBindless(RenderFrame& renderFrame,
+void IBLPass::RegisterGiTexturesToBindless(RenderFrame& renderFrame,
 	Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut)
 {
 	if (!renderFrame.HasBindlessSupport())
@@ -134,7 +134,7 @@ void FGIBLPass::RegisterGiTexturesToBindless(RenderFrame& renderFrame,
 	std::cout << "  BRDF LUT: index " << _giBuffer.brdfLUTIndex << endl;
 }
 
-void FGIBLPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void IBLPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
 	if (!_record)
 		return;

@@ -73,7 +73,7 @@ SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer comm
 
 void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
 	Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
-	DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook)
+	DescriptorSetBuilder& builder)
 {
 	auto& batch = GetRendererBatch();
 	if (batch.GetDrawCommandCount() == 0)
@@ -98,10 +98,6 @@ void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
 	builder.SetStorageBuffer(2, batch.GetInstanceBuffer());
 	builder.SetUniformBuffer(8, GetMaterialManager().GetMaterialBuffer());
 	builder.SetStorageBuffer(9, batch.GetMaterialIndexBuffer());
-
-	// Runs before Build() so the hook can contribute its own descriptor resources.
-	if (perShaderHook)
-		perShaderHook(shader);
 
 	auto& resources = builder.Build();
 

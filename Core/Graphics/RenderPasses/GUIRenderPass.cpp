@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "FGGUIRenderPass.h"
+#include "GUIRenderPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameResources.h"
 #include "Graphics/Vulkans/Device.h"
@@ -9,7 +9,7 @@
 
 using namespace Core;
 
-FGGUIRenderPass::FGGUIRenderPass(Device& device, SwapChain& swapChain,
+GUIRenderPass::GUIRenderPass(Device& device, SwapChain& swapChain,
     VkSampleCountFlagBits msaaSamples)
     : _device(device)
     , _swapChain(swapChain)
@@ -70,7 +70,7 @@ FGGUIRenderPass::FGGUIRenderPass(Device& device, SwapChain& swapChain,
     ImGui_ImplVulkan_Init(&init_info);
 }
 
-FGGUIRenderPass::~FGGUIRenderPass()
+GUIRenderPass::~GUIRenderPass()
 {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -79,7 +79,7 @@ FGGUIRenderPass::~FGGUIRenderPass()
     vkDestroyDescriptorPool(_device.GetDevice(), _pool, nullptr);
 }
 
-void FGGUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void GUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
 	_mainColor = builder.GetTexture(RT_MAIN_COLOR);
@@ -94,7 +94,7 @@ void FGGUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
     ImGui::Render();
 }
 
-void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void GUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     const uint32_t imageIndex = context.GetImageIndex();
     VkImage swapChainImage = _swapChain.GetImage(imageIndex);
@@ -109,6 +109,8 @@ void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
         .Submit();
 
+    // Built by hand: the resolve target is a raw swapchain view, which the
+    // typed helper (whole-texture views) cannot express.
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachment.imageView = context.GetTexture(_mainColor).GetImageView();
@@ -119,15 +121,12 @@ void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
     colorAttachment.resolveImageView = _swapChain.GetImageView(imageIndex);
     colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea = { { 0, 0 }, _extent };
-    renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
+    RenderingSetup setup;
+    setup.renderArea = _extent;
+    setup.colorAttachments.push_back(colorAttachment);
 
     commandBuffer.SetViewportAndScissor(_extent);
-    commandBuffer.BeginRendering(renderingInfo);
+    commandBuffer.BeginRendering(setup);
 
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer.GetHandle());
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "Vulkans/MemoryAllocator.h"
 #include "Vulkans/Buffer.h"
+#include "Vulkans/Image.h"
 #include "ResourcePool.h"
 
 namespace Core
@@ -15,18 +16,9 @@ namespace Core
 	class Job;
 	class TransientResourceAllocator;
 
-	struct RenderTargetDesc
+	// The shared ImageDesc plus what only a pooled render target needs.
+	struct RenderTargetDesc : ImageDesc
 	{
-		VkExtent2D extent;
-		VkFormat format = VK_FORMAT_UNDEFINED; // For depth targets, this can be left as VK_FORMAT_UNDEFINED to auto-select a suitable depth format
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		bool isCubemap = false;
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-
 		// Optional custom sampler. Leave invalid to use default sampler
 		Handle<Sampler> sampler;
 

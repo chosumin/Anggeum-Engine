@@ -290,7 +290,7 @@ void Core::GLTFLoader::LoadSkybox(string path)
 	string textureName = path.substr(pos + 1, path.length() - 1);
 
 	//Create a cubemap
-	ImageCreateInfo imageCreateInfo
+	ImageCreateDesc imageCreateInfo
 	{
 		path,
 		VK_SAMPLE_COUNT_1_BIT,
@@ -517,7 +517,7 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		int samplerIndex = _model->textures[i].sampler;
 
 		// Texture owns its Image 1:1; build it from the glTF image URI.
-		ImageCreateInfo imageCreateInfo{};
+		ImageCreateDesc imageCreateInfo{};
 		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
 
 		auto texture =

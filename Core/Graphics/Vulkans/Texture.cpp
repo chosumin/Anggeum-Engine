@@ -29,7 +29,8 @@ uint32_t Core::Texture::GetLayers() const
 VkWriteDescriptorSet Core::TextureBuffer::CreateWriteDescriptorSet(uint32_t binding, VkDescriptorType descriptorType)
 {
 	imageInfo.imageLayout = imageLayout;
-	auto& tex = rawTexture != nullptr ? *rawTexture : texture.Get();
+	assert(rawTexture != nullptr && "texture buffer bound without a texture");
+	auto& tex = *rawTexture;
 	imageInfo.imageView = tex.GetImage().GetOrCreateImageView(mipLevel);
 
 	switch (descriptorType)

@@ -10,7 +10,7 @@
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/FrameGraph/FrameGraphPass.h"
-#include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
+#include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 using namespace Core;
 
 DFAOPass::DFAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
@@ -44,7 +44,7 @@ void DFAOPass::EnsureRenderTargets(FrameResources& frameResources)
     // GeometryPass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    _aoTexture = frameResources.GetOrCreateRenderTarget(FGAmbientOcclusionPass::RT_AO, aoDesc);
+    _aoTexture = frameResources.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);
 }
 
 void DFAOPass::UpdateParams()
@@ -130,8 +130,8 @@ void DFAOPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuff
     auto builder = context.CreateDescriptorSetBuilder(dfaoShader, 0);
     builder.SetTextureBuffer(0, depth);
     builder.SetTextureBuffer(1, normal);
-    builder.SetTextureBuffer(2, _sdfGenerator->GetSDFTexture());
-    builder.SetTextureBuffer(3, _aoTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+    builder.SetTextureBuffer(2, _sdfGenerator->GetSDFTexture().Get());
+    builder.SetTextureBuffer(3, _aoTexture.Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
     builder.SetStorageBuffer(4, *_sdfGenerator->GetBoundsBuffer());
     builder.SetUniformBuffer(5, *_paramsBuffer);
     auto& resources = builder.Build();

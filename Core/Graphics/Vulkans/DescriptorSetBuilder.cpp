@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "DescriptorSetBuilder.h"
 #include "Shader.h"
 #include "UniformBuffer.h"
@@ -27,19 +27,6 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
 {
 	// StorageBuffer is a non-owning view; `buffer` stays owned by the caller.
 	_resources.storageBuffers[binding].SetBuffer(buffer);
-	return *this;
-}
-
-Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
-	uint32_t binding, Handle<Texture> texture, uint32_t mipLevel,
-	VkImageLayout layout)
-{
-	TextureBuffer texBuffer{};
-	texBuffer.texture = texture;
-	texBuffer.mipLevel = mipLevel;
-	texBuffer.imageLayout = layout;
-
-	_resources.textureBuffers[binding] = texBuffer;
 	return *this;
 }
 

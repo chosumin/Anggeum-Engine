@@ -48,7 +48,7 @@ namespace Core
 		// reached through this frame.
 		void DrawIndirect(CommandBuffer& commandBuffer,
 			Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
-			DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook);
+			DescriptorSetBuilder& builder);
 
 		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
 		RendererBatch& GetRendererBatch() const { return *_renderScene.GetRendererBatch(); }

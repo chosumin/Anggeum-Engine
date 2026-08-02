@@ -6,21 +6,21 @@
 namespace Core
 {
 	class Device;
-	class Scene;
+	class RenderScene;
 	class Shader;
 	class Pipeline;
 	class PipelineState;
 	class PerspectiveCamera;
 
-	class FGShadowPass : public FrameGraphPass
+	class ShadowPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
-		FGShadowPass(Device& device, Scene& scene, VkFormat depthFormat);
-		~FGShadowPass();
+		ShadowPass(Device& device, RenderScene& renderScene, VkFormat depthFormat);
+		~ShadowPass();
 
-		const char* GetName() const override { return "FGShadowPass"; }
+		const char* GetName() const override { return "ShadowPass"; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;
@@ -41,7 +41,7 @@ namespace Core
 
 	private:
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		VkExtent2D _shadowExtent;
 
 		Handle<Shader> _shadowShader;
@@ -54,7 +54,7 @@ namespace Core
 		FGTexture _shadowDepth;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
 
-		// Per-cascade culled draw lists, produced by FGShadowCullPass. Invalid
+		// Per-cascade culled draw lists, produced by ShadowCullPass. Invalid
 		// entries mean the cascade was inactive this frame (clear-only).
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeIndirect{};
 

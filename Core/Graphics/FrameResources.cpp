@@ -149,61 +149,12 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 	}
 
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { desc.extent.width, desc.extent.height, 1 };
-	imageInfo.format = format;
-	imageInfo.mipLevels = desc.mipLevels;
-	imageInfo.arrayLayers = desc.arrayLayers;
-	imageInfo.samples = desc.samples;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = desc.usage;
+	// Cube flag, view type, image type, and the CONCURRENT graphics+compute
+	// sharing all come from Image::CreateImage.
+	ImageDesc imageDesc = static_cast<const ImageDesc&>(desc);
+	imageDesc.format = format; // depth fallback applied above
 
-	// These render targets can be produced on the compute queue and consumed on
-	// the graphics queue. Using CONCURRENT sharing lets both queues access them
-	// without explicit queue-ownership-transfer barriers. When the graphics and
-	// compute queue families are identical, CONCURRENT is invalid, so fall back
-	// to EXCLUSIVE.
-	const auto& qfi = _device.GetQueueFamilyIndices();
-	uint32_t queueFamilies[2] = {
-		qfi.GraphicsFamily.value(),
-		qfi.ComputeFamily.value()
-	};
-	if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
-	{
-		imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-		imageInfo.queueFamilyIndexCount = 2;
-		imageInfo.pQueueFamilyIndices = queueFamilies;
-	}
-	else
-	{
-		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	}
-
-	if (desc.isCubemap)
-		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-	VkImageViewType viewType;
-	if (desc.viewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM)
-	{
-		// Explicit view type override
-		viewType = desc.viewType;
-	}
-	else if (desc.isCubemap)
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-	}
-	else if (desc.arrayLayers > 1)
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-	}
-	else
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_2D;
-	}
-
-	auto image = make_unique<Image>(_device, imageInfo, desc.aspect, viewType);
+	auto image = make_unique<Image>(_device, imageDesc);
 	auto* imagePtr = image.get();
 
 	Handle<Sampler> sampler = desc.sampler.IsValid() ? desc.sampler : _defaultSampler;

@@ -1,6 +1,7 @@
 #pragma once
 #include "FrameGraphResource.h"
 #include "Graphics/SyncContext.h"
+#include "Graphics/Vulkans/RenderingSetup.h"
 
 namespace Core
 {
@@ -58,15 +59,6 @@ namespace Core
 			, _buffers(buffers)
 		{
 		}
-
-		struct RenderingSetup
-		{
-			bool valid = false;
-			vector<VkRenderingAttachmentInfo> colorAttachments;
-			VkRenderingAttachmentInfo depthAttachment{};
-			bool hasDepth = false;
-			VkRenderingInfo renderingInfo{};
-		};
 
 		// Exactly what Execute-side descriptor building consumes: the frame
 		// slot's pool (owned by FrameResources) and the device for the builder.

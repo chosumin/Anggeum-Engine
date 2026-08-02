@@ -40,7 +40,7 @@ namespace Core
 		// and registers it with the bindless array. Pass a sampler handle, or leave
 		// it empty to bind none.
 		Handle<Texture> LoadTexture(const string& textureName,
-			const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler = Handle<Sampler>{});
+			const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler = Handle<Sampler>{});
 
 		// Adopts an externally built image (e.g. a GPU-generated volume) into the
 		// texture pool. For app-lifetime textures that aren't loaded from a file.

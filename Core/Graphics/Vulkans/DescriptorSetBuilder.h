@@ -33,12 +33,6 @@ namespace Core
 
 		// --- Texture: combined image sampler ---
 		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding,
-			Handle<Texture> texture,
-			uint32_t mipLevel = 0,
-			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-		// --- Texture: combined image sampler ---
-		DescriptorSetBuilder& SetTextureBuffer(uint32_t binding,
 			Texture& texture,
 			uint32_t mipLevel = 0,
 			VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

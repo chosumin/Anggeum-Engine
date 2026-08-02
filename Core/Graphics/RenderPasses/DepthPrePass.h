@@ -4,14 +4,14 @@
 
 namespace Core
 {
-	class Scene;
+	class RenderScene;
 	class Device;
 	class Shader;
 	class Pipeline;
 	class PipelineState;
 	class Buffer;
 
-	class FGDepthPrePass : public FrameGraphPass
+	class DepthPrePass : public FrameGraphPass
 	{
 	public:
 		enum class Phase { First, Second };
@@ -19,9 +19,9 @@ namespace Core
 		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 		static constexpr const char* RT_MAIN_NORMAL = "MainNormal";
 
-		FGDepthPrePass(Device& device, Scene& scene, VkExtent2D extent,
+		DepthPrePass(Device& device, RenderScene& renderScene, VkExtent2D extent,
 			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase);
-		~FGDepthPrePass();
+		~DepthPrePass();
 
 		const char* GetName() const override
 		{
@@ -33,7 +33,7 @@ namespace Core
 
 	private:
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		VkExtent2D _extent;
 		VkSampleCountFlagBits _msaaSamples;
 		Phase _phase;
