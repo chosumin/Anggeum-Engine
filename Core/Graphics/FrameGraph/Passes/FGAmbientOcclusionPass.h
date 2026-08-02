@@ -48,7 +48,8 @@ namespace Core
         unique_ptr<DFAOPass> _dfaoPass;
         AOMethod _activeMethod = AOMethod::CACAO;
 
-        // Stashed per frame in Setup, consumed by Execute on the worker.
         bool _ready = false;
+        FGTexture _depth;
+        FGTexture _normal;
     };
 }

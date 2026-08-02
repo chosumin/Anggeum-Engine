@@ -86,45 +86,18 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     return ctx;
 }
 
-bool CACAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal)
+bool CACAOPass::Prepare(FrameResources& frameResources)
 {
-    _currentContext = nullptr;
-
-    if (!depth.IsValid() || !normal.IsValid())
-        return false;
+    _frameKey = nullptr;
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     if (!camera)
         return false;
 
-    auto& aoImage = _aoTexture.Get().GetImage();
-
-    FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
-        &frameResources,
-        depth.Get().GetImageView(),
-        normal.Get().GetImageView(),
-        aoImage.GetImage(),
-        _aoTexture.Get().GetImageView());
-
-    // Apply current settings
-    FFX_CACAO_Settings cacaoSettings = {};
-    cacaoSettings.radius                           = m_settings.Radius;
-    cacaoSettings.shadowMultiplier                 = m_settings.ShadowMultiplier;
-    cacaoSettings.shadowPower                      = m_settings.ShadowPower;
-    cacaoSettings.shadowClamp                      = m_settings.ShadowClamp;
-    cacaoSettings.horizonAngleThreshold            = m_settings.HorizonAngleThreshold;
-    cacaoSettings.fadeOutFrom                      = m_settings.FadeOutFrom;
-    cacaoSettings.fadeOutTo                        = m_settings.FadeOutTo;
-    cacaoSettings.qualityLevel                     = static_cast<FFX_CACAO_Quality>(m_settings.QualityLevel);
-    cacaoSettings.adaptiveQualityLimit             = m_settings.AdaptiveQualityLimit;
-    cacaoSettings.blurPassCount                    = m_settings.BlurPassCount;
-    cacaoSettings.sharpness                        = m_settings.Sharpness;
-    cacaoSettings.detailShadowStrength             = m_settings.DetailShadowStrength;
-    cacaoSettings.generateNormals                  = m_settings.GenerateNormals ? FFX_CACAO_TRUE : FFX_CACAO_FALSE;
-    cacaoSettings.bilateralSigmaSquared            = m_settings.BilateralSigmaSquared;
-    cacaoSettings.bilateralSimilarityDistanceSigma = m_settings.BilateralSimilarityDistanceSigma;
-
-    FFX_CACAO_VkUpdateSettings(ctx, &cacaoSettings);
+    // Per-frame-slot key for the FFX context cache; the context itself (which
+    // binds the depth/normal views) is created lazily in Record, once the
+    // transient normal has been realized.
+    _frameKey = &frameResources;
 
     mat4 projMatrix = camera->Matrices.Projection;
     projMatrix[1][1] = -projMatrix[1][1];
@@ -143,14 +116,42 @@ bool CACAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, H
     memcpy(_proj.elements, glm::value_ptr(projMatrix), sizeof(float) * 16);
     memcpy(_normalsToView.elements, glm::value_ptr(normalsWorldToView), sizeof(float) * 16);
 
-    _currentContext = ctx;
     return true;
 }
 
-void CACAOPass::Record(CommandBuffer& commandBuffer)
+void CACAOPass::Record(CommandBuffer& commandBuffer, Texture& depth, Texture& normal)
 {
-    assert(_currentContext != nullptr && "Record without a successful Prepare");
-    FFX_CACAO_VkDraw(_currentContext, commandBuffer.GetHandle(), &_proj, &_normalsToView);
+    auto& aoImage = _aoTexture.Get().GetImage();
+
+    // Cached per slot: created on the first frame for this slot with the (stable)
+    // depth/normal/output views. FFX manages its own Vulkan objects, so creating
+    // it here on a worker thread is independent of command-buffer recording.
+    FFX_CACAO_VkContext* ctx = GetOrCreateCacaoContext(
+        _frameKey,
+        depth.GetImageView(),
+        normal.GetImageView(),
+        aoImage.GetImage(),
+        _aoTexture.Get().GetImageView());
+
+    FFX_CACAO_Settings cacaoSettings = {};
+    cacaoSettings.radius                           = m_settings.Radius;
+    cacaoSettings.shadowMultiplier                 = m_settings.ShadowMultiplier;
+    cacaoSettings.shadowPower                      = m_settings.ShadowPower;
+    cacaoSettings.shadowClamp                      = m_settings.ShadowClamp;
+    cacaoSettings.horizonAngleThreshold            = m_settings.HorizonAngleThreshold;
+    cacaoSettings.fadeOutFrom                      = m_settings.FadeOutFrom;
+    cacaoSettings.fadeOutTo                        = m_settings.FadeOutTo;
+    cacaoSettings.qualityLevel                     = static_cast<FFX_CACAO_Quality>(m_settings.QualityLevel);
+    cacaoSettings.adaptiveQualityLimit             = m_settings.AdaptiveQualityLimit;
+    cacaoSettings.blurPassCount                    = m_settings.BlurPassCount;
+    cacaoSettings.sharpness                        = m_settings.Sharpness;
+    cacaoSettings.detailShadowStrength             = m_settings.DetailShadowStrength;
+    cacaoSettings.generateNormals                  = m_settings.GenerateNormals ? FFX_CACAO_TRUE : FFX_CACAO_FALSE;
+    cacaoSettings.bilateralSigmaSquared            = m_settings.BilateralSigmaSquared;
+    cacaoSettings.bilateralSimilarityDistanceSigma = m_settings.BilateralSimilarityDistanceSigma;
+    FFX_CACAO_VkUpdateSettings(ctx, &cacaoSettings);
+
+    FFX_CACAO_VkDraw(ctx, commandBuffer.GetHandle(), &_proj, &_normalsToView);
 }
 
 void CACAOPass::EnsureRenderTargets(FrameResources& frameResources)

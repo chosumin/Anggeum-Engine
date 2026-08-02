@@ -24,8 +24,8 @@ namespace Core
 
         void EnsureRenderTargets(FrameResources& frameResources);
 
-        bool Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal);
-        void Record(CommandBuffer& commandBuffer);
+        bool Prepare(FrameResources& frameResources);
+        void Record(CommandBuffer& commandBuffer, Texture& depth, Texture& normal);
         void UpdateGUI();
 
     private:
@@ -68,7 +68,7 @@ namespace Core
         Settings m_settings;
 
         // Stashed by Prepare, consumed by Record.
-        FFX_CACAO_VkContext* _currentContext = nullptr;
+        FrameResources* _frameKey = nullptr;
         FFX_CACAO_Matrix4x4 _proj{};
         FFX_CACAO_Matrix4x4 _normalsToView{};
 

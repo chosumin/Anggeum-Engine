@@ -92,17 +92,12 @@ void DFAOPass::UpdateGUI()
     }
 }
 
-bool DFAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal)
+bool DFAOPass::Prepare(FrameResources& frameResources)
 {
     if (!_sdfGenerator || !_sdfGenerator->IsGenerated())
         return false;
 
     if (!_sdfGenerator->GetSDFTexture().IsValid() || !_sdfGenerator->GetBoundsBuffer())
-        return false;
-
-    _depthForSampling = depth;
-    _normalForSampling = normal;
-    if (!_depthForSampling.IsValid() || !_normalForSampling.IsValid())
         return false;
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
@@ -126,14 +121,15 @@ bool DFAOPass::Prepare(FrameResources& frameResources, Handle<Texture> depth, Ha
     return true;
 }
 
-void DFAOPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void DFAOPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    Texture& depth, Texture& normal)
 {
     commandBuffer.BeginDebugMarker("DFAO");
 
     auto& dfaoShader = _dfaoShader.Get();
     auto builder = context.CreateDescriptorSetBuilder(dfaoShader, 0);
-    builder.SetTextureBuffer(0, _depthForSampling);
-    builder.SetTextureBuffer(1, _normalForSampling);
+    builder.SetTextureBuffer(0, depth);
+    builder.SetTextureBuffer(1, normal);
     builder.SetTextureBuffer(2, _sdfGenerator->GetSDFTexture());
     builder.SetTextureBuffer(3, _aoTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
     builder.SetStorageBuffer(4, *_sdfGenerator->GetBoundsBuffer());

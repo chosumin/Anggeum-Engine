@@ -25,8 +25,10 @@ namespace Core
 
         void EnsureRenderTargets(FrameResources& frameResources);
 
-        bool Prepare(FrameResources& frameResources, Handle<Texture> depth, Handle<Texture> normal);
-        void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+        bool Prepare(FrameResources& frameResources);
+
+        void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            Texture& depth, Texture& normal);
 
         void UpdateGUI();
 
@@ -56,8 +58,6 @@ namespace Core
         DFAOUniform _params{};
 
         // Stashed by Prepare, consumed by Record.
-        Handle<Texture> _depthForSampling;
-        Handle<Texture> _normalForSampling;
         Buffer* _paramsBuffer = nullptr;
         DFAOPushConstants _pushConstants{};
 

@@ -36,31 +36,13 @@ FGDepthPrePass::~FGDepthPrePass() = default;
 void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderExecutor& renderExecutor)
 {
-	// the MSAA normal is consumed only by FGResolvePass and dies within
-	// the graph — a true transient, aliasable by the allocator.
-	Handle<Texture> normalTexture;
-	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-	{
-		FGTextureDesc normalDesc{};
-		normalDesc.extent = _extent;
-		normalDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
-		normalDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		normalDesc.samples = _msaaSamples;
-		normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		_mainNormal = builder.CreateTexture(RT_MAIN_NORMAL, normalDesc);
-	}
-	else
-	{
-		RenderTargetDesc normalDesc{};
-		normalDesc.extent = _extent;
-		normalDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
-		normalDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		normalDesc.samples = _msaaSamples;
-		normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		normalDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		normalTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_NORMAL, normalDesc);
-		_mainNormal = builder.ImportTexture(RT_MAIN_NORMAL, normalTexture);
-	}
+	FGTextureDesc normalDesc{};
+	normalDesc.extent = _extent;
+	normalDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
+	normalDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	normalDesc.samples = _msaaSamples;
+	normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	_mainNormal = builder.CreateTexture(RT_MAIN_NORMAL, normalDesc);
 
 	RenderTargetDesc depthDesc{};
 	depthDesc.extent = _extent;

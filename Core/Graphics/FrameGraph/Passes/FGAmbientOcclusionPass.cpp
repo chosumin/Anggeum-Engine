@@ -42,11 +42,10 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
     const char* normalName = msaa
         ? FGResolvePass::RT_RESOLVED_NORMAL
         : FGDepthPrePass::RT_MAIN_NORMAL;
-    builder.Read(builder.GetTexture(depthName), TextureAccess::SampledCompute);
-    builder.Read(builder.GetTexture(normalName), TextureAccess::SampledCompute);
-
-    auto depth = frameResources.GetRenderTarget(depthName);
-    auto normal = frameResources.GetRenderTarget(normalName);
+    _depth = builder.GetTexture(depthName);
+    _normal = builder.GetTexture(normalName);
+    builder.Read(_depth, TextureAccess::SampledCompute);
+    builder.Read(_normal, TextureAccess::SampledCompute);
 
     FGTexture ao = builder.ImportTexture(RT_AO, frameResources.GetRenderTarget(RT_AO));
 
@@ -56,11 +55,11 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
             // FFX manages the output's layout itself (discards via UNDEFINED, ends
             // at SHADER_READ_ONLY), so the graph only tracks the final state.
             builder.WriteManual(ao, TextureAccess::SampledCompute);
-            _ready = _cacaoPass->Prepare(frameResources, depth, normal);
+            _ready = _cacaoPass->Prepare(frameResources);
             break;
         case AOMethod::DFAO:
             builder.Write(ao, TextureAccess::StorageComputeWrite);
-            _ready = _dfaoPass->Prepare(frameResources, depth, normal);
+            _ready = _dfaoPass->Prepare(frameResources);
             break;
     }
 }
@@ -70,13 +69,16 @@ void FGAmbientOcclusionPass::Execute(FrameGraphPassContext& context, CommandBuff
     if (!_ready)
         return;
 
+    Texture& depth = context.GetTexture(_depth);
+    Texture& normal = context.GetTexture(_normal);
+
     switch (_activeMethod)
     {
-        case AOMethod::CACAO: 
-            _cacaoPass->Record(commandBuffer); 
+        case AOMethod::CACAO:
+            _cacaoPass->Record(commandBuffer, depth, normal);
             break;
-        case AOMethod::DFAO: 
-            _dfaoPass->Record(context, commandBuffer); 
+        case AOMethod::DFAO:
+            _dfaoPass->Record(context, commandBuffer, depth, normal);
             break;
     }
 }
