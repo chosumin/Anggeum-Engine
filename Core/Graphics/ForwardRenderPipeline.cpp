@@ -10,12 +10,9 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/FrameGraph/FrameGraph.h"
-#include "Graphics/RenderPasses/HiZCullPass.h"
-#include "Graphics/RenderPasses/DepthPrePass.h"
-#include "Graphics/RenderPasses/ResolvePass.h"
+#include "Graphics/RenderPasses/DepthPrePasses.h"
 #include "Graphics/RenderPasses/LightCullingPass.h"
-#include "Graphics/RenderPasses/ShadowCullPass.h"
-#include "Graphics/RenderPasses/ShadowPass.h"
+#include "Graphics/RenderPasses/ShadowPasses.h"
 #include "Graphics/RenderPasses/SDFShadowPass.h"
 #include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 #include "Graphics/RenderPasses/IBLPass.h"
@@ -49,34 +46,15 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
 
-	// Two-pass occlusion culling is interleaved (pass-2 culls against the depth
-	// pass 1 drew), so the depth prepass is split and every step between the two
-	// halves is its own pass:
-	using CullPhase = HiZCullPass::Phase;
-	using DepthPhase = DepthPrePass::Phase;
+	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
 
-	// Cull1 owns the CPU state both culling phases share; Cull2 references it.
-	auto hiZCull1 = make_unique<HiZCullPass>(device, renderScene, CullPhase::Cull1);
-	HiZCullPass* hiZCull1Ptr = hiZCull1.get();
-
-	_frameGraph->AddPass(std::move(hiZCull1));
-	_frameGraph->AddPass(make_unique<DepthPrePass>(device, renderScene, extent, depthFormat, _msaaSamples, DepthPhase::First));
-	_frameGraph->AddPass(make_unique<ResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ false));
-	_frameGraph->AddPass(make_unique<HiZCullPass>(device, renderScene, CullPhase::Cull2, hiZCull1Ptr));
-	_frameGraph->AddPass(make_unique<DepthPrePass>(device, renderScene, extent, depthFormat, _msaaSamples, DepthPhase::Second));
-	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-		_frameGraph->AddPass(make_unique<ResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));
 	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
 
-	// The cull pass runs first but reads the cascade matrices off the shadow
-	// pass, so the shadow pass object is created before it and added after.
-	auto fgShadowPass = make_unique<ShadowPass>(device, renderScene, depthFormat);
-	ShadowPass* fgShadowPassPtr = fgShadowPass.get();
-	_frameGraph->AddPass(make_unique<ShadowCullPass>(device, renderScene, *fgShadowPassPtr));
-	_frameGraph->AddPass(std::move(fgShadowPass));
+	// The shadow feature wires its own cull + draw passes into the graph.
+	ShadowPasses shadowPasses(*_frameGraph, device, renderScene, depthFormat);
 
 	auto fgSdfShadowPass = make_unique<SDFShadowPass>(
-		device, renderScene, extent, _msaaSamples, *fgShadowPassPtr);
+		device, renderScene, extent, _msaaSamples, shadowPasses.GetShadowBuffer());
 	SDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
 	_frameGraph->AddPass(std::move(fgSdfShadowPass));
 

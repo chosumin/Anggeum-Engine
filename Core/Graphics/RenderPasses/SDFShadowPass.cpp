@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "SDFShadowPass.h"
-#include "ShadowPass.h"
 #include "DepthPrePass.h"
 #include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
@@ -23,12 +22,12 @@ using namespace Core;
 static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
 
 SDFShadowPass::SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
-	VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass)
+	VkSampleCountFlagBits msaaSamples, ShadowUniform* shadowBuffer)
 	: _device(device)
 	, _renderScene(renderScene)
 	, _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
-	, _shadowPass(shadowPass)
+	, _shadowBuffer(shadowBuffer)
 {
 	_sdfGenerator = make_unique<SDFGenerator>(device);
 
@@ -71,7 +70,7 @@ void SDFShadowPass::UpdateSDFParams()
 	_sdfParams.PaddingFactor  = 0.1f;
 
 	// Copy transition parameters from the shadow pass
-	auto* shadowUniform = _shadowPass.GetShadowBuffer();
+	auto* shadowUniform = _shadowBuffer;
 	_sdfParams.SDFTransitionDistance = shadowUniform->SDFTransitionDistance;
 	_sdfParams.SDFTransitionRange    = shadowUniform->SDFTransitionRange;
 }

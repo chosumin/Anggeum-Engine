@@ -10,7 +10,6 @@ namespace Core
 	class Shader;
 	class Pipeline;
 	class SDFGenerator;
-	class ShadowPass;
 
 	// Screen-space SDF shadow mask: ray-marches the scene's SDF
 	// volume blended with the cascaded shadow maps.
@@ -21,7 +20,7 @@ namespace Core
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
 		SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
-			VkSampleCountFlagBits msaaSamples, ShadowPass& shadowPass);
+			VkSampleCountFlagBits msaaSamples, ShadowUniform* shadowBuffer);
 		~SDFShadowPass();
 
 		const char* GetName() const override { return "SDFShadowPass"; }
@@ -55,7 +54,7 @@ namespace Core
 		RenderScene& _renderScene;
 		VkExtent2D _screenExtent;
 		VkSampleCountFlagBits _msaaSamples;
-		ShadowPass& _shadowPass;
+		ShadowUniform* _shadowBuffer;
 
 		unique_ptr<SDFGenerator> _sdfGenerator;
 
