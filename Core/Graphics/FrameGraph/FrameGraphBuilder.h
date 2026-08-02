@@ -22,10 +22,12 @@ namespace Core
 		FGTexture ImportTexture(const string& name, Handle<Texture> texture);
 		FGBuffer ImportBuffer(const string& name, Handle<Buffer> buffer);
 
-		// Blackboard lookup for resources another pass declared earlier.
+		// Blackboard lookup for resources another pass declared earlier. The Has*
+		// forms double as "did the producer run this frame".
 		FGTexture GetTexture(const string& name) const;
 		FGBuffer GetBuffer(const string& name) const;
 		bool HasTexture(const string& name) const;
+		bool HasBuffer(const string& name) const;
 
 		void Read(FGTexture texture, TextureAccess access);
 		void Read(FGBuffer buffer, BufferAccess access);

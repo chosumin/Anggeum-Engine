@@ -103,6 +103,11 @@ namespace Core
 		return _graph._resourceIndices.count(name) != 0;
 	}
 
+	bool FrameGraphBuilder::HasBuffer(const string& name) const
+	{
+		return _graph._resourceIndices.count(name) != 0;
+	}
+
 	void FrameGraphBuilder::AddAccess(uint32_t resourceIndex, const FGAccessInfo& info)
 	{
 		auto& decl = _graph._passDecls[_passIndex];

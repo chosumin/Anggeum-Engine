@@ -15,7 +15,6 @@ namespace Core
 	class CommandBuffer;
 	class Job;
 	class TransientResourceAllocator;
-	class OcclusionCuller;
 	class FrustumCuller;
 	class RendererBatch;
 
@@ -155,7 +154,6 @@ namespace Core
 		// Cullers live here because everything they own — indirect command buffers,
 		// cull-data UBOs, the Hi-Z pyramid — is a per-frame-slot resource of this
 		// class. Reached through RenderFrame, which supplies the batch.
-		OcclusionCuller& GetOrCreateOcclusionCuller(RendererBatch& batch, CameraBuffer& camera);
 		FrustumCuller& GetOrCreateFrustumCuller(RendererBatch& batch, CameraBuffer& camera);
 
 	private:

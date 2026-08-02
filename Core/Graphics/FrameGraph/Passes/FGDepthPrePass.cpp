@@ -2,7 +2,7 @@
 #include "FGDepthPrePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/OcclusionCuller.h"
+#include "FGHiZCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -90,9 +90,15 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformVertex);
 
-	_culler = nullptr;
-	if (PerspectiveCamera* camera = _scene.GetMainCamera())
-		_culler = renderFrame.PrepareOcclusionCuller(camera->Matrices);
+	_indirect = FGBuffer{};
+	const char* indirectName = _phase == Phase::First
+		? FGHiZCullPass::SB_PASS1_INDIRECT
+		: FGHiZCullPass::SB_PASS2_INDIRECT;
+	if (builder.HasBuffer(indirectName))
+	{
+		_indirect = builder.GetBuffer(indirectName);
+		builder.Read(_indirect, BufferAccess::IndirectRead);
+	}
 }
 
 void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -101,7 +107,7 @@ void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	// loadOps still clear the targets for the passes that read them.
 	context.BeginRendering(commandBuffer);
 
-	if (_culler != nullptr)
+	if (_indirect.IsValid())
 	{
 		commandBuffer.SetViewportAndScissor(context.GetRenderArea());
 
@@ -109,15 +115,9 @@ void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 		auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
 		builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 
-		// First phase replays the pass-1 draw list (visible last frame); second
-		// phase replays the pass-2 list (recovered by this frame's Hi-Z).
-		Buffer& indirect = _phase == Phase::First
-			? *_culler->GetIndirectCommandBuffer()
-			: *_culler->GetPass2IndirectCommandBuffer();
-
 		auto& renderFrame = context.GetRenderFrame();
 		renderFrame.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
-			indirect, builder, nullptr);
+			context.GetBuffer(_indirect), builder, nullptr);
 	}
 
 	context.EndRendering(commandBuffer);

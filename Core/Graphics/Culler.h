@@ -42,6 +42,9 @@ namespace Core
 
         Buffer* GetIndirectCommandBuffer() const { return &_indirectCommandBuffer.Get(); }
 
+        // Also used by FGHiZCullPass, which does its culling without a Culler.
+        static void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
+
     protected:
         // The batch supplies the geometry being culled and must outlive this Culler.
         // `id` is used to give this Culler's FrameResources entries unique names so cullers don't collide.
@@ -52,8 +55,6 @@ namespace Core
         // the shaders and pipelines around it do not. Overrides extend it with their
         // own batch-sized buffers and must call the base version first.
         virtual void PrepareBatchResources(FrameResources& frameResources);
-
-        static void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
     protected:
         Device& _device;

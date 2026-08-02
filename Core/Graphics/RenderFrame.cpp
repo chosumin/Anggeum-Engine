@@ -7,7 +7,6 @@
 #include "Vulkans/Shader.h"
 #include "Vulkans/Pipeline.h"
 #include "Vulkans/DescriptorSetBuilder.h"
-#include "OcclusionCuller.h"
 #include "FrustumCuller.h"
 #include "RendererBatch.h"
 #include "MeshBufferManager.h"
@@ -15,28 +14,12 @@
 
 using namespace Core;
 
-namespace
-{
-	// Shared sentinel for temp frames that draw without a RenderScene; all of its
-	// managers stay null, so the accessors report "no manager" as before.
-	RenderScene& EmptyRenderScene()
-	{
-		static RenderScene empty;
-		return empty;
-	}
-}
-
 RenderFrame::RenderFrame(Device& device, RenderScene& renderScene)
 	: _device(device)
 	, _renderScene(renderScene)
 	, _resources(device)
 {
 	CreateSyncObjects();
-}
-
-RenderFrame::RenderFrame(Device& device)
-	: RenderFrame(device, EmptyRenderScene())
-{
 }
 
 RenderFrame::~RenderFrame()
@@ -89,30 +72,21 @@ SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer comm
 	return _submission.submitInfos.back();
 }
 
-OcclusionCuller* RenderFrame::PrepareOcclusionCuller(CameraBuffer& camera)
-{
-	auto* batch = _renderScene.GetRendererBatch();
-	if (!batch || batch->GetDrawCommandCount() == 0)
-		return nullptr;
-
-	return &_resources.GetOrCreateOcclusionCuller(*batch, camera);
-}
-
 FrustumCuller* RenderFrame::PrepareFrustumCuller(CameraBuffer& camera)
 {
-	auto* batch = _renderScene.GetRendererBatch();
-	if (!batch || batch->GetDrawCommandCount() == 0)
+	auto& batch = GetRendererBatch();
+	if (batch.GetDrawCommandCount() == 0)
 		return nullptr;
 
-	return &_resources.GetOrCreateFrustumCuller(*batch, camera);
+	return &_resources.GetOrCreateFrustumCuller(batch, camera);
 }
 
 void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
 	Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
 	DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook)
 {
-	auto* batch = _renderScene.GetRendererBatch();
-	if (!batch || batch->GetDrawCommandCount() == 0)
+	auto& batch = GetRendererBatch();
+	if (batch.GetDrawCommandCount() == 0)
 		return;
 
 	auto& meshBufferManager = GetMeshBufferManager();
@@ -130,10 +104,10 @@ void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
 
 	commandBuffer.BindPipeline(&pipeline);
 
-	builder.SetStorageBuffer(1, batch->GetTransformBatch().TransformBuffer.Get());
-	builder.SetStorageBuffer(2, batch->GetInstanceBuffer());
+	builder.SetStorageBuffer(1, batch.GetTransformBatch().TransformBuffer.Get());
+	builder.SetStorageBuffer(2, batch.GetInstanceBuffer());
 	builder.SetUniformBuffer(8, GetMaterialManager().GetMaterialBuffer());
-	builder.SetStorageBuffer(9, batch->GetMaterialIndexBuffer());
+	builder.SetStorageBuffer(9, batch.GetMaterialIndexBuffer());
 
 	// Runs before Build() so the hook can contribute its own descriptor resources.
 	if (perShaderHook)
@@ -153,7 +127,7 @@ void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
 
 	commandBuffer.DrawIndexedIndirect(
 		indirectCommandBuffer,
-		batch->GetDrawCommandCount(),
+		batch.GetDrawCommandCount(),
 		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
 	);
 }

@@ -10,7 +10,6 @@ namespace Core
 	class Pipeline;
 	class PipelineState;
 	class Buffer;
-	class OcclusionCuller;
 
 	class FGDepthPrePass : public FrameGraphPass
 	{
@@ -47,6 +46,7 @@ namespace Core
 		FGTexture _mainDepth;
 		FGBuffer _camera;
 
-		OcclusionCuller* _culler = nullptr;
+		// This phase's culled draw list, produced by the HiZCull passes.
+		FGBuffer _indirect;
 	};
 }

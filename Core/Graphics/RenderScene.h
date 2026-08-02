@@ -29,15 +29,12 @@ namespace Core
 	class RenderScene
 	{
 	public:
-		// Default: all managers null — the empty sentinel temp frames bind to. Such an
-		// instance must not be Sync()'d.
-		RenderScene() = default;
 		explicit RenderScene(Device& device);
 
 		// Run every manager's self-gated sync, in dependency order.
 		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
 
-		// Null when descriptor indexing is unsupported (and on the empty sentinel).
+		// Null when descriptor indexing is unsupported.
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindless.get(); }
 		bool HasBindlessSupport() const { return _bindless != nullptr; }
 

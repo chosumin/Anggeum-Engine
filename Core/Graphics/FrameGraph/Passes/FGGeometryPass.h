@@ -14,7 +14,6 @@ namespace Core
     class Material;
     class SubMesh;
     class Buffer;
-    class OcclusionCuller;
 
     class FGGeometryPass : public FrameGraphPass
     {
@@ -65,7 +64,10 @@ namespace Core
         FGBuffer _lightVisibility;
         Shader* _geometryShader = nullptr;
         Pipeline* _geometryPipeline = nullptr;
-        OcclusionCuller* _culler = nullptr;
+
+        // Both culled draw lists, produced by the HiZCull passes.
+        FGBuffer _pass1Indirect;
+        FGBuffer _pass2Indirect;
 
         Shader* _skyboxShader = nullptr;
         Material* _skyboxMaterial = nullptr;

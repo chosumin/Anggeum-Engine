@@ -5,14 +5,12 @@
 #include "FGSDFShadowPass.h"
 #include "FGAmbientOcclusionPass.h"
 #include "FGIBLPass.h"
+#include "FGHiZCullPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/OcclusionCuller.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
-#include "Graphics/RendererBatch.h"
-#include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -96,7 +94,8 @@ void FGGeometryPass::PrepareSkybox()
 void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
-    _culler = nullptr;
+    _pass1Indirect = FGBuffer{};
+    _pass2Indirect = FGBuffer{};
 
     PerspectiveCamera* camera = _scene.GetMainCamera();
     if (!camera)
@@ -192,9 +191,14 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
     PrepareSkybox();
 
-    // Same camera as the HiZCull/depth passes → shared culler; this pass only
-    // replays its indirect draw buffers (both lists are already culled).
-    _culler = renderFrame.PrepareOcclusionCuller(camera->Matrices);
+    if (builder.HasBuffer(FGHiZCullPass::SB_PASS1_INDIRECT))
+    {
+        _pass1Indirect = builder.GetBuffer(FGHiZCullPass::SB_PASS1_INDIRECT);
+        builder.Read(_pass1Indirect, BufferAccess::IndirectRead);
+
+        _pass2Indirect = builder.GetBuffer(FGHiZCullPass::SB_PASS2_INDIRECT);
+        builder.Read(_pass2Indirect, BufferAccess::IndirectRead);
+    }
 }
 
 void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -204,7 +208,7 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
     // onto.
     context.BeginRendering(commandBuffer);
 
-    if (_culler == nullptr || _geometryShader == nullptr)
+    if (!_pass1Indirect.IsValid() || _geometryShader == nullptr)
     {
         context.EndRendering(commandBuffer);
         return;
@@ -233,9 +237,9 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
     // Replay both culled draw lists, then the skybox, all in one scope.
     auto& renderFrame = context.GetRenderFrame();
     renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        *_culler->GetIndirectCommandBuffer(), builder, perShaderHook);
+        context.GetBuffer(_pass1Indirect), builder, perShaderHook);
     renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        *_culler->GetPass2IndirectCommandBuffer(), builder, perShaderHook);
+        context.GetBuffer(_pass2Indirect), builder, perShaderHook);
 
     RecordSkybox(context, commandBuffer);
 

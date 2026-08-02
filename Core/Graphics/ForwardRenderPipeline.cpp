@@ -53,10 +53,15 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	// halves is its own pass:
 	using CullPhase = FGHiZCullPass::Phase;
 	using DepthPhase = FGDepthPrePass::Phase;
-	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull1));
+
+	// Cull1 owns the CPU state both culling phases share; Cull2 references it.
+	auto hiZCull1 = make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull1);
+	FGHiZCullPass* hiZCull1Ptr = hiZCull1.get();
+
+	_frameGraph->AddPass(std::move(hiZCull1));
 	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::First));
 	_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ false));
-	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull2));
+	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull2, hiZCull1Ptr));
 	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::Second));
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
 		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));

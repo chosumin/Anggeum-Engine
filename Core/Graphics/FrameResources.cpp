@@ -11,7 +11,6 @@
 #include "FrameGraph/TransientResourceAllocator.h"
 #include "Foundation/Job.h"
 #include "TransferJob.h"
-#include "OcclusionCuller.h"
 #include "FrustumCuller.h"
 #include "RendererBatch.h"
 
@@ -34,9 +33,8 @@ TransientResourceAllocator& FrameResources::GetTransientAllocator()
 
 FrameResources::~FrameResources()
 {
-	// RenderContext::Submit is the only thing that runs init work, so a frame that
-	// never goes through it (the temp frames used for IBL prefiltering) must not
-	// queue any: it would be dropped instead of recorded.
+	// RenderContext::Submit is the only thing that runs init work; anything still
+	// pending here was queued after the last submit and would be silently dropped.
 	assert(_pendingTransitions.empty() && AllInitJobsExecuted() &&
 		"frame init work was queued but never executed");
 }
@@ -342,11 +340,6 @@ T& FrameResources::GetOrCreateCuller(RendererBatch& batch, CameraBuffer& camera)
 
 	result.SetCamera(camera);
 	return result;
-}
-
-OcclusionCuller& FrameResources::GetOrCreateOcclusionCuller(RendererBatch& batch, CameraBuffer& camera)
-{
-	return GetOrCreateCuller<OcclusionCuller>(batch, camera);
 }
 
 FrustumCuller& FrameResources::GetOrCreateFrustumCuller(RendererBatch& batch, CameraBuffer& camera)

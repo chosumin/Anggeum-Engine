@@ -12,7 +12,6 @@ namespace Core
 	class DescriptorSetBuilder;
 	class RendererBatch;
 	class RenderScene;
-	class OcclusionCuller;
 	class FrustumCuller;
 	class CommandBuffer;
 	class Shader;
@@ -21,10 +20,7 @@ namespace Core
 	class RenderFrame
 	{
 	public:
-		// Primary frames receive the shared GPU-driven managers by reference.
 		RenderFrame(Device& device, RenderScene& renderScene);
-		// Temporary frames (e.g. IBL prefilter) draw without the GPU-driven managers.
-		explicit RenderFrame(Device& device);
 		~RenderFrame();
 		
 		// Reset frame resources
@@ -39,7 +35,6 @@ namespace Core
 		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
 		DescriptorSetResources* GetBindlessResources();
 
-		// Always present on scene frames (temp frames must not call these).
 		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.GetMeshBufferManager(); }
 
 		MaterialManager& GetMaterialManager() { return *_renderScene.GetMaterialManager(); }
@@ -52,7 +47,6 @@ namespace Core
 		// Cullers are stored per frame slot in FrameResources; this supplies the
 		// batch they cull. Null when there is nothing to draw, which is also the
 		// signal for a pass to skip its culling and drawing this frame.
-		OcclusionCuller* PrepareOcclusionCuller(CameraBuffer& camera);
 		FrustumCuller* PrepareFrustumCuller(CameraBuffer& camera);
 
 		// Records one indirect draw of the scene batch. Lives here because the
@@ -72,8 +66,7 @@ namespace Core
 
 		FrameSubmission _submission;
 
-		// Non-owning: the RenderScene owned by Engine. Temp frames bind this to a shared
-		// empty instance (all managers null).
+		// Non-owning: the RenderScene owned by Engine.
 		RenderScene& _renderScene;
 
 		DescriptorSetResources _bindlessResources;
