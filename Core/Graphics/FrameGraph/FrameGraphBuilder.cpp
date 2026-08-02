@@ -170,7 +170,7 @@ namespace Core
 		assert(variant < FrameGraphPassContext::MaxRenderingVariants);
 		assert(decl.texture.IsValid());
 
-		auto& pass = _graph._passDecls[_passIndex];
+		auto& pass = _graph._passRecords[_passIndex];
 		auto& colors = pass.colorAttachments[variant];
 		if (colors.size() <= slot)
 			colors.resize(slot + 1);
@@ -189,7 +189,7 @@ namespace Core
 		assert(variant < FrameGraphPassContext::MaxRenderingVariants);
 		assert(decl.texture.IsValid());
 
-		auto& pass = _graph._passDecls[_passIndex];
+		auto& pass = _graph._passRecords[_passIndex];
 		pass.depthAttachments[variant] = decl;
 		pass.hasDepth[variant] = true;
 		pass.hasRendering[variant] = true;

@@ -308,6 +308,7 @@ namespace Core
 	void FrameGraph::SetupAndCompile(RenderFrame& renderFrame, uint32_t imageIndex)
 	{
 		_passDecls.clear();
+		_passRecords.clear();
 		_resources.clear();
 		_resourceIndices.clear();
 		_compiledValid = false;
@@ -317,9 +318,10 @@ namespace Core
 
 		// Setup sweep: every pass declares its resources for this frame.
 		_passDecls.resize(_passes.size());
+		_passRecords.resize(_passes.size());
 		for (size_t p = 0; p < _passes.size(); p++)
 		{
-			_passDecls[p].pass = _passes[p].get();
+			_passRecords[p].pass = _passes[p].get();
 			_passDecls[p].queue = _passes[p]->GetQueueType();
 
 			FrameGraphBuilder builder(*this, static_cast<uint32_t>(p));
@@ -507,7 +509,7 @@ namespace Core
 
 		for (size_t p = 0; p < _passDecls.size(); p++)
 		{
-			auto& passDecl = _passDecls[p];
+			auto& passRecord = _passRecords[p];
 
 			_contexts.push_back(FrameGraphPassContext(_device,
 				renderFrame.GetResources().GetDescriptorPool(),
@@ -516,7 +518,7 @@ namespace Core
 			auto& context = _contexts.back();
 
 			context._declared.assign(_resources.size(), 0);
-			for (const auto& access : passDecl.accesses)
+			for (const auto& access : _passDecls[p].accesses)
 				context._declared[access.resource] = 1;
 
 			if (_compiled.culledPasses[p])
@@ -524,7 +526,7 @@ namespace Core
 
 			for (uint32_t variant = 0; variant < FrameGraphPassContext::MaxRenderingVariants; variant++)
 			{
-				if (!passDecl.hasRendering[variant])
+				if (!passRecord.hasRendering[variant])
 					continue;
 
 				auto& setup = context._rendering[variant];
@@ -532,7 +534,7 @@ namespace Core
 
 				VkExtent2D renderArea{ 0, 0 };
 
-				for (const auto& attachment : passDecl.colorAttachments[variant])
+				for (const auto& attachment : passRecord.colorAttachments[variant])
 				{
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
@@ -560,9 +562,9 @@ namespace Core
 					renderArea = { extent.width, extent.height };
 				}
 
-				if (passDecl.hasDepth[variant])
+				if (passRecord.hasDepth[variant])
 				{
-					const auto& attachment = passDecl.depthAttachments[variant];
+					const auto& attachment = passRecord.depthAttachments[variant];
 					Texture* texture = _physicalTextures[attachment.texture.index];
 					assert(texture != nullptr);
 
@@ -625,18 +627,18 @@ namespace Core
 
 	void FrameGraph::RecordPass(CommandBuffer& commandBuffer, uint32_t passIndex, uint32_t timerPassIndex)
 	{
-		auto& decl = _passDecls[passIndex];
+		auto& record = _passRecords[passIndex];
 		auto& context = _contexts[passIndex];
 
 		_timer->WriteBeginTimestamp(commandBuffer, _frameIndex, timerPassIndex);
-		commandBuffer.BeginDebugMarker(decl.pass->GetName());
+		commandBuffer.BeginDebugMarker(record.pass->GetName());
 
 		// All barriers belong here, ahead of Execute: a pass that renders opens its
 		// own scope inside Execute, and barriers are illegal inside one.
 		RecordBarriers(commandBuffer, _compiled.preBarriers[passIndex],
 			_physicalTextures, _physicalBuffers);
 
-		decl.pass->Execute(context, commandBuffer);
+		record.pass->Execute(context, commandBuffer);
 
 		commandBuffer.EndDebugMarker();
 		_timer->EndPass(commandBuffer, _frameIndex, timerPassIndex);
@@ -665,11 +667,12 @@ namespace Core
 			if (_compiled.culledPasses[i])
 				continue;
 
-			auto& decl = _passDecls[i];
-			queueTimer.RegisterPass(_frameIndex, timerPassIndex, decl.queue, decl.pass->GetName());
+			const QueueType queue = _passDecls[i].queue;
+			queueTimer.RegisterPass(_frameIndex, timerPassIndex, queue,
+				_passRecords[i].pass->GetName());
 
 			Enqueue(make_unique<FrameGraphRecordJob>(*this,
-				static_cast<uint32_t>(i), timerPassIndex, decl.queue));
+				static_cast<uint32_t>(i), timerPassIndex, queue));
 			timerPassIndex++;
 		}
 
@@ -758,7 +761,7 @@ namespace Core
 
 			os << " pass " << p << " [" <<
 				(_passDecls[p].queue == QueueType::Compute ? "compute" : "graphics") <<
-				"] '" << _passDecls[p].pass->GetName() << "'";
+				"] '" << _passRecords[p].pass->GetName() << "'";
 			if (sync.waitPass >= 0)
 				os << " waits(pass " << sync.waitPass << ")";
 			if (sync.signals)
@@ -776,7 +779,7 @@ namespace Core
 
 		for (size_t p = 0; p < _passDecls.size(); p++)
 			if (_compiled.culledPasses[p])
-				os << " culled: '" << _passDecls[p].pass->GetName() << "'\n";
+				os << " culled: '" << _passRecords[p].pass->GetName() << "'\n";
 
 		return os.str();
 	}
@@ -800,19 +803,19 @@ namespace Core
 			const auto& sync = _compiled.passSync[p];
 
 			ImGui::Text("%s [%s]%s  (%zu barriers)",
-				_passDecls[p].pass->GetName(),
+				_passRecords[p].pass->GetName(),
 				_passDecls[p].queue == QueueType::Compute ? "Compute" : "Graphics",
 				sync.signals ? " (signals)" : "",
 				_compiled.preBarriers[p].size());
 
 			if (sync.waitPass >= 0)
 				ImGui::Text("   waits on %s",
-					_passDecls[sync.waitPass].pass->GetName());
+					_passRecords[sync.waitPass].pass->GetName());
 		}
 
 		for (size_t p = 0; p < _passDecls.size(); p++)
 			if (_compiled.culledPasses[p])
-				ImGui::Text("Culled: %s", _passDecls[p].pass->GetName());
+				ImGui::Text("Culled: %s", _passRecords[p].pass->GetName());
 
 		if (_currentTransients != nullptr)
 		{

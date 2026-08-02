@@ -43,14 +43,18 @@ namespace Core
 		FGAccessInfo info{};
 	};
 
-	// Declaration of one pass for the current frame.
 	struct FGPassDecl
 	{
-		FrameGraphPass* pass = nullptr;
 		QueueType queue = QueueType::Graphics;
 		bool sideEffect = false;
 
 		vector<FGAccessDecl> accesses; // declaration order
+	};
+
+	// The recording half of the same pass, parallel to FGPassDecl by index
+	struct FGPassRecordDecl
+	{
+		FrameGraphPass* pass = nullptr;
 
 		array<vector<FGAttachment>, FrameGraphPassContext::MaxRenderingVariants> colorAttachments;
 		array<FGAttachment, FrameGraphPassContext::MaxRenderingVariants> depthAttachments;
@@ -172,8 +176,10 @@ namespace Core
 
 		vector<unique_ptr<FrameGraphPass>> _passes;
 
-		// Per-frame declarations (rebuilt by the Setup sweep).
+		// Per-frame declarations (rebuilt by the Setup sweep). The two pass
+		// vectors are parallel: index p is the same pass in both.
 		vector<FGPassDecl> _passDecls;
+		vector<FGPassRecordDecl> _passRecords;
 		vector<FGResourceDecl> _resources;
 		unordered_map<string, uint32_t> _resourceIndices; // by name
 
