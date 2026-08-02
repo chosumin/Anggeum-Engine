@@ -2,7 +2,7 @@
 #include "FGShadowPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/FrustumCuller.h"
+#include "FGShadowCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -216,7 +216,7 @@ void FGShadowPass::UpdateCascades(PerspectiveCamera* camera)
 void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
-	_cullers.fill(nullptr);
+	_cascadeIndirect.fill(FGBuffer{});
 
 	PerspectiveCamera* camera = _scene.GetMainCamera();
 	if (!camera)
@@ -249,9 +249,6 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 		shadowTexture.Get().GetLayerImageView(i);
 
-	// The culling dispatches write indirect draw buffers the graph cannot see.
-	builder.SetSideEffect();
-
 	for (uint32_t i = 0; i < _shadowBuffer.CascadeCount; ++i)
 	{
 		// Each cascade binds binding 0 with a different view, and all four
@@ -263,7 +260,12 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 		_cascadeBuffers[i] = builder.ImportBuffer(cascadeName, cascadeHandle);
 		builder.Read(_cascadeBuffers[i], BufferAccess::UniformVertex);
 
-		_cullers[i] = renderFrame.PrepareFrustumCuller(_cascadeViews[i]);
+		string indirectName = FGShadowCullPass::IndirectName(i);
+		if (builder.HasBuffer(indirectName))
+		{
+			_cascadeIndirect[i] = builder.GetBuffer(indirectName);
+			builder.Read(_cascadeIndirect[i], BufferAccess::IndirectRead);
+		}
 	}
 }
 
@@ -293,7 +295,7 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 		// Skip cascades beyond the SDF transition zone but still clear them
 		// so stale depth doesn't show up in the debug viewer.
-		if (cascadeIndex >= _shadowBuffer.CascadeCount || _cullers[cascadeIndex] == nullptr)
+		if (cascadeIndex >= _shadowBuffer.CascadeCount || !_cascadeIndirect[cascadeIndex].IsValid())
 		{
 			string clearName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Clear (skipped)";
 			commandBuffer.BeginDebugMarker(clearName.c_str());
@@ -311,15 +313,9 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		// Frustum culling dispatch first, outside the rendering scope.
-		auto& culler = *_cullers[cascadeIndex];
-		auto cullingBuilder = context.CreateDescriptorSetBuilder(culler.GetCullingShader());
-		culler.Dispatch(renderFrame.GetResources(), commandBuffer, cullingBuilder,
-			culler.GetCamera());
-
 		commandBuffer.BeginRendering(renderingInfo);
 		renderFrame.DrawIndirect(commandBuffer, shader, *_pipeline,
-			*culler.GetIndirectCommandBuffer(), builder, nullptr);
+			context.GetBuffer(_cascadeIndirect[cascadeIndex]), builder, nullptr);
 		commandBuffer.EndRendering();
 
 		commandBuffer.EndDebugMarker();

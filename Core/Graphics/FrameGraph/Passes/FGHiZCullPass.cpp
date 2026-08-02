@@ -5,8 +5,8 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/FrameResources.h"
 #include "Graphics/RendererBatch.h"
-#include "Graphics/Culler.h"
 #include "Graphics/ResourceManager.h"
+#include "Utils/Math.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
@@ -288,17 +288,20 @@ void FGHiZCullPass::DispatchCulling(FrameGraphPassContext& context,
         BuildHiZ(context, commandBuffer, *depth);
         slot.hiZBuilt = true;
     }
-    else if (!slot.hiZLayoutInitialized)
+    else if (!(slot.hiZImage == _hiZTexture))
     {
-        // Nothing has written the pyramid yet, but the cull shader binds it
-        // regardless, so move it out of UNDEFINED once.
+        // A pyramid this slot has not touched yet. Nothing has written it, but
+        // the cull shader binds it regardless, so move it out of UNDEFINED —
+        // and it holds no depth, so occlusion testing stays off.
         commandBuffer.CreateBarrierBatch()
             .Image(_hiZTexture.Get(),
                 VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             .Submit();
+
+        slot.hiZBuilt = false;
     }
-    slot.hiZLayoutInitialized = true;
+    slot.hiZImage = _hiZTexture;
 
     // Culling parameters. Built CPU-side and assigned once: the mapping is
     // uncached, so field-by-field writes into it would be slow.
@@ -313,7 +316,7 @@ void FGHiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     cullData.enableOcclusionCulling = slot.hiZBuilt ? 1 : 0;
 
     glm::mat4 viewProj = camera.Projection * camera.View;
-    Culler::ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
+    Math::ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
     Buffer& cullDataBuffer = _cullData.Get();
     cullDataBuffer.Update(cullData);

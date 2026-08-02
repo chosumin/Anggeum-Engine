@@ -11,10 +11,7 @@ namespace Core
 	class Pipeline;
 	class PipelineState;
 	class PerspectiveCamera;
-	class FrustumCuller;
 
-	// Cascaded shadow maps: renders each active cascade into one layer of the
-	// ShadowDepth 2D-array target with frustum-culled indirect draws.
 	class FGShadowPass : public FrameGraphPass
 	{
 	public:
@@ -33,8 +30,11 @@ namespace Core
 		// CPU-side shadow block shared with SDFShadowPass (transition distances).
 		ShadowUniform* GetShadowBuffer() { return &_shadowBuffer; }
 
-	private:
 		void UpdateCascades(PerspectiveCamera* camera);
+		uint32_t GetCascadeCount() const { return _shadowBuffer.CascadeCount; }
+		const CameraBuffer& GetCascadeView(uint32_t cascade) const { return _cascadeViews[cascade]; }
+
+	private:
 
 		/** Returns frustum corners in world space for the given view-projection */
 		std::array<glm::vec3, 8> GetFrustumCornersWorldSpace(const glm::mat4& viewProj);
@@ -53,7 +53,10 @@ namespace Core
 
 		FGTexture _shadowDepth;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
-		array<FrustumCuller*, SHADOW_MAP_CASCADE_COUNT> _cullers{};
+
+		// Per-cascade culled draw lists, produced by FGShadowCullPass. Invalid
+		// entries mean the cascade was inactive this frame (clear-only).
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeIndirect{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;

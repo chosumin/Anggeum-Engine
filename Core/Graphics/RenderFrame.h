@@ -12,7 +12,6 @@ namespace Core
 	class DescriptorSetBuilder;
 	class RendererBatch;
 	class RenderScene;
-	class FrustumCuller;
 	class CommandBuffer;
 	class Shader;
 	class Pipeline;
@@ -43,11 +42,6 @@ namespace Core
 		// live in FrameResources. Passes reach them through here.
 		FrameResources& GetResources() { return _resources; }
 		const FrameResources& GetResources() const { return _resources; }
-
-		// Cullers are stored per frame slot in FrameResources; this supplies the
-		// batch they cull. Null when there is nothing to draw, which is also the
-		// signal for a pass to skip its culling and drawing this frame.
-		FrustumCuller* PrepareFrustumCuller(CameraBuffer& camera);
 
 		// Records one indirect draw of the scene batch. Lives here because the
 		// vertex/index, transform, material and bindless inputs it binds are all

@@ -34,8 +34,8 @@ namespace Core
 
 	// RendererBatch: the application-wide GPU-driven draw set. Part of RenderScene
 	// (owned by Engine), a single instance shared by every frame-in-flight. Its buffers
-	// are read-only inputs to the per-frame Cullers, so one shared copy is safe (the
-	// mutable culling outputs live per-frame in the Culler). Rebuilt from the scene by
+	// are read-only inputs to the culling passes, so one shared copy is safe (the
+	// mutable culling outputs are per-frame-slot graph buffers). Rebuilt from the scene by
 	// Prepare(), which RenderScene::Sync calls only when the scene structure changed.
 	class RendererBatch
 	{
@@ -49,7 +49,7 @@ namespace Core
 		void MarkDirty() { _dirty = true; }
 
 		// Bumped every time the draw set is rebuilt. Holders that sized themselves
-		// against the batch (Cullers) compare this to notice they went stale
+		// against the batch (the culling passes) compare this to notice they went stale
 		uint64_t GetRevision() const { return _revision; }
 
 		// Rebuild the whole draw set from the current scene membership. Self-gated;
@@ -101,7 +101,7 @@ namespace Core
 		bool _dirty = false;         // scene membership changed since the last rebuild
 		uint64_t _revision = 0;      // incremented on every rebuild
 
-		// Screen extents for Culler initialization
+		// Screen extents for the Hi-Z pyramid sizing
 		VkExtent2D _extents = {};
 	};
 }

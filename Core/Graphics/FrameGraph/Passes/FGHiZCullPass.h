@@ -54,7 +54,7 @@ namespace Core
             uint64_t batchRevision = 0;
             bool buffersCreated = false;
 
-            bool hiZLayoutInitialized = false;
+            Handle<Texture> hiZImage;
             bool hiZBuilt = false;
         };
 

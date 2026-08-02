@@ -11,7 +11,6 @@
 #include "FrameGraph/TransientResourceAllocator.h"
 #include "Foundation/Job.h"
 #include "TransferJob.h"
-#include "FrustumCuller.h"
 #include "RendererBatch.h"
 
 using namespace Core;
@@ -309,40 +308,4 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 	Handle<Buffer> handle = _bufferPool.Add(buffer);
 	_uniformBufferHandles[name] = handle;
 	return handle;
-}
-
-
-template<typename T>
-T& FrameResources::GetOrCreateCuller(RendererBatch& batch, CameraBuffer& camera)
-{
-	CullerKey key{ &camera, &batch, type_index(typeid(T)) };
-
-	auto it = _cullers.find(key);
-	if (it != _cullers.end())
-	{
-		// The key carries the concrete type, so this cast cannot be wrong.
-		T& culler = static_cast<T&>(*it->second);
-
-		// The batch is a single shared instance, so its address stays put across a
-		// rebuild and the key alone cannot tell us the culler went stale. Its
-		// buffers are sized from the draw set, so a rebuild has to be picked up
-		// before anything records against them.
-		if (culler.GetBatchRevision() != batch.GetRevision())
-			culler.OnBatchRebuilt(*this);
-
-		culler.SetCamera(camera);
-		return culler;
-	}
-
-	auto culler = make_unique<T>(_device, *this, batch, _nextCullerId++);
-	T& result = *culler;
-	_cullers[key] = std::move(culler);
-
-	result.SetCamera(camera);
-	return result;
-}
-
-FrustumCuller& FrameResources::GetOrCreateFrustumCuller(RendererBatch& batch, CameraBuffer& camera)
-{
-	return GetOrCreateCuller<FrustumCuller>(batch, camera);
 }

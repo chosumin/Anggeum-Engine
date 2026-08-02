@@ -14,6 +14,7 @@
 #include "Graphics/FrameGraph/Passes/FGDepthPrePass.h"
 #include "Graphics/FrameGraph/Passes/FGResolvePass.h"
 #include "Graphics/FrameGraph/Passes/FGLightCullingPass.h"
+#include "Graphics/FrameGraph/Passes/FGShadowCullPass.h"
 #include "Graphics/FrameGraph/Passes/FGShadowPass.h"
 #include "Graphics/FrameGraph/Passes/FGSDFShadowPass.h"
 #include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
@@ -67,8 +68,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));
 	_frameGraph->AddPass(make_unique<FGLightCullingPass>(device, scene, extent, tileNums, _msaaSamples));
 
+	// The cull pass runs first but reads the cascade matrices off the shadow
+	// pass, so the shadow pass object is created before it and added after.
 	auto fgShadowPass = make_unique<FGShadowPass>(device, scene, depthFormat);
 	FGShadowPass* fgShadowPassPtr = fgShadowPass.get();
+	_frameGraph->AddPass(make_unique<FGShadowCullPass>(device, scene, *fgShadowPassPtr));
 	_frameGraph->AddPass(std::move(fgShadowPass));
 
 	auto fgSdfShadowPass = make_unique<FGSDFShadowPass>(

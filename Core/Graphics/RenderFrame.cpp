@@ -7,7 +7,6 @@
 #include "Vulkans/Shader.h"
 #include "Vulkans/Pipeline.h"
 #include "Vulkans/DescriptorSetBuilder.h"
-#include "FrustumCuller.h"
 #include "RendererBatch.h"
 #include "MeshBufferManager.h"
 #include "MaterialManager.h"
@@ -70,15 +69,6 @@ SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer comm
 {
 	_submission.submitInfos.emplace_back(queueType, commandBuffer, syncContext);
 	return _submission.submitInfos.back();
-}
-
-FrustumCuller* RenderFrame::PrepareFrustumCuller(CameraBuffer& camera)
-{
-	auto& batch = GetRendererBatch();
-	if (batch.GetDrawCommandCount() == 0)
-		return nullptr;
-
-	return &_resources.GetOrCreateFrustumCuller(batch, camera);
 }
 
 void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
