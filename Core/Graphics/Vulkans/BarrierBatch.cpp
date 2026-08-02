@@ -13,45 +13,44 @@ Core::BarrierBatch::BarrierBatch(CommandBuffer& commandBuffer, Device& device, u
 {
 }
 
-Core::BarrierBatch& Core::BarrierBatch::Buffer(
-	Core::Buffer& buffer,
-	VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
-	VkAccessFlags srcAccess, VkAccessFlags dstAccess,
-	QueueType destQueue)
+Core::BarrierBatch& Core::BarrierBatch::Buffer(Core::Buffer& buffer,
+	VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+	VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
 {
-	VkBufferMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	VkBufferMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	barrier.srcStageMask = srcStage;
 	barrier.srcAccessMask = srcAccess;
+	barrier.dstStageMask = dstStage;
 	barrier.dstAccessMask = dstAccess;
-
-	ResolveQueueOwnership(destQueue, barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
-
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.buffer = buffer.GetBuffer();
 	barrier.offset = 0;
 	barrier.size = VK_WHOLE_SIZE;
 
 	_bufferBarriers.push_back(barrier);
 
-	_srcStageMask |= srcStage;
-	_dstStageMask |= dstStage;
-
 	return *this;
 }
 
-Core::BarrierBatch& Core::BarrierBatch::Image(
-	Core::Texture& texture,
+Core::BarrierBatch& Core::BarrierBatch::Image(Core::Texture& texture,
 	VkImageLayout oldLayout, VkImageLayout newLayout,
-	QueueType destQueue)
+	VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+	VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
 {
 	Core::Image& image = texture.GetImage();
 
-	VkImageMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	VkImageMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	barrier.srcStageMask = srcStage;
+	barrier.srcAccessMask = srcAccess;
+	barrier.dstStageMask = dstStage;
+	barrier.dstAccessMask = dstAccess;
 	barrier.oldLayout = oldLayout;
 	barrier.newLayout = newLayout;
-
-	ResolveQueueOwnership(destQueue, barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
-
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.image = image.GetImage();
 	barrier.subresourceRange.aspectMask = image.GetAspectFlags();
 	barrier.subresourceRange.baseMipLevel = 0;
@@ -59,17 +58,45 @@ Core::BarrierBatch& Core::BarrierBatch::Image(
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = image.GetLayer();
 
-	VkPipelineStageFlags sourceStage;
-	VkPipelineStageFlags destinationStage;
-
-	// Access masks and pipeline stages are inferred from the layouts.
-	GetAccessAndStageMask(oldLayout, barrier.srcAccessMask, sourceStage);
-	GetAccessAndStageMask(newLayout, barrier.dstAccessMask, destinationStage);
-
 	_imageBarriers.push_back(barrier);
 
-	_srcStageMask |= sourceStage;
-	_dstStageMask |= destinationStage;
+	return *this;
+}
+
+Core::BarrierBatch& Core::BarrierBatch::Image(Core::Texture& texture,
+	VkImageLayout oldLayout, VkImageLayout newLayout)
+{
+	VkPipelineStageFlags2 srcStage, dstStage;
+	VkAccessFlags2 srcAccess, dstAccess;
+	GetAccessAndStageMask(oldLayout, srcAccess, srcStage);
+	GetAccessAndStageMask(newLayout, dstAccess, dstStage);
+
+	return Image(texture, oldLayout, newLayout, srcStage, srcAccess, dstStage, dstAccess);
+}
+
+Core::BarrierBatch& Core::BarrierBatch::Image(VkImage image, VkImageAspectFlags aspect,
+	VkImageLayout oldLayout, VkImageLayout newLayout,
+	VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+	VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
+{
+	VkImageMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+	barrier.srcStageMask = srcStage;
+	barrier.srcAccessMask = srcAccess;
+	barrier.dstStageMask = dstStage;
+	barrier.dstAccessMask = dstAccess;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = aspect;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	_imageBarriers.push_back(barrier);
 
 	return *this;
 }
@@ -79,78 +106,63 @@ void Core::BarrierBatch::Submit()
 	if (Empty())
 		return;
 
-	vkCmdPipelineBarrier(
-		_commandBuffer.GetHandle(),
-		SanitizeStageMask(_srcStageMask),
-		SanitizeStageMask(_dstStageMask),
-		0,
-		0, nullptr,
-		static_cast<uint32_t>(_bufferBarriers.size()), _bufferBarriers.data(),
-		static_cast<uint32_t>(_imageBarriers.size()), _imageBarriers.data());
+	for (auto& barrier : _bufferBarriers)
+	{
+		barrier.srcStageMask = SanitizeStageMask(barrier.srcStageMask);
+		barrier.dstStageMask = SanitizeStageMask(barrier.dstStageMask);
+	}
+	for (auto& barrier : _imageBarriers)
+	{
+		barrier.srcStageMask = SanitizeStageMask(barrier.srcStageMask);
+		barrier.dstStageMask = SanitizeStageMask(barrier.dstStageMask);
+	}
+
+	VkDependencyInfo dependencyInfo{};
+	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(_bufferBarriers.size());
+	dependencyInfo.pBufferMemoryBarriers = _bufferBarriers.data();
+	dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(_imageBarriers.size());
+	dependencyInfo.pImageMemoryBarriers = _imageBarriers.data();
+
+	vkCmdPipelineBarrier2(_commandBuffer.GetHandle(), &dependencyInfo);
 
 	// Reset so the batch can be reused for the next set of barriers.
 	_bufferBarriers.clear();
 	_imageBarriers.clear();
-	_srcStageMask = 0;
-	_dstStageMask = 0;
-}
-
-void Core::BarrierBatch::ResolveQueueOwnership(QueueType destQueue,
-	uint32_t& outSrcFamily, uint32_t& outDstFamily) const
-{
-	if (destQueue == QueueType::None)
-	{
-		outSrcFamily = VK_QUEUE_FAMILY_IGNORED;
-		outDstFamily = VK_QUEUE_FAMILY_IGNORED;
-		return;
-	}
-
-	const auto& qfi = _device.GetQueueFamilyIndices();
-
-	if (destQueue == QueueType::Graphics)
-	{
-		outSrcFamily = qfi.ComputeFamily.value();
-		outDstFamily = qfi.GraphicsFamily.value();
-	}
-	else
-	{
-		outSrcFamily = qfi.GraphicsFamily.value();
-		outDstFamily = qfi.ComputeFamily.value();
-	}
 }
 
 void Core::BarrierBatch::GetAccessAndStageMask(VkImageLayout imageLayout,
-	VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags) const
+	VkAccessFlags2& outAccess, VkPipelineStageFlags2& outStage)
 {
 	switch (imageLayout)
 	{
 	case VK_IMAGE_LAYOUT_UNDEFINED:
-		outAccessFlags = 0;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		outAccess = VK_ACCESS_2_NONE;
+		outStage = VK_PIPELINE_STAGE_2_NONE;
 		break;
 	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-		outAccessFlags = VK_ACCESS_TRANSFER_WRITE_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		outAccess = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+		outStage = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-		outAccessFlags = VK_ACCESS_SHADER_READ_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		outAccess = VK_ACCESS_2_SHADER_READ_BIT;
+		outStage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-		outAccessFlags = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		outAccess = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		outStage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-		outAccessFlags = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		outAccess = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+		outStage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-		outAccessFlags = VK_ACCESS_TRANSFER_READ_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		outAccess = VK_ACCESS_2_TRANSFER_READ_BIT;
+		outStage = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_GENERAL:
-		outAccessFlags = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-		outPipelineStageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		outAccess = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+		outStage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 		break;
 	default:
 		throw invalid_argument("unsupported layout transition!");
@@ -158,7 +170,7 @@ void Core::BarrierBatch::GetAccessAndStageMask(VkImageLayout imageLayout,
 	}
 }
 
-VkPipelineStageFlags Core::BarrierBatch::SanitizeStageMask(VkPipelineStageFlags stageMask) const
+VkPipelineStageFlags2 Core::BarrierBatch::SanitizeStageMask(VkPipelineStageFlags2 stageMask) const
 {
 	const auto& qfi = _device.GetQueueFamilyIndices();
 
@@ -168,28 +180,29 @@ VkPipelineStageFlags Core::BarrierBatch::SanitizeStageMask(VkPipelineStageFlags 
 		_queueFamilyIndex != qfi.ComputeFamily.value())
 		return stageMask;
 
-	// Graphics-only pipeline stages are invalid on a compute queue. Replace
-	// them with the closest compute-compatible equivalent so the queue
-	// ownership barriers stay spec-compliant.
-	const VkPipelineStageFlags graphicsOnly =
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-		VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-		VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
-		VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
-		VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
+	const VkPipelineStageFlags2 graphicsOnly =
+		VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+		VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+		VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT |
+		VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
+		VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+		VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT |
+		VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+		VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
+		VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT |
+		VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
+		VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+		VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT |
+		VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
 	if (stageMask & graphicsOnly)
 	{
 		stageMask &= ~graphicsOnly;
-		stageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		stageMask |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 	}
 
 	if (stageMask == 0)
-		stageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		stageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
 
 	return stageMask;
 }

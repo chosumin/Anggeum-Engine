@@ -114,7 +114,7 @@ void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
     // Acquire-to-attachment: contents are discarded (the resolve overwrites
     // every pixel). The imageAvailable semaphore wait (first graphics submit)
     // is scoped to COLOR_ATTACHMENT_OUTPUT, matching this barrier's dst stage.
-    commandBuffer.CreateBarrierBatch2()
+    commandBuffer.CreateBarrierBatch()
         .Image(swapChainImage, VK_IMAGE_ASPECT_COLOR_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_NONE,
@@ -146,7 +146,7 @@ void FGGUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
     commandBuffer.EndRendering();
 
     // Hand the resolved image to the presentation engine.
-    commandBuffer.CreateBarrierBatch2()
+    commandBuffer.CreateBarrierBatch()
         .Image(swapChainImage, VK_IMAGE_ASPECT_COLOR_BIT,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

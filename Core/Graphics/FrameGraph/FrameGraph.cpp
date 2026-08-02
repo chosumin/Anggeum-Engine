@@ -662,7 +662,7 @@ namespace Core
 			if (plans.empty())
 				return;
 
-			BarrierBatch2 batch = commandBuffer.CreateBarrierBatch2();
+			BarrierBatch batch = commandBuffer.CreateBarrierBatch();
 			for (const auto& plan : plans)
 			{
 				if (plan.isImage)

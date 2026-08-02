@@ -39,9 +39,13 @@ namespace Core
         void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
     private:
-        void EnsureIBLResources(FrameResources& frameResources);
-        void RegisterGiTexturesToBindless(FrameResources& frameResources,
+        // Creates the IBL render targets, imports them (WriteManual — the
+        // generators manage layouts themselves), and on the first call builds
+        // the generators + registers the cubemaps/LUT to bindless.
+        void EnsureIBLResources(FrameGraphBuilder& builder, FrameResources& frameResources,
             RenderExecutor& renderExecutor);
+        void RegisterGiTexturesToBindless(RenderExecutor& renderExecutor,
+            Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut);
 
         void PrepareSkybox();
         void RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
@@ -66,15 +70,15 @@ namespace Core
 
         bool _iblGenerated = false;
 
-        // App-lifetime IBL resources: created once, registered to bindless in
-        // Setup.
-        Handle<Texture> _offscreenTexture;
-        Handle<Texture> _irradianceCubemap;
-        Handle<Texture> _prefilteredCubemap;
-        Handle<Texture> _brdfLut;
         unique_ptr<PreEnvironmentPass> _preEnvironmentPass;
         unique_ptr<BrdfLutPass> _brdfLutPass;
+        
         bool _recordIBL = false;
+        
+        FGTexture _offscreen;
+        FGTexture _irradiance;
+        FGTexture _prefiltered;
+        FGTexture _brdfLut;
 
         FGTexture _mainColor;
         FGTexture _mainDepth;
@@ -90,7 +94,6 @@ namespace Core
         Pipeline* _geometryPipeline = nullptr;
         OcclusionCuller* _culler = nullptr;
 
-        // Skybox stash (found once; scene meshes are static after load)
         Shader* _skyboxShader = nullptr;
         Material* _skyboxMaterial = nullptr;
         SubMesh* _skyboxSubMesh = nullptr;

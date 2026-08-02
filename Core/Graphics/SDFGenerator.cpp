@@ -227,18 +227,18 @@ void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuf
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(objectDataBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Buffer(transformBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		.Submit();
 
@@ -262,8 +262,8 @@ void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuf
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Submit();
 }
@@ -313,8 +313,8 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(_triLookupBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Submit();
 }

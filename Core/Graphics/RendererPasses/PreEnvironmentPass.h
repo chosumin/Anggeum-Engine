@@ -22,18 +22,22 @@ namespace Core
     class PreEnvironmentPass
     {
     public:
-        PreEnvironmentPass(Device& device, Scene& scene,
-            Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap);
+        PreEnvironmentPass(Device& device, Scene& scene, VkFormat offscreenFormat);
         ~PreEnvironmentPass();
 
         void Initialize();
-        void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+
+        void Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            Texture& offscreen, Texture& irradiance, Texture& prefiltered);
 
     private:
-        void RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
-        void RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+        void RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            Texture& offscreen, Texture& irradiance);
+        void RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            Texture& offscreen, Texture& prefiltered);
 
-        void BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent);
+        void BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent,
+            Texture& offscreen);
 
     private:
         Device& _device;
@@ -41,9 +45,7 @@ namespace Core
 
         unique_ptr<PipelineState> _pipelineState;
 
-        Texture* _colorRenderTarget;
-        Texture* _irradianceCubemap;
-        Texture* _prefilteredCubemap;
+        VkFormat _offscreenFormat;
 
         Shader* _irradianceShader = nullptr;
         Shader* _prefilteredShader = nullptr;

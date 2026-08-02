@@ -19,14 +19,11 @@ using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
-Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene,
-    Texture* offscreen, Texture* irradianceCubemap, Texture* prefilteredCubemap)
+Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene, VkFormat offscreenFormat)
     : _device(device)
     , _scene(scene)
     , _pipelineState(make_unique<PipelineState>())
-    , _colorRenderTarget(offscreen)
-    , _irradianceCubemap(irradianceCubemap)
-    , _prefilteredCubemap(prefilteredCubemap)
+    , _offscreenFormat(offscreenFormat)
     , _irradianceShader(&device.GetResourceManager().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
     , _prefilteredShader(&device.GetResourceManager().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
 {
@@ -62,7 +59,7 @@ void Core::PreEnvironmentPass::Initialize()
         depthInfo.depthTestEnable = VK_FALSE;
 
         PipelineRenderingDesc renderingDesc;
-        renderingDesc.colorFormats = { _colorRenderTarget->GetFormat() };
+        renderingDesc.colorFormats = { _offscreenFormat };
 
         _irradiancePipeline = make_unique<Pipeline>(_device, renderingDesc, *_irradianceShader, pipelineState);
         _prefilteredPipeline = make_unique<Pipeline>(_device, renderingDesc, *_prefilteredShader, pipelineState);
@@ -90,20 +87,22 @@ void Core::PreEnvironmentPass::Initialize()
     _skyCubemap = skyCubemap;
 }
 
-void Core::PreEnvironmentPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void Core::PreEnvironmentPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    Texture& offscreen, Texture& irradiance, Texture& prefiltered)
 {
     if (_sky == nullptr)
         return;
 
-    RecordIrradiance(context, commandBuffer);
-    RecordPrefiltered(context, commandBuffer);
+    RecordIrradiance(context, commandBuffer, offscreen, irradiance);
+    RecordPrefiltered(context, commandBuffer, offscreen, prefiltered);
 }
 
-void Core::PreEnvironmentPass::BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent)
+void Core::PreEnvironmentPass::BeginOffscreenRendering(CommandBuffer& commandBuffer, VkExtent2D extent,
+    Texture& offscreen)
 {
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = _colorRenderTarget->GetImageView();
+    colorAttachment.imageView = offscreen.GetImageView();
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -119,23 +118,24 @@ void Core::PreEnvironmentPass::BeginOffscreenRendering(CommandBuffer& commandBuf
     commandBuffer.BeginRendering(renderingInfo);
 }
 
-void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    Texture& offscreen, Texture& irradiance)
 {
     auto& shader = *_irradianceShader;
 
     commandBuffer.CreateBarrierBatch()
-        .Image(*_irradianceCubemap,
+        .Image(irradiance,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-        .Image(*_colorRenderTarget,
+        .Image(offscreen,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
         .Submit();
 
-    uint32_t mipLevels = _irradianceCubemap->GetMipLevels();
-    uint32_t layers = _irradianceCubemap->GetLayers();
+    uint32_t mipLevels = irradiance.GetMipLevels();
+    uint32_t layers = irradiance.GetLayers();
 
-    auto extent = _colorRenderTarget->GetExtent();
+    auto extent = offscreen.GetExtent();
     VkExtent2D extent2D = { extent.width, extent.height };
 
     for (uint32_t m = 0; m < mipLevels; ++m)
@@ -148,7 +148,7 @@ void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, 
 
             commandBuffer.SetViewportAndScissor(mipExtent);
 
-            BeginOffscreenRendering(commandBuffer, mipExtent);
+            BeginOffscreenRendering(commandBuffer, mipExtent, offscreen);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
             commandBuffer.PushConstants(shader, 0, viewProjection);
@@ -170,16 +170,16 @@ void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, 
             commandBuffer.EndRendering();
 
             commandBuffer.CreateBarrierBatch()
-                .Image(*_colorRenderTarget,
+                .Image(offscreen,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
                 .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget,
-                *_irradianceCubemap, 0, 0, m, layer);
+            commandBuffer.CopyImage(offscreen,
+                irradiance, 0, 0, m, layer);
 
             commandBuffer.CreateBarrierBatch()
-                .Image(*_colorRenderTarget,
+                .Image(offscreen,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
                 .Submit();
@@ -187,26 +187,27 @@ void Core::PreEnvironmentPass::RecordIrradiance(FrameGraphPassContext& context, 
     }
 
     commandBuffer.CreateBarrierBatch()
-        .Image(*_irradianceCubemap,
+        .Image(irradiance,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         .Submit();
 }
 
-void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    Texture& offscreen, Texture& prefiltered)
 {
     auto& shader = *_prefilteredShader;
 
     commandBuffer.CreateBarrierBatch()
-        .Image(*_prefilteredCubemap,
+        .Image(prefiltered,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
         .Submit();
 
-    uint32_t mipLevels = _prefilteredCubemap->GetMipLevels();
-    uint32_t layers = _prefilteredCubemap->GetLayers();
+    uint32_t mipLevels = prefiltered.GetMipLevels();
+    uint32_t layers = prefiltered.GetLayers();
 
-    auto extent = _colorRenderTarget->GetExtent();
+    auto extent = offscreen.GetExtent();
     VkExtent2D extent2D = { extent.width, extent.height };
 
     for (uint32_t m = 0; m < mipLevels; ++m)
@@ -219,7 +220,7 @@ void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context,
 
             commandBuffer.SetViewportAndScissor(mipExtent);
 
-            BeginOffscreenRendering(commandBuffer, mipExtent);
+            BeginOffscreenRendering(commandBuffer, mipExtent, offscreen);
 
             mat4 viewProjection = glm::perspective((float)(PI / 2.0), 1.0f, 0.1f, 512.0f) * _mvpMatrices[layer];
             commandBuffer.PushConstants(shader, 0, viewProjection);
@@ -243,16 +244,16 @@ void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context,
             commandBuffer.EndRendering();
 
             commandBuffer.CreateBarrierBatch()
-                .Image(*_colorRenderTarget,
+                .Image(offscreen,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
                 .Submit();
 
-            commandBuffer.CopyImage(*_colorRenderTarget,
-                *_prefilteredCubemap, 0, 0, m, layer);
+            commandBuffer.CopyImage(offscreen,
+                prefiltered, 0, 0, m, layer);
 
             commandBuffer.CreateBarrierBatch()
-                .Image(*_colorRenderTarget,
+                .Image(offscreen,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
                 .Submit();
@@ -260,7 +261,7 @@ void Core::PreEnvironmentPass::RecordPrefiltered(FrameGraphPassContext& context,
     }
 
     commandBuffer.CreateBarrierBatch()
-        .Image(*_prefilteredCubemap,
+        .Image(prefiltered,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         .Submit();

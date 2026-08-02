@@ -10,9 +10,9 @@
 
 using namespace Core;
 
-Core::BrdfLutPass::BrdfLutPass(Device& device, Texture* brdfLut)
+Core::BrdfLutPass::BrdfLutPass(Device& device, VkFormat lutFormat)
     : _device(device)
-    , _brdfLut(brdfLut)
+    , _lutFormat(lutFormat)
     , _pipelineState(make_unique<PipelineState>())
 {
 }
@@ -37,26 +37,26 @@ void Core::BrdfLutPass::Initialize()
     depthInfo.depthTestEnable = VK_FALSE;
 
     PipelineRenderingDesc renderingDesc;
-    renderingDesc.colorFormats = { _brdfLut->GetFormat() };
+    renderingDesc.colorFormats = { _lutFormat };
 
     _brdfPipeline = make_unique<Pipeline>(_device,
         renderingDesc, _brdfMaterial->GetShaderHandle().Get(), pipelineState);
 }
 
-void Core::BrdfLutPass::Record(CommandBuffer& commandBuffer)
+void Core::BrdfLutPass::Record(CommandBuffer& commandBuffer, Texture& brdfLut)
 {
     commandBuffer.CreateBarrierBatch()
-        .Image(*_brdfLut,
+        .Image(brdfLut,
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
         .Submit();
 
-    auto extent = _brdfLut->GetExtent();
+    auto extent = brdfLut.GetExtent();
     VkExtent2D extent2D = { extent.width, extent.height };
 
     VkRenderingAttachmentInfo colorAttachment{};
     colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = _brdfLut->GetImageView();
+    colorAttachment.imageView = brdfLut.GetImageView();
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -78,7 +78,7 @@ void Core::BrdfLutPass::Record(CommandBuffer& commandBuffer)
     commandBuffer.EndRendering();
 
     commandBuffer.CreateBarrierBatch()
-        .Image(*_brdfLut,
+        .Image(brdfLut,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         .Submit();

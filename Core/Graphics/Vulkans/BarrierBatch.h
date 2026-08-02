@@ -1,5 +1,4 @@
 #pragma once
-#include "Graphics/SyncContext.h"
 
 namespace Core
 {
@@ -8,59 +7,55 @@ namespace Core
 	class Texture;
 	class CommandBuffer;
 
-	// Accumulates buffer / image barriers and flushes them as a single
-	// vkCmdPipelineBarrier. Create one via CommandBuffer::CreateBarrierBatch(),
-	// chain the recording calls, then Submit().
+	// Accumulates buffer / image barriers and flushes them as a single PipelineBarrier.
 	class BarrierBatch
 	{
 	public:
 		BarrierBatch(CommandBuffer& commandBuffer, Device& device, uint32_t queueFamilyIndex);
 
-		// Buffer memory barrier. destQueue != None records a queue-ownership transfer.
-		BarrierBatch& Buffer(
-			Core::Buffer& buffer,
-			VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
-			VkAccessFlags srcAccess, VkAccessFlags dstAccess,
-			QueueType destQueue = QueueType::None);
+		BarrierBatch& Buffer(Core::Buffer& buffer,
+			VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+			VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
 
-		// Image layout transition. Access masks and pipeline stages are inferred
-		// from the layouts. destQueue != None records a queue-ownership transfer.
-		BarrierBatch& Image(
-			Core::Texture& texture,
+		BarrierBatch& Image(Core::Texture& texture,
 			VkImageLayout oldLayout, VkImageLayout newLayout,
-			QueueType destQueue = QueueType::None);
+			VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+			VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
 
-		// Records the accumulated barriers into the command buffer as one
-		// vkCmdPipelineBarrier, then clears the batch so it can be reused.
-		// No-op if nothing has been recorded.
+		// Convenience layout transition: stages and accesses are inferred from
+		// the layouts (conservative upper bounds).
+		BarrierBatch& Image(Core::Texture& texture,
+			VkImageLayout oldLayout, VkImageLayout newLayout);
+
+		// Raw-handle variant for images without an engine wrapper (swapchain).
+		BarrierBatch& Image(VkImage image, VkImageAspectFlags aspect,
+			VkImageLayout oldLayout, VkImageLayout newLayout,
+			VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+			VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
+
+		// Records the accumulated barriers as one barrier call, then
+		// clears the batch so it can be reused. No-op if nothing has been recorded.
 		void Submit();
 
 		bool Empty() const
 		{
-			return _bufferBarriers.empty() &&
-				_imageBarriers.empty();
+			return _bufferBarriers.empty() && _imageBarriers.empty();
 		}
 
 	private:
-		void GetAccessAndStageMask(VkImageLayout imageLayout,
-			VkAccessFlags& outAccessFlags, VkPipelineStageFlags& outPipelineStageFlags) const;
-		VkPipelineStageFlags SanitizeStageMask(VkPipelineStageFlags stageMask) const;
-		void ResolveQueueOwnership(QueueType destQueue,
-			uint32_t& outSrcFamily, uint32_t& outDstFamily) const;
+		static void GetAccessAndStageMask(VkImageLayout imageLayout,
+			VkAccessFlags2& outAccess, VkPipelineStageFlags2& outStage);
+		VkPipelineStageFlags2 SanitizeStageMask(VkPipelineStageFlags2 stageMask) const;
 
 	private:
 		CommandBuffer& _commandBuffer;
 		Device& _device;
 
 		// Queue family the owning command buffer records for. Used to strip
-		// pipeline stages the queue does not support and to resolve ownership
-		// transfers.
+		// pipeline stages the queue does not support.
 		uint32_t _queueFamilyIndex;
 
-		VkPipelineStageFlags _srcStageMask = 0;
-		VkPipelineStageFlags _dstStageMask = 0;
-
-		vector<VkBufferMemoryBarrier> _bufferBarriers;
-		vector<VkImageMemoryBarrier> _imageBarriers;
+		vector<VkBufferMemoryBarrier2> _bufferBarriers;
+		vector<VkImageMemoryBarrier2> _imageBarriers;
 	};
 }

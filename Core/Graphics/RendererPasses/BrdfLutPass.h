@@ -14,15 +14,15 @@ namespace Core
     class BrdfLutPass
     {
     public:
-        BrdfLutPass(Device& device, Texture* brdfLut);
+        BrdfLutPass(Device& device, VkFormat lutFormat);
         ~BrdfLutPass();
 
         void Initialize();
-        void Record(CommandBuffer& commandBuffer);
+        void Record(CommandBuffer& commandBuffer, Texture& brdfLut);
 
     private:
         Device& _device;
-        Texture* _brdfLut;
+        VkFormat _lutFormat;
 
         unique_ptr<PipelineState> _pipelineState;
 

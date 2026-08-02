@@ -106,7 +106,7 @@ void RenderExecutor::OcclusionCullAndDraw(CommandBuffer& commandBuffer,
     // The two legacy VkRenderPasses ordered phase 1 against phase 2 through
     // their external subpass dependencies; with dynamic rendering the
     // attachment barriers are explicit.
-    commandBuffer.CreateBarrierBatch2()
+    commandBuffer.CreateBarrierBatch()
         .Image(colorTarget,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

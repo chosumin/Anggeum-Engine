@@ -64,10 +64,13 @@ Pipeline* FGGeometryPass::GetOrCreatePipeline(Shader& shader)
     return result;
 }
 
-void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
+void FGGeometryPass::EnsureIBLResources(FrameGraphBuilder& builder, FrameResources& frameResources,
+    RenderExecutor& renderExecutor)
 {
-    // Create only once since these are read only
-    if (_offscreenTexture.IsValid())
+    // One-time: everything below (creation, generators, bindless) is done on the
+    // frame the volume is first generated. The textures are app-lifetime and
+    // sampled via bindless afterward, so they're only imported/resolved here.
+    if (_iblGenerated)
         return;
 
     // Offscreen (for IBL generation)
@@ -77,7 +80,7 @@ void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
     offscreenDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     offscreenDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     offscreenDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    _offscreenTexture = frameResources.GetOrCreateRenderTarget(RT_OFFSCREEN, offscreenDesc);
+    auto offscreenHandle = frameResources.GetOrCreateRenderTarget(RT_OFFSCREEN, offscreenDesc);
 
     // Irradiance cubemap
     RenderTargetDesc irradianceDesc{};
@@ -89,7 +92,7 @@ void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
     irradianceDesc.isCubemap = true;
     irradianceDesc.mipLevels = 8;
     irradianceDesc.arrayLayers = 6;
-    _irradianceCubemap = frameResources.GetOrCreateRenderTarget(RT_IRRADIANCE, irradianceDesc);
+    auto irradianceHandle = frameResources.GetOrCreateRenderTarget(RT_IRRADIANCE, irradianceDesc);
 
     // Prefiltered cubemap
     RenderTargetDesc prefilteredDesc{};
@@ -101,7 +104,7 @@ void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
     prefilteredDesc.isCubemap = true;
     prefilteredDesc.mipLevels = 8;
     prefilteredDesc.arrayLayers = 6;
-    _prefilteredCubemap = frameResources.GetOrCreateRenderTarget(RT_PREFILTERED, prefilteredDesc);
+    auto prefilteredHandle = frameResources.GetOrCreateRenderTarget(RT_PREFILTERED, prefilteredDesc);
 
     // BRDF LUT
     RenderTargetDesc brdfLutDesc{};
@@ -110,23 +113,46 @@ void FGGeometryPass::EnsureIBLResources(FrameResources& frameResources)
     brdfLutDesc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     brdfLutDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     brdfLutDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-    _brdfLut = frameResources.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
+    auto brdfLutHandle = frameResources.GetOrCreateRenderTarget(RT_BRDF_LUT, brdfLutDesc);
+
+    // Import + WriteManual: the generators do their own layout transitions
+    // (UNDEFINED discard → attachment/transfer → shader-read), so the graph
+    // emits no barriers and only needs them resolvable through the context.
+    auto importManual = [&](const char* name, Handle<Texture> handle, TextureAccess finalState)
+    {
+        FGTexture t = builder.ImportTexture(name, handle,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED);
+        builder.WriteManual(t, finalState);
+        return t;
+    };
+    _offscreen = importManual(RT_OFFSCREEN, offscreenHandle, TextureAccess::ColorWrite);
+    _irradiance = importManual(RT_IRRADIANCE, irradianceHandle, TextureAccess::SampledFragment);
+    _prefiltered = importManual(RT_PREFILTERED, prefilteredHandle, TextureAccess::SampledFragment);
+    _brdfLut = importManual(RT_BRDF_LUT, brdfLutHandle, TextureAccess::SampledFragment);
+
+    _preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _scene, offscreenDesc.format);
+    _preEnvironmentPass->Initialize();
+
+    _brdfLutPass = make_unique<BrdfLutPass>(_device, brdfLutDesc.format);
+    _brdfLutPass->Initialize();
+
+    RegisterGiTexturesToBindless(renderExecutor, irradianceHandle, prefilteredHandle, brdfLutHandle);
+
+    _iblGenerated = true;
+    _recordIBL = true;
 }
 
-void FGGeometryPass::RegisterGiTexturesToBindless(FrameResources& frameResources,
-    RenderExecutor& renderExecutor)
+void FGGeometryPass::RegisterGiTexturesToBindless(RenderExecutor& renderExecutor,
+    Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut)
 {
     if (!renderExecutor.HasBindlessSupport())
         return;
 
-    if (!_irradianceCubemap.IsValid() || !_prefilteredCubemap.IsValid() || !_brdfLut.IsValid())
-        return;
-
     auto* bindlessManager = renderExecutor.GetBindlessTextureManager();
 
-    uint32_t irradianceCubemapIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_IRRADIANCE));
-    uint32_t prefilteredCubemapIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_PREFILTERED));
-    uint32_t brdfLutIndex = bindlessManager->RegisterTexture(frameResources.GetRenderTarget(RT_BRDF_LUT));
+    uint32_t irradianceCubemapIndex = bindlessManager->RegisterTexture(irradiance);
+    uint32_t prefilteredCubemapIndex = bindlessManager->RegisterTexture(prefiltered);
+    uint32_t brdfLutIndex = bindlessManager->RegisterTexture(brdfLut);
 
     // Strip the MSB cubemap flag before passing to the shader.
     // The bindless index stores BindlessCubemapFlag as a cubemap marker internally,
@@ -197,20 +223,7 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
     colorDesc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     auto colorTexture = frameResources.GetOrCreateRenderTarget(RT_MAIN_COLOR, colorDesc);
 
-    EnsureIBLResources(frameResources);
-    if (!_iblGenerated)
-    {
-        _preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _scene,
-            &_offscreenTexture.Get(), &_irradianceCubemap.Get(), &_prefilteredCubemap.Get());
-        _preEnvironmentPass->Initialize();
-
-        _brdfLutPass = make_unique<BrdfLutPass>(_device, &_brdfLut.Get());
-        _brdfLutPass->Initialize();
-
-        RegisterGiTexturesToBindless(frameResources, renderExecutor);
-        _iblGenerated = true;
-        _recordIBL = true;
-    }
+    EnsureIBLResources(builder, frameResources, renderExecutor);
 
     _mainColor = builder.ImportTexture(RT_MAIN_COLOR, colorTexture,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -316,8 +329,11 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
     {
         _recordIBL = false;
         commandBuffer.BeginDebugMarker("IBL Generation");
-        _preEnvironmentPass->Record(context, commandBuffer);
-        _brdfLutPass->Record(commandBuffer);
+        _preEnvironmentPass->Record(context, commandBuffer,
+            context.GetTexture(_offscreen),
+            context.GetTexture(_irradiance),
+            context.GetTexture(_prefiltered));
+        _brdfLutPass->Record(commandBuffer, context.GetTexture(_brdfLut));
         commandBuffer.EndDebugMarker();
     }
 

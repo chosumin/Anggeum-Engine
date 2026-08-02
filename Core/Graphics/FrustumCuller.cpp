@@ -60,8 +60,8 @@ void Core::FrustumCuller::Dispatch(RenderFrame& renderFrame,
         .Buffer(
             _indirectCommandBuffer.Get(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
         .Submit();
 
@@ -101,8 +101,8 @@ void Core::FrustumCuller::Dispatch(RenderFrame& renderFrame,
         .Buffer(
             _indirectCommandBuffer.Get(),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
             VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_SHADER_READ_BIT)
         .Submit();
 }
