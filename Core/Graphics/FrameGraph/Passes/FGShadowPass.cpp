@@ -2,7 +2,6 @@
 #include "FGShadowPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/RenderExecutor.h"
 #include "Graphics/FrustumCuller.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
@@ -215,7 +214,7 @@ void FGShadowPass::UpdateCascades(PerspectiveCamera* camera)
 }
 
 void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-	RenderExecutor& renderExecutor)
+	RenderFrame& renderFrame)
 {
 	_cullers.fill(nullptr);
 
@@ -245,8 +244,12 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	builder.Write(_shadowDepth, TextureAccess::DepthWrite);
 
 	// Renders into one array layer at a time via per-cascade layer views, which
-	// the declared-attachment path (whole-texture view) cannot express.
+	// the declared-attachment path (whole-texture view) cannot express. Execute
+	// runs on a worker, so the views are created here rather than on demand.
 	builder.SetManualRendering();
+
+	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
+		shadowTexture.Get().GetLayerImageView(i);
 
 	// The culling dispatches write indirect draw buffers the graph cannot see.
 	builder.SetSideEffect();
@@ -262,7 +265,7 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 		_cascadeBuffers[i] = builder.ImportBuffer(cascadeName, cascadeHandle);
 		builder.Read(_cascadeBuffers[i], BufferAccess::UniformVertex);
 
-		_cullers[i] = renderExecutor.PrepareFrustumCuller(_cascadeViews[i]);
+		_cullers[i] = renderFrame.PrepareFrustumCuller(_cascadeViews[i]);
 	}
 }
 
@@ -270,7 +273,7 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 {
 	auto& shadowTexture = context.GetTexture(_shadowDepth);
 	auto& shader = _shadowShader.Get();
-	auto& executor = context.GetRenderExecutor();
+	auto& renderFrame = context.GetRenderFrame();
 
 	commandBuffer.SetViewportAndScissor(_shadowExtent);
 
@@ -310,8 +313,16 @@ void FGShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
-		executor.FrustumCullAndDraw(commandBuffer, *_cullers[cascadeIndex],
-			shader, *_pipeline, renderingInfo, builder, nullptr);
+		// Frustum culling dispatch first, outside the rendering scope.
+		auto& culler = *_cullers[cascadeIndex];
+		auto cullingBuilder = context.CreateDescriptorSetBuilder(culler.GetCullingShader());
+		culler.Dispatch(renderFrame.GetResources(), commandBuffer, cullingBuilder,
+			culler.GetCamera());
+
+		commandBuffer.BeginRendering(renderingInfo);
+		renderFrame.DrawIndirect(commandBuffer, shader, *_pipeline,
+			*culler.GetIndirectCommandBuffer(), builder, nullptr);
+		commandBuffer.EndRendering();
 
 		commandBuffer.EndDebugMarker();
 	}

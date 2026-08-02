@@ -1,8 +1,9 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "Image.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
+#include "Graphics/FrameResources.h"
 #include "Utils/FileSystem.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -111,6 +112,12 @@ VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
     if (_mipImageViews[mipLevel - 1] != VK_NULL_HANDLE)
         return _mipImageViews[mipLevel - 1];
 
+    // Passes record in parallel, so creating a view here would race: two workers
+    // would each create one and leak the loser (and corrupt the vector). Whoever
+    // needs a mip view must ask for it from Setup.
+    assert(!FrameResources::IsRecordingGuardActive() &&
+        "mip image view created during the recording window; create it in Setup");
+
     auto imageView = CreateImageView(1,
         _viewType,
         GetAspectFlags(),
@@ -122,14 +129,17 @@ VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
 
 VkImageView& Core::Image::GetOrCreateLayerImageView(uint32_t layerIndex)
 {
-    if (_layerImageViews.empty())
-        _layerImageViews.resize(_layer, VK_NULL_HANDLE);
-
     if (layerIndex >= _layer)
         throw runtime_error("Layer index out of range!");
 
+    if (_layerImageViews.empty())
+        _layerImageViews.resize(_layer, VK_NULL_HANDLE);
+
     if (_layerImageViews[layerIndex] != VK_NULL_HANDLE)
         return _layerImageViews[layerIndex];
+
+    assert(!FrameResources::IsRecordingGuardActive() &&
+        "layer image view created during the recording window; create it in Setup");
 
     _layerImageViews[layerIndex] = CreateSingleLayerImageView(layerIndex, GetAspectFlags());
     return _layerImageViews[layerIndex];
@@ -438,7 +448,20 @@ VkImageView Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType ima
         throw runtime_error("failed to create texture image view!");
     }
 
+    NameView(imageView, "mip", baseMipLevel);
+
     return imageView;
+}
+
+// Every view this class creates gets a name, so a validation message naming an
+// unnamed view points at a view the engine did not create.
+void Core::Image::NameView(VkImageView view, const char* kind, uint32_t index) const
+{
+    const string label = "Image(" + (_filePath.empty() ? string("rt") : _filePath) + ") "
+        + kind + " " + std::to_string(index) + " View";
+
+    _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+        (uint64_t)view, label.c_str());
 }
 
 VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags)
@@ -460,6 +483,8 @@ VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImage
     {
         throw runtime_error("failed to create single layer image view!");
     }
+
+    NameView(imageView, "layer", layerIndex);
 
     return imageView;
 }

@@ -3,24 +3,21 @@
 #include "Foundation/Scene.h"
 #include "Foundation/WorkerThread.h"
 #include "Foundation/Entity.h"
-#include "Components/Mesh.h"
 #include "Components/Light.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/ResourceManager.h"
-#include "Graphics/TransferJob.h"
-#include "Graphics/Vulkans/SubmitInfo.h"
 #include "Graphics/FrameGraph/FrameGraph.h"
+#include "Graphics/FrameGraph/Passes/FGHiZCullPass.h"
 #include "Graphics/FrameGraph/Passes/FGDepthPrePass.h"
 #include "Graphics/FrameGraph/Passes/FGResolvePass.h"
 #include "Graphics/FrameGraph/Passes/FGLightCullingPass.h"
 #include "Graphics/FrameGraph/Passes/FGShadowPass.h"
 #include "Graphics/FrameGraph/Passes/FGSDFShadowPass.h"
 #include "Graphics/FrameGraph/Passes/FGAmbientOcclusionPass.h"
+#include "Graphics/FrameGraph/Passes/FGIBLPass.h"
 #include "Graphics/FrameGraph/Passes/FGGeometryPass.h"
 #include "Graphics/FrameGraph/Passes/FGGUIRenderPass.h"
 #include "Utils/Utility.h"
@@ -49,12 +46,20 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	// Migrated passes live in the frame graph; declaration order is execution
-	// order and matches the legacy prefix (DepthPre → Resolve → LightCulling).
 	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
-	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples));
+
+	// Two-pass occlusion culling is interleaved (pass-2 culls against the depth
+	// pass 1 drew), so the depth prepass is split and every step between the two
+	// halves is its own pass:
+	using CullPhase = FGHiZCullPass::Phase;
+	using DepthPhase = FGDepthPrePass::Phase;
+	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull1));
+	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::First));
+	_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ false));
+	_frameGraph->AddPass(make_unique<FGHiZCullPass>(device, scene, CullPhase::Cull2));
+	_frameGraph->AddPass(make_unique<FGDepthPrePass>(device, scene, extent, depthFormat, _msaaSamples, DepthPhase::Second));
 	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples));
+		_frameGraph->AddPass(make_unique<FGResolvePass>(device, extent, _msaaSamples, /*resolveNormal*/ true));
 	_frameGraph->AddPass(make_unique<FGLightCullingPass>(device, scene, extent, tileNums, _msaaSamples));
 
 	auto fgShadowPass = make_unique<FGShadowPass>(device, scene, depthFormat);
@@ -69,6 +74,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	_frameGraph->AddPass(make_unique<FGAmbientOcclusionPass>(
 		device, scene, extent, _msaaSamples,
 		fgSdfShadowPassPtr->GetSDFGenerator()));
+
+	// Generates the IBL maps the geometry pass samples. Runs on the first frame
+	// only; after that it declares nothing and the graph culls it.
+	_frameGraph->AddPass(make_unique<FGIBLPass>(device, scene));
 
 	_frameGraph->AddPass(make_unique<FGGeometryPass>(
 		device, scene, swapChain, depthFormat, _msaaSamples, tileNums));

@@ -23,53 +23,79 @@ namespace
 	};
 }
 
-FGResolvePass::FGResolvePass(Device& device, VkExtent2D screenExtent, VkSampleCountFlagBits msaaSamples)
+FGResolvePass::FGResolvePass(Device& device, VkExtent2D screenExtent,
+	VkSampleCountFlagBits msaaSamples, bool resolveNormal)
 	: _device(device)
 	, _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
+	, _resolveNormal(resolveNormal)
 {
-	assert(msaaSamples != VK_SAMPLE_COUNT_1_BIT && "FGResolvePass is MSAA-only");
+	assert((!resolveNormal || msaaSamples != VK_SAMPLE_COUNT_1_BIT) &&
+		"the normal resolve is MSAA-only");
 
-	_depthResolveShader = _device.GetResourceManager().LoadShader("Shaders/depthResolve.comp.spv");
-	_depthResolvePipeline = make_unique<Pipeline>(_device, _depthResolveShader.Get());
+	auto& resourceManager = _device.GetResourceManager();
 
-	_normalResolveShader = _device.GetResourceManager().LoadShader("Shaders/normalResolve.comp.spv");
-	_normalResolvePipeline = make_unique<Pipeline>(_device, _normalResolveShader.Get());
+	_depthResolveShader = resourceManager.LoadShader("Shaders/depthResolve.comp.spv");
+	_depthResolvePipeline = resourceManager.LoadComputePipeline("Shaders/depthResolve.comp.spv");
+
+	if (_resolveNormal)
+	{
+		_normalResolveShader = resourceManager.LoadShader("Shaders/normalResolve.comp.spv");
+		_normalResolvePipeline = resourceManager.LoadComputePipeline("Shaders/normalResolve.comp.spv");
+	}
 }
 
 FGResolvePass::~FGResolvePass() = default;
 
 void FGResolvePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-	RenderExecutor& renderExecutor)
+	RenderFrame& renderFrame)
 {
-	FGTextureDesc resolvedNormalDesc{};
-	resolvedNormalDesc.extent = _screenExtent;
-	resolvedNormalDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
-	resolvedNormalDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	resolvedNormalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
-	resolvedNormalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-	_resolvedNormal = builder.CreateTexture(RT_RESOLVED_NORMAL, resolvedNormalDesc);
-
-	// FGDepthPrePass declared MainDepth/MainNormal/ResolvedDepth in its Setup
-	// (declaration order guarantees it ran first).
+	// FGDepthPrePass declared the MSAA targets in its Setup (declaration order
+	// guarantees it ran first).
 	_mainDepth = builder.GetTexture(FGDepthPrePass::RT_MAIN_DEPTH);
-	_mainNormal = builder.GetTexture(FGDepthPrePass::RT_MAIN_NORMAL);
-	_resolvedDepth = builder.GetTexture(RT_RESOLVED_DEPTH);
 
-	// The resolve shaders sample the MSAA targets from compute-stage dispatches
+	// Depth history: next frame's pass-1 Hi-Z reads this slot's image, so it is
+	// imported rather than a transient. Both instances declare it — ImportTexture
+	// is idempotent for the same name and physical resource.
+	RenderTargetDesc depthDesc{};
+	depthDesc.extent = _screenExtent;
+	depthDesc.format = VK_FORMAT_R32_SFLOAT;
+	depthDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	depthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	depthDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	_resolvedDepth = builder.ImportTexture(RT_RESOLVED_DEPTH,
+		frameResources.GetOrCreateRenderTarget(RT_RESOLVED_DEPTH, depthDesc));
+
+	// The resolve shaders sample the source from compute-stage dispatches
 	// recorded on the graphics queue.
 	builder.Read(_mainDepth, TextureAccess::SampledCompute);
-	builder.Read(_mainNormal, TextureAccess::SampledCompute);
 	builder.Write(_resolvedDepth, TextureAccess::StorageComputeWrite);
+
+	if (!_resolveNormal)
+		return;
+
+	FGTextureDesc normalDesc{};
+	normalDesc.extent = _screenExtent;
+	normalDesc.format = VK_FORMAT_R8G8B8A8_UNORM;
+	normalDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	normalDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	normalDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	_resolvedNormal = builder.CreateTexture(RT_RESOLVED_NORMAL, normalDesc);
+
+	_mainNormal = builder.GetTexture(FGDepthPrePass::RT_MAIN_NORMAL);
+
+	builder.Read(_mainNormal, TextureAccess::SampledCompute);
 	builder.Write(_resolvedNormal, TextureAccess::StorageComputeWrite);
 }
 
 void FGResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-	// Depth resolve. Layout transitions are the graph's job now — the pass only
-	// dispatches.
+	// Layout transitions are the graph's job; the pass only dispatches.
 	{
-		commandBuffer.BeginDebugMarker("Resolve MSAA Depth");
+		commandBuffer.BeginDebugMarker("Resolve Depth");
 
 		auto extent = context.GetTexture(_resolvedDepth).GetExtent();
 		ResolvePushConstants pc{
@@ -85,7 +111,7 @@ void FGResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
 		builder.SetTextureBuffer(1, context.GetTexture(_resolvedDepth), 0, VK_IMAGE_LAYOUT_GENERAL);
 		auto& resources = builder.Build();
 
-		commandBuffer.BindPipeline(_depthResolvePipeline.get());
+		commandBuffer.BindPipeline(&_depthResolvePipeline.Get());
 		commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, shader, resources);
 		commandBuffer.PushConstants(shader, 0, pc);
 		commandBuffer.Dispatch((extent.width + 7) / 8, (extent.height + 7) / 8, 1);
@@ -93,7 +119,9 @@ void FGResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
 		commandBuffer.EndDebugMarker();
 	}
 
-	// Normal resolve.
+	if (!_resolveNormal)
+		return;
+
 	{
 		commandBuffer.BeginDebugMarker("Resolve MSAA Normal");
 
@@ -110,7 +138,7 @@ void FGResolvePass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
 		builder.SetTextureBuffer(1, context.GetTexture(_resolvedNormal), 0, VK_IMAGE_LAYOUT_GENERAL);
 		auto& resources = builder.Build();
 
-		commandBuffer.BindPipeline(_normalResolvePipeline.get());
+		commandBuffer.BindPipeline(&_normalResolvePipeline.Get());
 		commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, shader, resources);
 		commandBuffer.PushConstants(shader, 0, pc);
 		commandBuffer.Dispatch((_screenExtent.width + 7) / 8, (_screenExtent.height + 7) / 8, 1);

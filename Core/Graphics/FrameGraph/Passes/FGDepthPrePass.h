@@ -15,17 +15,21 @@ namespace Core
 	class FGDepthPrePass : public FrameGraphPass
 	{
 	public:
+		enum class Phase { First, Second };
+
 		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 		static constexpr const char* RT_MAIN_NORMAL = "MainNormal";
-		static constexpr const char* RT_RESOLVED_DEPTH = "ResolvedDepth";
 
 		FGDepthPrePass(Device& device, Scene& scene, VkExtent2D extent,
-			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples);
+			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase);
 		~FGDepthPrePass();
 
-		const char* GetName() const override { return "DepthPrePass"; }
+		const char* GetName() const override
+		{
+			return _phase == Phase::First ? "DepthPre1" : "DepthPre2";
+		}
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-			RenderExecutor& renderExecutor) override;
+			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
@@ -33,6 +37,7 @@ namespace Core
 		Scene& _scene;
 		VkExtent2D _extent;
 		VkSampleCountFlagBits _msaaSamples;
+		Phase _phase;
 
 		Handle<Shader> _depthNormalShader;
 		unique_ptr<PipelineState> _pipelineState;
@@ -40,11 +45,8 @@ namespace Core
 
 		FGTexture _mainNormal;
 		FGTexture _mainDepth;
-		FGTexture _resolvedDepth;
 		FGBuffer _camera;
 
-		// Prepared on the main thread by Setup (culler creation mutates resource
-		// pools); nullptr when there is nothing to draw this frame.
 		OcclusionCuller* _culler = nullptr;
 	};
 }

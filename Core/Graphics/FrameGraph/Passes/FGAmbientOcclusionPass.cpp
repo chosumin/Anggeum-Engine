@@ -21,7 +21,7 @@ FGAmbientOcclusionPass::FGAmbientOcclusionPass(Device& device, Scene& scene,
 FGAmbientOcclusionPass::~FGAmbientOcclusionPass() = default;
 
 void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-    RenderExecutor& renderExecutor)
+    RenderFrame& renderFrame)
 {
     switch (_activeMethod)
     {

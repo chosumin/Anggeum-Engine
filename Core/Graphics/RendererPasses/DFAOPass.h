@@ -53,7 +53,7 @@ namespace Core
         Handle<Texture> _aoTexture;
 
         Handle<Shader>       _dfaoShader;
-        unique_ptr<Pipeline> _dfaoPipeline;
+        Handle<Pipeline> _dfaoPipeline;
 
         DFAOUniform _params{};
 

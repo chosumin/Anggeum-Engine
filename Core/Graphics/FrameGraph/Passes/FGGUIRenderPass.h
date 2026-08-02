@@ -19,7 +19,7 @@ namespace Core
         const char* GetName() const override { return "FGGUIRenderPass"; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-            RenderExecutor& renderExecutor) override;
+            RenderFrame& renderFrame) override;
         void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
     private:

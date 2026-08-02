@@ -3,7 +3,6 @@
 #include "Vulkans/MemoryAllocator.h"
 #include "ResourcePool.h"
 #include "FrameResources.h"
-#include "RenderExecutor.h"
 #include "RenderScene.h"
 #include "Vulkans/SubmitInfo.h"
 
@@ -13,6 +12,11 @@ namespace Core
 	class DescriptorSetBuilder;
 	class RendererBatch;
 	class RenderScene;
+	class OcclusionCuller;
+	class FrustumCuller;
+	class CommandBuffer;
+	class Shader;
+	class Pipeline;
 
 	class RenderFrame
 	{
@@ -45,8 +49,18 @@ namespace Core
 		FrameResources& GetResources() { return _resources; }
 		const FrameResources& GetResources() const { return _resources; }
 
-		// Culler management - per camera and RendererBatch, reused within a frame
-		RenderExecutor& GetRenderExecutor() { return *_renderExecutor; }
+		// Cullers are stored per frame slot in FrameResources; this supplies the
+		// batch they cull. Null when there is nothing to draw, which is also the
+		// signal for a pass to skip its culling and drawing this frame.
+		OcclusionCuller* PrepareOcclusionCuller(CameraBuffer& camera);
+		FrustumCuller* PrepareFrustumCuller(CameraBuffer& camera);
+
+		// Records one indirect draw of the scene batch. Lives here because the
+		// vertex/index, transform, material and bindless inputs it binds are all
+		// reached through this frame.
+		void DrawIndirect(CommandBuffer& commandBuffer,
+			Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
+			DescriptorSetBuilder& builder, function<void(Shader&)> perShaderHook);
 
 		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
 		RendererBatch& GetRendererBatch() const { return *_renderScene.GetRendererBatch(); }
@@ -64,10 +78,7 @@ namespace Core
 
 		DescriptorSetResources _bindlessResources;
 
-		// Per-frame GPU resources (render targets / transient buffers / framebuffers)
+		// Per-frame GPU resources (render targets / transient buffers / cullers)
 		FrameResources _resources;
-
-		// Per-camera/RendererBatch cullers, reused within a frame
-		unique_ptr<RenderExecutor> _renderExecutor;
 	};
 }

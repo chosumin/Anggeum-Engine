@@ -10,7 +10,7 @@
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "MeshBufferManager.h"
 #include "FrameResources.h"
-#include "RenderExecutor.h"
+#include "RenderFrame.h"
 #include "ResourceManager.h"
 #include "TransferJob.h"
 #include "Utils/FileSystem.h"
@@ -170,13 +170,13 @@ SDFGenerator::SDFGenerator(Device& device)
 	: _device(device)
 {
 	_sdfGenerateShader = _device.GetResourceManager().LoadShader("Shaders/sdfGenerate.comp.spv");
-	_sdfGeneratePipeline = make_unique<Pipeline>(_device, _sdfGenerateShader.Get());
+	_sdfGeneratePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfGenerate.comp.spv");
 
 	_boundsReduceShader = _device.GetResourceManager().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
-	_boundsReducePipeline = make_unique<Pipeline>(_device, _boundsReduceShader.Get());
+	_boundsReducePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfBoundsReduce.comp.spv");
 
 	_triLookupShader = _device.GetResourceManager().LoadShader("Shaders/sdfTriLookup.comp.spv");
-	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
+	_triLookupPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfTriLookup.comp.spv");
 
 	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
 	uint32_t posInf = FloatToSortableUint(1e20f);
@@ -249,7 +249,7 @@ void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuf
 	builder.SetStorageBuffer(2, _boundsBuffer.Get());
 	auto& resources = builder.Build();
 
-	commandBuffer.BindPipeline(_boundsReducePipeline.get());
+	commandBuffer.BindPipeline(&_boundsReducePipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		boundsReduceShader,
 		resources);
@@ -300,7 +300,7 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 		uint32_t drawCommandCount;
 	} pc = { totalTriangles, drawCommandCount };
 
-	commandBuffer.BindPipeline(_triLookupPipeline.get());
+	commandBuffer.BindPipeline(&_triLookupPipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		triLookupShader,
 		resources);
@@ -319,20 +319,20 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 		.Submit();
 }
 
-void SDFGenerator::Generate(FrameResources& frameResources, RenderExecutor& renderExecutor,
+void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderFrame,
 	CommandBuffer& commandBuffer,
 	uint32_t resolution)
 {
 	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(resolution);
 
-	auto& meshBufferManager = renderExecutor.GetMeshBufferManager();
-	auto batch = renderExecutor.GetRendererBatch();
-	auto& objectDataBuffer = batch->GetObjectDataBuffer();
-	auto& indirectCommandBuffer = batch->GetIndirectCommandBuffer();
-	auto drawCommandCount = batch->GetDrawCommandCount();
-	auto instanceCount = batch->GetInstanceCount();
-	auto& transformBuffer = batch->GetTransformBatch().TransformBuffer.Get();
+	auto& meshBufferManager = renderFrame.GetMeshBufferManager();
+	auto& batch = renderFrame.GetRendererBatch();
+	auto& objectDataBuffer = batch.GetObjectDataBuffer();
+	auto& indirectCommandBuffer = batch.GetIndirectCommandBuffer();
+	auto drawCommandCount = batch.GetDrawCommandCount();
+	auto instanceCount = batch.GetInstanceCount();
+	auto& transformBuffer = batch.GetTransformBatch().TransformBuffer.Get();
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 
@@ -368,7 +368,7 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderExecutor& rend
 	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
-	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());
+	commandBuffer.BindPipeline(&_sdfGeneratePipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		sdfGenerateShader,
 		sdfResources);

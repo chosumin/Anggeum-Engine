@@ -28,7 +28,7 @@ namespace Core
 		QueueType GetQueueType() const override { return QueueType::Compute; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-			RenderExecutor& renderExecutor) override;
+			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 		void OnGUI(RenderFrame& renderFrame) override;
 
@@ -60,11 +60,11 @@ namespace Core
 		unique_ptr<SDFGenerator> _sdfGenerator;
 
 		Handle<Shader> _sdfShadowShader;
-		unique_ptr<Pipeline> _sdfShadowPipeline;
+		Handle<Pipeline> _sdfShadowPipeline;
 
 		// Volume visualization
 		Handle<Shader> _volumeSliceShader;
-		unique_ptr<Pipeline> _volumeSlicePipeline;
+		Handle<Pipeline> _volumeSlicePipeline;
 		VkDescriptorSet _sdfShadowImGuiDS = VK_NULL_HANDLE;
 		VkDescriptorSet _volumeSliceImGuiDS = VK_NULL_HANDLE;
 

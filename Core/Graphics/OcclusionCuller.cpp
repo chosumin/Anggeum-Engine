@@ -4,29 +4,28 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
-#include "Graphics/RenderFrame.h"
+#include "Graphics/FrameResources.h"
 #include "Graphics/ResourceManager.h"
 #include "Vulkans/Texture.h"
 
 using namespace Core;
 
-Core::OcclusionCuller::OcclusionCuller(Device& device, RenderFrame& renderFrame,
+Core::OcclusionCuller::OcclusionCuller(Device& device, FrameResources& frameResources,
     RendererBatch& rendererBatch, uint32_t id)
     : Culler(device, rendererBatch, id)
 {
-    auto& frameResources = renderFrame.GetResources();
     auto& resourceManager = device.GetResourceManager();
 
-    PrepareHiZResources(device, renderFrame, rendererBatch.GetExtents());
+    PrepareHiZResources(device, frameResources, rendererBatch.GetExtents());
 
     _cullingShader = resourceManager.LoadShader("Shaders/gpuCulling.comp.spv");
-    _cullingPipeline = make_unique<Pipeline>(device, _cullingShader.Get());
+    _cullingPipeline = resourceManager.LoadComputePipeline("Shaders/gpuCulling.comp.spv");
 
     _pass2CullingShader = resourceManager.LoadShader("Shaders/gpuCullingPass2.comp.spv");
-    _pass2CullingPipeline = make_unique<Pipeline>(device, _pass2CullingShader.Get());
+    _pass2CullingPipeline = resourceManager.LoadComputePipeline("Shaders/gpuCullingPass2.comp.spv");
 
     _resetDrawCommandsShader = resourceManager.LoadShader("Shaders/resetDrawCommands.comp.spv");
-    _resetDrawCommandsPipeline = make_unique<Pipeline>(device, _resetDrawCommandsShader.Get());
+    _resetDrawCommandsPipeline = resourceManager.LoadComputePipeline("Shaders/resetDrawCommands.comp.spv");
 
     _pass1CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(_namePrefix + "Pass1CullData");
     _pass2CullDataBuffer = frameResources.GetOrCreateUniformBuffer<GPUCullData>(_namePrefix + "Pass2CullData");
@@ -37,14 +36,13 @@ Core::OcclusionCuller::OcclusionCuller(Device& device, RenderFrame& renderFrame,
     rejectedCountDesc.memoryType = MemoryType::DEVICE_LOCAL;
     _rejectedCountBuffer = frameResources.GetOrCreateStorageBuffer(_namePrefix + "RejectedCount", rejectedCountDesc);
 
-    PrepareBatchResources(renderFrame);
+    PrepareBatchResources(frameResources);
 }
 
-void Core::OcclusionCuller::PrepareBatchResources(RenderFrame& renderFrame)
+void Core::OcclusionCuller::PrepareBatchResources(FrameResources& frameResources)
 {
-    Culler::PrepareBatchResources(renderFrame);
+    Culler::PrepareBatchResources(frameResources);
 
-    auto& frameResources = renderFrame.GetResources();
 
     BufferDesc rejectedIndicesDesc{};
     rejectedIndicesDesc.size = _instanceCount * sizeof(uint32_t);
@@ -68,21 +66,21 @@ void Core::OcclusionCuller::PrepareBatchResources(RenderFrame& renderFrame)
         _namePrefix + "Pass2Indirect", indirectDesc, drawCommands);
 }
 
-void Core::OcclusionCuller::ResetDrawCommands(RenderFrame& renderFrame, CommandBuffer& commandBuffer)
+void Core::OcclusionCuller::ResetDrawCommands(FrameResources& frameResources, CommandBuffer& commandBuffer)
 {
     uint32_t drawCount = _drawCount;
 
-    commandBuffer.BindPipeline(_resetDrawCommandsPipeline.get());
+    commandBuffer.BindPipeline(&_resetDrawCommandsPipeline.Get());
 
     auto& resetShader = _resetDrawCommandsShader.Get();
-    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(resetShader, 0);
+    auto builder = frameResources.CreateDescriptorSetBuilder(resetShader, 0);
     builder.SetStorageBuffer(0, _indirectCommandBuffer.Get());
     builder.SetStorageBuffer(1, _pass2IndirectCommandBuffer.Get());
     builder.SetStorageBuffer(2, _rejectedCountBuffer.Get());
     auto& resources = builder.Build();
 
     commandBuffer.PushConstants(resetShader, 0, drawCount);
-    commandBuffer.BindDescriptorSet(_resetDrawCommandsPipeline->GetPipelineBindPoint(),
+    commandBuffer.BindDescriptorSet(_resetDrawCommandsPipeline.Get().GetPipelineBindPoint(),
         resetShader, resources);
 
     uint32_t groupCount = (drawCount + 63) / 64;
@@ -107,41 +105,54 @@ void Core::OcclusionCuller::ResetDrawCommands(RenderFrame& renderFrame, CommandB
         .Submit();
 }
 
-void Core::OcclusionCuller::DispatchPass1Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, Handle<Texture> depth)
+void Core::OcclusionCuller::CullPass1(FrameResources& frameResources, CommandBuffer& commandBuffer,
+    Texture* previousDepth)
 {
-    DispatchCulling(renderFrame, commandBuffer, camera, depth,
+    commandBuffer.BeginDebugMarker("Reset Draw Commands");
+    ResetDrawCommands(frameResources, commandBuffer);
+    commandBuffer.EndDebugMarker();
+
+    commandBuffer.BeginDebugMarker("Pass 1 Culling");
+    DispatchCulling(frameResources, commandBuffer, GetCamera(), previousDepth,
         _indirectCommandBuffer.Get(), _pass1CullDataBuffer.Get(),
-        _cullingShader.Get(), _cullingPipeline.get());
+        _cullingShader.Get(), _cullingPipeline.Get());
+    commandBuffer.EndDebugMarker();
 }
 
-void Core::OcclusionCuller::DispatchPass2Culling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, Handle<Texture> depth)
+void Core::OcclusionCuller::CullPass2(FrameResources& frameResources, CommandBuffer& commandBuffer,
+    Texture& currentDepth)
 {
-    DispatchCulling(renderFrame, commandBuffer, camera, depth,
+    commandBuffer.BeginDebugMarker("Pass 2 Culling");
+    DispatchCulling(frameResources, commandBuffer, GetCamera(), &currentDepth,
         _pass2IndirectCommandBuffer.Get(), _pass2CullDataBuffer.Get(),
-        _pass2CullingShader.Get(), _pass2CullingPipeline.get());
+        _pass2CullingShader.Get(), _pass2CullingPipeline.Get());
+    commandBuffer.EndDebugMarker();
 }
 
-void Core::OcclusionCuller::DispatchCulling(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-    const CameraBuffer& camera, Handle<Texture> depth,
+void Core::OcclusionCuller::DispatchCulling(FrameResources& frameResources, CommandBuffer& commandBuffer,
+    const CameraBuffer& camera, Texture* depth,
     Core::Buffer& indirectCommandBuffer, Core::Buffer& cullDataBuffer,
-    Shader& cullingShader, Pipeline* cullingPipeline)
+    Shader& cullingShader, Pipeline& cullingPipeline)
 {
-    // Generate Hi-Z from depth
-    if (!_hiZInitialized)
+    // Build the Hi-Z pyramid from the depth buffer this dispatch was given. It is
+    // absent on the frames before the first depth buffer exists (pass 1 reads the
+    // previous frame's depth), so the build is skipped rather than assumed.
+    if (depth != nullptr)
     {
+        GenerateHiZBuffer(frameResources, commandBuffer, *depth);
+        _hiZBuilt = true;
+    }
+    else if (!_hiZLayoutInitialized)
+    {
+        // Nothing has written the pyramid yet, but the cull shader binds it
+        // regardless, so move it out of UNDEFINED once.
         commandBuffer.CreateBarrierBatch()
             .Image(_hiZTexture.Get(),
                 VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             .Submit();
-        _hiZInitialized = true;
     }
-    else
-    {
-        GenerateHiZBuffer(renderFrame, commandBuffer, depth);
-    }
+    _hiZLayoutInitialized = true;
 
     // Culling dispatch. Built CPU-side and assigned once: the mapping is
     // uncached, so field-by-field writes into it would be slow.
@@ -151,16 +162,16 @@ void Core::OcclusionCuller::DispatchCulling(RenderFrame& renderFrame, CommandBuf
     cullData.screenSize = glm::vec2(_screenExtent.width, _screenExtent.height);
     cullData.drawCount = _instanceCount;
     cullData.hiZMipLevels = _hiZMipLevels;
-    cullData.enableOcclusionCulling = _hiZInitialized ? 1 : 0;
+    cullData.enableOcclusionCulling = _hiZBuilt ? 1 : 0;
 
     glm::mat4 viewProj = camera.Projection * camera.View;
     ExtractFrustumPlanes(viewProj, cullData.frustumPlanes);
 
     cullDataBuffer.Update(cullData);
 
-    commandBuffer.BindPipeline(cullingPipeline);
+    commandBuffer.BindPipeline(&cullingPipeline);
 
-    auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(cullingShader, 0);
+    auto builder = frameResources.CreateDescriptorSetBuilder(cullingShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, _rendererBatch.GetObjectDataBuffer());
     builder.SetStorageBuffer(2, _rendererBatch.GetTransformBatch().TransformBuffer.Get());
@@ -171,7 +182,7 @@ void Core::OcclusionCuller::DispatchCulling(RenderFrame& renderFrame, CommandBuf
     builder.SetStorageBuffer(11, _rejectedCountBuffer.Get());
     auto& resources = builder.Build();
 
-    commandBuffer.BindDescriptorSet(cullingPipeline->GetPipelineBindPoint(),
+    commandBuffer.BindDescriptorSet(cullingPipeline.GetPipelineBindPoint(),
         cullingShader, resources);
 
     uint32_t groupCount = (_instanceCount + 63) / 64;
@@ -201,7 +212,7 @@ void Core::OcclusionCuller::DispatchCulling(RenderFrame& renderFrame, CommandBuf
         .Submit();
 }
 
-void Core::OcclusionCuller::PrepareHiZResources(Device& device, RenderFrame& renderFrame, VkExtent2D extents)
+void Core::OcclusionCuller::PrepareHiZResources(Device& device, FrameResources& frameResources, VkExtent2D extents)
 {
     _screenExtent = extents;
 
@@ -224,19 +235,26 @@ void Core::OcclusionCuller::PrepareHiZResources(Device& device, RenderFrame& ren
     hiZDesc.mipLevels = _hiZMipLevels;
     hiZDesc.sampler = device.GetResourceManager().LoadSampler(samplerDesc);
 
-    _hiZTexture = renderFrame.GetResources().GetOrCreateRenderTarget(_namePrefix + "HiZ", hiZDesc);
+    _hiZTexture = frameResources.GetOrCreateRenderTarget(_namePrefix + "HiZ", hiZDesc);
+
+    // The mip chain is bound per level while recording, and the two culling
+    // passes record on different worker threads against this one texture, so the
+    // views are created here (main thread) instead of lazily on a worker.
+    Texture& hiZTexture = _hiZTexture.Get();
+    for (uint32_t mip = 1; mip < _hiZMipLevels; ++mip)
+        hiZTexture.GetImage().GetOrCreateImageView(mip);
 
     // Load shaders
     _hiZGenerateShader = device.GetResourceManager().LoadShader("Shaders/hiZGenerate.comp.spv");
-    _hiZPipeline = make_unique<Pipeline>(device, _hiZGenerateShader.Get());
+    _hiZPipeline = device.GetResourceManager().LoadComputePipeline("Shaders/hiZGenerate.comp.spv");
 }
 
-void Core::OcclusionCuller::GenerateHiZBuffer(RenderFrame& renderFrame, CommandBuffer& commandBuffer, Handle<Texture> depth)
+void Core::OcclusionCuller::GenerateHiZBuffer(FrameResources& frameResources, CommandBuffer& commandBuffer, Texture& depth)
 {
     // Resolve once on the render thread; the image ops take Texture& (the mip loop
     // below still uses the _hiZTexture handle for SetTextureBuffer).
     Texture& hiZTex = _hiZTexture.Get();
-    Texture& depthTex = depth.Get();
+    Texture& depthTex = depth;
 
     // Prepare depth as copy source and Hi-Z as copy destination.
     commandBuffer.CreateBarrierBatch()
@@ -264,7 +282,7 @@ void Core::OcclusionCuller::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
     // Generate Hi-Z mip chain
     if (_hiZMipLevels > 1)
     {
-        commandBuffer.BindPipeline(_hiZPipeline.get());
+        commandBuffer.BindPipeline(&_hiZPipeline.Get());
 
         uint32_t groupX = (_screenExtent.width + 7) / 8;
         uint32_t groupY = (_screenExtent.height + 7) / 8;
@@ -278,7 +296,7 @@ void Core::OcclusionCuller::GenerateHiZBuffer(RenderFrame& renderFrame, CommandB
             mipHeight = std::max(1u, mipHeight / 2);
 
             auto& hiZShader = _hiZGenerateShader.Get();
-            auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(hiZShader, 0);
+            auto builder = frameResources.CreateDescriptorSetBuilder(hiZShader, 0);
             builder.SetTextureBuffer(0, _hiZTexture, mip - 1, VK_IMAGE_LAYOUT_GENERAL);
             builder.SetTextureBuffer(1, _hiZTexture, mip, VK_IMAGE_LAYOUT_GENERAL);
             auto& resources = builder.Build();

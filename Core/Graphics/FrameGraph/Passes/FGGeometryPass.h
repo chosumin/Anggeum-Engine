@@ -15,18 +15,12 @@ namespace Core
     class SubMesh;
     class Buffer;
     class OcclusionCuller;
-    class PreEnvironmentPass;
-    class BrdfLutPass;
 
     class FGGeometryPass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
         static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
-        static constexpr const char* RT_IRRADIANCE = "Irradiance";
-        static constexpr const char* RT_PREFILTERED = "Prefiltered";
-        static constexpr const char* RT_BRDF_LUT = "BrdfLut";
-        static constexpr const char* RT_OFFSCREEN = "Offscreen";
 
         FGGeometryPass(Device& device, Scene& scene, SwapChain& swapChain,
             VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums);
@@ -35,18 +29,10 @@ namespace Core
         const char* GetName() const override { return "FGGeometryPass"; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-            RenderExecutor& renderExecutor) override;
+            RenderFrame& renderFrame) override;
         void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
     private:
-        // Creates the IBL render targets, imports them (WriteManual — the
-        // generators manage layouts themselves), and on the first call builds
-        // the generators + registers the cubemaps/LUT to bindless.
-        void EnsureIBLResources(FrameGraphBuilder& builder, FrameResources& frameResources,
-            RenderExecutor& renderExecutor);
-        void RegisterGiTexturesToBindless(RenderExecutor& renderExecutor,
-            Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut);
-
         void PrepareSkybox();
         void RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
 
@@ -65,20 +51,7 @@ namespace Core
         // Per-shader pipeline cache
         unordered_map<Shader*, unique_ptr<Pipeline>> _pipelineCache;
 
-        GI _giBuffer;
         TileInfo _tileInfo;
-
-        bool _iblGenerated = false;
-
-        unique_ptr<PreEnvironmentPass> _preEnvironmentPass;
-        unique_ptr<BrdfLutPass> _brdfLutPass;
-        
-        bool _recordIBL = false;
-        
-        FGTexture _offscreen;
-        FGTexture _irradiance;
-        FGTexture _prefiltered;
-        FGTexture _brdfLut;
 
         FGTexture _mainColor;
         FGTexture _mainDepth;

@@ -23,7 +23,7 @@ DFAOPass::DFAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
     , _sdfGenerator(sdfGenerator)
 {
     _dfaoShader   = _device.GetResourceManager().LoadShader("Shaders/dfao.comp.spv");
-    _dfaoPipeline = make_unique<Pipeline>(_device, _dfaoShader.Get());
+    _dfaoPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/dfao.comp.spv");
 }
 
 DFAOPass::~DFAOPass()
@@ -136,7 +136,7 @@ void DFAOPass::Record(FrameGraphPassContext& context, CommandBuffer& commandBuff
     builder.SetUniformBuffer(5, *_paramsBuffer);
     auto& resources = builder.Build();
 
-    commandBuffer.BindPipeline(_dfaoPipeline.get());
+    commandBuffer.BindPipeline(&_dfaoPipeline.Get());
     commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
         dfaoShader, resources);
     commandBuffer.PushConstants(dfaoShader, 0, _pushConstants);

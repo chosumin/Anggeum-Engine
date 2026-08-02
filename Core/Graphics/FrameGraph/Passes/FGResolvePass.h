@@ -9,35 +9,40 @@ namespace Core
 	class Pipeline;
 	class Texture;
 
-	// Frame-graph port of ResolvePass: resolves the MSAA depth/normal targets to
-	// single-sample images via compute dispatches on the graphics queue.
 	class FGResolvePass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_RESOLVED_DEPTH = "ResolvedDepth";
 		static constexpr const char* RT_RESOLVED_NORMAL = "ResolvedNormal";
 
-		FGResolvePass(Device& device, VkExtent2D screenExtent, VkSampleCountFlagBits msaaSamples);
+		// resolveNormal also resolves MainNormal into ResolvedNormal (MSAA only).
+		FGResolvePass(Device& device, VkExtent2D screenExtent,
+			VkSampleCountFlagBits msaaSamples, bool resolveNormal);
 		~FGResolvePass();
 
-		const char* GetName() const override { return "ResolvePass"; }
+		const char* GetName() const override
+		{
+			return _resolveNormal ? "ResolvePass" : "DepthResolvePass";
+		}
+
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-			RenderExecutor& renderExecutor) override;
+			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
 		Device& _device;
 		VkExtent2D _screenExtent;
 		VkSampleCountFlagBits _msaaSamples;
+		bool _resolveNormal;
 
 		Handle<Shader> _depthResolveShader;
-		unique_ptr<Pipeline> _depthResolvePipeline;
+		Handle<Pipeline> _depthResolvePipeline;
 		Handle<Shader> _normalResolveShader;
-		unique_ptr<Pipeline> _normalResolvePipeline;
+		Handle<Pipeline> _normalResolvePipeline;
 
 		FGTexture _mainDepth;
-		FGTexture _mainNormal;
 		FGTexture _resolvedDepth;
+		FGTexture _mainNormal;
 		FGTexture _resolvedNormal;
 	};
 }

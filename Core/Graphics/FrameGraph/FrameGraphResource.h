@@ -53,9 +53,7 @@ namespace Core
 		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED; // meaningless for buffers
 		bool isWrite = false;
 
-		// The pass records its own barriers for this access (e.g. RenderExecutor's
-		// mid-pass depth resolve). The graph emits no barrier and just adopts
-		// layout/stage/access as the state the pass leaves the resource in.
+		// The pass records its own barriers for this access.
 		bool manualBarriers = false;
 	};
 

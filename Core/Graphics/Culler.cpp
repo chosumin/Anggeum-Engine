@@ -1,6 +1,6 @@
 #include "Graphics/Culler.h"
 #include "Graphics/RendererBatch.h"
-#include "Graphics/RenderFrame.h"
+#include "Graphics/FrameResources.h"
 
 using namespace Core;
 
@@ -15,10 +15,8 @@ Core::Culler::Culler(Device& device, RendererBatch& rendererBatch, uint32_t id)
 
 Core::Culler::~Culler() = default;
 
-void Core::Culler::PrepareBatchResources(RenderFrame& renderFrame)
+void Core::Culler::PrepareBatchResources(FrameResources& frameResources)
 {
-    auto& frameResources = renderFrame.GetResources();
-
     _instanceCount = _rendererBatch.GetInstanceCount();
     _drawCount = _rendererBatch.GetIndirectDrawBuffer().GetDrawCount();
     _batchRevision = _rendererBatch.GetRevision();
@@ -38,9 +36,9 @@ void Core::Culler::PrepareBatchResources(RenderFrame& renderFrame)
         _namePrefix + "Pass1Indirect", indirectDesc, drawCommands);
 }
 
-void Core::Culler::OnBatchRebuilt(RenderFrame& renderFrame)
+void Core::Culler::OnBatchRebuilt(FrameResources& frameResources)
 {
-    PrepareBatchResources(renderFrame);
+    PrepareBatchResources(frameResources);
 }
 
 void Core::Culler::ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes)

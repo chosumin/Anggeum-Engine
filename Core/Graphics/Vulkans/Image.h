@@ -64,6 +64,9 @@ namespace Core
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
 		VkImageView CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType, VkImageAspectFlags aspectFlags, uint32_t baseMipLevel);
+
+		// Labels a freshly created view for the validation layer.
+		void NameView(VkImageView view, const char* kind, uint32_t index) const;
 		VkImageView CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags);
 	private:
 		Device& _device;

@@ -2,6 +2,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Sampler.h"
 #include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
@@ -30,6 +31,8 @@ namespace Core
 
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
+
+		Handle<Pipeline> LoadComputePipeline(const string& shaderName);
 
 		Handle<Sampler> LoadSampler(const SamplerCreateInfo info);
 
@@ -85,6 +88,11 @@ namespace Core
 		// Shaders: pool-owned, looked up by name for dedup.
 		ResourcePool<Shader> _shaderPool;
 		unordered_map<string, Handle<Shader>> _shaderHandles;
+
+		// Compute pipelines: pool-owned, looked up by shader name for dedup.
+		ResourcePool<Pipeline> _computePipelinePool;
+		unordered_map<string, Handle<Pipeline>> _computePipelineHandles;
+		mutex _computePipelineMutex;
 
 		// Samplers: pool-owned, looked up by create-info for dedup.
 		ResourcePool<Sampler> _samplerPool;

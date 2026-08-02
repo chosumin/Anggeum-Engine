@@ -2,6 +2,7 @@
 #include "Vulkans/MemoryAllocator.h"
 #include "Vulkans/Buffer.h"
 #include "ResourcePool.h"
+#include "Culler.h"
 
 namespace Core
 {
@@ -14,6 +15,35 @@ namespace Core
 	class CommandBuffer;
 	class Job;
 	class TransientResourceAllocator;
+	class OcclusionCuller;
+	class FrustumCuller;
+	class RendererBatch;
+
+	// Key for the culler cache. The concrete type is part of the key, so one
+	// camera can own a culler of each kind.
+	struct CullerKey
+	{
+		const CameraBuffer* Camera;
+		RendererBatch* Batch;
+		type_index Type;
+
+		bool operator==(const CullerKey& other) const
+		{
+			return Camera == other.Camera && Batch == other.Batch && Type == other.Type;
+		}
+	};
+
+	struct CullerKeyHash
+	{
+		size_t operator()(const CullerKey& key) const
+		{
+			size_t h = 0;
+			h ^= std::hash<const CameraBuffer*>{}(key.Camera);
+			h ^= std::hash<RendererBatch*>{}(key.Batch) << 1;
+			h ^= key.Type.hash_code() << 2;
+			return h;
+		}
+	};
 
 	struct RenderTargetDesc
 	{
@@ -38,10 +68,6 @@ namespace Core
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
-	// Owns the per-frame-in-flight GPU resources: render targets, transient
-	// storage/uniform buffers, and framebuffers. Split out of RenderFrame so the
-	// frame object keeps only execution/sync concerns (submission, descriptor pool,
-	// bindless, RenderExecutor). Reach it via RenderFrame::GetResources().
 	class FrameResources
 	{
 	public:
@@ -126,6 +152,12 @@ namespace Core
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
+		// Cullers live here because everything they own — indirect command buffers,
+		// cull-data UBOs, the Hi-Z pyramid — is a per-frame-slot resource of this
+		// class. Reached through RenderFrame, which supplies the batch.
+		OcclusionCuller& GetOrCreateOcclusionCuller(RendererBatch& batch, CameraBuffer& camera);
+		FrustumCuller& GetOrCreateFrustumCuller(RendererBatch& batch, CameraBuffer& camera);
+
 	private:
 		// Only reachable through the typed overload, so a block's size always comes
 		// from a real C++ type rather than a hand-written byte count.
@@ -139,6 +171,9 @@ namespace Core
 		void CreateDescriptorPool();
 
 		bool AllInitJobsExecuted() const;
+
+		template<typename T>
+		T& GetOrCreateCuller(RendererBatch& batch, CameraBuffer& camera);
 
 	private:
 		Device& _device;
@@ -160,6 +195,13 @@ namespace Core
 		unordered_map<string, Handle<Buffer>> _uniformBufferHandles;
 
 		Handle<Texture> _previousDepthBuffer;
+
+		// Per-camera/RendererBatch cullers, reused across frames on this slot.
+		unordered_map<CullerKey, unique_ptr<Culler>, CullerKeyHash> _cullers;
+
+		// Monotonic index handed to each new Culler so its FrameResources entries
+		// get unique names (cullers are never removed, so ids stay stable).
+		uint32_t _nextCullerId = 0;
 
 		Handle<Sampler> _defaultSampler;
 

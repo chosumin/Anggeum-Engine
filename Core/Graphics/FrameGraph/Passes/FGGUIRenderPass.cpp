@@ -80,10 +80,10 @@ FGGUIRenderPass::~FGGUIRenderPass()
 }
 
 void FGGUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-    RenderExecutor& renderExecutor)
+    RenderFrame& renderFrame)
 {
 	_mainColor = builder.GetTexture(RT_MAIN_COLOR);
-	builder.Write(_mainColor, TextureAccess::ColorLoadWrite);
+	builder.Read(_mainColor, TextureAccess::SampledFragment);
 
 	// The resolve target is the raw swapchain image (no graph declaration) and
     // ImGui's draw data is external state.

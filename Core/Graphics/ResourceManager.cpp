@@ -76,6 +76,24 @@ namespace Core
 		return StoreShader(shaderName, std::move(shader));
 	}
 
+	Handle<Pipeline> ResourceManager::LoadComputePipeline(const string& shaderName)
+	{
+		// LoadShader takes its own lock, so it runs before this one is held.
+		Handle<Shader> shader = LoadShader(shaderName);
+
+		lock_guard<mutex> guard(_computePipelineMutex);
+
+		auto it = _computePipelineHandles.find(shaderName);
+		if (it != _computePipelineHandles.end() && _computePipelinePool.IsAlive(it->second))
+			return it->second;
+
+		Handle<Pipeline> handle = _computePipelinePool.Add(
+			make_shared<Pipeline>(_device, shader.Get()));
+		_computePipelineHandles[shaderName] = handle;
+
+		return handle;
+	}
+
 	Handle<Shader> ResourceManager::LoadShader(const string& vertPath, const string& fragPath)
 	{
 		lock_guard<mutex> guard(_shaderMutex);

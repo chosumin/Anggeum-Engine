@@ -202,6 +202,16 @@ void TransientResourceAllocator::Realize(const vector<Request>& requests, Handle
 		if (request.isTexture)
 		{
 			images[i]->BindMemoryAt(_heap, _placements[i].offset);
+
+			// Name the transient's image/view so a validation leak or barrier
+			// error prints "MainColor (transient)" instead of a bare handle.
+			const string label = request.name + " (transient)";
+			auto& debugUtils = _device.GetDebugUtils();
+			debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE,
+				(uint64_t)images[i]->GetImage(), label.c_str());
+			debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+				(uint64_t)images[i]->GetOrCreateImageView(0), (label + " View").c_str());
+
 			_textures[request.name] = make_unique<Texture>(request.name,
 				std::move(images[i]), defaultSampler);
 		}

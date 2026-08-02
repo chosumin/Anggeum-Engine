@@ -12,7 +12,7 @@ namespace Core
     class Shader;
     class Pipeline;
     class CommandBuffer;
-    class RenderFrame;
+    class FrameResources;
     class DescriptorSetBuilder;
     class RendererBatch;
 
@@ -21,9 +21,6 @@ namespace Core
     {
     public:
         virtual ~Culler();
-
-        bool IsUsedThisFrame() const { return _markUsedThisFrame; }
-        void MarkUsedThisFrame(bool used) { _markUsedThisFrame = used; }
 
         // The camera this Culler was created for. The culler cache keys on the
         // camera, so the pair is permanently 1:1.
@@ -41,7 +38,7 @@ namespace Core
         // rebuilt. The per-draw buffers are swapped in place, so handles already
         // handed out stay valid. Must run before anything records against them this
         // frame.
-        void OnBatchRebuilt(RenderFrame& renderFrame);
+        void OnBatchRebuilt(FrameResources& frameResources);
 
         Buffer* GetIndirectCommandBuffer() const { return &_indirectCommandBuffer.Get(); }
 
@@ -54,7 +51,7 @@ namespace Core
         // derived constructor and again on every rebuild (via OnBatchRebuilt), while
         // the shaders and pipelines around it do not. Overrides extend it with their
         // own batch-sized buffers and must call the base version first.
-        virtual void PrepareBatchResources(RenderFrame& renderFrame);
+        virtual void PrepareBatchResources(FrameResources& frameResources);
 
         static void ExtractFrustumPlanes(const glm::mat4& viewProj, glm::vec4* planes);
 
@@ -78,8 +75,5 @@ namespace Core
         Handle<Buffer> _indirectCommandBuffer;
         uint32_t _instanceCount = 0;
         uint32_t _drawCount = 0;
-
-    private:
-        bool _markUsedThisFrame = false;
     };
 }

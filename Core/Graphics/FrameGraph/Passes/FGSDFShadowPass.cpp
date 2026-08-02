@@ -5,7 +5,6 @@
 #include "FGResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/RenderExecutor.h"
 #include "Graphics/RendererBatch.h"
 #include "Graphics/SDFGenerator.h"
 #include "Graphics/ResourceManager.h"
@@ -34,10 +33,10 @@ FGSDFShadowPass::FGSDFShadowPass(Device& device, Scene& scene, VkExtent2D screen
 	_sdfGenerator = make_unique<SDFGenerator>(device);
 
 	_sdfShadowShader = _device.GetResourceManager().LoadShader("Shaders/sdfShadow.comp.spv");
-	_sdfShadowPipeline = make_unique<Pipeline>(_device, _sdfShadowShader.Get());
+	_sdfShadowPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfShadow.comp.spv");
 
 	_volumeSliceShader = _device.GetResourceManager().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
-	_volumeSlicePipeline = make_unique<Pipeline>(_device, _volumeSliceShader.Get());
+	_volumeSlicePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfVolumeSlice.comp.spv");
 }
 
 FGSDFShadowPass::~FGSDFShadowPass()
@@ -78,7 +77,7 @@ void FGSDFShadowPass::UpdateSDFParams()
 }
 
 void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-	RenderExecutor& renderExecutor)
+	RenderFrame& renderFrame)
 {
 	_sliceReady = false;
 
@@ -100,12 +99,12 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 			// Rare event: generation creates/resizes pool-owned resources, so it
 			// runs here on the main thread with its own synchronous submit
 			// instead of inside the graph's recording window.
-			auto* batch = renderExecutor.GetRendererBatch();
-			if (batch && batch->GetDrawCommandCount() > 0)
+			auto& batch = renderFrame.GetRendererBatch();
+			if (batch.GetDrawCommandCount() > 0)
 			{
 				auto& commandBuffer = _device.BeginSingleTimeCommands();
 				commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
-				_sdfGenerator->Generate(frameResources, renderExecutor,
+				_sdfGenerator->Generate(frameResources, renderFrame,
 					commandBuffer, SDF_VOLUME_DIM);
 				commandBuffer.EndDebugMarker();
 				_device.EndSingleTimeCommands(commandBuffer);
@@ -219,7 +218,7 @@ void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 	builder.SetStorageBuffer(5, *_sdfGenerator->GetBoundsBuffer());
 	auto& resources = builder.Build();
 
-	commandBuffer.BindPipeline(_sdfShadowPipeline.get());
+	commandBuffer.BindPipeline(&_sdfShadowPipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		sdfShadowShader,
 		resources);
@@ -239,7 +238,7 @@ void FGSDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& com
 		sliceBuilder.SetStorageBuffer(2, *_sdfGenerator->GetBoundsBuffer());
 		auto& sliceResources = sliceBuilder.Build();
 
-		commandBuffer.BindPipeline(_volumeSlicePipeline.get());
+		commandBuffer.BindPipeline(&_volumeSlicePipeline.Get());
 		commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, volumeSliceShader,
 			sliceResources);
 		commandBuffer.PushConstants(volumeSliceShader, 0, _slicePushConstants);

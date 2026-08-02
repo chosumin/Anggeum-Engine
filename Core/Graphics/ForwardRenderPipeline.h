@@ -9,7 +9,6 @@ namespace Core
 	class Scene;
 	class SwapChain;
 	class WorkerThreadManager;
-	class TransferContext;
 	class Buffer;
 	class RenderContext;
 	class FrameGraph;

@@ -324,7 +324,7 @@ namespace Core
 			_passDecls[p].queue = _passes[p]->GetQueueType();
 
 			FrameGraphBuilder builder(*this, static_cast<uint32_t>(p));
-			_passes[p]->Setup(builder, renderFrame.GetResources(), renderFrame.GetRenderExecutor());
+			_passes[p]->Setup(builder, renderFrame.GetResources(), renderFrame);
 		}
 
 		vector<FGResourceState> entryStates;
@@ -512,7 +512,7 @@ namespace Core
 
 			_contexts.push_back(FrameGraphPassContext(_device,
 				renderFrame.GetResources().GetDescriptorPool(),
-				renderFrame.GetRenderExecutor(), imageIndex,
+				renderFrame, imageIndex,
 				_physicalTextures, _physicalBuffers));
 			auto& context = _contexts.back();
 

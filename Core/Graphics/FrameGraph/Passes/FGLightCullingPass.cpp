@@ -21,7 +21,7 @@ FGLightCullingPass::FGLightCullingPass(Device& device, Scene& scene,
 	, _msaaSamples(msaaSamples)
 {
 	_computeMaterial = device.GetResourceManager().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
-	_computePipeline = make_unique<Pipeline>(device, _computeMaterial.Get().GetShaderHandle().Get());
+	_computePipeline = device.GetResourceManager().LoadComputePipeline("shaders/lightCulling.comp.spv");
 
 	_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
 	_tileInfo.tileNums = tileNums;
@@ -30,7 +30,7 @@ FGLightCullingPass::FGLightCullingPass(Device& device, Scene& scene,
 FGLightCullingPass::~FGLightCullingPass() = default;
 
 void FGLightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-	RenderExecutor& renderExecutor)
+	RenderFrame& renderFrame)
 {
 	// The depth this pass consumes: the resolved depth when MSAA is on, the main
 	// depth otherwise. Both were declared by the earlier graph passes.
@@ -68,8 +68,8 @@ void FGLightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& 
 	builder.SetUniformBuffer(3, context.GetBuffer(_lights));
 	auto& resources = builder.Build();
 
-	commandBuffer.BindPipeline(_computePipeline.get());
-	commandBuffer.BindDescriptorSet(_computePipeline->GetPipelineBindPoint(),
+	commandBuffer.BindPipeline(&_computePipeline.Get());
+	commandBuffer.BindDescriptorSet(_computePipeline.Get().GetPipelineBindPoint(),
 		computeShader, resources);
 	commandBuffer.PushConstants(computeShader, 0, _tileInfo);
 	commandBuffer.Dispatch(_tileInfo.tileNums.x, _tileInfo.tileNums.y, 1);

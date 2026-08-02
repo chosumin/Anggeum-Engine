@@ -135,9 +135,13 @@ void Core::SwapChain::CreateImageViews()
     for (size_t i = 0; i < _swapChainImages.size(); i++)
     {
         _swapChainImageViews[i] = CreateImageView(
-            _device, 
-            _swapChainImages[i], _swapChainImageFormat, 
+            _device,
+            _swapChainImages[i], _swapChainImageFormat,
             VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+        const string label = "SwapChain " + std::to_string(i) + " View";
+        _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+            (uint64_t)_swapChainImageViews[i], label.c_str());
     }
 }
 

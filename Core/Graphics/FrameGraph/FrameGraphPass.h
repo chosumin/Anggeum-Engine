@@ -11,7 +11,6 @@ namespace Core
 	class FrameGraph;
 	class FrameGraphBuilder;
 	class FrameResources;
-	class RenderExecutor;
 	class DescriptorPool;
 	class DescriptorSetBuilder;
 	class Shader;
@@ -23,7 +22,7 @@ namespace Core
 	class FrameGraphPassContext
 	{
 	public:
-		static constexpr uint32_t MaxRenderingVariants = 2;
+		static constexpr uint32_t MaxRenderingVariants = 1;
 
 		uint32_t GetImageIndex() const { return _imageIndex; }
 
@@ -34,7 +33,7 @@ namespace Core
 		// serializes allocation internally).
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0) const;
 
-		RenderExecutor& GetRenderExecutor() const { return _renderExecutor; }
+		RenderFrame& GetRenderFrame() const { return _renderFrame; }
 
 		// Begins/ends dynamic rendering with the attachments this pass declared.
 		void BeginRendering(CommandBuffer& commandBuffer, uint32_t variant = 0) const;
@@ -50,11 +49,11 @@ namespace Core
 		// Only the FrameGraph builds contexts; the references bind them to a
 		// frame and to the graph's physical tables for their whole lifetime.
 		FrameGraphPassContext(Device& device, DescriptorPool& descriptorPool,
-			RenderExecutor& renderExecutor, uint32_t imageIndex,
+			RenderFrame& renderFrame, uint32_t imageIndex,
 			const vector<Texture*>& textures, const vector<Buffer*>& buffers)
 			: _device(device)
 			, _descriptorPool(descriptorPool)
-			, _renderExecutor(renderExecutor)
+			, _renderFrame(renderFrame)
 			, _imageIndex(imageIndex)
 			, _textures(textures)
 			, _buffers(buffers)
@@ -74,7 +73,7 @@ namespace Core
 		// slot's pool (owned by FrameResources) and the device for the builder.
 		Device& _device;
 		DescriptorPool& _descriptorPool;
-		RenderExecutor& _renderExecutor;
+		RenderFrame& _renderFrame;
 		uint32_t _imageIndex;
 
 		// Graph-wide physical resolution tables, owned by the FrameGraph.
@@ -104,7 +103,7 @@ namespace Core
 		virtual QueueType GetQueueType() const { return QueueType::Graphics; }
 
 		virtual void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-			RenderExecutor& renderExecutor) = 0;
+			RenderFrame& renderFrame) = 0;
 		virtual void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) = 0;
 		virtual void OnGUI(RenderFrame& renderFrame) {}
 	};

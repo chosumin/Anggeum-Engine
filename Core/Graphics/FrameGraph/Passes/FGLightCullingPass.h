@@ -22,7 +22,7 @@ namespace Core
 		const char* GetName() const override { return "LightCullingPass"; }
 		QueueType GetQueueType() const override { return QueueType::Compute; }
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
-			RenderExecutor& renderExecutor) override;
+			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
@@ -32,7 +32,7 @@ namespace Core
 		VkSampleCountFlagBits _msaaSamples;
 
 		Handle<Material> _computeMaterial;
-		unique_ptr<Pipeline> _computePipeline;
+		Handle<Pipeline> _computePipeline;
 
 		FGTexture _depth;
 		FGBuffer _lightVisibility;
