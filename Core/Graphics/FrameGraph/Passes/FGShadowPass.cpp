@@ -244,10 +244,8 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	builder.Write(_shadowDepth, TextureAccess::DepthWrite);
 
 	// Renders into one array layer at a time via per-cascade layer views, which
-	// the declared-attachment path (whole-texture view) cannot express. Execute
-	// runs on a worker, so the views are created here rather than on demand.
-	builder.SetManualRendering();
-
+	// the declared-attachment path (whole-texture view) cannot express, so this
+	// pass builds its own VkRenderingInfo per cascade.
 	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
 		shadowTexture.Get().GetLayerImageView(i);
 

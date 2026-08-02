@@ -97,22 +97,28 @@ void FGDepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
 void FGDepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-	// Nothing to draw this frame (no camera / no batch).
-	if (_culler == nullptr)
-		return;
+	// Entered even with nothing to draw (no camera / no batch), so the declared
+	// loadOps still clear the targets for the passes that read them.
+	context.BeginRendering(commandBuffer);
 
-	commandBuffer.SetViewportAndScissor(context.GetRenderArea(0));
+	if (_culler != nullptr)
+	{
+		commandBuffer.SetViewportAndScissor(context.GetRenderArea());
 
-	auto& depthNormalShader = _depthNormalShader.Get();
-	auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
-	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
+		auto& depthNormalShader = _depthNormalShader.Get();
+		auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
+		builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 
-	// First phase replays the pass-1 draw list (visible last frame); second phase
-	// replays the pass-2 list (recovered by this frame's Hi-Z).
-	Buffer& indirect = _phase == Phase::First
-		? *_culler->GetIndirectCommandBuffer()
-		: *_culler->GetPass2IndirectCommandBuffer();
+		// First phase replays the pass-1 draw list (visible last frame); second
+		// phase replays the pass-2 list (recovered by this frame's Hi-Z).
+		Buffer& indirect = _phase == Phase::First
+			? *_culler->GetIndirectCommandBuffer()
+			: *_culler->GetPass2IndirectCommandBuffer();
 
-	auto& renderFrame = context.GetRenderFrame();
-	renderFrame.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline, indirect, builder, nullptr);
+		auto& renderFrame = context.GetRenderFrame();
+		renderFrame.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
+			indirect, builder, nullptr);
+	}
+
+	context.EndRendering(commandBuffer);
 }

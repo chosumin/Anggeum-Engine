@@ -49,7 +49,6 @@ namespace Core
 		FrameGraphPass* pass = nullptr;
 		QueueType queue = QueueType::Graphics;
 		bool sideEffect = false;
-		bool manualRendering = false;
 
 		vector<FGAccessDecl> accesses; // declaration order
 
@@ -107,8 +106,7 @@ namespace Core
 		vector<uint8_t> culledPasses;  // per pass
 		vector<FGLifetime> lifetimes;  // per resource
 		vector<FGPassSync> passSync;   // per pass (alive passes only)
-		vector<vector<FGBarrierPlan>> preBarriers;  // per pass
-		vector<vector<FGBarrierPlan>> postBarriers; // per pass
+		vector<vector<FGBarrierPlan>> preBarriers;
 		vector<FGResourceState> finalStates;        // per resource (imported: fed back to registry)
 	};
 

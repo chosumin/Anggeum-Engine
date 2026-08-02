@@ -90,10 +90,6 @@ void FGIBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& fram
 	_prefiltered = importManual(RT_PREFILTERED, prefilteredHandle, TextureAccess::SampledFragment);
 	_brdfLut = importManual(RT_BRDF_LUT, brdfLutHandle, TextureAccess::SampledFragment);
 
-	// The generators open a rendering scope per cubemap face, which the declared
-	// attachment path cannot express.
-	builder.SetManualRendering();
-
 	// The results are consumed through bindless, which the graph cannot see.
 	builder.SetSideEffect();
 

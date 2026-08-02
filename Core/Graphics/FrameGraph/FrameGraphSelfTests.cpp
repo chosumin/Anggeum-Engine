@@ -173,13 +173,9 @@ namespace Core
 		}
 
 		// Imported C: written as GENERAL by P1 (its last access), so its final
-		// state flows to the registry as GENERAL with no forced export barrier —
-		// the registry is the sole cross-frame entry authority now.
-		{
-			for (const auto& plan : out.postBarriers[1])
-				assert(plan.resource != 2 && "no export post-barrier expected");
-			assert(out.finalStates[2].layout == VK_IMAGE_LAYOUT_GENERAL);
-		}
+		// state flows to the registry as GENERAL. The registry is the sole
+		// cross-frame entry authority — nothing forces an exit layout.
+		assert(out.finalStates[2].layout == VK_IMAGE_LAYOUT_GENERAL);
 
 		// Re-running culling with no readers of D and no side effect.
 		{

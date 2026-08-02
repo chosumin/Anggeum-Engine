@@ -97,7 +97,6 @@ namespace Core
 		out.lifetimes.assign(resourceCount, FGLifetime{});
 		out.passSync.assign(passCount, FGPassSync{});
 		out.preBarriers.assign(passCount, {});
-		out.postBarriers.assign(passCount, {});
 		out.finalStates.assign(resourceCount, FGResourceState{});
 
 		// ---- Pass culling: refcount on reads, iterated to a fixpoint ----
@@ -632,20 +631,12 @@ namespace Core
 		_timer->WriteBeginTimestamp(commandBuffer, _frameIndex, timerPassIndex);
 		commandBuffer.BeginDebugMarker(decl.pass->GetName());
 
+		// All barriers belong here, ahead of Execute: a pass that renders opens its
+		// own scope inside Execute, and barriers are illegal inside one.
 		RecordBarriers(commandBuffer, _compiled.preBarriers[passIndex],
 			_physicalTextures, _physicalBuffers);
 
-		const bool autoRendering = !decl.manualRendering && context.HasRendering(0);
-		if (autoRendering)
-			context.BeginRendering(commandBuffer, 0);
-
 		decl.pass->Execute(context, commandBuffer);
-
-		if (autoRendering)
-			context.EndRendering(commandBuffer);
-
-		RecordBarriers(commandBuffer, _compiled.postBarriers[passIndex],
-			_physicalTextures, _physicalBuffers);
 
 		commandBuffer.EndDebugMarker();
 		_timer->EndPass(commandBuffer, _frameIndex, timerPassIndex);
@@ -781,13 +772,6 @@ namespace Core
 					os << " layout " << plan.oldLayout << " -> " << plan.newLayout;
 				os << "\n";
 			}
-			for (const auto& plan : _compiled.postBarriers[p])
-			{
-				os << "  post " << _resources[plan.resource].name;
-				if (plan.isImage)
-					os << " layout " << plan.oldLayout << " -> " << plan.newLayout;
-				os << "\n";
-			}
 		}
 
 		for (size_t p = 0; p < _passDecls.size(); p++)
@@ -815,12 +799,11 @@ namespace Core
 
 			const auto& sync = _compiled.passSync[p];
 
-			ImGui::Text("%s [%s]%s  (pre %zu / post %zu barriers)",
+			ImGui::Text("%s [%s]%s  (%zu barriers)",
 				_passDecls[p].pass->GetName(),
 				_passDecls[p].queue == QueueType::Compute ? "Compute" : "Graphics",
 				sync.signals ? " (signals)" : "",
-				_compiled.preBarriers[p].size(),
-				_compiled.postBarriers[p].size());
+				_compiled.preBarriers[p].size());
 
 			if (sync.waitPass >= 0)
 				ImGui::Text("   waits on %s",

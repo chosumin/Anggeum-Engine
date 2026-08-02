@@ -198,10 +198,6 @@ namespace Core
 			TextureAccess::DepthLoadWrite : TextureAccess::DepthWrite);
 	}
 
-	void FrameGraphBuilder::SetManualRendering()
-	{
-		_graph._passDecls[_passIndex].manualRendering = true;
-	}
 
 	void FrameGraphBuilder::SetSideEffect()
 	{

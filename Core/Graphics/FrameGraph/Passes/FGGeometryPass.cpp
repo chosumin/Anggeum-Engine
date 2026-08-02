@@ -199,12 +199,18 @@ void FGGeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
 void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-    // Nothing to draw this frame (no camera, no shader, or no batch).
-    if (_culler == nullptr || _geometryShader == nullptr)
-        return;
+    // Entered even with nothing to draw (no camera, no shader, or no batch), so
+    // the declared loadOp still clears the colour target the GUI pass composites
+    // onto.
+    context.BeginRendering(commandBuffer);
 
-    // The graph opens the rendering scope from the declared attachments.
-    commandBuffer.SetViewportAndScissor(context.GetRenderArea(0));
+    if (_culler == nullptr || _geometryShader == nullptr)
+    {
+        context.EndRendering(commandBuffer);
+        return;
+    }
+
+    commandBuffer.SetViewportAndScissor(context.GetRenderArea());
 
     auto builder = context.CreateDescriptorSetBuilder(*_geometryShader, 0);
     builder.SetUniformBuffer(0, context.GetBuffer(_camera));
@@ -232,6 +238,8 @@ void FGGeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
         *_culler->GetPass2IndirectCommandBuffer(), builder, perShaderHook);
 
     RecordSkybox(context, commandBuffer);
+
+    context.EndRendering(commandBuffer);
 }
 
 void FGGeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer)

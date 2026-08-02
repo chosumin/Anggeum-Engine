@@ -41,8 +41,6 @@ namespace Core
 		void SetColorAttachment(uint32_t slot, const FGAttachment& decl, uint32_t variant = 0);
 		void SetDepthAttachment(const FGAttachment& decl, uint32_t variant = 0);
 
-		// The pass calls context.BeginRendering itself.
-		void SetManualRendering();
 
 		// Never cull this pass (it writes state the graph cannot see, e.g. the
 		// RendererBatch indirect draw buffers).

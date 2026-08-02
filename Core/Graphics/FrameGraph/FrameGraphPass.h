@@ -35,7 +35,6 @@ namespace Core
 
 		RenderFrame& GetRenderFrame() const { return _renderFrame; }
 
-		// Begins/ends dynamic rendering with the attachments this pass declared.
 		void BeginRendering(CommandBuffer& commandBuffer, uint32_t variant = 0) const;
 		void EndRendering(CommandBuffer& commandBuffer) const;
 
