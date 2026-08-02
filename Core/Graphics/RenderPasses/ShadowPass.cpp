@@ -273,7 +273,6 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 {
 	auto& shadowTexture = context.GetTexture(_shadowDepth);
 	auto& shader = _shadowShader.Get();
-	auto& renderFrame = context.GetRenderFrame();
 
 	commandBuffer.SetViewportAndScissor(_shadowExtent);
 
@@ -312,7 +311,7 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
 		commandBuffer.BeginRendering(setup);
-		renderFrame.DrawIndirect(commandBuffer, shader, *_pipeline,
+		_renderScene.DrawIndirect(commandBuffer, shader, *_pipeline,
 			context.GetBuffer(_cascadeIndirect[cascadeIndex]), builder);
 		commandBuffer.EndRendering();
 

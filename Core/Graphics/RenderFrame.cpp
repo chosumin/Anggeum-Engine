@@ -43,16 +43,6 @@ void RenderFrame::Reset()
 	_resources.Reset();
 }
 
-DescriptorSetResources* RenderFrame::GetBindlessResources()
-{
-	if (!HasBindlessSupport())
-		return nullptr;
-
-	_bindlessResources.descriptorSet = _renderScene.GetBindlessTextureManager()->GetDescriptorSet();
-	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
-	return &_bindlessResources;
-}
-
 void RenderFrame::CreateSyncObjects()
 {
 	VkSemaphoreCreateInfo semaphoreInfo{};
@@ -69,51 +59,4 @@ SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer comm
 {
 	_submission.submitInfos.emplace_back(queueType, commandBuffer, syncContext);
 	return _submission.submitInfos.back();
-}
-
-void RenderFrame::DrawIndirect(CommandBuffer& commandBuffer,
-	Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
-	DescriptorSetBuilder& builder)
-{
-	auto& batch = GetRendererBatch();
-	if (batch.GetDrawCommandCount() == 0)
-		return;
-
-	auto& meshBufferManager = GetMeshBufferManager();
-
-	auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
-
-	auto vertexBufferHandles = meshBufferManager.GetVertexBuffers(vertexAttibuteNames);
-	vector<Buffer*> vertexBuffers;
-	vertexBuffers.reserve(vertexBufferHandles.size());
-	for (auto& handle : vertexBufferHandles)
-		vertexBuffers.push_back(&handle.Get());
-
-	commandBuffer.BindVertexBuffers(vertexBuffers, 0);
-	commandBuffer.BindIndexBuffer(meshBufferManager.GetIndexBuffer().Get(), meshBufferManager.GetIndexType());
-
-	commandBuffer.BindPipeline(&pipeline);
-
-	builder.SetStorageBuffer(1, batch.GetTransformBatch().TransformBuffer.Get());
-	builder.SetStorageBuffer(2, batch.GetInstanceBuffer());
-	builder.SetUniformBuffer(8, GetMaterialManager().GetMaterialBuffer());
-	builder.SetStorageBuffer(9, batch.GetMaterialIndexBuffer());
-
-	auto& resources = builder.Build();
-
-	vector<DescriptorSetResources*> resourcesList = { &resources };
-	if (shader.UsesBindlessTextures())
-	{
-		auto* bindlessResources = GetBindlessResources();
-		if (bindlessResources)
-			resourcesList.push_back(bindlessResources);
-	}
-
-	commandBuffer.BindDescriptorSets(pipeline.GetPipelineBindPoint(), shader, resourcesList);
-
-	commandBuffer.DrawIndexedIndirect(
-		indirectCommandBuffer,
-		batch.GetDrawCommandCount(),
-		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
-	);
 }

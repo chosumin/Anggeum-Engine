@@ -7,6 +7,10 @@
 #include "Graphics/ResourceManager.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/Shader.h"
+#include "Graphics/Vulkans/Pipeline.h"
+#include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Foundation/Scene.h"
 
 using namespace Core;
@@ -113,4 +117,50 @@ void RenderScene::ApplyComputedBounds()
 	}
 
 	_pendingBounds.clear();
+}
+
+void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
+	Pipeline& pipeline, Buffer& indirectCommandBuffer, DescriptorSetBuilder& builder)
+{
+	if (_batch->GetDrawCommandCount() == 0)
+		return;
+
+	auto vertexAttibuteNames = shader.GetVertexAttirbuteNames();
+
+	auto vertexBufferHandles = _meshBuffer->GetVertexBuffers(vertexAttibuteNames);
+	vector<Buffer*> vertexBuffers;
+	vertexBuffers.reserve(vertexBufferHandles.size());
+	for (auto& handle : vertexBufferHandles)
+		vertexBuffers.push_back(&handle.Get());
+
+	commandBuffer.BindVertexBuffers(vertexBuffers, 0);
+	commandBuffer.BindIndexBuffer(_meshBuffer->GetIndexBuffer().Get(), _meshBuffer->GetIndexType());
+
+	commandBuffer.BindPipeline(&pipeline);
+
+	builder.SetStorageBuffer(1, _batch->GetTransformBatch().TransformBuffer.Get());
+	builder.SetStorageBuffer(2, _batch->GetInstanceBuffer());
+	builder.SetUniformBuffer(8, _material->GetMaterialBuffer());
+	builder.SetStorageBuffer(9, _batch->GetMaterialIndexBuffer());
+
+	auto& resources = builder.Build();
+
+	// Local on purpose: passes record on different workers concurrently, so the
+	// bindless set reference must not go through shared mutable state.
+	DescriptorSetResources bindlessResources{};
+	vector<DescriptorSetResources*> resourcesList = { &resources };
+	if (shader.UsesBindlessTextures() && _bindless != nullptr)
+	{
+		bindlessResources.descriptorSet = _bindless->GetDescriptorSet();
+		bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
+		resourcesList.push_back(&bindlessResources);
+	}
+
+	commandBuffer.BindDescriptorSets(pipeline.GetPipelineBindPoint(), shader, resourcesList);
+
+	commandBuffer.DrawIndexedIndirect(
+		indirectCommandBuffer,
+		_batch->GetDrawCommandCount(),
+		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+	);
 }

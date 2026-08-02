@@ -232,10 +232,9 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
     commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
 
     // Replay both culled draw lists, then the skybox, all in one scope.
-    auto& renderFrame = context.GetRenderFrame();
-    renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
+    _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
         context.GetBuffer(_pass1Indirect), builder);
-    renderFrame.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
+    _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
         context.GetBuffer(_pass2Indirect), builder);
 
     RecordSkybox(context, commandBuffer);

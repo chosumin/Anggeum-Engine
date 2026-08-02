@@ -115,8 +115,7 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 		auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
 		builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 
-		auto& renderFrame = context.GetRenderFrame();
-		renderFrame.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
+		_renderScene.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
 			context.GetBuffer(_indirect), builder);
 	}
 

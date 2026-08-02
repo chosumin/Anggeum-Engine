@@ -11,6 +11,11 @@ namespace Core
 	class Device;
 	class Scene;
 	class TransferContext;
+	class CommandBuffer;
+	class Shader;
+	class Pipeline;
+	class Buffer;
+	class DescriptorSetBuilder;
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
@@ -50,6 +55,14 @@ namespace Core
 		// jobs report what they measured.
 		const glm::vec3& GetSceneBoundsMin() const { return _sceneBoundsMin; }
 		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
+
+		// Records one indirect draw of the scene batch: binds the global mesh
+		// buffers, the batch's transform/instance/material tables and (when the
+		// shader wants it) the bindless set. Lives here because every one of
+		// those inputs is owned by this class.
+		void DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
+			Pipeline& pipeline, Buffer& indirectCommandBuffer,
+			DescriptorSetBuilder& builder);
 
 		// Resource loading never issues transfer jobs itself; it pushes requests here
 		// and Sync() turns them into jobs. Held by the coordinator until dedicated

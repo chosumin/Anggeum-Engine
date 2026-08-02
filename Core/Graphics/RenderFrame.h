@@ -32,7 +32,6 @@ namespace Core
 
 		BindlessTextureManager* GetBindlessTextureManager() const { return _renderScene.GetBindlessTextureManager(); }
 		bool HasBindlessSupport() const { return _renderScene.HasBindlessSupport(); }
-		DescriptorSetResources* GetBindlessResources();
 
 		MeshBufferManager& GetMeshBufferManager() const { return *_renderScene.GetMeshBufferManager(); }
 
@@ -42,13 +41,6 @@ namespace Core
 		// live in FrameResources. Passes reach them through here.
 		FrameResources& GetResources() { return _resources; }
 		const FrameResources& GetResources() const { return _resources; }
-
-		// Records one indirect draw of the scene batch. Lives here because the
-		// vertex/index, transform, material and bindless inputs it binds are all
-		// reached through this frame.
-		void DrawIndirect(CommandBuffer& commandBuffer,
-			Shader& shader, Pipeline& pipeline, Buffer& indirectCommandBuffer,
-			DescriptorSetBuilder& builder);
 
 		// RendererBatch is owned by RenderContext and shared across frames-in-flight.
 		RendererBatch& GetRendererBatch() const { return *_renderScene.GetRendererBatch(); }
@@ -62,8 +54,6 @@ namespace Core
 
 		// Non-owning: the RenderScene owned by Engine.
 		RenderScene& _renderScene;
-
-		DescriptorSetResources _bindlessResources;
 
 		// Per-frame GPU resources (render targets / transient buffers / cullers)
 		FrameResources _resources;
