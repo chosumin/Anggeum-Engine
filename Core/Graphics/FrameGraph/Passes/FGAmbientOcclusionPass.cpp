@@ -47,6 +47,8 @@ void FGAmbientOcclusionPass::Setup(FrameGraphBuilder& builder, FrameResources& f
     builder.Read(_depth, TextureAccess::SampledCompute);
     builder.Read(_normal, TextureAccess::SampledCompute);
 
+    // Import: cross-queue (compute write, graphics read) so aliasing gives
+    // nothing, and CACAO/DFAO + ImGui sample it by handle.
     FGTexture ao = builder.ImportTexture(RT_AO, frameResources.GetRenderTarget(RT_AO));
 
     switch (_activeMethod)

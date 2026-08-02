@@ -239,6 +239,8 @@ void FGShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	depthDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	auto shadowTexture = frameResources.GetOrCreateRenderTarget(RT_SHADOW_DEPTH, depthDesc);
 
+	// Import: 2D-array with per-cascade layer views (transient allocator makes
+	// only 2D single-layer), and ImGui previews the cascades by name.
 	_shadowDepth = builder.ImportTexture(RT_SHADOW_DEPTH, shadowTexture);
 	builder.Write(_shadowDepth, TextureAccess::DepthWrite);
 

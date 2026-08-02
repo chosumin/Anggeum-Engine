@@ -158,6 +158,8 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	_depth = builder.GetTexture(depthName);
 	builder.Read(_depth, TextureAccess::SampledCompute);
 
+	// Import: cross-queue (compute write, graphics read) so aliasing gives
+	// nothing, and ImGui previews it by name.
 	_sdfShadow = builder.ImportTexture(RT_SDF_SHADOW, sdfShadowTexture);
 	builder.Write(_sdfShadow, TextureAccess::StorageComputeWrite);
 
@@ -176,6 +178,8 @@ void FGSDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
 	// Volume raytrace debug view (ImGui samples it in the GUI pass).
 	if (PerspectiveCamera* camera = _scene.GetMainCamera())
 	{
+		// Import: debug-only, sampled solely by ImGui — no in-graph reader, so a
+		// transient would be culled.
 		_volumeSlice = builder.ImportTexture(RT_SDF_VOLUME_SLICE, volumeSliceTexture);
 		builder.Write(_volumeSlice, TextureAccess::StorageComputeWrite);
 
