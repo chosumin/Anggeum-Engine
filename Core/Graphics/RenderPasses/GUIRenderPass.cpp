@@ -57,8 +57,9 @@ GUIRenderPass::GUIRenderPass(Device& device, SwapChain& swapChain,
     init_info.Device = _device.GetDevice();
     init_info.Queue = _device.GetGraphicsQueue();
     init_info.DescriptorPool = _pool;
-    init_info.MinImageCount = 3;
-    init_info.ImageCount = 3;
+	const uint32_t imageCount = static_cast<uint32_t>(_swapChain.GetSwapChainCount());
+	init_info.MinImageCount = imageCount;
+	init_info.ImageCount = imageCount;
     init_info.MSAASamples = _msaaSamples;
     init_info.UseDynamicRendering = true;
     init_info.PipelineRenderingCreateInfo = {};
