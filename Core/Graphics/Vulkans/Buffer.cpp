@@ -5,12 +5,29 @@
 Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, MemoryType memoryType)
 	:_device(device), _size(size)
 {
+	CreateVkBuffer(size, usage);
+
+	_allocator = device.GetMemoryAllocatorManager();
+
+	_allocation = make_unique<MemoryAllocation>();
+	_allocator->Allocate(*_allocation, memoryType, _size, false);
+	_allocator->BindBufferMemory(*this, *_allocation);
+}
+
+Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, Unbound)
+	:_device(device), _size(size), _allocator(nullptr)
+{
+	CreateVkBuffer(size, usage);
+}
+
+void Core::Buffer::CreateVkBuffer(VkDeviceSize size, VkBufferUsageFlags usage)
+{
 	VkBufferCreateInfo bufferInfo{};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size = size;
 	bufferInfo.usage = usage;
 
-	const auto& qfi = device.GetQueueFamilyIndices();
+	const auto& qfi = _device.GetQueueFamilyIndices();
 	uint32_t queueFamilies[2] = {
 		qfi.GraphicsFamily.value(),
 		qfi.ComputeFamily.value()
@@ -26,17 +43,24 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	}
 
-	auto deviceHandle = _device.GetDevice();
-
-	if (vkCreateBuffer(deviceHandle, &bufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
+	if (vkCreateBuffer(_device.GetDevice(), &bufferInfo, nullptr, &_buffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create buffer!");
 	}
+}
 
-	_allocator = device.GetMemoryAllocatorManager();
+VkMemoryRequirements Core::Buffer::GetMemoryRequirements() const
+{
+	VkMemoryRequirements requirements{};
+	vkGetBufferMemoryRequirements(_device.GetDevice(), _buffer, &requirements);
+	return requirements;
+}
 
-	_allocation = make_unique<MemoryAllocation>();
-	_allocator->Allocate(*_allocation, memoryType, _size, false);
-	_allocator->BindBufferMemory(*this, *_allocation);
+void Core::Buffer::BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset)
+{
+	assert(_allocation == nullptr && "buffer already owns a managed allocation");
+
+	if (vkBindBufferMemory(_device.GetDevice(), _buffer, memory, offset) != VK_SUCCESS)
+		throw std::runtime_error("failed to bind buffer memory at offset!");
 }
 
 Core::Buffer::~Buffer()
@@ -45,7 +69,9 @@ Core::Buffer::~Buffer()
 
 	vkDestroyBuffer(device, _buffer, nullptr);
 
-	_allocator->Deallocate(*_allocation);
+	// Placed buffers (Unbound + BindMemoryAt) do not own their memory.
+	if (_allocation != nullptr)
+		_allocator->Deallocate(*_allocation);
 }
 
 void Core::Buffer::CopyBuffer(void* data, VkDeviceSize size)

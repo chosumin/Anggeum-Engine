@@ -70,6 +70,8 @@ void Core::WorkerThread::Run()
 
 			commandBuffer->EndCommandBuffer();
 
+			pendingJob->status = JobStatus::COMPLETE;
+
 			pendingJob->completionWait->notify_one();
 		}
 	}
@@ -82,29 +84,28 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 	case JobType::GRAPHICS_PRIMARY:
 	{
 		auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-		commandBuffer.BeginCommandBuffer(false);
+		commandBuffer.BeginCommandBuffer();
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}
 	case JobType::GRAPHICS_SECONDARY:
 	{
 		auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-			nullptr, nullptr, 0, 0);
+		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}
 	case JobType::COMPUTE:
 	{
 		auto& commandBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-		commandBuffer.BeginCommandBuffer(false);
+		commandBuffer.BeginCommandBuffer();
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}
 	case JobType::TRANSFER:
 	{
 		auto& commandBuffer = _transferCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr, nullptr, 0, 0);
+		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}

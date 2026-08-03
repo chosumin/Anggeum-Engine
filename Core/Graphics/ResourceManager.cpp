@@ -10,7 +10,7 @@ namespace Core
 	ResourceManager::ResourceManager(Device& device)
 		: _device(device)
 	{
-		ImageCreateInfo imageCreateInfo{};
+		ImageCreateDesc imageCreateInfo{};
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
@@ -76,6 +76,24 @@ namespace Core
 		return StoreShader(shaderName, std::move(shader));
 	}
 
+	Handle<Pipeline> ResourceManager::LoadComputePipeline(const string& shaderName)
+	{
+		// LoadShader takes its own lock, so it runs before this one is held.
+		Handle<Shader> shader = LoadShader(shaderName);
+
+		lock_guard<mutex> guard(_computePipelineMutex);
+
+		auto it = _computePipelineHandles.find(shaderName);
+		if (it != _computePipelineHandles.end() && _computePipelinePool.IsAlive(it->second))
+			return it->second;
+
+		Handle<Pipeline> handle = _computePipelinePool.Add(
+			make_shared<Pipeline>(_device, shader.Get()));
+		_computePipelineHandles[shaderName] = handle;
+
+		return handle;
+	}
+
 	Handle<Shader> ResourceManager::LoadShader(const string& vertPath, const string& fragPath)
 	{
 		lock_guard<mutex> guard(_shaderMutex);
@@ -122,7 +140,7 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateInfo imageCreateInfo, const Handle<Sampler> sampler)
+	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 

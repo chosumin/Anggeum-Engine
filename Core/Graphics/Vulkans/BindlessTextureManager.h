@@ -9,9 +9,13 @@ namespace Core
 	inline constexpr uint32_t InvalidBindlessIndex = UINT32_MAX;
 	inline constexpr uint32_t BindlessCubemapFlag = 0x80000000u;
 
-	// Internal texture slot
+	// Internal texture slot. The handle is what the slot really tracks (it stays
+	// valid across pool relocation and detects stale generations); the
+	// TextureBuffer is only filled with the resolved texture when descriptor
+	// writes are flushed.
 	struct TextureSlot
 	{
+		Handle<Texture> texture;
 		TextureBuffer textureBuffer;
 		bool isActive = false;
 	};

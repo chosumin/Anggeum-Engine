@@ -9,6 +9,7 @@
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "MeshBufferManager.h"
+#include "FrameResources.h"
 #include "RenderFrame.h"
 #include "ResourceManager.h"
 #include "TransferJob.h"
@@ -169,13 +170,13 @@ SDFGenerator::SDFGenerator(Device& device)
 	: _device(device)
 {
 	_sdfGenerateShader = _device.GetResourceManager().LoadShader("Shaders/sdfGenerate.comp.spv");
-	_sdfGeneratePipeline = make_unique<Pipeline>(_device, _sdfGenerateShader.Get());
+	_sdfGeneratePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfGenerate.comp.spv");
 
 	_boundsReduceShader = _device.GetResourceManager().LoadShader("Shaders/sdfBoundsReduce.comp.spv");
-	_boundsReducePipeline = make_unique<Pipeline>(_device, _boundsReduceShader.Get());
+	_boundsReducePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfBoundsReduce.comp.spv");
 
 	_triLookupShader = _device.GetResourceManager().LoadShader("Shaders/sdfTriLookup.comp.spv");
-	_triLookupPipeline = make_unique<Pipeline>(_device, _triLookupShader.Get());
+	_triLookupPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfTriLookup.comp.spv");
 
 	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
 	uint32_t posInf = FloatToSortableUint(1e20f);
@@ -197,27 +198,21 @@ SDFGenerator::~SDFGenerator() = default;
 
 void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 {
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_3D;
-	imageInfo.extent = { resolution, resolution, resolution };
-	imageInfo.format = VK_FORMAT_R32_SFLOAT;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+	// depth > 1 makes the unified path create a 3D image (and a 3D view).
+	ImageDesc imageDesc{};
+	imageDesc.extent = { resolution, resolution };
+	imageDesc.depth = resolution;
+	imageDesc.format = VK_FORMAT_R32_SFLOAT;
+	imageDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	auto image = make_unique<Image>(_device, imageInfo,
-		VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_3D);
+	auto image = make_unique<Image>(_device, imageDesc);
 
 	auto sampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
 	_sdfTexture = _device.GetResourceManager().LoadTexture("SDFVolume", std::move(image), sampler);
 }
 
-void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
 	Buffer& objectDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
@@ -226,29 +221,29 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(objectDataBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Buffer(transformBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		.Submit();
 
 	auto& boundsReduceShader = _boundsReduceShader.Get();
-	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(boundsReduceShader, 0);
+	auto builder = frameResources.CreateDescriptorSetBuilder(boundsReduceShader, 0);
 	builder.SetStorageBuffer(0, objectDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
 	builder.SetStorageBuffer(2, _boundsBuffer.Get());
 	auto& resources = builder.Build();
 
-	commandBuffer.BindPipeline(_boundsReducePipeline.get());
+	commandBuffer.BindPipeline(&_boundsReducePipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		boundsReduceShader,
 		resources);
@@ -261,13 +256,13 @@ void SDFGenerator::ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& c
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(_boundsBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Submit();
 }
 
-void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBuffer& commandBuffer,
 	Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
@@ -288,7 +283,7 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	}
 
 	auto& triLookupShader = _triLookupShader.Get();
-	auto builder = renderFrame.GetResources().CreateDescriptorSetBuilder(triLookupShader, 0);
+	auto builder = frameResources.CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
 	builder.SetStorageBuffer(1, objectDataBuffer);
 	builder.SetStorageBuffer(2, _triLookupBuffer.Get());
@@ -299,7 +294,7 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 		uint32_t drawCommandCount;
 	} pc = { totalTriangles, drawCommandCount };
 
-	commandBuffer.BindPipeline(_triLookupPipeline.get());
+	commandBuffer.BindPipeline(&_triLookupPipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		triLookupShader,
 		resources);
@@ -312,34 +307,35 @@ void SDFGenerator::BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& 
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(_triLookupBuffer.Get(),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT)
 		.Submit();
 }
 
-void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-	MeshBufferManager& meshBufferManager,
+void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderFrame,
+	CommandBuffer& commandBuffer,
 	uint32_t resolution)
 {
 	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(resolution);
 
-	auto batch = renderFrame.GetRenderExecutor().GetRendererBatch();
-	auto& objectDataBuffer = batch->GetObjectDataBuffer();
-	auto& indirectCommandBuffer = batch->GetIndirectCommandBuffer();
-	auto drawCommandCount = batch->GetDrawCommandCount();
-	auto instanceCount = batch->GetInstanceCount();
-	auto& transformBuffer = batch->GetTransformBatch().TransformBuffer.Get();
+	auto& meshBufferManager = renderFrame.GetMeshBufferManager();
+	auto& batch = renderFrame.GetRendererBatch();
+	auto& objectDataBuffer = batch.GetObjectDataBuffer();
+	auto& indirectCommandBuffer = batch.GetIndirectCommandBuffer();
+	auto drawCommandCount = batch.GetDrawCommandCount();
+	auto instanceCount = batch.GetInstanceCount();
+	auto& transformBuffer = batch.GetTransformBatch().TransformBuffer.Get();
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 
 	// Step 1: Compute world-space bounds
-	ComputeWorldBounds(renderFrame, commandBuffer,
+	ComputeWorldBounds(frameResources, commandBuffer,
 		objectDataBuffer, transformBuffer, instanceCount);
 
 	// Step 2: Build per-triangle lookup (vertexOffset + transformIndex)
-	BuildTriangleLookup(renderFrame, commandBuffer,
+	BuildTriangleLookup(frameResources, commandBuffer,
 		objectDataBuffer, indirectCommandBuffer,
 		drawCommandCount, totalTriangles);
 
@@ -357,16 +353,16 @@ void SDFGenerator::Generate(RenderFrame& renderFrame, CommandBuffer& commandBuff
 	pc.useUint16Indices = (meshBufferManager.GetIndexType() == VK_INDEX_TYPE_UINT16) ? 1 : 0;
 
 	auto& sdfGenerateShader = _sdfGenerateShader.Get();
-	auto sdfBuilder = renderFrame.GetResources().CreateDescriptorSetBuilder(sdfGenerateShader, 0);
+	auto sdfBuilder = frameResources.CreateDescriptorSetBuilder(sdfGenerateShader, 0);
 	sdfBuilder.SetStorageBuffer(0, meshBufferManager.GetVertexBuffers({ "POSITION" })[0].Get());
 	sdfBuilder.SetStorageBuffer(1, meshBufferManager.GetIndexBuffer().Get());
-	sdfBuilder.SetTextureBuffer(2, _sdfTexture, 0, VK_IMAGE_LAYOUT_GENERAL);
+	sdfBuilder.SetTextureBuffer(2, _sdfTexture.Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	sdfBuilder.SetStorageBuffer(3, _boundsBuffer.Get());
 	sdfBuilder.SetStorageBuffer(4, _triLookupBuffer.Get());
 	sdfBuilder.SetStorageBuffer(5, transformBuffer);
 
 	auto& sdfResources = sdfBuilder.Build();
-	commandBuffer.BindPipeline(_sdfGeneratePipeline.get());
+	commandBuffer.BindPipeline(&_sdfGeneratePipeline.Get());
 	commandBuffer.BindDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE,
 		sdfGenerateShader,
 		sdfResources);

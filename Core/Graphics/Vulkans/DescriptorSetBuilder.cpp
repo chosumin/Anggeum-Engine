@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "DescriptorSetBuilder.h"
 #include "Shader.h"
 #include "UniformBuffer.h"
@@ -31,11 +31,11 @@ Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetStorageBuffer(
 }
 
 Core::DescriptorSetBuilder& Core::DescriptorSetBuilder::SetTextureBuffer(
-	uint32_t binding, Handle<Texture> texture, uint32_t mipLevel,
+	uint32_t binding, Texture& texture, uint32_t mipLevel,
 	VkImageLayout layout)
 {
 	TextureBuffer texBuffer{};
-	texBuffer.texture = texture;
+	texBuffer.rawTexture = &texture;
 	texBuffer.mipLevel = mipLevel;
 	texBuffer.imageLayout = layout;
 

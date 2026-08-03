@@ -3,35 +3,29 @@
 #include "Foundation/Scene.h"
 #include "Foundation/WorkerThread.h"
 #include "Foundation/Entity.h"
-#include "Components/Mesh.h"
 #include "Components/Light.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/RenderFrame.h"
-#include "Graphics/Vulkans/MemoryAllocator.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/ResourceManager.h"
-#include "Graphics/TransferJob.h"
-#include "Graphics/Vulkans/SubmitInfo.h"
-#include "Graphics/RendererPasses/DepthPrePass.h"
-#include "Graphics/RendererPasses/LightCullingPass.h"
-#include "Graphics/RendererPasses/GeometryPass.h"
-#include "Graphics/RendererPasses/ShadowPass.h"
-#include "Graphics/RendererPasses/SDFShadowPass.h"
-#include "Graphics/RendererPasses/DFAOPass.h"
-#include "Graphics/RendererPasses/CACAOPass.h"
-#include "Graphics/RendererPasses/GUIRenderPass.h"
-#include "Graphics/RendererPasses/AmbientOcclusionPass.h"
-#include "Graphics/RendererPasses/ResolvePass.h"
+#include "Graphics/FrameGraph/FrameGraph.h"
+#include "Graphics/RenderPasses/DepthPrePasses.h"
+#include "Graphics/RenderPasses/LightCullingPass.h"
+#include "Graphics/RenderPasses/ShadowPasses.h"
+#include "Graphics/RenderPasses/SDFShadowPass.h"
+#include "Graphics/RenderPasses/AmbientOcclusionPass.h"
+#include "Graphics/RenderPasses/IBLPass.h"
+#include "Graphics/RenderPasses/GeometryPass.h"
+#include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
 	WorkerThreadManager& workerThreadManager,
-	Scene& scene, SwapChain& swapChain)
+	RenderScene& renderScene, SwapChain& swapChain)
 	:_device(device)
-	,_scene(scene)
+	,_renderScene(renderScene)
 	,_swapChainExtents(swapChain.GetSwapChainExtent())
 {
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
@@ -50,49 +44,37 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	auto depthPrePass = new DepthPrePass(device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples);
-	AddRendererPass(depthPrePass);
+	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
 
-	if (_msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-	{
-		auto resolvePass = new ResolvePass(device, workerThreadManager, extent, _msaaSamples);
-		AddRendererPass(resolvePass);
-	}
+	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
 
-	auto lightCullingPass = new LightCullingPass(device, workerThreadManager, scene, swapChain.GetSwapChainExtent(), tileNums);
-	AddRendererPass(lightCullingPass);
+	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
 
-	auto shadowPass = new ShadowPass(
-		device, workerThreadManager, scene, depthFormat);
-	AddRendererPass(shadowPass);
+	// The shadow feature wires its own cull + draw passes into the graph.
+	ShadowPasses shadowPasses(*_frameGraph, device, renderScene, depthFormat);
 
-	auto sdfShadowPass = new SDFShadowPass(
-		device, workerThreadManager, scene, extent, _msaaSamples, *shadowPass);
-	AddRendererPass(sdfShadowPass);
+	auto fgSdfShadowPass = make_unique<SDFShadowPass>(
+		device, renderScene, extent, _msaaSamples, shadowPasses.GetShadowBuffer());
+	SDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
+	_frameGraph->AddPass(std::move(fgSdfShadowPass));
 
-	auto ambientOcclusionPass = new AmbientOcclusionPass(
-		device, workerThreadManager, scene,
-		extent, _msaaSamples,
-		sdfShadowPass->GetSDFGenerator());
-	AddRendererPass(ambientOcclusionPass);
+	_frameGraph->AddPass(make_unique<AmbientOcclusionPass>(
+		device, renderScene, extent, _msaaSamples,
+		fgSdfShadowPassPtr->GetSDFGenerator()));
 
-	auto geometryPass = new GeometryPass(
-		device, workerThreadManager, scene, swapChain, depthFormat, _msaaSamples,
-		tileNums);
-	AddRendererPass(geometryPass);
+	// Generates the IBL maps the geometry pass samples. Runs on the first frame
+	// only; after that it declares nothing and the graph culls it.
+	_frameGraph->AddPass(make_unique<IBLPass>(device, renderScene));
 
-	auto guiPass = new GUIRenderPass(device, workerThreadManager, swapChain, _msaaSamples);
-	AddRendererPass(guiPass);
+	_frameGraph->AddPass(make_unique<GeometryPass>(
+		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
+
+	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 {
 	Cleanup();
-
-	for (auto&& rendererPass : _rendererPasses)
-	{
-		delete(rendererPass);
-	}
 
 	auto a = std::bind(&ForwardRenderPipeline::Resize, this, std::placeholders::_1);
 	Core::RenderContext::RemoveResizeCallback(a);
@@ -100,56 +82,16 @@ Core::ForwardRenderPipeline::~ForwardRenderPipeline()
 
 void ForwardRenderPipeline::Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex)
 {
-	auto& queueTimer = renderContext.GetQueueTimer();
-	const uint32_t frameIndex = renderContext.GetCurrentFrameIndex();
-
 	UploadSharedUniforms(renderFrame);
 
-	for (size_t passIndex = 0; passIndex < _rendererPasses.size(); passIndex++)
-	{
-		auto&& rendererPass = _rendererPasses[passIndex];
-
-		// Get class name from typeid
-		const char* className = typeid(*rendererPass).name();
-
-		// Remove "class Core::" prefix if present
-		const char* simpleName = className;
-		const char* prefix = "class Core::";
-		if (strncmp(className, prefix, strlen(prefix)) == 0)
-		{
-			simpleName = className + strlen(prefix);
-		}
-
-		// Request command buffer based on queue type
-		QueueType queueType = rendererPass->GetQueueType();
-		CommandBuffer& commandBuffer = (queueType == QueueType::Compute)
-			? renderContext.RequestComputeCommandBuffer()
-			: renderContext.RequestCommandBuffer();
-
-		// Register SubmitInfo before Draw so the pass can inject wait/signal semaphores
-		renderFrame.AddSubmitInfo(queueType, commandBuffer.GetHandle(),
-			renderContext.GetSyncContext());
-
-		commandBuffer.BeginCommandBuffer();
-		queueTimer.BeginPass(commandBuffer, frameIndex,
-			static_cast<uint32_t>(passIndex), queueType, simpleName);
-
-		commandBuffer.BeginDebugMarker(simpleName);
-
-		rendererPass->EnsureRenderTargets(renderFrame);
-		rendererPass->Draw(renderFrame, commandBuffer, imageIndex);
-
-		commandBuffer.EndDebugMarker();
-
-		queueTimer.EndPass(commandBuffer, frameIndex, static_cast<uint32_t>(passIndex));
-		commandBuffer.EndCommandBuffer();
-	}
+	_frameGraph->SetupAndCompile(renderFrame, imageIndex);
+	_frameGraph->Execute(renderContext, renderFrame);
 }
 
 void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 {
 	auto& frameResources = renderFrame.GetResources();
-	if (auto* camera = _scene.GetMainCamera())
+	if (auto* camera = _renderScene.GetScene().GetMainCamera())
 	{
 		auto& cameraBuffer = frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA).Get();
 		cameraBuffer.Update(camera->Matrices);
@@ -159,7 +101,7 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 	// light array field by field into it would be slow.
 	LightBuffer lights{};
 
-	auto sceneLights = _scene.GetComponents<Light>();
+	auto sceneLights = _renderScene.GetScene().GetComponents<Light>();
 	uint32_t count = std::min((uint32_t)sceneLights.size(), (uint32_t)MAX_FORWARD_LIGHT_COUNT);
 	for (uint32_t i = 0; i < count; ++i)
 	{
@@ -188,21 +130,10 @@ void Core::ForwardRenderPipeline::UploadSharedUniforms(RenderFrame& renderFrame)
 void Core::ForwardRenderPipeline::OnGUI(RenderFrame& renderFrame)
 {
 	ImGui::Begin("Renderer Passes");
-	for (auto&& rendererPass : _rendererPasses)
-	{
-		// Get class name from typeid
-		const char* className = typeid(*rendererPass).name();
 
-		// Remove "class Core::" prefix if present
-		const char* simpleName = className;
-		const char* prefix = "class Core::";
-		if (strncmp(className, prefix, strlen(prefix)) == 0)
-		{
-			simpleName = className + strlen(prefix);
-		}
+	_frameGraph->OnDebugGUI();
+	_frameGraph->OnGUI(renderFrame);
 
-		rendererPass->OnGUI(renderFrame);
-	}
 	ImGui::End();
 }
 
@@ -214,7 +145,7 @@ void Core::ForwardRenderPipeline::Resize(SwapChain& swapChain)
 {
 	Cleanup();
 
-	VkExtent2D extent = swapChain.GetSwapChainExtent();
+	_frameGraph->Invalidate();
 }
 
 VkSampleCountFlagBits Core::ForwardRenderPipeline::GetMaxUsableSampleCount()

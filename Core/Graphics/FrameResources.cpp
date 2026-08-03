@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "FrameResources.h"
 #include "Vulkans/Buffer.h"
-#include "Vulkans/Framebuffer.h"
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/Image.h"
 #include "Vulkans/Texture.h"
@@ -9,8 +8,10 @@
 #include "Vulkans/DescriptorPool.h"
 #include "Vulkans/DescriptorSetBuilder.h"
 #include "ResourceManager.h"
+#include "FrameGraph/TransientResourceAllocator.h"
 #include "Foundation/Job.h"
 #include "TransferJob.h"
+#include "RendererBatch.h"
 
 using namespace Core;
 
@@ -21,11 +22,18 @@ FrameResources::FrameResources(Device& device)
 	_defaultSampler = device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
 }
 
+TransientResourceAllocator& FrameResources::GetTransientAllocator()
+{
+	if (_transientAllocator == nullptr)
+		_transientAllocator = make_unique<TransientResourceAllocator>(_device);
+
+	return *_transientAllocator;
+}
+
 FrameResources::~FrameResources()
 {
-	// RenderContext::Submit is the only thing that runs init work, so a frame that
-	// never goes through it (the temp frames used for IBL prefiltering) must not
-	// queue any: it would be dropped instead of recorded.
+	// RenderContext::Submit is the only thing that runs init work; anything still
+	// pending here was queued after the last submit and would be silently dropped.
 	assert(_pendingTransitions.empty() && AllInitJobsExecuted() &&
 		"frame init work was queued but never executed");
 }
@@ -34,9 +42,6 @@ void FrameResources::Reset()
 {
 	if (_descriptorPool)
 		_descriptorPool->Reset();
-
-	_currentDepth = Handle<Texture>{};
-	_currentNormal = Handle<Texture>{};
 
 	// Reached only after the GPU finished this slot's previous frame, so the
 	// staging buffers these jobs own are no longer being read. Anything still
@@ -131,6 +136,8 @@ Handle<Texture> FrameResources::GetOrCreateRenderTarget(const string& name,
 Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	const RenderTargetDesc& desc)
 {
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	VkFormat format = desc.format;
 
 	// Depth format fallback if undefined and aspect includes depth
@@ -142,61 +149,12 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 	}
 
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent = { desc.extent.width, desc.extent.height, 1 };
-	imageInfo.format = format;
-	imageInfo.mipLevels = desc.mipLevels;
-	imageInfo.arrayLayers = desc.arrayLayers;
-	imageInfo.samples = desc.samples;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = desc.usage;
+	// Cube flag, view type, image type, and the CONCURRENT graphics+compute
+	// sharing all come from Image::CreateImage.
+	ImageDesc imageDesc = static_cast<const ImageDesc&>(desc);
+	imageDesc.format = format; // depth fallback applied above
 
-	// These render targets can be produced on the compute queue and consumed on
-	// the graphics queue. Using CONCURRENT sharing lets both queues access them
-	// without explicit queue-ownership-transfer barriers. When the graphics and
-	// compute queue families are identical, CONCURRENT is invalid, so fall back
-	// to EXCLUSIVE.
-	const auto& qfi = _device.GetQueueFamilyIndices();
-	uint32_t queueFamilies[2] = {
-		qfi.GraphicsFamily.value(),
-		qfi.ComputeFamily.value()
-	};
-	if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
-	{
-		imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-		imageInfo.queueFamilyIndexCount = 2;
-		imageInfo.pQueueFamilyIndices = queueFamilies;
-	}
-	else
-	{
-		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	}
-
-	if (desc.isCubemap)
-		imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-
-	VkImageViewType viewType;
-	if (desc.viewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM)
-	{
-		// Explicit view type override
-		viewType = desc.viewType;
-	}
-	else if (desc.isCubemap)
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-	}
-	else if (desc.arrayLayers > 1)
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-	}
-	else
-	{
-		viewType = VK_IMAGE_VIEW_TYPE_2D;
-	}
-
-	auto image = make_unique<Image>(_device, imageInfo, desc.aspect, viewType);
+	auto image = make_unique<Image>(_device, imageDesc);
 	auto* imagePtr = image.get();
 
 	Handle<Sampler> sampler = desc.sampler.IsValid() ? desc.sampler : _defaultSampler;
@@ -231,6 +189,8 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 	if (it != _storageBufferHandles.end())
 		return it->second;
 
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
@@ -244,6 +204,8 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 Handle<Buffer> FrameResources::CreateOrReplaceStorageBuffer(const string& name,
 	const BufferDesc& desc)
 {
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
@@ -286,6 +248,8 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 		return it->second;
 	}
 
+	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
+
 	auto buffer = make_shared<Buffer>(_device, size,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
 
@@ -295,64 +259,4 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 	Handle<Buffer> handle = _bufferPool.Add(buffer);
 	_uniformBufferHandles[name] = handle;
 	return handle;
-}
-
-Framebuffer* FrameResources::GetOrCreateFramebuffer(const string& name,
-	RenderPass& renderPass, const vector<string>& attachmentNames, int32_t layerIndex)
-{
-	auto it = _framebuffers.find(name);
-	if (it != _framebuffers.end())
-		return it->second.get();
-
-	vector<VkImageView> imageViews;
-	VkExtent2D extent = { 0, 0 };
-
-	for (const auto& attachmentName : attachmentNames)
-	{
-		auto textureHandle = GetRenderTarget(attachmentName);
-		if (textureHandle.IsValid())
-		{
-			auto& texture = textureHandle.Get();
-			if (layerIndex >= 0)
-			{
-				// Use single layer image view for array textures
-				imageViews.push_back(texture.GetLayerImageView(
-					static_cast<uint32_t>(layerIndex)));
-			}
-			else
-			{
-				// Use full image view (default behavior)
-				imageViews.push_back(texture.GetImageView());
-			}
-
-			if (extent.width == 0)
-			{
-				auto texExtent = texture.GetExtent();
-				extent = { texExtent.width, texExtent.height };
-			}
-		}
-	}
-
-	if (imageViews.empty())
-		return nullptr;
-
-	// Create framebuffer with explicit image views
-	auto framebuffer = make_unique<Framebuffer>(_device, renderPass, imageViews, extent);
-
-	auto* result = framebuffer.get();
-	_framebuffers[name] = std::move(framebuffer);
-	return result;
-}
-
-Framebuffer* FrameResources::GetFramebuffer(const string& name) const
-{
-	auto it = _framebuffers.find(name);
-	if (it != _framebuffers.end())
-		return it->second.get();
-	return nullptr;
-}
-
-void FrameResources::RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer)
-{
-	_framebuffers[name] = std::move(framebuffer);
 }

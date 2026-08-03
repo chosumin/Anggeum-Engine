@@ -2,7 +2,8 @@
 
 namespace Core
 {
-	struct ImageCreateInfo
+	// Description for file-based asset textures (they carry a path, not a shape).
+	struct ImageCreateDesc
 	{
 		string filePath;
 		VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
@@ -11,19 +12,57 @@ namespace Core
 		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 	};
 
+	// The one description for every engine-created image.
+	struct ImageDesc
+	{
+		VkExtent2D extent{};
+		uint32_t depth = 1; // > 1 makes a 3D image
+
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		uint32_t mipLevels = 1;
+		uint32_t arrayLayers = 1;
+		bool isCubemap = false;
+
+		// MAX_ENUM = derive: cube if isCubemap, 2D_ARRAY if arrayLayers > 1,
+		// 3D if depth > 1, else 2D.
+		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+	};
+
 	struct MemoryAllocation;
 	class Image
 	{
 	public:
 		friend class Texture;
 	public:
-		Image(Device& device, ImageCreateInfo imageCreateInfo);
+		// Tag for the transient/aliased path: the VkImage is created without
+		// memory.
+		struct Unbound {};
 
-		//Creates a render target image
-		Image(Device& device, VkImageCreateInfo& imageInfo, 
-			VkImageAspectFlags aspectFlags, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D);
+		Image(Device& device, ImageCreateDesc imageCreateInfo);
+
+		// The unified creation path for engine-made images: 
+		// bound device-local memory + default view.
+		Image(Device& device, const ImageDesc& desc);
+
+		// Transient/aliased path:
+		// the default view is deferred to BindMemoryAt.
+		Image(Device& device, const ImageDesc& desc, Unbound);
 
 		~Image();
+
+		// View creation for images the engine does not own (the swapchain's).
+		static VkImageView CreateRawView(Device& device, VkImage image,
+			VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
+
+		VkMemoryRequirements GetMemoryRequirements() const;
+		
+		// Binds at an explicit offset into caller-owned memory (transient heap)
+		// and creates the default image view. The memory must outlive this image;
+		// the destructor does not free it.
+		void BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset);
 
 		VkFormat GetFormat() { return _format; }
 		VkImage& GetImage() { return _image; }
@@ -50,7 +89,13 @@ namespace Core
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
 		VkImageView CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType, VkImageAspectFlags aspectFlags, uint32_t baseMipLevel);
+
+		// Labels a freshly created view for the validation layer.
+		void NameView(VkImageView view, const char* kind, uint32_t index) const;
 		VkImageView CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags);
+
+		// View-type derivation shared by both ctors (see ImageDesc::viewType).
+		static VkImageViewType DeriveViewType(const ImageDesc& desc);
 	private:
 		Device& _device;
 
@@ -70,7 +115,11 @@ namespace Core
 		VkImageViewType _viewType;
 
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocatorManager* _allocator;
+		MemoryAllocatorManager* _allocator = nullptr;
+
+		// Aspect requested at construction for the deferred-bind (Unbound) path;
+		// the default view is created with it in BindMemoryAt.
+		VkImageAspectFlags _deferredAspectFlags = 0;
 
 		string _filePath;
 	};

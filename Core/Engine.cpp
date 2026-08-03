@@ -20,7 +20,10 @@ Core::Engine::Engine(const EngineOptions& options)
     _device = new Core::Device(*options.window);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
-    _renderScene = new Core::RenderScene(*_device);
+
+    auto* sampleScene = new SampleScene(*_device);
+    _scene = sampleScene;
+    _renderScene = new Core::RenderScene(*_device, *_scene);
     _renderContext = new Core::RenderContext(*_device, *_renderScene);
     _status = make_unique<Core::Status>(*_renderContext);
 
@@ -30,18 +33,20 @@ Core::Engine::Engine(const EngineOptions& options)
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
 
-    _scene = new SampleScene(*_device, (float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
+    sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
     _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
-        *_scene, swapChain);
+        *_renderScene, swapChain);
 }
 
 Core::Engine::~Engine()
 {
+    // Reverse of construction: the context's frames reference the render scene's
+    // batch, and the render scene references the scene.
     delete(_renderPipeline);
-    delete(_scene);
-    delete(_renderContext);   // frames/cullers reference the batch, so destroy them first
+    delete(_renderContext);
     delete(_renderScene);
+    delete(_scene);
     delete(_transferContext);
     delete(_workerThreadManager);
     delete(_device);

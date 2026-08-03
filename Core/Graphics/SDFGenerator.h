@@ -14,6 +14,7 @@ namespace Core
 	class Pipeline;
 	class Shader;
 	class CommandBuffer;
+	class FrameResources;
 	class RenderFrame;
 
 	struct SDFGeneratePushConstants
@@ -30,8 +31,12 @@ namespace Core
 		SDFGenerator(Device& device);
 		~SDFGenerator();
 
-		void Generate(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
-			MeshBufferManager& meshBufferManager,
+		// Records the full generation (bounds reduce, triangle lookup, volume
+		// dispatch) into the given command buffer. Creates/resizes pool-owned
+		// resources, so it must run on the main thread (e.g. a single-time
+		// command buffer submitted outside the frame graph's recording window).
+		void Generate(FrameResources& frameResources, RenderFrame& renderFrame,
+			CommandBuffer& commandBuffer,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
 		// Persistent storage. File format includes the bounds buffer so the
@@ -48,10 +53,10 @@ namespace Core
 
 	private:
 		void CreateSDFTexture(uint32_t resolution);
-		void ComputeWorldBounds(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+		void ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
 			Buffer& objectDataBuffer, Buffer& transformBuffer,
 			uint32_t instanceCount);
-		void BuildTriangleLookup(RenderFrame& renderFrame, CommandBuffer& commandBuffer,
+		void BuildTriangleLookup(FrameResources& frameResources, CommandBuffer& commandBuffer,
 			Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
 			uint32_t drawCommandCount, uint32_t totalTriangles);
 
@@ -62,17 +67,17 @@ namespace Core
 		// ResourceManager texture pool; this generator just holds the handle.
 		Handle<Texture> _sdfTexture;
 		Handle<Shader> _sdfGenerateShader;
-		unique_ptr<Pipeline> _sdfGeneratePipeline;
+		Handle<Pipeline> _sdfGeneratePipeline;
 
 		// Bounds/triLookup are app-lifetime, so they live in the ResourceManager global
 		// buffer pool (via CreateBuffer/ResizeBuffer); held here by handle.
 		Handle<Shader> _boundsReduceShader;
-		unique_ptr<Pipeline> _boundsReducePipeline;
+		Handle<Pipeline> _boundsReducePipeline;
 		Handle<Buffer> _boundsBuffer;
 
 		// Per-triangle lookup: stores vertexOffset and transformIndex for each triangle
 		Handle<Shader> _triLookupShader;
-		unique_ptr<Pipeline> _triLookupPipeline;
+		Handle<Pipeline> _triLookupPipeline;
 		Handle<Buffer> _triLookupBuffer;
 
 		std::string _sdfCachePath = "Assets/Cache/sdf_volume.sdfvol";

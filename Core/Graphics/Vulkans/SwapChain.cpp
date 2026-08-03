@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SwapChain.h"
+#include "Image.h"
 #include "Utils/Utility.h"
 
 Core::SwapChain::SwapChain(Device& device)
@@ -134,10 +135,14 @@ void Core::SwapChain::CreateImageViews()
 
     for (size_t i = 0; i < _swapChainImages.size(); i++)
     {
-        _swapChainImageViews[i] = CreateImageView(
-            _device, 
-            _swapChainImages[i], _swapChainImageFormat, 
+        _swapChainImageViews[i] = Image::CreateRawView(
+            _device,
+            _swapChainImages[i], _swapChainImageFormat,
             VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+        const string label = "SwapChain " + std::to_string(i) + " View";
+        _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+            (uint64_t)_swapChainImageViews[i], label.c_str());
     }
 }
 
@@ -181,24 +186,4 @@ void Core::SwapChain::CleanupSwapChain()
     vkDestroySwapchainKHR(device, _swapChain, nullptr);
 }
 
-VkImageView Core::SwapChain::CreateImageView(Device& device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
-{
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
 
-    VkImageView imageView;
-    if (vkCreateImageView(device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
-    {
-        throw runtime_error("failed to create texture image view!");
-    }
-
-    return imageView;
-}

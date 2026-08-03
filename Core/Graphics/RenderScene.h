@@ -11,6 +11,11 @@ namespace Core
 	class Device;
 	class Scene;
 	class TransferContext;
+	class CommandBuffer;
+	class Shader;
+	class Pipeline;
+	class Buffer;
+	class DescriptorSetBuilder;
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
@@ -29,15 +34,16 @@ namespace Core
 	class RenderScene
 	{
 	public:
-		// Default: all managers null — the empty sentinel temp frames bind to. Such an
-		// instance must not be Sync()'d.
-		RenderScene() = default;
-		explicit RenderScene(Device& device);
+		// The CPU scene this render scene mirrors. The scene object is created
+		// first (empty) and loaded later, so it can be a constructor argument.
+		RenderScene(Device& device, Scene& scene);
+
+		Scene& GetScene() const { return _scene; }
 
 		// Run every manager's self-gated sync, in dependency order.
 		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
 
-		// Null when descriptor indexing is unsupported (and on the empty sentinel).
+		// Null when descriptor indexing is unsupported.
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindless.get(); }
 		bool HasBindlessSupport() const { return _bindless != nullptr; }
 
@@ -49,6 +55,14 @@ namespace Core
 		// jobs report what they measured.
 		const glm::vec3& GetSceneBoundsMin() const { return _sceneBoundsMin; }
 		const glm::vec3& GetSceneBoundsMax() const { return _sceneBoundsMax; }
+
+		// Records one indirect draw of the scene batch: binds the global mesh
+		// buffers, the batch's transform/instance/material tables and (when the
+		// shader wants it) the bindless set. Lives here because every one of
+		// those inputs is owned by this class.
+		void DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
+			Pipeline& pipeline, Buffer& indirectCommandBuffer,
+			DescriptorSetBuilder& builder);
 
 		// Resource loading never issues transfer jobs itself; it pushes requests here
 		// and Sync() turns them into jobs. Held by the coordinator until dedicated
@@ -70,6 +84,7 @@ namespace Core
 		};
 
 	private:
+		Scene& _scene;
 		unique_ptr<BindlessTextureManager> _bindless;
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;

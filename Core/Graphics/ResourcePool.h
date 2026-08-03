@@ -14,9 +14,6 @@ namespace Core
 	 * Slots hold a shared_ptr so the pool can co-own with legacy shared_ptr holders
 	 * while a resource type is migrated onto handles. Once nothing else holds the
 	 * resource, the pool is its sole owner and Remove() destroys it.
-	 *
-	 * Not thread-safe on its own: ResourceManager serialises access with the mutex
-	 * it already keeps per resource type.
 	 */
 	template<typename T>
 	class ResourcePool

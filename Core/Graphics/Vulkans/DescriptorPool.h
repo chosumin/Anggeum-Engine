@@ -114,15 +114,15 @@ namespace Core
 		void Reset();
 		
 		VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout layout);
-		vector<VkDescriptorSet> AllocateDescriptorSets(
-			const vector<VkDescriptorSetLayout>& layouts);
-		
+
 		VkDescriptorPool GetHandle() const { return _descriptorPool; }
 		
 	private:
 		Device& _device;
 		VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
 		uint32_t _maxSets = 0;
+
+		mutex _allocateMutex;
 	};
 }
 

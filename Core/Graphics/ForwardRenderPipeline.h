@@ -6,19 +6,18 @@
 
 namespace Core
 {
-	class RendererPass;
-	class Scene;
+	class RenderScene;
 	class SwapChain;
 	class WorkerThreadManager;
-	class TransferContext;
 	class Buffer;
 	class RenderContext;
+	class FrameGraph;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
 		ForwardRenderPipeline(Device& device, 
-			WorkerThreadManager& workerThreadManager, Scene& scene, SwapChain& swapChain);
+			WorkerThreadManager& workerThreadManager, RenderScene& renderScene, SwapChain& swapChain);
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex) override;
@@ -34,19 +33,15 @@ namespace Core
 	private:
 		VkSampleCountFlagBits GetMaxUsableSampleCount();
 
-		void AddRendererPass(RendererPass* renderPass)
-		{
-			_rendererPasses.push_back(renderPass);
-		}
-
 		// Fills the uniform blocks every pass in this frame shares.
 		void UploadSharedUniforms(RenderFrame& renderFrame);
 
 	private:
 		Device& _device;
-		Scene& _scene;
+		RenderScene& _renderScene;
 		VkExtent2D _swapChainExtents;
-		vector<RendererPass*> _rendererPasses;
+
+		unique_ptr<FrameGraph> _frameGraph;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 	};
 }

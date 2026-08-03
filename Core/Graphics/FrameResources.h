@@ -1,33 +1,24 @@
 #pragma once
 #include "Vulkans/MemoryAllocator.h"
 #include "Vulkans/Buffer.h"
+#include "Vulkans/Image.h"
 #include "ResourcePool.h"
 
 namespace Core
 {
 	class Device;
 	class Texture;
-	class Framebuffer;
-	class RenderPass;
 	class Sampler;
 	class Shader;
 	class DescriptorPool;
 	class DescriptorSetBuilder;
 	class CommandBuffer;
 	class Job;
+	class TransientResourceAllocator;
 
-	struct RenderTargetDesc
+	// The shared ImageDesc plus what only a pooled render target needs.
+	struct RenderTargetDesc : ImageDesc
 	{
-		VkExtent2D extent;
-		VkFormat format = VK_FORMAT_UNDEFINED; // For depth targets, this can be left as VK_FORMAT_UNDEFINED to auto-select a suitable depth format
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		bool isCubemap = false;
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-
 		// Optional custom sampler. Leave invalid to use default sampler
 		Handle<Sampler> sampler;
 
@@ -39,10 +30,6 @@ namespace Core
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 
-	// Owns the per-frame-in-flight GPU resources: render targets, transient
-	// storage/uniform buffers, and framebuffers. Split out of RenderFrame so the
-	// frame object keeps only execution/sync concerns (submission, descriptor pool,
-	// bindless, RenderExecutor). Reach it via RenderFrame::GetResources().
 	class FrameResources
 	{
 	public:
@@ -104,26 +91,28 @@ namespace Core
 			return GetOrCreateUniformBuffer(name, sizeof(T));
 		}
 
-		Framebuffer* GetOrCreateFramebuffer(const string& name, RenderPass& renderPass,
-			const vector<string>& attachmentNames, int32_t layerIndex = -1);
-		Framebuffer* GetFramebuffer(const string& name) const;
-		void RegisterFramebuffer(const string& name, unique_ptr<Framebuffer> framebuffer);
 
 		// Create a DescriptorSetBuilder for the given shader and set index. It
 		// allocates from this frame's descriptor pool, which Reset() recycles.
 		DescriptorSetBuilder CreateDescriptorSetBuilder(Shader& shader, uint32_t setIndex = 0);
 
+		DescriptorPool& GetDescriptorPool() { return *_descriptorPool; }
+
+		// This frame slot's transient aliasing heap, driven by the frame graph's
+		// compile output.
+		TransientResourceAllocator& GetTransientAllocator();
+
 		// One-off GPU work a resource needs before the frame's passes can touch it.
 		bool HasPendingInit() const;
 		void ExecutePendingInit(CommandBuffer& commandBuffer);
 
+		// Recording-window guard: while frame graph passes record on worker
+		// threads the resource pools are frozen (the main thread only waits).
+		static void SetRecordingGuard(bool recording) { _recordingGuard = recording; }
+		static bool IsRecordingGuardActive() { return _recordingGuard; }
+
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
-
-		void SetCurrentDepth(Handle<Texture> depth) { _currentDepth = depth; }
-		Handle<Texture> GetCurrentDepth() const { return _currentDepth; }
-		void SetCurrentNormal(Handle<Texture> normal) { _currentNormal = normal; }
-		Handle<Texture> GetCurrentNormal() const { return _currentNormal; }
 
 	private:
 		// Only reachable through the typed overload, so a block's size always comes
@@ -142,7 +131,12 @@ namespace Core
 	private:
 		Device& _device;
 
+		static inline atomic<bool> _recordingGuard = false;
+
 		unique_ptr<DescriptorPool> _descriptorPool;
+
+		// Frame graph transients (placed/aliased); see GetTransientAllocator.
+		unique_ptr<TransientResourceAllocator> _transientAllocator;
 
 		ResourcePool<Texture> _renderTargetPool;
 		unordered_map<string, Handle<Texture>> _renderTargets;
@@ -154,12 +148,9 @@ namespace Core
 		unordered_map<string, Handle<Buffer>> _uniformBufferHandles;
 
 		Handle<Texture> _previousDepthBuffer;
-		Handle<Texture> _currentDepth;
-		Handle<Texture> _currentNormal;
 
 		Handle<Sampler> _defaultSampler;
 
-		unordered_map<string, unique_ptr<Framebuffer>> _framebuffers;
 
 		// UNDEFINED -> requested starting layout for targets created this frame.
 		// Cleared as they are recorded.

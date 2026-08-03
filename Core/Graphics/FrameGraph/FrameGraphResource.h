@@ -1,0 +1,86 @@
+#pragma once
+#include "Graphics/Vulkans/Image.h"
+
+namespace Core
+{
+	// Virtual resource handles used during frame graph setup.
+	struct FGHandle
+	{
+		uint32_t index = UINT32_MAX;
+		bool IsValid() const { return index != UINT32_MAX; }
+	};
+
+	struct FGTexture : FGHandle {};
+	struct FGBuffer : FGHandle {};
+
+	// How a pass touches a texture.
+	enum class TextureAccess : uint8_t
+	{
+		ColorWrite,          // color attachment, cleared/overwritten
+		ColorLoadWrite,      // color attachment, previous contents loaded
+		DepthWrite,          // depth attachment, cleared/overwritten
+		DepthLoadWrite,      // depth attachment, previous contents loaded
+		DepthRead,           // depth attachment, read-only depth test
+		SampledFragment,     // sampled in fragment shaders
+		SampledVertex,       // sampled in vertex shaders
+		SampledCompute,      // sampled in compute shaders
+		StorageComputeWrite, // storage image write in compute (GENERAL)
+		StorageComputeRead,  // storage image read in compute (GENERAL)
+		TransferSrc,
+		TransferDst,
+		Present,             // final swapchain hand-off
+	};
+
+	// How a pass touches a buffer.
+	enum class BufferAccess : uint8_t
+	{
+		UniformVertex,
+		UniformFragment,
+		UniformCompute,
+		StorageVertexRead,
+		StorageFragmentRead,
+		StorageComputeRead,
+		StorageComputeWrite,
+		IndirectRead,
+		TransferSrc,
+		TransferDst,
+	};
+
+	// The sync2 facts a declared access boils down to.
+	struct FGAccessInfo
+	{
+		VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
+		VkAccessFlags2 access = VK_ACCESS_2_NONE;
+		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED; // meaningless for buffers
+		bool isWrite = false;
+
+		// The pass records its own barriers for this access.
+		bool manualBarriers = false;
+
+		// A write that loads the previous contents (LOAD_OP_LOAD attachments).
+		// Counts as a read in pass culling: the previous producer is needed.
+		bool loadsPrevious = false;
+	};
+
+	FGAccessInfo GetAccessInfo(TextureAccess access);
+	FGAccessInfo GetAccessInfo(BufferAccess access);
+
+	// Transients share the engine-wide image description.
+	using FGTextureDesc = ImageDesc;
+
+	struct FGBufferDesc
+	{
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	};
+
+	// Dynamic-rendering attachment declaration.
+	struct FGAttachment
+	{
+		FGTexture texture;
+		VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		VkAttachmentStoreOp storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		VkClearValue clear{};
+		FGTexture resolveTarget{}; // invalid = no resolve
+	};
+}

@@ -1,8 +1,9 @@
-#include "stdafx.h"
+癤�#include "stdafx.h"
 #include "Image.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
+#include "Graphics/FrameResources.h"
 #include "Utils/FileSystem.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -11,7 +12,7 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
+Core::Image::Image(Device& device, ImageCreateDesc imageCreateInfo)
     :_device(device), _sampleCount(imageCreateInfo.sampleCount), _createFlags(imageCreateInfo.flags), _viewType(imageCreateInfo.imageViewType),
 	_filePath(imageCreateInfo.filePath), _format(imageCreateInfo.format),
     _image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE)
@@ -23,22 +24,91 @@ Core::Image::Image(Device& device, ImageCreateInfo imageCreateInfo)
         VK_IMAGE_USAGE_STORAGE_BIT;
 }
 
-Core::Image::Image(Device& device, VkImageCreateInfo& imageInfo, 
-    VkImageAspectFlags aspectFlags, VkImageViewType imageViewType)
-	:_device(device), _format(imageInfo.format), _extent(imageInfo.extent), _sampleCount(imageInfo.samples), _mipLevels(imageInfo.mipLevels), _usageFlags(imageInfo.usage),
-	_layer(imageInfo.arrayLayers), _viewType(imageViewType)
+VkImageViewType Core::Image::DeriveViewType(const ImageDesc& desc)
+{
+	if (desc.viewType != VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+		return desc.viewType;
+	if (desc.isCubemap)
+		return VK_IMAGE_VIEW_TYPE_CUBE;
+	if (desc.arrayLayers > 1)
+		return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+	if (desc.depth > 1)
+		return VK_IMAGE_VIEW_TYPE_3D;
+	return VK_IMAGE_VIEW_TYPE_2D;
+}
+
+Core::Image::Image(Device& device, const ImageDesc& desc)
+	:_device(device), _format(desc.format),
+	_extent{ desc.extent.width, desc.extent.height, desc.depth },
+	_sampleCount(desc.samples), _mipLevels(desc.mipLevels), _usageFlags(desc.usage),
+	_layer(desc.arrayLayers), _viewType(DeriveViewType(desc)),
+	_createFlags(desc.isCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0)
 {
 	CreateImage(
 		VK_IMAGE_TILING_OPTIMAL,
 		_usageFlags,
 		VK_IMAGE_LAYOUT_UNDEFINED,
-        imageInfo.flags);
+		_createFlags);
 
 	BindImageMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    _imageView = CreateImageView(_mipLevels,
-        imageViewType, 
-        aspectFlags, 0);
+	_imageView = CreateImageView(_mipLevels, _viewType, desc.aspect, 0);
+}
+
+Core::Image::Image(Device& device, const ImageDesc& desc, Unbound)
+	:_device(device), _format(desc.format),
+	_extent{ desc.extent.width, desc.extent.height, desc.depth },
+	_sampleCount(desc.samples), _mipLevels(desc.mipLevels), _usageFlags(desc.usage),
+	_layer(desc.arrayLayers), _viewType(DeriveViewType(desc)),
+	_createFlags(desc.isCubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0),
+	_image(VK_NULL_HANDLE), _imageView(VK_NULL_HANDLE), _deferredAspectFlags(desc.aspect)
+{
+	CreateImage(
+		VK_IMAGE_TILING_OPTIMAL,
+		_usageFlags,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		_createFlags);
+}
+
+VkImageView Core::Image::CreateRawView(Device& device, VkImage image,
+	VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
+{
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = image;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = format;
+	viewInfo.subresourceRange.aspectMask = aspectFlags;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = mipLevels;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	VkImageView imageView;
+	if (vkCreateImageView(device.GetDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+		throw runtime_error("failed to create raw image view!");
+
+	return imageView;
+}
+
+VkMemoryRequirements Core::Image::GetMemoryRequirements() const
+{
+	VkMemoryRequirements requirements{};
+	vkGetImageMemoryRequirements(_device.GetDevice(), _image, &requirements);
+	return requirements;
+}
+
+void Core::Image::BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset)
+{
+	assert(_allocation == nullptr && "image already owns a managed allocation");
+	assert(_imageView == VK_NULL_HANDLE && "image memory already bound");
+
+	if (vkBindImageMemory(_device.GetDevice(), _image, memory, offset) != VK_SUCCESS)
+		throw runtime_error("failed to bind image memory at offset!");
+
+	// Views require bound memory, so the default view is created here rather
+	// than in the constructor.
+	_imageView = CreateImageView(_mipLevels, _viewType, _deferredAspectFlags, 0);
 }
 
 Core::Image::~Image()
@@ -78,6 +148,12 @@ VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
     if (_mipImageViews[mipLevel - 1] != VK_NULL_HANDLE)
         return _mipImageViews[mipLevel - 1];
 
+    // Passes record in parallel, so creating a view here would race: two workers
+    // would each create one and leak the loser (and corrupt the vector). Whoever
+    // needs a mip view must ask for it from Setup.
+    assert(!FrameResources::IsRecordingGuardActive() &&
+        "mip image view created during the recording window; create it in Setup");
+
     auto imageView = CreateImageView(1,
         _viewType,
         GetAspectFlags(),
@@ -89,14 +165,17 @@ VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
 
 VkImageView& Core::Image::GetOrCreateLayerImageView(uint32_t layerIndex)
 {
-    if (_layerImageViews.empty())
-        _layerImageViews.resize(_layer, VK_NULL_HANDLE);
-
     if (layerIndex >= _layer)
         throw runtime_error("Layer index out of range!");
 
+    if (_layerImageViews.empty())
+        _layerImageViews.resize(_layer, VK_NULL_HANDLE);
+
     if (_layerImageViews[layerIndex] != VK_NULL_HANDLE)
         return _layerImageViews[layerIndex];
+
+    assert(!FrameResources::IsRecordingGuardActive() &&
+        "layer image view created during the recording window; create it in Setup");
 
     _layerImageViews[layerIndex] = CreateSingleLayerImageView(layerIndex, GetAspectFlags());
     return _layerImageViews[layerIndex];
@@ -225,10 +304,8 @@ void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
     _extent.height = static_cast<uint32_t>(height);
     _layer = 1;
 
-    // HDR는 채널당 32bit float 포맷 사용
     _format = VK_FORMAT_R32G32B32A32_SFLOAT;
 
-    // float 픽셀 데이터를 uint8_t 바이트 스트림으로 복사
     const size_t byteSize = static_cast<size_t>(width) * height * reqComp * sizeof(float);
     const uint8_t* byteData = reinterpret_cast<const uint8_t*>(pixels);
     outData = { byteData, byteData + byteSize };
@@ -328,7 +405,24 @@ void Core::Image::CreateImage(VkImageTiling tiling,
     //VK_IMAGE_LAYOUT_PREINITIALIZED, the first transition will preserve the texels.
     imageInfo.initialLayout = initialLayout;
     imageInfo.usage = usage;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // CONCURRENT across graphics+compute when the families differ, 
+    // so cross-queue access needs no ownership transfers.
+    const auto& qfi = _device.GetQueueFamilyIndices();
+    uint32_t queueFamilies[2] = {
+        qfi.GraphicsFamily.value(),
+        qfi.ComputeFamily.value()
+    };
+    if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 2;
+        imageInfo.pQueueFamilyIndices = queueFamilies;
+    }
+    else
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     //related to sparse images, such as 3D texture for a voxel terrain.
     imageInfo.flags = flags;
@@ -390,7 +484,20 @@ VkImageView Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType ima
         throw runtime_error("failed to create texture image view!");
     }
 
+    NameView(imageView, "mip", baseMipLevel);
+
     return imageView;
+}
+
+// Every view this class creates gets a name, so a validation message naming an
+// unnamed view points at a view the engine did not create.
+void Core::Image::NameView(VkImageView view, const char* kind, uint32_t index) const
+{
+    const string label = "Image(" + (_filePath.empty() ? string("rt") : _filePath) + ") "
+        + kind + " " + std::to_string(index) + " View";
+
+    _device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
+        (uint64_t)view, label.c_str());
 }
 
 VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImageAspectFlags aspectFlags)
@@ -412,6 +519,8 @@ VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImage
     {
         throw runtime_error("failed to create single layer image view!");
     }
+
+    NameView(imageView, "layer", layerIndex);
 
     return imageView;
 }

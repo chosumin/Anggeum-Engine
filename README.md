@@ -4,7 +4,7 @@
 
 ## About
 
-Toy 3D rendering engine for studying Vulkan API.
+Toy 3D rendering engine for learning modern rendering and Vulkan API.
 
 ---
 
@@ -16,6 +16,20 @@ Toy 3D rendering engine for studying Vulkan API.
 ---
 
 ## Features
+
+### [Frame Graph](Core/Graphics/FrameGraph/README.md)
+
+**Declarative Render Passes**
+- Passes declare resource reads/writes; barriers and pass culling are derived automatically (Vulkan 1.4 dynamic rendering)
+
+**Async Compute**
+- Dedicated compute queue alongside graphics, with cross-queue dependencies expressed via timeline semaphores
+
+**Transient Resource Aliasing**
+- Graph-owned transients with disjoint lifetimes alias the same memory via greedy interval placement
+
+**Multithreaded Recording**
+- One command buffer per pass, recorded in parallel by a worker thread pool off the main thread
 
 ### Rendering Pipeline
 
@@ -53,14 +67,7 @@ Toy 3D rendering engine for studying Vulkan API.
    - Stale handles resolve to null instead of aliasing recycled slots
    - In-place buffer replacement keeps held handles valid across resizes/rebuilds
 
-### Multithreading
-
-**Async Compute (GPU)**
-   - Dedicated compute queue alongside the graphics queue
-   - Cross-queue dependencies expressed with timeline semaphores
-
-**Worker Threads (CPU)**
-   - Thread pool recording secondary command buffers off the main thread
+**Asynchronous Uploads**
    - Buffer and image uploads staged on worker threads and submitted as a single batch through a transfer context
 
 ### Shader System

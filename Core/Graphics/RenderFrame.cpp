@@ -4,19 +4,14 @@
 #include "Vulkans/Buffer.h"
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/SubmitInfo.h"
+#include "Vulkans/Shader.h"
+#include "Vulkans/Pipeline.h"
+#include "Vulkans/DescriptorSetBuilder.h"
+#include "RendererBatch.h"
+#include "MeshBufferManager.h"
+#include "MaterialManager.h"
 
 using namespace Core;
-
-namespace
-{
-	// Shared sentinel for temp frames that draw without a RenderScene; all of its
-	// managers stay null, so the accessors report "no manager" as before.
-	RenderScene& EmptyRenderScene()
-	{
-		static RenderScene empty;
-		return empty;
-	}
-}
 
 RenderFrame::RenderFrame(Device& device, RenderScene& renderScene)
 	: _device(device)
@@ -24,13 +19,6 @@ RenderFrame::RenderFrame(Device& device, RenderScene& renderScene)
 	, _resources(device)
 {
 	CreateSyncObjects();
-
-	_renderExecutor = make_unique<RenderExecutor>(device, *this);
-}
-
-RenderFrame::RenderFrame(Device& device)
-	: RenderFrame(device, EmptyRenderScene())
-{
 }
 
 RenderFrame::~RenderFrame()
@@ -51,21 +39,8 @@ void RenderFrame::Reset()
 	_submission.submitInfos.clear();
 	_submission.submitScratch.clear();
 
-	// Reset culler usage tracking for this frame
-	_renderExecutor->ResetFrame();
-
 	// Recycles this frame's descriptor pool and clears transient selectors.
 	_resources.Reset();
-}
-
-DescriptorSetResources* RenderFrame::GetBindlessResources()
-{
-	if (!HasBindlessSupport())
-		return nullptr;
-
-	_bindlessResources.descriptorSet = _renderScene.GetBindlessTextureManager()->GetDescriptorSet();
-	_bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
-	return &_bindlessResources;
 }
 
 void RenderFrame::CreateSyncObjects()

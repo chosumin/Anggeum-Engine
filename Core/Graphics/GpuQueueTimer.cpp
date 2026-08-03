@@ -97,6 +97,31 @@ GpuQueueTimer::~GpuQueueTimer()
 void GpuQueueTimer::BeginPass(CommandBuffer& commandBuffer, uint32_t frameIndex,
 	uint32_t passIndex, QueueType queue, const char* name)
 {
+	RegisterPass(frameIndex, passIndex, queue, name);
+	WriteBeginTimestamp(commandBuffer, frameIndex, passIndex);
+}
+
+void GpuQueueTimer::RegisterPass(uint32_t frameIndex, uint32_t passIndex,
+	QueueType queue, const char* name)
+{
+	if (_supported == false || passIndex >= MaxPasses)
+		return;
+
+	auto& record = _records[frameIndex];
+
+	// Pass 0 opens a fresh frame record so a shrinking pass count cannot leave
+	// stale trailing entries.
+	if (passIndex == 0)
+		record.passCount = 0;
+
+	record.queues[passIndex] = queue;
+	record.names[passIndex] = name;
+	record.passCount = std::max(record.passCount, passIndex + 1);
+}
+
+void GpuQueueTimer::WriteBeginTimestamp(CommandBuffer& commandBuffer,
+	uint32_t frameIndex, uint32_t passIndex)
+{
 	if (_supported == false || passIndex >= MaxPasses)
 		return;
 
@@ -112,11 +137,6 @@ void GpuQueueTimer::BeginPass(CommandBuffer& commandBuffer, uint32_t frameIndex,
 	// idle queue look busy.
 	vkCmdWriteTimestamp(commandBuffer.GetHandle(),
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, _queryPool, query);
-
-	auto& record = _records[frameIndex];
-	record.queues[passIndex] = queue;
-	record.names[passIndex] = name;
-	record.passCount = passIndex + 1;
 }
 
 void GpuQueueTimer::EndPass(CommandBuffer& commandBuffer, uint32_t frameIndex, uint32_t passIndex)

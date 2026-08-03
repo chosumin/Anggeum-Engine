@@ -7,8 +7,7 @@ namespace Core
 	class CommandBuffer;
 	class CommandPool;
 
-	// Buffer creation parameters, shared by the ResourceManager global buffer pool
-	// and the FrameResources per-frame pool.
+	// Buffer creation parameters
 	struct BufferDesc
 	{
 		VkDeviceSize size = 0;
@@ -19,10 +18,20 @@ namespace Core
 	class Buffer
 	{
 	public:
+		// Tag for the transient/aliased path: the VkBuffer is created without memory.
+		struct Unbound {};
+
 		Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, MemoryType memoryType);
+		Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, Unbound);
 		~Buffer();
 
 		VkBuffer GetBuffer() { return _buffer; }
+
+		VkMemoryRequirements GetMemoryRequirements() const;
+		
+		// Binds at an explicit offset into caller-owned memory (transient heap).
+		// The memory must outlive this buffer; the destructor does not free it.
+		void BindMemoryAt(VkDeviceMemory memory, VkDeviceSize offset);
 
 		void CopyBuffer(void* data, VkDeviceSize size);
 		void GetMappedPtr(void** data);
@@ -43,6 +52,8 @@ namespace Core
 
 		VkDeviceSize GetSize() const { return _size; }
 	private:
+		void CreateVkBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
+
 		// The byte count only matters here, where memcpy needs one; callers always
 		// get it from the type they hand over.
 		void UpdateRaw(const void* data, VkDeviceSize size);
