@@ -66,7 +66,7 @@ namespace Core
 	struct TextureBuffer
 	{
 		Texture* rawTexture = nullptr;
-		uint mipLevel;
+		uint mipLevel = 0;
 		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		VkDescriptorImageInfo imageInfo{};
 
