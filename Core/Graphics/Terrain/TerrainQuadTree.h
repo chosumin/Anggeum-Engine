@@ -11,7 +11,7 @@ namespace Core
 	// Owns the GPU face of the terrain world structure: the three payload
 	// atlases (synchronized slots - one slot index addresses all of them),
 	// the mip-mapped quadtree index texture, and the node description buffer.
-	class TerrainAtlas
+	class TerrainQuadTree
 	{
 	public:
 		static constexpr const char* HEIGHT_ATLAS = "Terrain.HeightAtlas";
@@ -20,7 +20,7 @@ namespace Core
 		static constexpr const char* QUADTREE_INDEX = "Terrain.QuadtreeIndex";
 		static constexpr const char* NODE_DESC = "Terrain.NodeDesc";
 
-		TerrainAtlas(Device& device, const TerrainConfig& config);
+		TerrainQuadTree(Device& device, const TerrainConfig& config);
 
 		Handle<Texture> GetHeightAtlas() const { return _heightAtlas; }
 		Handle<Texture> GetNormalAtlas() const { return _normalAtlas; }
