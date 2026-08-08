@@ -19,13 +19,6 @@ namespace Core
 		float heightMin = -100.0f;
 		float heightMax = 100.0f;
 
-		// Noise
-		uint32_t noiseSeed = 1337;
-		float noiseBaseFrequency = 1.0f / 900.0f;
-		int noiseOctaves = 6;
-		float noiseLacunarity = 2.0f;
-		float noiseGain = 0.5f;
-
 		// Formats. Uncompressed for now: the engine has no BC encoder yet.
 		VkFormat heightFormat = VK_FORMAT_R16_UNORM;
 		VkFormat normalFormat = VK_FORMAT_R8G8B8A8_UNORM;
