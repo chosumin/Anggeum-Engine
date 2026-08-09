@@ -62,7 +62,11 @@ namespace Core
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstInstance = 0);
 		void Draw(uint32_t vertexCount, uint32_t instanceCount);
 		void DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride);
+		void DrawIndexedIndirectCount(Buffer& indirectBuffer, VkDeviceSize indirectOffset,
+			Buffer& countBuffer, VkDeviceSize countOffset,
+			uint32_t maxDrawCount, uint32_t stride);
 		void Dispatch(uint32_t x, uint32_t y, uint32_t z);
+		void DispatchIndirect(Buffer& argsBuffer, VkDeviceSize offset = 0);
 
 		void FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
 

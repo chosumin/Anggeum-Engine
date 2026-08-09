@@ -50,6 +50,8 @@ namespace Core
 		DeviceFeatureChain featureChain;
 	    PickPhysicalDevice(featureChain);
 
+		_supportsDrawIndirectCount = featureChain.features12.drawIndirectCount;
+
 		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
 
 		CreateLogicalDevice(featureChain);

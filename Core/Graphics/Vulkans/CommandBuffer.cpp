@@ -424,6 +424,29 @@ void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t d
 	);
 }
 
+void Core::CommandBuffer::DrawIndexedIndirectCount(Buffer& indirectBuffer,
+	VkDeviceSize indirectOffset, Buffer& countBuffer, VkDeviceSize countOffset,
+	uint32_t maxDrawCount, uint32_t stride)
+{
+	assert(_device.SupportsDrawIndirectCount()
+		&& "drawIndirectCount feature is not available on this device");
+
+	vkCmdDrawIndexedIndirectCount(
+		_commandBuffer,
+		indirectBuffer.GetBuffer(),
+		indirectOffset,
+		countBuffer.GetBuffer(),
+		countOffset,
+		maxDrawCount,
+		stride
+	);
+}
+
+void Core::CommandBuffer::DispatchIndirect(Buffer& argsBuffer, VkDeviceSize offset)
+{
+	vkCmdDispatchIndirect(_commandBuffer, argsBuffer.GetBuffer(), offset);
+}
+
 void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data)
 {
 	vkCmdFillBuffer(_commandBuffer, buffer.GetBuffer(), offset, size, data);

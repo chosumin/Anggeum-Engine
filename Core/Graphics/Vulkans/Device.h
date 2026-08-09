@@ -73,6 +73,7 @@ namespace Core
 		ResourceManager& GetResourceManager() const { return *_resourceManager; }
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
+		bool SupportsDrawIndirectCount() const { return _supportsDrawIndirectCount; }
 
 		DebugUtils& GetDebugUtils() { return _debugUtils; }
 		const DebugUtils& GetDebugUtils() const { return _debugUtils; }
@@ -111,6 +112,7 @@ namespace Core
 
 		// Descriptor indexing support
 		bool _supportsDescriptorIndexing = false;
+		bool _supportsDrawIndirectCount = false;
 		VkPhysicalDeviceDescriptorIndexingFeatures _descriptorIndexingFeatures{};
 
 		const vector<const char*> _deviceExtensions;
