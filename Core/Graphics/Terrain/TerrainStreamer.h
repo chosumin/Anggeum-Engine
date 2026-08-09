@@ -48,7 +48,12 @@ namespace Core
 		~TerrainStreamer();
 
 		// Main thread, once per frame, before frame-graph Setup.
-		const FrameUploads& Update(vec2 cameraXZ);
+		void Update(vec2 cameraXZ);
+
+		const FrameUploads& GetFrameUploads() const { return _uploads; }
+
+		// For frozen frames: publish "nothing to upload" without diffing.
+		void ClearFrameUploads() { _uploads = {}; }
 
 		bool IsResident(const TerrainNodeId& id) const
 		{

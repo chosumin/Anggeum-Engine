@@ -25,7 +25,10 @@ namespace Core
 		const TerrainConfig& GetConfig() const { return _config; }
 		TerrainQuadTree& GetQuadTree() { return *_quadTree; }
 		TerrainStreamer& GetStreamer() { return *_streamer; }
-		const TerrainStreamer::FrameUploads& GetFrameUploads() const { return _uploads; }
+		const TerrainStreamer::FrameUploads& GetFrameUploads() const
+		{
+			return _streamer->GetFrameUploads();
+		}
 
 		const vector<TerrainNodeInstance>& GetRenderList() const { return _renderList; }
 		const array<uint32_t, 8>& GetRenderListPerLod() const { return _renderListPerLod; }
@@ -49,7 +52,6 @@ namespace Core
 		unique_ptr<TerrainQuadTree> _quadTree;
 		unique_ptr<TerrainStreamer> _streamer;
 
-		TerrainStreamer::FrameUploads _uploads;
 		vector<TerrainNodeInstance> _renderList;
 		array<uint32_t, 8> _renderListPerLod{};
 		array<vec4, 6> _frustumPlanes{};

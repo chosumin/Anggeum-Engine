@@ -75,7 +75,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	_frameGraph->AddPass(make_unique<GeometryPass>(
 		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
 
-	_frameGraph->AddPass(make_unique<TerrainPass>(device, terrainSystem,
+	_frameGraph->AddPass(make_unique<TerrainPass>(device, renderScene,
 		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
 
 	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));

@@ -113,7 +113,7 @@ namespace Core
 		_tablesDirty = true;
 	}
 
-	const TerrainStreamer::FrameUploads& TerrainStreamer::Update(vec2 cameraXZ)
+	void TerrainStreamer::Update(vec2 cameraXZ)
 	{
 		_uploads = {};
 		_stats = {};
@@ -211,7 +211,5 @@ namespace Core
 		for (const auto& runtime : _runtime)
 			if (runtime.state == TerrainNodeState::Resident)
 				++_stats.resident;
-
-		return _uploads;
 	}
 }

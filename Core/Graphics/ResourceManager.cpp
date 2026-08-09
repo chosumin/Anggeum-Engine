@@ -353,6 +353,11 @@ namespace Core
 			vert = "shaders/brdf_lut.vert.spv";
 			frag = "shaders/brdf_lut.frag.spv";
 			break;
+		case Utility::HashCode("Terrain"):
+			pass = "Terrain";
+			vert = "shaders/terrain.vert.spv";
+			frag = "shaders/terrain.frag.spv";
+			break;
 		default:
 			pass = "Geometry";
 			//Default is compute shader.

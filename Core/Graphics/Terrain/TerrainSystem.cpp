@@ -61,9 +61,9 @@ namespace Core
 		vec2 cameraXZ{ position.x, position.z };
 
 		if (!_freezeStreaming)
-			_uploads = _streamer->Update(cameraXZ);
+			_streamer->Update(cameraXZ);
 		else
-			_uploads = {};
+			_streamer->ClearFrameUploads();
 
 		BuildRenderList(cameraXZ, camera.GetProjection() * camera.GetView());
 	}

@@ -264,6 +264,21 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, ui
     );
 }
 
+void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture,
+    const vector<VkBufferImageCopy>& regions)
+{
+    assert(!regions.empty());
+
+    vkCmdCopyBufferToImage(
+        _commandBuffer,
+        buffer.GetBuffer(),
+        texture.GetImage().GetImage(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        static_cast<uint32_t>(regions.size()),
+        regions.data()
+    );
+}
+
 void Core::CommandBuffer::GenerateMipmaps(Texture& texture, uint32_t mipLevels)
 {
     Image& image = texture.GetImage();
