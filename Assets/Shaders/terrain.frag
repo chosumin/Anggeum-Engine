@@ -33,7 +33,7 @@ void main()
     vec3 normal = normalize(texture(normalAtlas, uv).xyz * 2.0 - 1.0);
     vec3 albedo = texture(albedoAtlas, uv).rgb;
 
-    float diffuse = max(dot(normal, -normalize(params.sunDirection.xyz)), 0.0);
+    float diffuse = max(dot(normal, normalize(params.sunDirection.xyz)), 0.0);
     vec3 lit = albedo * (diffuse + params.sunDirection.w);
 
     int mode = params.debugMode.x;

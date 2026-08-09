@@ -101,7 +101,6 @@ void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 	params.invColorAtlasBorder = vec4(1.0f / vec2(quadTree.GetColorAtlasExtent()),
 		float(config.borderTexels), 0.0f);
 
-	params.sunDirection = vec4(normalize(vec3(0.4f, -1.0f, 0.3f)), 0.25f);
 	if (auto* mainLight = _renderScene.GetScene().GetMainLight())
 	{
 		auto& transform = mainLight->GetEntity().GetTransform();
