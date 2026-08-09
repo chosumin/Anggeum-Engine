@@ -16,6 +16,7 @@ namespace Core
 	class Pipeline;
 	class Buffer;
 	class DescriptorSetBuilder;
+	class TerrainSystem;
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
@@ -37,8 +38,13 @@ namespace Core
 		// The CPU scene this render scene mirrors. The scene object is created
 		// first (empty) and loaded later, so it can be a constructor argument.
 		RenderScene(Device& device, Scene& scene);
+		~RenderScene();
 
 		Scene& GetScene() const { return _scene; }
+
+		// The terrain world system: part of the renderer's world model, created
+		// with the other managers and updated by Sync() like them.
+		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
 		// Run every manager's self-gated sync, in dependency order.
 		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
@@ -89,6 +95,7 @@ namespace Core
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;
 		unique_ptr<RendererBatch> _batch;
+		unique_ptr<TerrainSystem> _terrainSystem;
 
 		TextureUploadQueue _textureUploads;
 		GeometryCopyQueue _geometryCopies;

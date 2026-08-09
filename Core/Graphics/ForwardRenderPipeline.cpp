@@ -6,6 +6,7 @@
 #include "Components/Light.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/RenderFrame.h"
+#include "Graphics/RenderScene.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
@@ -18,10 +19,12 @@
 #include "Graphics/RenderPasses/IBLPass.h"
 #include "Graphics/RenderPasses/GeometryPass.h"
 #include "Graphics/RenderPasses/GUIRenderPass.h"
+#include "Graphics/RenderPasses/TerrainStreamingPass.h"
+#include "Graphics/RenderPasses/TerrainPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
-Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
+Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	WorkerThreadManager& workerThreadManager,
 	RenderScene& renderScene, SwapChain& swapChain)
 	:_device(device)
@@ -46,6 +49,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
 
+	TerrainSystem& terrainSystem = renderScene.GetTerrainSystem();
+	_frameGraph->AddPass(make_unique<TerrainStreamingPass>(terrainSystem));
+
 	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
 
 	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
@@ -68,6 +74,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 
 	_frameGraph->AddPass(make_unique<GeometryPass>(
 		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
+
+	_frameGraph->AddPass(make_unique<TerrainPass>(device, terrainSystem,
+		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
 
 	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));
 }

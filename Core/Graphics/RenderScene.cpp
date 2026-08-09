@@ -12,6 +12,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Foundation/Scene.h"
+#include "Graphics/Terrain/TerrainSystem.h"
 
 using namespace Core;
 
@@ -26,7 +27,14 @@ RenderScene::RenderScene(Device& device, Scene& scene)
 	_meshBuffer = make_unique<MeshBufferManager>(device);
 	_material = make_unique<MaterialManager>(device);
 	_batch = make_unique<RendererBatch>(device);
+
+	// The terrain's static grid geometry lands in _geometryCopies and is
+	// uploaded by the first Sync, like any other loaded geometry.
+	_terrainSystem = make_unique<TerrainSystem>(device, _geometryCopies);
 }
+
+// Out of line for the unique_ptr members forward-declared in the header.
+RenderScene::~RenderScene() = default;
 
 void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents)
 {
@@ -52,6 +60,10 @@ void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D exten
 	// once more: the passes read the draw set on the GPU during this frame.
 	_batch->Sync(scene, transfer, extents);
 	transfer.Wait();
+
+	// Freezes this frame's terrain streaming uploads and render list before pass Setup.
+	if (auto* camera = scene.GetMainCamera())
+		_terrainSystem->Update(*camera);
 }
 
 void RenderScene::UploadQueuedTextures(TransferContext& transfer)

@@ -78,6 +78,13 @@ void Core::Engine::Draw()
 	auto extents = _renderContext->GetSurfaceExtent();
 
 	{
+		ScopedCpuTimer timer(phases.beginMs);
+		_renderContext->Begin(*_scene, extents);
+	}
+
+	// After Begin on purpose: Sync now also drives the terrain update, whose
+	// frame-slot staging writes require this slot's in-flight wait in Begin.
+	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 		_transferContext->UpdateFrame(_renderContext->GetCurrentFrameIndex());
 
@@ -85,10 +92,6 @@ void Core::Engine::Draw()
 		// descriptors and rebuilds the draw set, so no separate Wait is needed here.
 		// Each manager self-gates and clears its own dirty state.
 		_renderScene->Sync(*_scene, *_transferContext, extents);
-	}
-	{
-		ScopedCpuTimer timer(phases.beginMs);
-		_renderContext->Begin(*_scene, extents);
 	}
 
 	{
