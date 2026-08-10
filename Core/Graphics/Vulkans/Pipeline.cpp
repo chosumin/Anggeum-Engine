@@ -3,8 +3,34 @@
 #include "Shader.h"
 #include "PipelineState.h"
 
+namespace
+{
+	struct SpecializationData
+	{
+		vector<VkSpecializationMapEntry> entries;
+		vector<uint32_t> data;
+		VkSpecializationInfo info{};
+
+		void Build(const Core::SpecConstants& specConstants)
+		{
+			for (auto& [id, value] : specConstants.values)
+			{
+				entries.push_back({ id,
+					uint32_t(data.size() * sizeof(uint32_t)), sizeof(uint32_t) });
+				data.push_back(value);
+			}
+
+			info.mapEntryCount = uint32_t(entries.size());
+			info.pMapEntries = entries.data();
+			info.dataSize = data.size() * sizeof(uint32_t);
+			info.pData = data.data();
+		}
+	};
+}
+
 Core::Pipeline::Pipeline(Device& device,
-	const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState)
+	const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState,
+	const SpecConstants& specConstants)
 	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS)
 {
 	VkPipelineRenderingCreateInfo renderingInfo{};
@@ -14,16 +40,24 @@ Core::Pipeline::Pipeline(Device& device,
 	renderingInfo.depthAttachmentFormat = renderingDesc.depthFormat;
 	renderingInfo.stencilAttachmentFormat = renderingDesc.stencilFormat;
 
-	CreateGraphicsPipeline(VK_NULL_HANDLE, &renderingInfo, shader, pipelineState);
+	CreateGraphicsPipeline(VK_NULL_HANDLE, &renderingInfo, shader, pipelineState,
+		specConstants);
 }
 
-Core::Pipeline::Pipeline(Device& device, Shader& shader)
+Core::Pipeline::Pipeline(Device& device, Shader& shader, const SpecConstants& specConstants)
 	:_device(device), _pipelineBindPoint(VK_PIPELINE_BIND_POINT_COMPUTE)
 {
 	VkComputePipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipelineInfo.layout = shader.GetPipelineLayout();
 	pipelineInfo.stage = shader.GetComputeShaderStageCreateInfo();
+
+	SpecializationData specialization;
+	if (!specConstants.values.empty())
+	{
+		specialization.Build(specConstants);
+		pipelineInfo.stage.pSpecializationInfo = &specialization.info;
+	}
 
 	if (vkCreateComputePipelines(device.GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &_pipeline) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create compute pipeline!");
@@ -38,9 +72,18 @@ Core::Pipeline::~Pipeline()
 
 void Core::Pipeline::CreateGraphicsPipeline(VkRenderPass renderPass,
 	const VkPipelineRenderingCreateInfo* renderingInfo,
-	Shader& shader, PipelineState& pipelineState)
+	Shader& shader, PipelineState& pipelineState,
+	const SpecConstants& specConstants)
 {
 	auto shaderStage = shader.GetShaderStageCreateInfo();
+
+	SpecializationData specialization;
+	if (!specConstants.values.empty())
+	{
+		specialization.Build(specConstants);
+		for (auto& stage : shaderStage)
+			stage.pSpecializationInfo = &specialization.info;
+	}
 	auto vertexInputState =
 		shader.GetVertexInputStateCreateInfo();
 	auto inputAssemblyState =
