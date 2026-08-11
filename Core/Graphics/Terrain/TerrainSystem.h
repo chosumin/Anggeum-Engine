@@ -40,11 +40,19 @@ namespace Core
 		bool IsWireframe() const { return _wireframe; }
 		int GetDebugMode() const { return _debugMode; }
 
+		// Validation stat fed back by TerrainNodeListPass (2 frames stale):
+		// must converge to the CPU covering-set count when the camera rests.
+		void SetGpuNodeCountStat(uint32_t count);
+
 	private:
 		void BuildRenderList(vec2 cameraXZ, const mat4& viewProj);
 		void VisitNode(const TerrainNodeId& id, vec2 cameraXZ);
 		float DistanceToNodeXZ(vec2 point, const TerrainNodeId& id) const;
 		bool IsNodeVisible(const TerrainNodeId& id) const;
+		
+		// Covering-set size WITHOUT frustum culling: the CPU reference the GPU
+		// node list is validated against (same traversal as the compute).
+		uint32_t CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ) const;
 		void CreateGridIndexBuffer(Device& device, GeometryCopyQueue& geometryCopyQueue);
 
 		TerrainConfig _config;
@@ -56,6 +64,8 @@ namespace Core
 		array<uint32_t, 8> _renderListPerLod{};
 		array<vec4, 6> _frustumPlanes{};
 		uint32_t _culledNodes = 0;
+		uint32_t _coveringNodeCount = 0;
+		uint32_t _gpuNodeCount = 0;
 
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;

@@ -1,0 +1,154 @@
+#version 450
+
+// Builds the Terrain Node List: the covering set of resident quadtree
+// nodes for this frame. Single dispatch, single workgroup; levels are walked
+// root-down with the intermediate lists ping-ponged through shared memory, so
+// no per-level dispatch or indirect-args round trips are needed.
+
+layout(local_size_x = 256) in;
+
+layout(set = 0, binding = 0) uniform usampler2D quadTreeIndex;
+
+// uvec2 per node: x = packed coord (lod << 28 | y << 14 | x), y = atlas slot.
+layout(set = 0, binding = 1) writeonly buffer NodeList
+{
+    uvec2 entries[];
+} nodeList;
+
+layout(set = 0, binding = 2) buffer NodeListCount
+{
+    uint count;
+} nodeCount;
+
+layout(push_constant) uniform Push
+{
+    vec2 cameraXZ;
+    vec2 worldOrigin;
+    float rootNodeSize;
+    float ringRadiusScale;
+    uint lodCount;
+    uint rootTiles;
+} push;
+
+const uint NODE_INVALID = 0xfffeu; // >= this: nothing resident (or no node)
+
+// Bounded by the atlas capacity: every listed node is resident, so a level
+// list can never exceed the number of atlas slots.
+layout(constant_id = 0) const uint MAX_NODES = 512u;
+
+// The 4-bit lod field in the packed coord bounds the level count.
+const uint MAX_LODS = 16u;
+
+// The lists ping-pong (space), but each level gets its OWN counter 
+// so one barrier per level suffices.
+shared uint lists[2][MAX_NODES];
+shared uint levelCounts[MAX_LODS + 1u];
+
+uint Pack(uint lod, uvec2 coord)
+{
+    return (lod << 28) | (coord.y << 14) | coord.x;
+}
+
+uvec2 UnpackCoord(uint packed)
+{
+    return uvec2(packed & 0x3fffu, (packed >> 14) & 0x3fffu);
+}
+
+float NodeSize(uint lod)
+{
+    return push.rootNodeSize / float(1u << (push.lodCount - 1u - lod));
+}
+
+float DistanceToNode(uint lod, uvec2 coord)
+{
+    float size = NodeSize(lod);
+    vec2 nodeMin = push.worldOrigin + vec2(coord) * size;
+    vec2 closest = clamp(push.cameraXZ, nodeMin, nodeMin + size);
+    return length(push.cameraXZ - closest);
+}
+
+bool Resident(uint lod, uvec2 coord)
+{
+    return texelFetch(quadTreeIndex, ivec2(coord), int(lod)).r < NODE_INVALID;
+}
+
+void main()
+{
+    uint tid = gl_LocalInvocationID.x;
+    uint rootCount = push.rootTiles * push.rootTiles;
+
+    if (tid <= MAX_LODS)
+        levelCounts[tid] = 0u;
+    if (tid == 0u)
+    {
+        nodeCount.count = 0u;
+        levelCounts[0] = rootCount;
+    }
+    if (tid < rootCount)
+        lists[0][tid] = Pack(push.lodCount - 1u,
+            uvec2(tid % push.rootTiles, tid / push.rootTiles));
+    barrier();
+
+    for (uint level = 0u; level < push.lodCount; ++level)
+    {
+        uint readIdx = level & 1u;
+        uint writeIdx = 1u - readIdx;
+        uint lod = push.lodCount - 1u - level;
+
+        // The only consumer of this level's counter, so the overflow clamp
+        // lives here (reserve-then-check appends may inflate it). Hoisted
+        // into a register: the loop's atomicAdds would otherwise force a
+        // shared reload every iteration.
+        uint levelCount = min(levelCounts[level], MAX_NODES);
+
+        for (uint i = tid; i < levelCount; i += gl_WorkGroupSize.x)
+        {
+            uint packedCoord = lists[readIdx][i];
+            uvec2 coord = UnpackCoord(packedCoord);
+
+            // Refine with the same radii the streamer requests with, so the
+            // listed set tracks the requested set (mirrors CPU VisitNode).
+            bool subdivided = false;
+            if (lod > 0u
+                && DistanceToNode(lod, coord)
+                    <= push.ringRadiusScale * NodeSize(lod - 1u))
+            {
+                uvec2 childBase = coord * 2u;
+                bool allResident =
+                    Resident(lod - 1u, childBase)
+                    && Resident(lod - 1u, childBase + uvec2(1u, 0u))
+                    && Resident(lod - 1u, childBase + uvec2(0u, 1u))
+                    && Resident(lod - 1u, childBase + uvec2(1u, 1u));
+
+                if (allResident)
+                {
+                    uint dst = atomicAdd(levelCounts[level + 1u], 4u);
+                    if (dst + 4u <= MAX_NODES)
+                    {
+                        lists[writeIdx][dst + 0u] = Pack(lod - 1u, childBase);
+                        lists[writeIdx][dst + 1u] = Pack(lod - 1u, childBase + uvec2(1u, 0u));
+                        lists[writeIdx][dst + 2u] = Pack(lod - 1u, childBase + uvec2(0u, 1u));
+                        lists[writeIdx][dst + 3u] = Pack(lod - 1u, childBase + uvec2(1u, 1u));
+                    }
+                    subdivided = true;
+                }
+            }
+
+            if (!subdivided)
+            {
+                uint slot = texelFetch(quadTreeIndex, ivec2(coord), int(lod)).r;
+                if (slot < NODE_INVALID) // not resident: parent already covers
+                {
+                    uint dst = atomicAdd(nodeCount.count, 1u);
+                    if (dst < MAX_NODES)
+                        nodeList.entries[dst] = uvec2(packedCoord, slot);
+                }
+            }
+        }
+
+        barrier();
+    }
+
+    if (tid == 0u)
+        nodeCount.count = min(nodeCount.count, MAX_NODES);
+}

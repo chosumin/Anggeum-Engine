@@ -4,6 +4,7 @@
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/ResourceManager.h"
 #include "Utils/Math.h"
+#include "Utils/Log.h"
 #include "Graphics/GeometryUpload.h"
 
 namespace Core
@@ -150,6 +151,35 @@ namespace Core
 		return length(point - closest);
 	}
 
+	uint32_t TerrainSystem::CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ) const
+	{
+		// Same refinement as VisitNode minus frustum culling and emission —
+		// the CPU reference for validating the GPU node list compute.
+		bool canRefine = id.lod > 0
+			&& DistanceToNodeXZ(cameraXZ, id) <= _streamer->LoadRadius(id.lod - 1);
+		if (canRefine)
+		{
+			TerrainNodeId children[4];
+			bool allResident = true;
+			for (uint32_t i = 0; i < 4; ++i)
+			{
+				children[i] = { uint8_t(id.lod - 1),
+					uint16_t(id.x * 2 + (i & 1)), uint16_t(id.y * 2 + (i >> 1)) };
+				allResident &= _streamer->IsResident(children[i]);
+			}
+
+			if (allResident)
+			{
+				uint32_t count = 0;
+				for (const TerrainNodeId& child : children)
+					count += CountCoveringSet(child, cameraXZ);
+				return count;
+			}
+		}
+
+		return _streamer->IsResident(id) ? 1u : 0u;
+	}
+
 	void TerrainSystem::BuildRenderList(vec2 cameraXZ, const mat4& viewProj)
 	{
 		_renderList.clear();
@@ -158,9 +188,22 @@ namespace Core
 		Math::ExtractFrustumPlanes(viewProj, _frustumPlanes.data());
 
 		uint8_t rootLod = uint8_t(_config.lodCount - 1);
+		_coveringNodeCount = 0;
 		for (uint16_t y = 0; y < _config.rootTilesZ; ++y)
 			for (uint16_t x = 0; x < _config.rootTilesX; ++x)
+			{
 				VisitNode({ rootLod, x, y }, cameraXZ);
+				_coveringNodeCount += CountCoveringSet({ rootLod, x, y }, cameraXZ);
+			}
+	}
+
+	void TerrainSystem::SetGpuNodeCountStat(uint32_t count)
+	{
+		// Temporary P2-2 bring-up log; remove once the patch pipeline consumes
+		// the list and validates it implicitly.
+		if (count != _gpuNodeCount)
+			LOG("Terrain node list: GPU %u (CPU covering %u)", count, _coveringNodeCount);
+		_gpuNodeCount = count;
 	}
 
 	void TerrainSystem::OnGUI()
@@ -176,6 +219,8 @@ namespace Core
 			_renderListPerLod[2], _renderListPerLod[3], _renderListPerLod[4],
 			_renderListPerLod[5]);
 		ImGui::Text("Frustum culled: %u subtrees", _culledNodes);
+		ImGui::Text("Node list: CPU %u vs GPU %u (readback lags 2 frames)",
+			_coveringNodeCount, _gpuNodeCount);
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");
