@@ -1,0 +1,52 @@
+#version 450
+
+// Fills the terrain LOD map: one texel per LOD0 sector holding the LOD of the
+// covering-set node drawn there this frame. Consumed by patch culling to
+// detect where neighbouring patches are coarser and pack stitch deltas.
+//
+// Gather form, one thread per SECTOR (not per node): each thread walks its
+// own ancestor chain down from the root with the shared refinement
+// predicate. Every texel is uniform per thread, 
+// where node-based dispatch would be exponentially uneven. 
+// Uncovered sectors (root not resident) write 0 = "finest", which stitching
+// reads as delta 0 and ignores.
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+#include "terrainCommon.glsl"
+
+layout(set = 0, binding = 0) uniform usampler2D quadTreeIndex;
+layout(set = 0, binding = 1, r8ui) uniform writeonly uimage2D lodMap;
+
+layout(push_constant) uniform Push
+{
+    vec2 cameraXZ;
+    vec2 worldOrigin;
+    float rootNodeSize;
+    float ringRadiusScale;
+    uint lodCount;
+    uint rootTiles;
+} push;
+
+void main()
+{
+    ivec2 sector = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(sector, imageSize(lodMap))))
+        return;
+
+    // The node at LOD L covering this sector is simply sector >> L.
+    uint lod = push.lodCount - 1u;
+    uvec2 coord = uvec2(sector) >> lod;
+    while (TerrainShouldRefine(quadTreeIndex, lod, coord,
+        push.cameraXZ, push.worldOrigin, push.rootNodeSize,
+        push.ringRadiusScale, push.lodCount))
+    {
+        --lod;
+        coord = uvec2(sector) >> lod;
+    }
+
+    // After any refinement the node is resident by the predicate; only a
+    // never-refined non-resident root leaves the sector uncovered.
+    uint value = TerrainNodeResident(quadTreeIndex, lod, coord) ? lod : 0u;
+    imageStore(lodMap, sector, uvec4(value));
+}

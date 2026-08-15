@@ -22,7 +22,7 @@ TerrainNodeListPass::TerrainNodeListPass(Device& device, RenderScene& renderScen
 	, _terrain(renderScene.GetTerrainSystem())
 {
 	auto& resourceManager = device.GetResourceManager();
-	_shader = resourceManager.LoadShader("Shaders/terrainNodeList.comp.spv");
+	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainNodeList.comp.spv");
 
 	const TerrainConfig& config = _terrain.GetConfig();
 	assert(config.rootTilesX == config.rootTilesZ
@@ -86,9 +86,12 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 		{ config.atlasCapacity * sizeof(uvec2), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 	builder.Write(_nodeList, BufferAccess::StorageComputeWrite);
 
+	// {count, groupsX, groupsY, groupsZ}: the tail three double as the
+	// VkDispatchIndirectCommand for one-group-per-node consumers (offset 4).
 	_nodeListCount = builder.CreateBuffer(SB_NODE_LIST_COUNT,
-		{ sizeof(uint32_t),
-		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
+		{ 4 * sizeof(uint32_t),
+		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+		  | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT });
 	builder.Write(_nodeListCount, BufferAccess::StorageComputeWrite);
 
 	_readback = builder.ImportBuffer("Terrain.NodeCountReadback" + to_string(slot),

@@ -44,6 +44,10 @@ namespace Core
 		// must converge to the CPU covering-set count when the camera rests.
 		void SetGpuNodeCountStat(uint32_t count);
 
+		// Bring-up validation for TerrainLodMapPass: compares the GPU map
+		// (2 frames stale) against the CPU covering-set expectation.
+		void ValidateGpuLodMap(const uint8_t* gpuMap);
+
 	private:
 		void BuildRenderList(vec2 cameraXZ, const mat4& viewProj);
 		void VisitNode(const TerrainNodeId& id, vec2 cameraXZ);
@@ -52,7 +56,7 @@ namespace Core
 		
 		// Covering-set size WITHOUT frustum culling: the CPU reference the GPU
 		// node list is validated against (same traversal as the compute).
-		uint32_t CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ) const;
+		uint32_t CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ);
 		void CreateGridIndexBuffer(Device& device, GeometryCopyQueue& geometryCopyQueue);
 
 		TerrainConfig _config;
@@ -66,6 +70,8 @@ namespace Core
 		uint32_t _culledNodes = 0;
 		uint32_t _coveringNodeCount = 0;
 		uint32_t _gpuNodeCount = 0;
+		vector<uint8_t> _expectedLodMap; // per LOD0 sector, from CountCoveringSet
+		uint32_t _gpuLodMapMismatches = 0;
 
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;

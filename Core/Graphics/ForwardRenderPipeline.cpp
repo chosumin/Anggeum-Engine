@@ -21,6 +21,7 @@
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainStreamingPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
+#include "Graphics/RenderPasses/TerrainLodMapPass.h"
 #include "Graphics/RenderPasses/TerrainPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -53,6 +54,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	TerrainSystem& terrainSystem = renderScene.GetTerrainSystem();
 	_frameGraph->AddPass(make_unique<TerrainStreamingPass>(terrainSystem));
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, renderScene));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
 

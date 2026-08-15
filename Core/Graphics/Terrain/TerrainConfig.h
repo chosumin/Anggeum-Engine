@@ -102,6 +102,17 @@ namespace Core
 		uvec2 colorTexelOrigin{};   // slot origin in the normal/albedo atlases
 	};
 
+	// Push-constant block of the GPU traversal shaders (node list, LOD map);
+	struct TerrainTraversalPush
+	{
+		vec2 cameraXZ{};
+		vec2 worldOrigin{};
+		float rootNodeSize = 0.0f;
+		float ringRadiusScale = 0.0f;
+		uint32_t lodCount = 0;
+		uint32_t rootTiles = 0;
+	};
+
 	// Shared uniform block for terrain.vert/.frag.
 	struct alignas(16) TerrainParams
 	{

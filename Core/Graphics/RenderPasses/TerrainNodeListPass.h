@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/ResourceHandle.h"
+#include "Graphics/Terrain/TerrainConfig.h"
 
 namespace Core
 {
@@ -32,17 +33,6 @@ namespace Core
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
-		// Mirrors the push_constant block in terrainNodeList.comp.
-		struct PushData
-		{
-			vec2 cameraXZ{};
-			vec2 worldOrigin{};
-			float rootNodeSize = 0.0f;
-			float ringRadiusScale = 0.0f;
-			uint32_t lodCount = 0;
-			uint32_t rootTiles = 0;
-		};
-
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
 
@@ -57,7 +47,7 @@ namespace Core
 
 		FGTexture _indexTexture;
 		FGBuffer _nodeList, _nodeListCount, _readback;
-		PushData _push{};
+		TerrainTraversalPush _push{};
 		bool _active = false;
 	};
 }

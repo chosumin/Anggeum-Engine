@@ -151,7 +151,7 @@ namespace Core
 		return length(point - closest);
 	}
 
-	uint32_t TerrainSystem::CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ) const
+	uint32_t TerrainSystem::CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ)
 	{
 		// Same refinement as VisitNode minus frustum culling and emission —
 		// the CPU reference for validating the GPU node list compute.
@@ -177,7 +177,19 @@ namespace Core
 			}
 		}
 
-		return _streamer->IsResident(id) ? 1u : 0u;
+		if (!_streamer->IsResident(id))
+			return 0;
+
+		// The expectation TerrainLodMapPass validates the GPU map against: a
+		// node at LOD L covers a (2^L)^2 square of LOD0 sectors.
+		uint32_t side = 1u << id.lod;
+		uvec2 base = uvec2(id.x, id.y) * side;
+		uint32_t sectorsPerSide = _config.NodesPerSide(0);
+		for (uint32_t y = 0; y < side; ++y)
+			for (uint32_t x = 0; x < side; ++x)
+				_expectedLodMap[(base.y + y) * sectorsPerSide + base.x + x] = id.lod;
+
+		return 1;
 	}
 
 	void TerrainSystem::BuildRenderList(vec2 cameraXZ, const mat4& viewProj)
@@ -189,12 +201,29 @@ namespace Core
 
 		uint8_t rootLod = uint8_t(_config.lodCount - 1);
 		_coveringNodeCount = 0;
+		// 0 matches the GPU clear: uncovered sectors read as "finest".
+		_expectedLodMap.assign(size_t(_config.NodesPerSide(0)) * _config.NodesPerSide(0), 0);
 		for (uint16_t y = 0; y < _config.rootTilesZ; ++y)
 			for (uint16_t x = 0; x < _config.rootTilesX; ++x)
 			{
 				VisitNode({ rootLod, x, y }, cameraXZ);
 				_coveringNodeCount += CountCoveringSet({ rootLod, x, y }, cameraXZ);
 			}
+	}
+
+	void TerrainSystem::ValidateGpuLodMap(const uint8_t* gpuMap)
+	{
+		// Temporary P2-3 bring-up check; remove with the other readbacks once
+		// the patch pipeline consumes the map and validates it implicitly.
+		uint32_t mismatches = 0;
+		for (size_t i = 0; i < _expectedLodMap.size(); ++i)
+			if (gpuMap[i] != _expectedLodMap[i])
+				++mismatches;
+
+		if (mismatches != _gpuLodMapMismatches)
+			LOG("Terrain LOD map: %u/%zu sectors differ from CPU expectation "
+				"(readback lags 2 frames)", mismatches, _expectedLodMap.size());
+		_gpuLodMapMismatches = mismatches;
 	}
 
 	void TerrainSystem::SetGpuNodeCountStat(uint32_t count)

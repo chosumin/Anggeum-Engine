@@ -355,8 +355,8 @@ namespace Core
 			break;
 		case Utility::HashCode("Terrain"):
 			pass = "Terrain";
-			vert = "shaders/terrain.vert.spv";
-			frag = "shaders/terrain.frag.spv";
+			vert = "shaders/Terrain/terrain.vert.spv";
+			frag = "shaders/Terrain/terrain.frag.spv";
 			break;
 		default:
 			pass = "Geometry";

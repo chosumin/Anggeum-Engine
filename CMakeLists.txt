@@ -158,8 +158,12 @@ else()
     set(COMPILED_SHADERS)
     foreach(SHADER ${SHADER_SOURCES})
         get_filename_component(SHADER_NAME ${SHADER} NAME)
-        set(SHADER_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Shaders/${SHADER_NAME}.spv")
-        set(SHADER_DEP_FILE "${SHADER_DEP_DIR}/${SHADER_NAME}.d")
+        # Keep the source's subdirectory (e.g. Terrain/) in the .spv path.
+        file(RELATIVE_PATH SHADER_REL
+            "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Shaders" ${SHADER})
+        set(SHADER_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Shaders/${SHADER_REL}.spv")
+        string(REPLACE "/" "_" SHADER_DEP_NAME "${SHADER_REL}")
+        set(SHADER_DEP_FILE "${SHADER_DEP_DIR}/${SHADER_DEP_NAME}.d")
 
         # Generate dependency file using glslc -M
         # This produces a Makefile-style .d file listing actual #include dependencies
