@@ -20,13 +20,8 @@ layout(set = 0, binding = 1, r8ui) uniform writeonly uimage2D lodMap;
 
 layout(push_constant) uniform Push
 {
-    vec2 cameraXZ;
-    vec2 worldOrigin;
-    float rootNodeSize;
-    float ringRadiusScale;
-    uint lodCount;
-    uint rootTiles;
-} push;
+    TerrainTraversalPush push;
+};
 
 void main()
 {

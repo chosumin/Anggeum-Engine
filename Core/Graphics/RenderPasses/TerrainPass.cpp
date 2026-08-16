@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "TerrainPass.h"
 #include "GeometryPass.h"
+#include "TerrainNodeListPass.h"
+#include "TerrainPatchCullPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameResources.h"
 #include "Graphics/RenderScene.h"
@@ -48,17 +50,13 @@ TerrainPass::~TerrainPass() = default;
 void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
-	const auto& renderList = _terrain.GetRenderList();
-	_instanceCount = uint32_t(renderList.size());
-	if (_instanceCount == 0)
-		return; // nothing resident yet: the pass culls itself
+	_active = false;
 
-	// The main targets only exist on frames the geometry pass declared them.
-	if (!builder.HasTexture(GeometryPass::RT_MAIN_COLOR))
-	{
-		_instanceCount = 0;
+	// Needs the GPU patch list and the main targets; either missing (no
+	// camera, first frames) means nothing to draw this frame.
+	if (!builder.HasBuffer(TerrainPatchCullPass::SB_PATCH_LIST)
+		|| !builder.HasTexture(GeometryPass::RT_MAIN_COLOR))
 		return;
-	}
 
 	_mainColor = builder.GetTexture(GeometryPass::RT_MAIN_COLOR);
 	_mainDepth = builder.GetTexture(GeometryPass::RT_MAIN_DEPTH);
@@ -87,12 +85,11 @@ void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformVertex);
 
-	_instances = builder.ImportBuffer("Terrain.Instances",
-		frameResources.CreateOrReplaceStorageBuffer("Terrain.Instances",
-			{ renderList.size() * sizeof(TerrainNodeInstance),
-			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT },
-			renderList));
-	builder.Read(_instances, BufferAccess::StorageVertexRead);
+	_patchList = builder.GetBuffer(TerrainPatchCullPass::SB_PATCH_LIST);
+	builder.Read(_patchList, BufferAccess::StorageVertexRead);
+
+	_patchDrawArgs = builder.GetBuffer(TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
+	builder.Read(_patchDrawArgs, BufferAccess::IndirectRead);
 
 	const TerrainConfig& config = _terrain.GetConfig();
 	TerrainParams params{};
@@ -109,16 +106,22 @@ void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 			params.sunDirection = vec4(normalize(direction), 0.25f);
 	}
 	params.debugMode = ivec4(_terrain.GetDebugMode(), 0, 0, 0);
+	params.worldParams = vec4(config.WorldOrigin(), config.rootNodeSize,
+		float(config.lodCount));
+	params.atlasInfo = vec4(float(config.atlasSlotsPerRow),
+		float(config.HeightTexels()), float(config.ColorTexels()), 0.0f);
 
 	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>("Terrain.Params");
 	paramsHandle.Get().Update(params);
 	_params = builder.ImportBuffer("Terrain.Params", paramsHandle);
 	builder.Read(_params, BufferAccess::UniformFragment);
+
+	_active = true;
 }
 
 void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
-	if (_instanceCount == 0)
+	if (!_active)
 		return;
 
 	context.BeginRendering(commandBuffer);
@@ -131,7 +134,7 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 	Shader& shader = _shader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
-	builder.SetStorageBuffer(1, context.GetBuffer(_instances));
+	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
 	builder.SetTextureBuffer(2, context.GetTexture(_height));
 	builder.SetTextureBuffer(3, context.GetTexture(_normal));
 	builder.SetTextureBuffer(4, context.GetTexture(_albedo));
@@ -141,7 +144,11 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 	commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);
 
 	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
-	commandBuffer.DrawIndexed(_terrain.GetGridIndexCount(), _instanceCount);
+
+	// One instanced draw of the whole terrain; the instance count is the
+	// patch culler's atomic tally, read by the GPU from the args buffer.
+	commandBuffer.DrawIndexedIndirect(context.GetBuffer(_patchDrawArgs), 1,
+		sizeof(VkDrawIndexedIndirectCommand));
 
 	context.EndRendering(commandBuffer);
 }

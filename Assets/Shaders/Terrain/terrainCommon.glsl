@@ -6,6 +6,12 @@ const uint TERRAIN_NODE_INVALID = 0xfffeu; // >= this: nothing resident
 // TerrainConfig::patchesPerNodeEdge (asserted CPU-side).
 const uint TERRAIN_PATCHES_PER_EDGE = 8u;
 
+// Quads per node edge; mirrors TerrainConfig::quadCountPerNodeEdge.
+const uint TERRAIN_NODE_QUADS = 128u;
+
+// Quads per patch edge (16) - the draw instance is one patch.
+const uint TERRAIN_PATCH_QUADS = TERRAIN_NODE_QUADS / TERRAIN_PATCHES_PER_EDGE;
+
 // Node list entry coord packing: [ lod:4 ][ y:14 ][ x:14 ].
 uint TerrainPackCoord(uint lod, uvec2 coord)
 {
@@ -21,6 +27,31 @@ uint TerrainUnpackLod(uint packedCoord)
 {
     return packedCoord >> 28;
 }
+
+// Mirrors Core::TerrainParams.
+struct TerrainParams
+{
+    vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
+    vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
+    vec4 sunDirection;         // xyz = direction (toward light), w = ambient
+    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
+    vec4 worldParams;          // xy = worldOrigin, z = rootNodeSize, w = lodCount
+    vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels
+};
+
+// Mirrors Core::TerrainTraversalPush, the push-constant block of the GPU
+// pipeline shaders: layout(push_constant) uniform Push
+// { TerrainTraversalPush push; };
+struct TerrainTraversalPush
+{
+    vec2 cameraXZ;
+    vec2 worldOrigin;
+    float rootNodeSize;
+    float ringRadiusScale;
+    uint lodCount;
+    uint rootTiles;
+    uint patchIndexCount;
+};
 
 float TerrainNodeSizeAt(float rootNodeSize, uint lodCount, uint lod)
 {

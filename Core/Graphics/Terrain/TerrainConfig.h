@@ -146,5 +146,7 @@ namespace Core
 		vec4 invColorAtlasBorder{};   // xy = 1 / colorAtlasExtent, z = borderTexels
 		vec4 sunDirection{};          // xyz = direction, w = ambient
 		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
+		vec4 worldParams{};           // xy = worldOrigin, z = rootNodeSize, w = lodCount
+		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels
 	};
 }

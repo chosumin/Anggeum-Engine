@@ -1,61 +1,62 @@
 #version 450
 
 #include "common.glsl"
+#include "terrainCommon.glsl"
 
-// No vertex inputs: the patch grid is derived from gl_VertexIndex and the
-// per-node instance data. Mirrors TerrainNodeInstance in TerrainConfig.h.
-struct NodeInstance
+// One instance = one visible patch from the GPU patch culling pass.
+layout(set = 0, binding = 1) readonly buffer PatchList
 {
-    vec2 originXZ;
-    float sizeMeters;
-    uint lod;
-    uvec2 heightTexelOrigin;
-    uvec2 colorTexelOrigin;
-};
-
-layout(set = 0, binding = 1) buffer readonly NodeInstances
-{
-    NodeInstance instances[];
-} nodeInstances;
+    uvec4 patches[]; // x = packed node coord, y = slot, z = patch idx, w = deltas
+} patchList;
 
 layout(set = 0, binding = 2) uniform sampler2D heightAtlas;
 
 layout(set = 0, binding = 5) uniform TerrainParamsUniform
 {
-    vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
-    vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
-    vec4 sunDirection;         // xyz = direction, w = ambient
-    ivec4 debugMode;
-} params;
+    TerrainParams params;
+};
 
-layout(location = 0) out vec2 outTileUV;
+layout(location = 0) out vec2 outTileUV;       // node-relative, for the color apron math
 layout(location = 1) flat out uvec2 outColorOrigin;
 layout(location = 2) flat out uint outLod;
 
-const uint GRID_QUADS = 128u;
-const uint GRID_VERTICES = GRID_QUADS + 1u;
+const uint PATCH_VERTS = TERRAIN_PATCH_QUADS + 1u; // 17
 
 void main()
 {
-    uint vx = gl_VertexIndex % GRID_VERTICES;
-    uint vy = gl_VertexIndex / GRID_VERTICES;
-    NodeInstance node = nodeInstances.instances[gl_InstanceIndex];
+    uvec4 patchEntry = patchList.patches[gl_InstanceIndex];
+    uint lod = TerrainUnpackLod(patchEntry.x);
+    uvec2 nodeCoord = TerrainUnpackCoord(patchEntry.x);
+    uint slot = patchEntry.y;
+    uvec2 patchXY = uvec2(patchEntry.z % TERRAIN_PATCHES_PER_EDGE,
+        patchEntry.z / TERRAIN_PATCHES_PER_EDGE);
 
-    // Height texels sit exactly on grid vertices: fetch, no filtering.
+    uint vx = gl_VertexIndex % PATCH_VERTS;
+    uint vy = gl_VertexIndex / PATCH_VERTS;
+
+    // Position within the NODE's 129-texel grid: height texels sit exactly
+    // on grid vertices, so this fetch is exact (no filtering).
+    uvec2 nodeTexel = patchXY * TERRAIN_PATCH_QUADS + uvec2(vx, vy); // 0..128
+    uvec2 slotOrigin = uvec2(slot % uint(params.atlasInfo.x),
+        slot / uint(params.atlasInfo.x));
+    uvec2 heightOrigin = slotOrigin * uint(params.atlasInfo.y);
+
     float height01 = texelFetch(heightAtlas,
-        ivec2(node.heightTexelOrigin) + ivec2(vx, vy), 0).r;
+        ivec2(heightOrigin + nodeTexel), 0).r;
     float height = mix(params.heightMinMaxInvAtlas.x,
         params.heightMinMaxInvAtlas.y, height01);
 
-    vec2 local = vec2(vx, vy) / float(GRID_QUADS);
+    float nodeSize = TerrainNodeSizeAt(params.worldParams.z,
+        uint(params.worldParams.w), lod);
+    vec2 local = vec2(nodeTexel) / float(TERRAIN_NODE_QUADS);
     vec3 world = vec3(
-        node.originXZ.x + local.x * node.sizeMeters,
+        params.worldParams.x + (float(nodeCoord.x) + local.x) * nodeSize,
         height,
-        node.originXZ.y + local.y * node.sizeMeters);
+        params.worldParams.y + (float(nodeCoord.y) + local.y) * nodeSize);
 
     outTileUV = local;
-    outColorOrigin = node.colorTexelOrigin;
-    outLod = node.lod;
+    outColorOrigin = slotOrigin * uint(params.atlasInfo.z);
+    outLod = lod;
 
     gl_Position = camera.proj * camera.view * vec4(world, 1.0);
 }

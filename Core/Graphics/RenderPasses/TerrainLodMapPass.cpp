@@ -32,20 +32,6 @@ TerrainLodMapPass::TerrainLodMapPass(Device& device, RenderScene& renderScene)
 		  VK_SAMPLER_MIPMAP_MODE_NEAREST });
 
 	_sectorsPerSide = _terrain.GetConfig().NodesPerSide(0);
-
-	for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
-	{
-		_mapReadback[slot] = resourceManager.LoadBuffer(
-			{ VkDeviceSize(_sectorsPerSide) * _sectorsPerSide,
-			  VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::UNIFORM },
-			"Terrain.LodMapReadback" + to_string(slot));
-
-		// Fresh device memory is undefined; zero so the first two frames'
-		// validation reads compare against a defined state.
-		void* mapped = nullptr;
-		_mapReadback[slot].Get().GetMappedPtr(&mapped);
-		memset(mapped, 0, size_t(_sectorsPerSide) * _sectorsPerSide);
-	}
 }
 
 TerrainLodMapPass::~TerrainLodMapPass() = default;
@@ -58,14 +44,6 @@ void TerrainLodMapPass::Setup(FrameGraphBuilder& builder,
 	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
 	if (!camera)
 		return;
-
-	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
-
-	// Bring-up validation: compare the 2-frame-old GPU map with the CPU
-	// covering-set expectation (fence-safe, same scheme as the node count).
-	void* mapped = nullptr;
-	_mapReadback[slot].Get().GetMappedPtr(&mapped);
-	_terrain.ValidateGpuLodMap(static_cast<const uint8_t*>(mapped));
 
 	const TerrainConfig& config = _terrain.GetConfig();
 	_push.cameraXZ = vec2(camera->Matrices.Position.x, camera->Matrices.Position.z);
@@ -92,10 +70,6 @@ void TerrainLodMapPass::Setup(FrameGraphBuilder& builder,
 		frameResources.GetOrCreateRenderTarget(RT_LOD_MAP, mapDesc));
 	builder.Write(_lodMap, TextureAccess::StorageComputeWrite);
 
-	_readback = builder.ImportBuffer("Terrain.LodMapReadback" + to_string(slot),
-		_mapReadback[slot]);
-	builder.Write(_readback, BufferAccess::TransferDst);
-
 	_active = true;
 }
 
@@ -120,14 +94,4 @@ void TerrainLodMapPass::Execute(FrameGraphPassContext& context,
 
 	uint32_t groups = (_sectorsPerSide + 7) / 8;
 	commandBuffer.Dispatch(groups, groups, 1);
-
-	// Bring-up readback: map -> host buffer for next-next frame's validation.
-	commandBuffer.CreateBarrierBatch()
-		.Image(lodMap, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT)
-		.Submit();
-
-	commandBuffer.CopyImageToBuffer(lodMap, VK_IMAGE_LAYOUT_GENERAL,
-		context.GetBuffer(_readback), _sectorsPerSide, _sectorsPerSide);
 }

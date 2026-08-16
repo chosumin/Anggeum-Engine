@@ -3,8 +3,6 @@
 #include "Procedural/ProceduralTerrainHeightSource.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/ResourceManager.h"
-#include "Utils/Math.h"
-#include "Utils/Log.h"
 #include "Graphics/GeometryUpload.h"
 
 namespace Core
@@ -22,15 +20,16 @@ namespace Core
 	void TerrainSystem::CreateGridIndexBuffer(Device& device,
 		GeometryCopyQueue& geometryCopyQueue)
 	{
-		// One shared index buffer over a virtual (quadCountPerNodeEdge+1)^2 vertex grid;
-		// terrain.vert derives positions from gl_VertexIndex, so there is no
-		// vertex buffer at all.
-		uint32_t quads = _config.quadCountPerNodeEdge;
+		// One shared index buffer over a virtual 17x17 PATCH grid - the draw
+		// instance is one patch of the GPU-culled patch list; terrain.vert
+		// derives positions from gl_VertexIndex, so there is no vertex buffer.
+		uint32_t quads = _config.PatchQuads();
 		uint32_t verticesPerSide = quads + 1;
 		assert(verticesPerSide * verticesPerSide <= 0x10000 && "u16 index space");
+		assert(_config.quadCountPerNodeEdge % _config.patchesPerNodeEdge == 0);
 
 		vector<uint16_t> indices;
-		indices.reserve(quads * quads * 6);
+		indices.reserve(size_t(quads) * quads * 6);
 		for (uint32_t y = 0; y < quads; ++y)
 			for (uint32_t x = 0; x < quads; ++x)
 			{
@@ -41,6 +40,7 @@ namespace Core
 				indices.insert(indices.end(), { v0, v2, v1, v1, v2, v3 });
 			}
 		_gridIndexCount = uint32_t(indices.size());
+		assert(_gridIndexCount == _config.PatchIndexCount());
 
 		_gridIndexBuffer = device.GetResourceManager().LoadBuffer(
 			{ indices.size() * sizeof(uint16_t),
@@ -65,186 +65,6 @@ namespace Core
 			_streamer->Update(cameraXZ);
 		else
 			_streamer->ClearFrameUploads();
-
-		BuildRenderList(cameraXZ, camera.GetProjection() * camera.GetView());
-	}
-
-	bool TerrainSystem::IsNodeVisible(const TerrainNodeId& id) const
-	{
-		const TerrainNodePayload& payload = _store.Get(id);
-		float range = _config.heightMax - _config.heightMin;
-		float size = _config.NodeSize(id.lod);
-		// Coarse nodes bake min/max from decimated samples, so pad the height
-		// bounds a little to stay conservative for the finer geometry below.
-		const float heightPad = 2.0f;
-		vec3 boundsMin(
-			_config.WorldOrigin().x + float(id.x) * size,
-			_config.heightMin + range * float(payload.minHeight) / 65535.0f - heightPad,
-			_config.WorldOrigin().y + float(id.y) * size);
-		vec3 boundsMax(boundsMin.x + size,
-			_config.heightMin + range * float(payload.maxHeight) / 65535.0f + heightPad,
-			boundsMin.z + size);
-
-		for (const vec4& plane : _frustumPlanes)
-		{
-			vec3 positive(
-				plane.x >= 0.0f ? boundsMax.x : boundsMin.x,
-				plane.y >= 0.0f ? boundsMax.y : boundsMin.y,
-				plane.z >= 0.0f ? boundsMax.z : boundsMin.z);
-			if (dot(vec3(plane), positive) + plane.w < 0.0f)
-				return false;
-		}
-		return true;
-	}
-
-	void TerrainSystem::VisitNode(const TerrainNodeId& id, vec2 cameraXZ)
-	{
-		if (!IsNodeVisible(id))
-		{
-			++_culledNodes;
-			return;
-		}
-
-		// Refine with the same radii the streamer requests with, so the
-		// rendered set tracks the requested set and fallback stays transient.
-		bool canRefine = id.lod > 0
-			&& DistanceToNodeXZ(cameraXZ, id) <= _streamer->LoadRadius(id.lod - 1);
-		if (canRefine)
-		{
-			TerrainNodeId children[4];
-			bool allResident = true;
-			for (uint32_t i = 0; i < 4; ++i)
-			{
-				children[i] = { uint8_t(id.lod - 1),
-					uint16_t(id.x * 2 + (i & 1)), uint16_t(id.y * 2 + (i >> 1)) };
-				allResident &= _streamer->IsResident(children[i]);
-			}
-
-			if (allResident)
-			{
-				for (const TerrainNodeId& child : children)
-					VisitNode(child, cameraXZ);
-				return;
-			}
-		}
-
-		if (!_streamer->IsResident(id))
-			return; // only possible before the root finishes uploading
-
-		uint16_t slot = _streamer->GetAtlasSlot(id);
-		TerrainNodeInstance instance;
-		instance.originXZ = _config.WorldOrigin()
-			+ vec2(float(id.x), float(id.y)) * _config.NodeSize(id.lod);
-		instance.sizeMeters = _config.NodeSize(id.lod);
-		instance.lod = id.lod;
-		instance.heightTexelOrigin = _quadTree->HeightTexelOrigin(slot);
-		instance.colorTexelOrigin = _quadTree->ColorTexelOrigin(slot);
-		_renderList.push_back(instance);
-		++_renderListPerLod[std::min<uint32_t>(id.lod, 7)];
-	}
-
-	float TerrainSystem::DistanceToNodeXZ(vec2 point, const TerrainNodeId& id) const
-	{
-		float size = _config.NodeSize(id.lod);
-		vec2 nodeMin = _config.WorldOrigin() + vec2(float(id.x), float(id.y)) * size;
-		vec2 closest = clamp(point, nodeMin, nodeMin + size);
-		return length(point - closest);
-	}
-
-	uint32_t TerrainSystem::CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ)
-	{
-		// Same refinement as VisitNode minus frustum culling and emission —
-		// the CPU reference for validating the GPU node list compute.
-		bool canRefine = id.lod > 0
-			&& DistanceToNodeXZ(cameraXZ, id) <= _streamer->LoadRadius(id.lod - 1);
-		if (canRefine)
-		{
-			TerrainNodeId children[4];
-			bool allResident = true;
-			for (uint32_t i = 0; i < 4; ++i)
-			{
-				children[i] = { uint8_t(id.lod - 1),
-					uint16_t(id.x * 2 + (i & 1)), uint16_t(id.y * 2 + (i >> 1)) };
-				allResident &= _streamer->IsResident(children[i]);
-			}
-
-			if (allResident)
-			{
-				uint32_t count = 0;
-				for (const TerrainNodeId& child : children)
-					count += CountCoveringSet(child, cameraXZ);
-				return count;
-			}
-		}
-
-		if (!_streamer->IsResident(id))
-			return 0;
-
-		// The expectation TerrainLodMapPass validates the GPU map against: a
-		// node at LOD L covers a (2^L)^2 square of LOD0 sectors.
-		uint32_t side = 1u << id.lod;
-		uvec2 base = uvec2(id.x, id.y) * side;
-		uint32_t sectorsPerSide = _config.NodesPerSide(0);
-		for (uint32_t y = 0; y < side; ++y)
-			for (uint32_t x = 0; x < side; ++x)
-				_expectedLodMap[(base.y + y) * sectorsPerSide + base.x + x] = id.lod;
-
-		return 1;
-	}
-
-	void TerrainSystem::BuildRenderList(vec2 cameraXZ, const mat4& viewProj)
-	{
-		_renderList.clear();
-		_renderListPerLod = {};
-		_culledNodes = 0;
-		Math::ExtractFrustumPlanes(viewProj, _frustumPlanes.data());
-
-		uint8_t rootLod = uint8_t(_config.lodCount - 1);
-		_coveringNodeCount = 0;
-		// 0 matches the GPU clear: uncovered sectors read as "finest".
-		_expectedLodMap.assign(size_t(_config.NodesPerSide(0)) * _config.NodesPerSide(0), 0);
-		for (uint16_t y = 0; y < _config.rootTilesZ; ++y)
-			for (uint16_t x = 0; x < _config.rootTilesX; ++x)
-			{
-				VisitNode({ rootLod, x, y }, cameraXZ);
-				_coveringNodeCount += CountCoveringSet({ rootLod, x, y }, cameraXZ);
-			}
-	}
-
-	void TerrainSystem::ValidateGpuLodMap(const uint8_t* gpuMap)
-	{
-		// Temporary P2-3 bring-up check; remove with the other readbacks once
-		// the patch pipeline consumes the map and validates it implicitly.
-		uint32_t mismatches = 0;
-		for (size_t i = 0; i < _expectedLodMap.size(); ++i)
-			if (gpuMap[i] != _expectedLodMap[i])
-				++mismatches;
-
-		if (mismatches != _gpuLodMapMismatches)
-			LOG("Terrain LOD map: %u/%zu sectors differ from CPU expectation "
-				"(readback lags 2 frames)", mismatches, _expectedLodMap.size());
-		_gpuLodMapMismatches = mismatches;
-	}
-
-	void TerrainSystem::SetGpuNodeCountStat(uint32_t count)
-	{
-		// Temporary P2-2 bring-up log; remove once the patch pipeline consumes
-		// the list and validates it implicitly.
-		if (count != _gpuNodeCount)
-			LOG("Terrain node list: GPU %u (CPU covering %u)", count, _coveringNodeCount);
-		_gpuNodeCount = count;
-	}
-
-	void TerrainSystem::SetGpuPatchCountStat(uint32_t count)
-	{
-		// Temporary P2-4 bring-up log; the render list is node-granular with
-		// coarser frustum bounds, so the expected relation is
-		// gpuPatches <= drawnNodes * 64 (patch culling is strictly finer).
-		if (count != _gpuPatchCount)
-			LOG("Terrain patch cull: GPU %u patches (CPU drawn %u nodes x 64 = %u)",
-				count, uint32_t(_renderList.size()),
-				uint32_t(_renderList.size()) * 64u);
-		_gpuPatchCount = count;
 	}
 
 	void TerrainSystem::OnGUI()
@@ -255,15 +75,7 @@ namespace Core
 		ImGui::Text("This frame: %u uploaded, %u evicted, %u free slots",
 			stats.uploadedThisFrame, stats.evictedThisFrame,
 			_quadTree->GetFreeSlotCount());
-		ImGui::Text("Drawn: %u nodes (LOD0 %u, LOD1 %u, LOD2 %u, LOD3 %u, LOD4 %u, LOD5 %u)",
-			uint32_t(_renderList.size()), _renderListPerLod[0], _renderListPerLod[1],
-			_renderListPerLod[2], _renderListPerLod[3], _renderListPerLod[4],
-			_renderListPerLod[5]);
-		ImGui::Text("Frustum culled: %u subtrees", _culledNodes);
-		ImGui::Text("Node list: CPU %u vs GPU %u (readback lags 2 frames)",
-			_coveringNodeCount, _gpuNodeCount);
-		ImGui::Text("Patch cull: GPU %u visible patches (nodes x 64 = %u)",
-			_gpuPatchCount, uint32_t(_renderList.size()) * 64u);
+		ImGui::Text("Visible patches (GPU, 2f delay): %u", _gpuPatchCount);
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");

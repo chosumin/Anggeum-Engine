@@ -1,15 +1,14 @@
 #version 450
 
+#include "terrainCommon.glsl"
+
 layout(set = 0, binding = 3) uniform sampler2D normalAtlas;
 layout(set = 0, binding = 4) uniform sampler2D albedoAtlas;
 
 layout(set = 0, binding = 5) uniform TerrainParamsUniform
 {
-    vec4 heightMinMaxInvAtlas;
-    vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
-    vec4 sunDirection;         // xyz = direction, w = ambient
-    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
-} params;
+    TerrainParams params;
+};
 
 layout(location = 0) in vec2 inTileUV;
 layout(location = 1) flat in uvec2 inColorOrigin;
@@ -17,7 +16,7 @@ layout(location = 2) flat in uint inLod;
 
 layout(location = 0) out vec4 outColor;
 
-const float GRID_QUADS = 128.0;
+const float GRID_QUADS = float(TERRAIN_NODE_QUADS);
 
 const vec3 LOD_COLORS[6] = vec3[](
     vec3(1.0, 0.2, 0.2), vec3(1.0, 0.6, 0.1), vec3(0.9, 0.9, 0.1),

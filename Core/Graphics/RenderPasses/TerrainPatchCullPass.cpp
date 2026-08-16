@@ -11,6 +11,7 @@
 #include "Graphics/Terrain/TerrainSystem.h"
 #include "Foundation/Scene.h"
 #include "Components/PerspectiveCamera.h"
+#include "Utils/Math.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/Shader.h"
@@ -79,8 +80,7 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	TerrainCullData cullData{};
 	cullData.view = camera->GetView();
 	cullData.proj = camera->GetProjection();
-	const auto& planes = _terrain.GetFrustumPlanes();
-	copy(planes.begin(), planes.end(), cullData.frustumPlanes);
+	Math::ExtractFrustumPlanes(cullData.proj * cullData.view, cullData.frustumPlanes);
 	cullData.screenHiZ = vec4(float(_screenExtent.width), float(_screenExtent.height),
 		_occlusionEnabled ? float(hiZTexture.Get().GetImage().GetMipLevel()) : 1.0f,
 		_occlusionEnabled ? 1.0f : 0.0f);

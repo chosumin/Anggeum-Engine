@@ -10,9 +10,8 @@ namespace Core
 	class PerspectiveCamera;
 	class GeometryCopyQueue;
 
-	// Facade over the terrain world structure: bakes the node store at
-	// startup, owns the atlases and streamer, and builds the per-frame
-	// covering set of resident nodes to render.
+	// Facade over the terrain world structure: loads/bakes the node store at
+	// startup and owns the quadtree GPU face and the streamer.
 	class TerrainSystem
 	{
 	public:
@@ -30,41 +29,19 @@ namespace Core
 			return _streamer->GetFrameUploads();
 		}
 
-		const vector<TerrainNodeInstance>& GetRenderList() const { return _renderList; }
-		const array<uint32_t, 8>& GetRenderListPerLod() const { return _renderListPerLod; }
-
+		// Shared 17x17 patch grid, indexed by the GPU-driven instanced draw.
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }
 		uint32_t GetGridIndexCount() const { return _gridIndexCount; }
+
+		// Visible patch count fed back by TerrainPatchCullPass (2 frames
+		// stale), for the stats display.
+		void SetGpuPatchCountStat(uint32_t count) { _gpuPatchCount = count; }
 
 		void OnGUI();
 		bool IsWireframe() const { return _wireframe; }
 		int GetDebugMode() const { return _debugMode; }
 
-		// Validation stat fed back by TerrainNodeListPass (2 frames stale):
-		// must converge to the CPU covering-set count when the camera rests.
-		void SetGpuNodeCountStat(uint32_t count);
-
-		// Bring-up validation for TerrainLodMapPass: compares the GPU map
-		// (2 frames stale) against the CPU covering-set expectation.
-		void ValidateGpuLodMap(const uint8_t* gpuMap);
-
-		// This frame's camera frustum, extracted once in BuildRenderList and
-		// shared with the GPU patch culler's uniform data.
-		const array<vec4, 6>& GetFrustumPlanes() const { return _frustumPlanes; }
-
-		// Bring-up stat from TerrainPatchCullPass (2 frames stale): visible
-		// patch count, sanity-bounded by drawn nodes x 64.
-		void SetGpuPatchCountStat(uint32_t count);
-
 	private:
-		void BuildRenderList(vec2 cameraXZ, const mat4& viewProj);
-		void VisitNode(const TerrainNodeId& id, vec2 cameraXZ);
-		float DistanceToNodeXZ(vec2 point, const TerrainNodeId& id) const;
-		bool IsNodeVisible(const TerrainNodeId& id) const;
-		
-		// Covering-set size WITHOUT frustum culling: the CPU reference the GPU
-		// node list is validated against (same traversal as the compute).
-		uint32_t CountCoveringSet(const TerrainNodeId& id, vec2 cameraXZ);
 		void CreateGridIndexBuffer(Device& device, GeometryCopyQueue& geometryCopyQueue);
 
 		TerrainConfig _config;
@@ -72,18 +49,10 @@ namespace Core
 		unique_ptr<TerrainQuadTree> _quadTree;
 		unique_ptr<TerrainStreamer> _streamer;
 
-		vector<TerrainNodeInstance> _renderList;
-		array<uint32_t, 8> _renderListPerLod{};
-		array<vec4, 6> _frustumPlanes{};
-		uint32_t _culledNodes = 0;
-		uint32_t _coveringNodeCount = 0;
-		uint32_t _gpuNodeCount = 0;
-		vector<uint8_t> _expectedLodMap; // per LOD0 sector, from CountCoveringSet
-		uint32_t _gpuLodMapMismatches = 0;
-		uint32_t _gpuPatchCount = 0;
-
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;
+
+		uint32_t _gpuPatchCount = 0;
 
 		bool _wireframe = false;
 		bool _freezeStreaming = false;

@@ -42,12 +42,8 @@ namespace Core
 		// specialized with this config's constants.
 		unique_ptr<Pipeline> _pipeline;
 
-		// Host-visible, one per frame slot: the GPU writes this frame's node
-		// count, the CPU reads the same slot two frames later (fence-safe).
-		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _countReadback;
-
 		FGTexture _indexTexture;
-		FGBuffer _nodeList, _nodeListCount, _patchDrawArgs, _readback;
+		FGBuffer _nodeList, _nodeListCount, _patchDrawArgs;
 		TerrainTraversalPush _push{};
 		bool _active = false;
 	};

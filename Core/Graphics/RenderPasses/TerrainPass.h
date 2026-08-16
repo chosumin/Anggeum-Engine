@@ -36,7 +36,7 @@ namespace Core
 		unique_ptr<Pipeline> _wireframePipeline;
 
 		FGTexture _mainColor, _mainDepth, _height, _normal, _albedo;
-		FGBuffer _camera, _instances, _params;
-		uint32_t _instanceCount = 0;
+		FGBuffer _camera, _patchList, _patchDrawArgs, _params;
+		bool _active = false;
 	};
 }

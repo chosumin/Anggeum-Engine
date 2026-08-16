@@ -37,18 +37,6 @@ TerrainNodeListPass::TerrainNodeListPass(Device& device, RenderScene& renderScen
 	// when growing the capacity).
 	_pipeline = make_unique<Pipeline>(device, _shader.Get(),
 		SpecConstants{ { { 0, config.atlasCapacity } } });
-
-	for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
-	{
-		_countReadback[slot] = resourceManager.LoadBuffer(
-			{ sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::UNIFORM },
-			"Terrain.NodeCountReadback" + to_string(slot));
-
-		// Fresh device memory contents are undefined; the first two frames
-		// read these buffers before the GPU has ever written them.
-		uint32_t zero = 0;
-		_countReadback[slot].Get().Update(zero);
-	}
 }
 
 void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
@@ -59,16 +47,6 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
 	if (!camera)
 		return;
-
-	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
-
-	// This slot's buffer was written two frames ago and Begin waited on that
-	// frame's completion, so the value is safe to read before we overwrite it.
-	uint32_t previousCount = 0;
-	void* mapped = nullptr;
-	_countReadback[slot].Get().GetMappedPtr(&mapped);
-	memcpy(&previousCount, mapped, sizeof(previousCount));
-	_terrain.SetGpuNodeCountStat(previousCount);
 
 	const TerrainConfig& config = _terrain.GetConfig();
 	_push.cameraXZ = vec2(camera->Matrices.Position.x, camera->Matrices.Position.z);
@@ -101,10 +79,6 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
 	builder.Write(_patchDrawArgs, BufferAccess::StorageComputeWrite);
 
-	_readback = builder.ImportBuffer("Terrain.NodeCountReadback" + to_string(slot),
-		_countReadback[slot]);
-	builder.Write(_readback, BufferAccess::TransferDst);
-
 	_active = true;
 }
 
@@ -130,16 +104,4 @@ void TerrainNodeListPass::Execute(FrameGraphPassContext& context,
 
 	// The whole traversal is one workgroup (see the shader's LDS ping-pong).
 	commandBuffer.Dispatch(1, 1, 1);
-
-	// Intra-pass hazard (compute count write -> readback copy) is ours to
-	// order; the graph only sees cross-pass edges.
-	Buffer& count = context.GetBuffer(_nodeListCount);
-	commandBuffer.CreateBarrierBatch()
-		.Buffer(count,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT)
-		.Submit();
-
-	commandBuffer.CopyBuffer(count, context.GetBuffer(_readback),
-		0, 0, sizeof(uint32_t));
 }

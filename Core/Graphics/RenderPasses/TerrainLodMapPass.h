@@ -36,12 +36,7 @@ namespace Core
 
 		Handle<Sampler> _nearestSampler;
 
-		// Bring-up readback, one per frame slot (same fence-safe 2-frame
-		// scheme as the node count readback).
-		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _mapReadback;
-
 		FGTexture _lodMap, _indexTexture;
-		FGBuffer _readback;
 		TerrainTraversalPush _push{};
 		uint32_t _sectorsPerSide = 0;
 		bool _active = false;

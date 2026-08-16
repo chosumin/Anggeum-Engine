@@ -44,14 +44,8 @@ layout(set = 0, binding = 3) writeonly buffer PatchDrawArgs
 
 layout(push_constant) uniform Push
 {
-    vec2 cameraXZ;
-    vec2 worldOrigin;
-    float rootNodeSize;
-    float ringRadiusScale;
-    uint lodCount;
-    uint rootTiles;
-    uint patchIndexCount;
-} push;
+    TerrainTraversalPush push;
+};
 
 // Bounded by the atlas capacity: every listed node is resident, so a level
 // list can never exceed the number of atlas slots.

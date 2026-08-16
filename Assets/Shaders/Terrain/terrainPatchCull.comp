@@ -52,14 +52,8 @@ layout(set = 0, binding = 6) uniform CullData
 
 layout(push_constant) uniform Push
 {
-    vec2 cameraXZ;
-    vec2 worldOrigin;
-    float rootNodeSize;
-    float ringRadiusScale;
-    uint lodCount;
-    uint rootTiles;
-    uint patchIndexCount;
-} push;
+    TerrainTraversalPush push;
+};
 
 
 
