@@ -11,6 +11,7 @@ namespace Core
 	class Shader;
 	class Pipeline;
 	class Buffer;
+	class Sampler;
 
 	class TerrainLodMapPass : public FrameGraphPass
 	{
@@ -32,6 +33,8 @@ namespace Core
 
 		Handle<Shader> _shader;
 		Handle<Pipeline> _pipeline;
+
+		Handle<Sampler> _nearestSampler;
 
 		// Bring-up readback, one per frame slot (same fence-safe 2-frame
 		// scheme as the node count readback).

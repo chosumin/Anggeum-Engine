@@ -13,7 +13,13 @@ namespace Core
 		float rootNodeSize = 2048.0f;
 		uint32_t lodCount = 6;
 		uint32_t quadCountPerNodeEdge = 128;   // quads per node edge
+		
+		// a node splits into 8x8 patches, the culling granularity.
+		// Mirrored as a literal in terrainPatchCull.comp.
+		uint32_t patchesPerNodeEdge = 8;
+
 		uint32_t borderTexels = 2;  // normal/albedo filtering apron
+
 		// Chosen so the average terrain height lands near y = 0 (the Sponza
 		// floor): the FBM mapping averages to the middle of the range.
 		float heightMin = -100.0f;
@@ -78,6 +84,13 @@ namespace Core
 		{
 			return (atlasCapacity + atlasSlotsPerRow - 1) / atlasSlotsPerRow;
 		}
+
+		uint32_t PatchQuads() const { return quadCountPerNodeEdge / patchesPerNodeEdge; }
+		uint32_t PatchIndexCount() const { return PatchQuads() * PatchQuads() * 6; }
+		uint32_t MaxPatches() const
+		{
+			return atlasCapacity * patchesPerNodeEdge * patchesPerNodeEdge;
+		}
 	};
 
 	// Sentinels for the quadtree index texture (R16_UINT, one texel per node).
@@ -102,7 +115,8 @@ namespace Core
 		uvec2 colorTexelOrigin{};   // slot origin in the normal/albedo atlases
 	};
 
-	// Push-constant block of the GPU traversal shaders (node list, LOD map);
+	// Push-constant block of the GPU traversal shaders (node list, LOD map,
+	// patch cull).
 	struct TerrainTraversalPush
 	{
 		vec2 cameraXZ{};
@@ -111,6 +125,18 @@ namespace Core
 		float ringRadiusScale = 0.0f;
 		uint32_t lodCount = 0;
 		uint32_t rootTiles = 0;
+		uint32_t patchIndexCount = 0; // PatchQuads()^2 * 6, for the draw args
+	};
+
+	// Uniform block for terrainPatchCull.comp; layout mirrors the mesh
+	// culler's CullData so the proven sphere frustum/Hi-Z tests port over.
+	struct alignas(16) TerrainCullData
+	{
+		mat4 view;
+		mat4 proj;
+		vec4 frustumPlanes[6];
+		vec4 screenHiZ{};     // xy = screen size, z = hiZ mip count, w = occlusion on
+		vec4 heightBounds{};  // x = min, y = max, z = conservative pad
 	};
 
 	// Shared uniform block for terrain.vert/.frag.

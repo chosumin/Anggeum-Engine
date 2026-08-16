@@ -22,6 +22,7 @@ namespace Core
 	public:
 		static constexpr const char* SB_NODE_LIST = "Terrain.NodeList";
 		static constexpr const char* SB_NODE_LIST_COUNT = "Terrain.NodeListCount";
+		static constexpr const char* SB_PATCH_DRAW_ARGS = "Terrain.PatchDrawArgs";
 
 		TerrainNodeListPass(Device& device, RenderScene& renderScene);
 		~TerrainNodeListPass() override;
@@ -46,7 +47,7 @@ namespace Core
 		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _countReadback;
 
 		FGTexture _indexTexture;
-		FGBuffer _nodeList, _nodeListCount, _readback;
+		FGBuffer _nodeList, _nodeListCount, _patchDrawArgs, _readback;
 		TerrainTraversalPush _push{};
 		bool _active = false;
 	};

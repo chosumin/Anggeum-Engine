@@ -29,6 +29,19 @@ layout(set = 0, binding = 2) coherent buffer NodeListCount
     uint groupsZ;
 } nodeCount;
 
+// The patch draw's VkDrawIndexedIndirectCommand. Initialized HERE (single
+// workgroup, ordered before patch culling by the graph) because the patch
+// cull pass spans many workgroups and cannot race-freely zero its own
+// counter. Patch culling atomically bumps instanceCount.
+layout(set = 0, binding = 3) writeonly buffer PatchDrawArgs
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+} patchDrawArgs;
+
 layout(push_constant) uniform Push
 {
     vec2 cameraXZ;
@@ -37,6 +50,7 @@ layout(push_constant) uniform Push
     float ringRadiusScale;
     uint lodCount;
     uint rootTiles;
+    uint patchIndexCount;
 } push;
 
 // Bounded by the atlas capacity: every listed node is resident, so a level
@@ -62,6 +76,12 @@ void main()
     {
         nodeCount.count = 0u;
         levelCounts[0] = rootCount;
+
+        patchDrawArgs.indexCount = push.patchIndexCount;
+        patchDrawArgs.instanceCount = 0u;
+        patchDrawArgs.firstIndex = 0u;
+        patchDrawArgs.vertexOffset = 0;
+        patchDrawArgs.firstInstance = 0u;
     }
     if (tid < rootCount)
         lists[0][tid] = TerrainPackCoord(push.lodCount - 1u,

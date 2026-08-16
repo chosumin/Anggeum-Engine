@@ -77,6 +77,7 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	_push.ringRadiusScale = config.ringRadiusScale;
 	_push.lodCount = config.lodCount;
 	_push.rootTiles = config.rootTilesX;
+	_push.patchIndexCount = config.PatchIndexCount();
 
 	_indexTexture = builder.ImportTexture(TerrainQuadTree::QUADTREE_INDEX,
 		_terrain.GetQuadTree().GetIndexTexture());
@@ -93,6 +94,12 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
 		  | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT });
 	builder.Write(_nodeListCount, BufferAccess::StorageComputeWrite);
+
+	_patchDrawArgs = builder.CreateBuffer(SB_PATCH_DRAW_ARGS,
+		{ 5 * sizeof(uint32_t),
+		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
+	builder.Write(_patchDrawArgs, BufferAccess::StorageComputeWrite);
 
 	_readback = builder.ImportBuffer("Terrain.NodeCountReadback" + to_string(slot),
 		_countReadback[slot]);
@@ -114,6 +121,7 @@ void TerrainNodeListPass::Execute(FrameGraphPassContext& context,
 	builder.SetTextureBuffer(0, context.GetTexture(_indexTexture));
 	builder.SetStorageBuffer(1, context.GetBuffer(_nodeList));
 	builder.SetStorageBuffer(2, context.GetBuffer(_nodeListCount));
+	builder.SetStorageBuffer(3, context.GetBuffer(_patchDrawArgs));
 	auto& resources = builder.Build();
 	commandBuffer.BindDescriptorSet(_pipeline->GetPipelineBindPoint(),
 		shader, resources);

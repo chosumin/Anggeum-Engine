@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "TerrainLodMapPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
+#include "Graphics/FrameResources.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/ResourceManager.h"
@@ -23,6 +24,12 @@ TerrainLodMapPass::TerrainLodMapPass(Device& device, RenderScene& renderScene)
 	auto& resourceManager = device.GetResourceManager();
 	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainLodMap.comp.spv");
 	_pipeline = resourceManager.LoadComputePipeline("Shaders/Terrain/terrainLodMap.comp.spv");
+
+	_nearestSampler = resourceManager.LoadSampler(
+		{ VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+		  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		  VK_SAMPLER_MIPMAP_MODE_NEAREST });
 
 	_sectorsPerSide = _terrain.GetConfig().NodesPerSide(0);
 
@@ -72,12 +79,17 @@ void TerrainLodMapPass::Setup(FrameGraphBuilder& builder,
 		_terrain.GetQuadTree().GetIndexTexture());
 	builder.Read(_indexTexture, TextureAccess::SampledCompute);
 
-	FGTextureDesc mapDesc{};
+	// Pool-owned (not a graph transient) so it can carry a NEAREST sampler:
+	// R8_UINT views reject the default LINEAR one. Content is still fully
+	// rewritten every frame.
+	RenderTargetDesc mapDesc{};
 	mapDesc.extent = { _sectorsPerSide, _sectorsPerSide };
 	mapDesc.format = VK_FORMAT_R8_UINT;
 	mapDesc.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	_lodMap = builder.CreateTexture(RT_LOD_MAP, mapDesc);
+	mapDesc.sampler = _nearestSampler;
+	_lodMap = builder.ImportTexture(RT_LOD_MAP,
+		frameResources.GetOrCreateRenderTarget(RT_LOD_MAP, mapDesc));
 	builder.Write(_lodMap, TextureAccess::StorageComputeWrite);
 
 	_readback = builder.ImportBuffer("Terrain.LodMapReadback" + to_string(slot),

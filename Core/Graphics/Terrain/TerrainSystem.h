@@ -48,6 +48,14 @@ namespace Core
 		// (2 frames stale) against the CPU covering-set expectation.
 		void ValidateGpuLodMap(const uint8_t* gpuMap);
 
+		// This frame's camera frustum, extracted once in BuildRenderList and
+		// shared with the GPU patch culler's uniform data.
+		const array<vec4, 6>& GetFrustumPlanes() const { return _frustumPlanes; }
+
+		// Bring-up stat from TerrainPatchCullPass (2 frames stale): visible
+		// patch count, sanity-bounded by drawn nodes x 64.
+		void SetGpuPatchCountStat(uint32_t count);
+
 	private:
 		void BuildRenderList(vec2 cameraXZ, const mat4& viewProj);
 		void VisitNode(const TerrainNodeId& id, vec2 cameraXZ);
@@ -72,6 +80,7 @@ namespace Core
 		uint32_t _gpuNodeCount = 0;
 		vector<uint8_t> _expectedLodMap; // per LOD0 sector, from CountCoveringSet
 		uint32_t _gpuLodMapMismatches = 0;
+		uint32_t _gpuPatchCount = 0;
 
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;

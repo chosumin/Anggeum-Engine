@@ -22,6 +22,7 @@
 #include "Graphics/RenderPasses/TerrainStreamingPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
+#include "Graphics/RenderPasses/TerrainPatchCullPass.h"
 #include "Graphics/RenderPasses/TerrainPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -57,6 +58,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, renderScene));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
+
+	// After HiZCull1 (inside DepthPrePasses) so the Hi-Z pyramid is on the
+	// blackboard for the patch occlusion test.
+	_frameGraph->AddPass(make_unique<TerrainPatchCullPass>(device, renderScene, extent));
 
 	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
 

@@ -235,6 +235,18 @@ namespace Core
 		_gpuNodeCount = count;
 	}
 
+	void TerrainSystem::SetGpuPatchCountStat(uint32_t count)
+	{
+		// Temporary P2-4 bring-up log; the render list is node-granular with
+		// coarser frustum bounds, so the expected relation is
+		// gpuPatches <= drawnNodes * 64 (patch culling is strictly finer).
+		if (count != _gpuPatchCount)
+			LOG("Terrain patch cull: GPU %u patches (CPU drawn %u nodes x 64 = %u)",
+				count, uint32_t(_renderList.size()),
+				uint32_t(_renderList.size()) * 64u);
+		_gpuPatchCount = count;
+	}
+
 	void TerrainSystem::OnGUI()
 	{
 		const TerrainStreamingStats& stats = _streamer->GetStats();
@@ -250,6 +262,8 @@ namespace Core
 		ImGui::Text("Frustum culled: %u subtrees", _culledNodes);
 		ImGui::Text("Node list: CPU %u vs GPU %u (readback lags 2 frames)",
 			_coveringNodeCount, _gpuNodeCount);
+		ImGui::Text("Patch cull: GPU %u visible patches (nodes x 64 = %u)",
+			_gpuPatchCount, uint32_t(_renderList.size()) * 64u);
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");

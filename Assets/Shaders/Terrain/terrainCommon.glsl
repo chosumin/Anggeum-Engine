@@ -2,6 +2,10 @@
 const uint TERRAIN_NODE_EMPTY = 0xffffu;
 const uint TERRAIN_NODE_INVALID = 0xfffeu; // >= this: nothing resident
 
+// A node splits into 8x8 patches, the culling/draw granularity. Mirrors
+// TerrainConfig::patchesPerNodeEdge (asserted CPU-side).
+const uint TERRAIN_PATCHES_PER_EDGE = 8u;
+
 // Node list entry coord packing: [ lod:4 ][ y:14 ][ x:14 ].
 uint TerrainPackCoord(uint lod, uvec2 coord)
 {
