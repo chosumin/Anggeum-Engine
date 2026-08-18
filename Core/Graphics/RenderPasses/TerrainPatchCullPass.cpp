@@ -34,16 +34,6 @@ TerrainPatchCullPass::TerrainPatchCullPass(Device& device, RenderScene& renderSc
 
 	assert(_terrain.GetConfig().patchesPerNodeEdge == 8
 		&& "terrainPatchCull.comp PATCHES_PER_EDGE / local_size mirror this");
-
-	for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
-	{
-		_countReadback[slot] = resourceManager.LoadBuffer(
-			{ sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::UNIFORM },
-			"Terrain.PatchCountReadback" + to_string(slot));
-
-		uint32_t zero = 0;
-		_countReadback[slot].Get().Update(zero);
-	}
 }
 
 void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
@@ -55,14 +45,6 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
 	if (!camera || !builder.HasBuffer(TerrainNodeListPass::SB_NODE_LIST))
 		return;
-
-	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
-
-	uint32_t previousCount = 0;
-	void* mapped = nullptr;
-	_countReadback[slot].Get().GetMappedPtr(&mapped);
-	memcpy(&previousCount, mapped, sizeof(previousCount));
-	_terrain.SetGpuPatchCountStat(previousCount);
 
 	const TerrainConfig& config = _terrain.GetConfig();
 	_push.cameraXZ = vec2(camera->Matrices.Position.x, camera->Matrices.Position.z);
@@ -120,8 +102,10 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	_patchDrawArgs = builder.GetBuffer(TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
 	builder.Write(_patchDrawArgs, BufferAccess::StorageComputeWrite);
 
+	// Stats feed: TerrainSystem owns the slots and reads them in OnGUI.
+	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
 	_readback = builder.ImportBuffer("Terrain.PatchCountReadback" + to_string(slot),
-		_countReadback[slot]);
+		_terrain.GetPatchCountReadback(slot));
 	builder.Write(_readback, BufferAccess::TransferDst);
 
 	_active = true;
@@ -158,7 +142,7 @@ void TerrainPatchCullPass::Execute(FrameGraphPassContext& context,
 	commandBuffer.DispatchIndirect(context.GetBuffer(_nodeListCount),
 		sizeof(uint32_t));
 
-	// Bring-up readback of instanceCount (offset 4 in the draw args).
+	// Stats readback of instanceCount (offset 4 in the draw args).
 	Buffer& drawArgs = context.GetBuffer(_patchDrawArgs);
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(drawArgs,

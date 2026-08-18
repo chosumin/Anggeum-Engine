@@ -7,6 +7,8 @@
 #include "Components/Transform.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/GeometryUpload.h"
+#include "Graphics/RenderContext.h"
+#include "Graphics/Vulkans/Buffer.h"
 
 namespace Core
 {
@@ -18,6 +20,19 @@ namespace Core
 		_quadTree = make_unique<TerrainQuadTree>(device, _config);
 		_streamer = make_unique<TerrainStreamer>(device, _config, _store, *_quadTree);
 		CreateGridIndexBuffer(device, geometryCopyQueue);
+
+		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
+		// each slot before its first GPU write has happened.
+		auto& resourceManager = device.GetResourceManager();
+		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
+		{
+			_patchCountReadback[slot] = resourceManager.LoadBuffer(
+				{ sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::UNIFORM },
+				"Terrain.PatchCountReadback" + to_string(slot));
+
+			uint32_t zero = 0;
+			_patchCountReadback[slot].Get().Update(zero);
+		}
 	}
 
 	void TerrainSystem::CreateGridIndexBuffer(Device& device,
@@ -101,7 +116,12 @@ namespace Core
 		ImGui::Text("This frame: %u uploaded, %u evicted, %u free slots",
 			stats.uploadedThisFrame, stats.evictedThisFrame,
 			_quadTree->GetFreeSlotCount());
-		ImGui::Text("Visible patches (GPU, 2f delay): %u", _gpuPatchCount);
+		uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+		uint32_t patchCount = 0;
+		void* mapped = nullptr;
+		_patchCountReadback[slot].Get().GetMappedPtr(&mapped);
+		memcpy(&patchCount, mapped, sizeof(patchCount));
+		ImGui::Text("Visible patches (GPU, 2f delay): %u", patchCount);
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");

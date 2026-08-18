@@ -12,15 +12,10 @@ namespace Core
 	class Pipeline;
 	class Buffer;
 
-	// Expands the Terrain Node List into 8x8 patches per node, 
+	// Expands the Terrain Node List into 8x8 patches per node,
 	// culls each patch (frustum + previous-frame Hi-Z) and
 	// packs LOD stitch deltas from the LOD map, producing the Visible Render
 	// Patch List + the instanced draw's indirect args.
-	//
-	// Registered AFTER HiZCull1 so "OcclusionCull.HiZ" is on the blackboard;
-	// occlusion falls back to off on frames without it. Single-phase against
-	// last frame's Hi-Z for now - upgrades to the terrain-primed current-frame
-	// depth when P2-7 adds the terrain depth prepass.
 	class TerrainPatchCullPass : public FrameGraphPass
 	{
 	public:
@@ -42,10 +37,6 @@ namespace Core
 
 		Handle<Shader> _shader;
 		Handle<Pipeline> _pipeline;
-
-		// Bring-up readback of the visible patch count (fence-safe 2-frame
-		// slot scheme, like the node count).
-		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _countReadback;
 
 		FGTexture _lodMap, _hiZ;
 		FGBuffer _nodeList, _nodeListCount, _nodeDescs, _patchList,

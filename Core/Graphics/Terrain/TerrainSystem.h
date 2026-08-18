@@ -36,9 +36,13 @@ namespace Core
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }
 		uint32_t GetGridIndexCount() const { return _gridIndexCount; }
 
-		// Visible patch count fed back by TerrainPatchCullPass (2 frames
-		// stale), for the stats display.
-		void SetGpuPatchCountStat(uint32_t count) { _gpuPatchCount = count; }
+		// Stats feed for the visible patch count: the patch cull pass copies
+		// the GPU-culled instanceCount into the frame's slot; OnGUI reads the
+		// slot whose submission Begin's wait already retired (2-frame delay).
+		Handle<Buffer> GetPatchCountReadback(uint32_t slot) const
+		{
+			return _patchCountReadback[slot];
+		}
 
 		void OnGUI();
 		bool IsWireframe() const { return _wireframe; }
@@ -55,7 +59,7 @@ namespace Core
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;
 
-		uint32_t _gpuPatchCount = 0;
+		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _patchCountReadback;
 
 		bool _wireframe = false;
 		bool _freezeStreaming = false;
