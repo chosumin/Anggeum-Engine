@@ -28,15 +28,35 @@ void main()
     uint lod = TerrainUnpackLod(patchEntry.x);
     uvec2 nodeCoord = TerrainUnpackCoord(patchEntry.x);
     uint slot = patchEntry.y;
+
+    // Patch index in a node
     uvec2 patchXY = uvec2(patchEntry.z % TERRAIN_PATCHES_PER_EDGE,
         patchEntry.z / TERRAIN_PATCHES_PER_EDGE);
 
+    // Vertex index in a patch
     uint vx = gl_VertexIndex % PATCH_VERTS;
     uint vy = gl_VertexIndex / PATCH_VERTS;
 
     // Position within the NODE's 129-texel grid: height texels sit exactly
     // on grid vertices, so this fetch is exact (no filtering).
     uvec2 nodeTexel = patchXY * TERRAIN_PATCH_QUADS + uvec2(vx, vy); // 0..128
+
+    // LOD stitching: a neighbour D lods coarser has vertices every 2^D of
+    // our texels (and our node origin lies on its grid), so snapping the
+    // along-edge coordinate down to a multiple of 2^D lands exactly on a
+    // neighbour vertex - position AND height (pure-noise bake). The snapped
+    // vertices collapse into degenerate triangles that close the T-junction.
+    // delta 0 (interior edges, same-lod neighbours) masks nothing.
+    uint deltas = patchEntry.w; // 4x4 bits: -x, +x, -z, +z (see patch cull)
+    if (vx == 0u)
+        nodeTexel.y &= ~((1u << (deltas & 0xfu)) - 1u);
+    if (vx == TERRAIN_PATCH_QUADS)
+        nodeTexel.y &= ~((1u << ((deltas >> 4u) & 0xfu)) - 1u);
+    if (vy == 0u)
+        nodeTexel.x &= ~((1u << ((deltas >> 8u) & 0xfu)) - 1u);
+    if (vy == TERRAIN_PATCH_QUADS)
+        nodeTexel.x &= ~((1u << ((deltas >> 12u) & 0xfu)) - 1u);
+
     uvec2 slotOrigin = uvec2(slot % uint(params.atlasInfo.x),
         slot / uint(params.atlasInfo.x));
     uvec2 heightOrigin = slotOrigin * uint(params.atlasInfo.y);
