@@ -1,7 +1,10 @@
 #include "stdafx.h"
 #include "TerrainSystem.h"
 #include "Procedural/ProceduralTerrainHeightSource.h"
+#include "Foundation/Entity.h"
 #include "Components/PerspectiveCamera.h"
+#include "Components/Light.h"
+#include "Components/Transform.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/GeometryUpload.h"
 
@@ -54,6 +57,29 @@ namespace Core
 		batch.copies.push_back({ _gridIndexBuffer,
 			vector<uint8_t>(bytes, bytes + indices.size() * sizeof(uint16_t)), 0 });
 		geometryCopyQueue.Push(move(batch));
+	}
+
+	TerrainParams TerrainSystem::BuildRenderParams(Light* mainLight) const
+	{
+		TerrainParams params{};
+		params.heightMinMaxInvAtlas = vec4(_config.heightMin, _config.heightMax,
+			1.0f / vec2(_quadTree->GetHeightAtlasExtent()));
+		params.invColorAtlasBorder = vec4(1.0f / vec2(_quadTree->GetColorAtlasExtent()),
+			float(_config.borderTexels), 0.0f);
+
+		if (mainLight)
+		{
+			auto& transform = mainLight->GetEntity().GetTransform();
+			vec3 direction = transform.GetRotation() * mainLight->GetProperties().Direction;
+			if (length(direction) > 0.0f)
+				params.sunDirection = vec4(normalize(direction), 0.25f);
+		}
+		params.debugMode = ivec4(_debugMode, 0, 0, 0);
+		params.worldParams = vec4(_config.WorldOrigin(), _config.rootNodeSize,
+			float(_config.lodCount));
+		params.atlasInfo = vec4(float(_config.atlasSlotsPerRow),
+			float(_config.HeightTexels()), float(_config.ColorTexels()), 0.0f);
+		return params;
 	}
 
 	void TerrainSystem::Update(PerspectiveCamera& camera)

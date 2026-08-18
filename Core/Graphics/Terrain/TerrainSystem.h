@@ -9,6 +9,7 @@ namespace Core
 	class Device;
 	class PerspectiveCamera;
 	class GeometryCopyQueue;
+	class Light;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
 	// startup and owns the quadtree GPU face and the streamer.
@@ -28,6 +29,8 @@ namespace Core
 		{
 			return _streamer->GetFrameUploads();
 		}
+
+		TerrainParams BuildRenderParams(Light* mainLight) const;
 
 		// Shared 17x17 patch grid, indexed by the GPU-driven instanced draw.
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }

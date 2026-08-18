@@ -73,9 +73,11 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	_push.rootTiles = config.rootTilesX;
 	_push.patchIndexCount = config.PatchIndexCount();
 
-	// Previous-frame Hi-Z, when the mesh culler built one this frame.
+	// The pyramid HiZCull1 rebuilds just before this pass: previous frame's
+	// resolved depth, terrain included.
 	Handle<Texture> hiZTexture = frameResources.GetRenderTarget(HiZCullPass::RT_HIZ);
-	_occlusionEnabled = builder.HasTexture(HiZCullPass::RT_HIZ) && hiZTexture.IsValid();
+	_occlusionEnabled = builder.HasTexture(HiZCullPass::RT_HIZ) && hiZTexture.IsValid()
+		&& frameResources.GetPreviousDepthBuffer().IsValid();
 
 	TerrainCullData cullData{};
 	cullData.view = camera->GetView();

@@ -3,6 +3,12 @@
 #include "common.glsl"
 #include "terrainCommon.glsl"
 
+// The depth prepass and the color pass rasterize the same patches through
+// two different pipelines; invariance makes both emit bit-identical
+// positions so the color pass survives its LESS_OR_EQUAL test on the
+// prepass depth with writes off.
+invariant gl_Position;
+
 // One instance = one visible patch from the GPU patch culling pass.
 layout(set = 0, binding = 1) readonly buffer PatchList
 {

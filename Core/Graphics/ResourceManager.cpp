@@ -330,7 +330,9 @@ namespace Core
 			break;
 		case Utility::HashCode("DepthNormal"):
 			pass = "Depth";
-			vert = "shaders/depthNormal.vert.spv";
+			// Shares lit.vert with the geometry pass: one vertex shader in both
+			// pipelines is what makes the prepass depth exactly re-testable.
+			vert = "shaders/lit.vert.spv";
 			frag = "shaders/depthNormal.frag.spv";
 			break;
 		case Utility::HashCode("Skybox"):
@@ -357,6 +359,11 @@ namespace Core
 			pass = "Terrain";
 			vert = "shaders/Terrain/terrain.vert.spv";
 			frag = "shaders/Terrain/terrain.frag.spv";
+			break;
+		case Utility::HashCode("TerrainDepth"):
+			pass = "Terrain";
+			vert = "shaders/Terrain/terrain.vert.spv";
+			frag = "shaders/Terrain/terrainDepth.frag.spv";
 			break;
 		default:
 			pass = "Geometry";
