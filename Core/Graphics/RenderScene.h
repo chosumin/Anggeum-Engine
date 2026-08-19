@@ -3,8 +3,6 @@
 #include "MaterialManager.h"
 #include "Vulkans/BindlessTextureManager.h"
 #include "RendererBatch.h"
-#include "GeometryUpload.h"
-#include "TextureUpload.h"
 
 namespace Core
 {
@@ -17,6 +15,9 @@ namespace Core
 	class Buffer;
 	class DescriptorSetBuilder;
 	class TerrainSystem;
+	class UploadScheduler;
+	class GeometryCopyQueue;
+	class TextureUploadQueue;
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
@@ -37,7 +38,7 @@ namespace Core
 	public:
 		// The CPU scene this render scene mirrors. The scene object is created
 		// first (empty) and loaded later, so it can be a constructor argument.
-		RenderScene(Device& device, Scene& scene);
+		RenderScene(Device& device, Scene& scene, UploadScheduler& uploads);
 		~RenderScene();
 
 		Scene& GetScene() const { return _scene; }
@@ -47,7 +48,7 @@ namespace Core
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
 		// Run every manager's self-gated sync, in dependency order.
-		void Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents);
+		void Sync(Scene& scene, VkExtent2D extents);
 
 		// Null when descriptor indexing is unsupported.
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindless.get(); }
@@ -70,36 +71,21 @@ namespace Core
 			Pipeline& pipeline, Buffer& indirectCommandBuffer,
 			DescriptorSetBuilder& builder);
 
-		// Resource loading never issues transfer jobs itself; it pushes requests here
-		// and Sync() turns them into jobs. Held by the coordinator until dedicated
-		// residency managers exist.
-		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
-		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
+		GeometryCopyQueue& GetGeometryCopyQueue();
+		TextureUploadQueue& GetTextureUploadQueue();
 
 	private:
-		void UploadQueuedTextures(TransferContext& transfer);
-		void UploadQueuedGeometry(TransferContext& transfer);
 		// Writes back what the upload jobs computed; only valid once they have finished.
 		void ApplyComputedBounds();
 
-		// A bounds result being computed by an in-flight upload job.
-		struct PendingBounds
-		{
-			SubMesh* target;
-			unique_ptr<GeometryBounds> result;
-		};
-
 	private:
 		Scene& _scene;
+		UploadScheduler& _uploads;
 		unique_ptr<BindlessTextureManager> _bindless;
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;
 		unique_ptr<RendererBatch> _batch;
 		unique_ptr<TerrainSystem> _terrainSystem;
-
-		TextureUploadQueue _textureUploads;
-		GeometryCopyQueue _geometryCopies;
-		vector<PendingBounds> _pendingBounds;
 
 		glm::vec3 _sceneBoundsMin{ FLT_MAX };
 		glm::vec3 _sceneBoundsMax{ -FLT_MAX };

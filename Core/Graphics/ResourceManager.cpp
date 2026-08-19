@@ -2,6 +2,8 @@
 #include "ResourceManager.h"
 #include "Utils/Utility.h"
 #include "Graphics/TransferJob.h"
+#include "Graphics/GeometryUpload.h"
+#include "Graphics/TextureUpload.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 

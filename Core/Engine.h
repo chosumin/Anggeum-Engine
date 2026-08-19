@@ -11,6 +11,7 @@ namespace Core
     class WorkerThreadManager;
     class IRenderPipeline;
     class RenderScene;
+    class UploadScheduler;
 
     struct EngineOptions
     {
@@ -36,6 +37,10 @@ namespace Core
         Scene* _scene;
         TransferContext* _transferContext;
         WorkerThreadManager* _workerThreadManager;
+
+        // Every render resource upload request funnels through it 
+        // (staging, budget and completion tracking live here).
+        UploadScheduler* _uploadScheduler;
 
         // GPU mirror of the scene for GPU-driven rendering, synced from scene dirty.
         RenderScene* _renderScene;
