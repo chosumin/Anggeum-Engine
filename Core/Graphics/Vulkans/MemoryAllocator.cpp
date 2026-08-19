@@ -27,7 +27,9 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation,
 {
 	lock_guard<mutex> lock(_mutex);
 
-	VkDeviceSize requestedAllocSize = ((size / _alignment) + 1) * _alignment;
+	// Round UP to the alignment (exact multiples stay as they are); the
+	// reservation may still exceed `size`, so copies must size from the data.
+	VkDeviceSize requestedAllocSize = ((size + _alignment - 1) / _alignment) * _alignment;
 	_totalAllocSize += requestedAllocSize;
 
 	SpanIndexPair location;
@@ -48,7 +50,7 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation,
 
 	auto& block = _blocks[location.blockIndex];
 
-	outAllocation.id = location.blockIndex;
+	outAllocation.id = block.id;
 	outAllocation.size = requestedAllocSize;
 	outAllocation.offset = block.freeMemories[location.spanIndex].offset;
 	outAllocation.type = _allocatorType;
@@ -63,6 +65,9 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 	OffsetSizePair span = { allocation.offset , allocation.size };
 
 	auto block = FindMemoryBlock(allocation.id);
+	assert(block != _blocks.end() && "deallocating from an unknown block");
+
+	_totalAllocSize -= allocation.size;
 
 	if (block->dedicated)
 	{
@@ -71,26 +76,34 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 	}
 	else
 	{
-		bool found = false;
-		for (auto&& freeMemory : block->freeMemories)
+		// Coalesce with both neighbours: `backward` ends where the freed span
+		// starts, `forward` starts where it ends. Merging only one direction
+		// would fragment the free list under load/unload churn.
+		auto& freeList = block->freeMemories;
+		auto backward = find_if(freeList.begin(), freeList.end(),
+			[&](const OffsetSizePair& f) { return f.offset + f.size == span.offset; });
+		auto forward = find_if(freeList.begin(), freeList.end(),
+			[&](const OffsetSizePair& f) { return f.offset == span.offset + span.size; });
+
+		if (backward != freeList.end() && forward != freeList.end())
 		{
-			if (freeMemory.offset == span.size + span.offset)
-			{
-				freeMemory.offset = span.offset;
-				freeMemory.size += allocation.size;
-				found = true;
-
-				break;
-			}
+			// The freed span bridges two free spans into one.
+			backward->size += span.size + forward->size;
+			freeList.erase(forward);
 		}
-
-		if (found == false)
+		else if (backward != freeList.end())
 		{
-			block->freeMemories.emplace_back(span);
-			_totalAllocSize -= allocation.size;
+			backward->size += span.size;
 		}
-
-		//todo : merge when multiple blocks are in sequence
+		else if (forward != freeList.end())
+		{
+			forward->offset = span.offset;
+			forward->size += span.size;
+		}
+		else
+		{
+			freeList.emplace_back(span);
+		}
 	}
 }
 
@@ -177,7 +190,7 @@ bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair,
 
 			if (offsetSizePair.size >= size && validOffset)
 			{
-				indexPair.blockIndex = block.id;
+				indexPair.blockIndex = i;
 				indexPair.spanIndex = j;
 
 				return true;
@@ -225,16 +238,22 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 
 	_blocks.push_back(newBlock);
 
-	return static_cast<uint32_t>(newBlock.id);
+	// The new block's VECTOR index (SpanIndexPair::blockIndex), not its id.
+	return static_cast<uint32_t>(_blocks.size() - 1);
 }
 
 void Core::MemoryAllocator::MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size)
 {
-	auto& block = *FindMemoryBlock(indices.blockIndex);
+	auto& block = _blocks[indices.blockIndex];
 
 	auto& offsetSize = block.freeMemories[indices.spanIndex];
 	offsetSize.offset += size;
 	offsetSize.size -= size;
+
+	// Fully consumed spans would otherwise linger as zero-size entries the
+	// free-chunk scan keeps visiting (and Deallocate could merge against).
+	if (offsetSize.size == 0)
+		block.freeMemories.erase(block.freeMemories.begin() + indices.spanIndex);
 }
 
 vector<Core::MemoryAllocator::MemoryBlock>::iterator Core::MemoryAllocator::FindMemoryBlock(size_t id)

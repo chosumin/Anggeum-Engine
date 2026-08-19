@@ -58,8 +58,8 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	// The pyramid HiZCull1 rebuilds just before this pass: previous frame's
 	// resolved depth, terrain included.
 	Handle<Texture> hiZTexture = frameResources.GetRenderTarget(HiZCullPass::RT_HIZ);
-	_occlusionEnabled = builder.HasTexture(HiZCullPass::RT_HIZ) && hiZTexture.IsValid()
-		&& frameResources.GetPreviousDepthBuffer().IsValid();
+	bool hiZBound = builder.HasTexture(HiZCullPass::RT_HIZ) && hiZTexture.IsValid();
+	_occlusionEnabled = hiZBound && frameResources.GetPreviousDepthBuffer().IsValid();
 
 	TerrainCullData cullData{};
 	cullData.view = camera->GetView();
@@ -89,11 +89,17 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	_lodMap = builder.GetTexture(TerrainLodMapPass::RT_LOD_MAP);
 	builder.Read(_lodMap, TextureAccess::SampledCompute);
 
-	if (_occlusionEnabled)
+	if (hiZBound)
 	{
 		_hiZ = builder.GetTexture(HiZCullPass::RT_HIZ);
-		builder.Read(_hiZ, TextureAccess::SampledCompute);
 	}
+	else
+	{
+		// No pyramid this frame
+		_hiZ = builder.ImportTexture(TerrainQuadTree::HEIGHT_ATLAS,
+			_terrain.GetQuadTree().GetHeightAtlas());
+	}
+	builder.Read(_hiZ, TextureAccess::SampledCompute);
 
 	_patchList = builder.CreateBuffer(SB_PATCH_LIST,
 		{ config.MaxPatches() * sizeof(uvec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
@@ -124,9 +130,7 @@ void TerrainPatchCullPass::Execute(FrameGraphPassContext& context,
 	builder.SetStorageBuffer(0, context.GetBuffer(_nodeList));
 	builder.SetStorageBuffer(1, context.GetBuffer(_nodeDescs));
 	builder.SetTextureBuffer(2, context.GetTexture(_lodMap));
-	builder.SetTextureBuffer(3, _occlusionEnabled
-		? context.GetTexture(_hiZ)
-		: _terrain.GetQuadTree().GetHeightAtlas().Get());
+	builder.SetTextureBuffer(3, context.GetTexture(_hiZ));
 	builder.SetStorageBuffer(4, context.GetBuffer(_patchList));
 	builder.SetStorageBuffer(5, context.GetBuffer(_patchDrawArgs));
 	builder.SetUniformBuffer(6, context.GetBuffer(_cullData));
