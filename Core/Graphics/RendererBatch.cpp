@@ -11,7 +11,7 @@
 #include "Components/Mesh.h"
 #include "Components/Transform.h"
 #include "TransferJob.h"
-#include "Graphics/TransferContext.h"
+#include "Graphics/GeometryUpload.h"
 
 using namespace Core;
 
@@ -97,7 +97,16 @@ Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> curre
     return cache.LoadBuffer(desc, name);
 }
 
-void Core::RendererBatch::RebuildGpuBuffers(TransferContext& transfer)
+// Reinterpret a typed table as the byte stream a copy request carries.
+template<typename T>
+static vector<uint8_t> ToBytes(const vector<T>& data)
+{
+	vector<uint8_t> bytes(data.size() * sizeof(T));
+	memcpy(bytes.data(), data.data(), bytes.size());
+	return bytes;
+}
+
+void Core::RendererBatch::RebuildGpuBuffers(GeometryCopyQueue& copyQueue)
 {
     // Bumped before the early-out below so an empty rebuild still counts: the draw
     // set changed either way, and Cullers have to notice.
@@ -222,37 +231,26 @@ void Core::RendererBatch::RebuildGpuBuffers(TransferContext& transfer)
     _instanceBuffer = AcquirePersistentBuffer(
         _instanceBuffer, instanceDesc, "RendererBatch.Instance");
 
-    // Enqueued rather than submitted here: the jobs stage their data on worker
-    // threads and go out as one submit when the caller flushes the TransferContext,
-    // instead of blocking this thread on a fence per buffer.
-    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<DrawIndexedIndirectCommand>>(_device,
-        _indirectCommandBuffer.Get(), vector<DrawIndexedIndirectCommand>(drawCommands), 0),
-        "RendererBatch.IndirectCommand");
+    // Copy REQUESTS, not jobs: like every loader, the batch only describes its
+    // table fills; the upload scheduler stages them on a worker thread and they
+    // go out as one submit when the caller flushes it.
+    GeometryCopyBatch batch;
+    batch.debugName = "RendererBatch.Tables";
+    batch.copies.push_back({ _indirectCommandBuffer, ToBytes(drawCommands), 0 });
+    batch.copies.push_back({ _materialIndexBuffer, ToBytes(materialIndices), 0 });
+    batch.copies.push_back({ _objectDataBuffer, ToBytes(objectData), 0 });
+    batch.copies.push_back({ _instanceBuffer, ToBytes(instanceData), 0 });
 
-    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<uint32_t>>(_device,
-        _materialIndexBuffer.Get(), vector<uint32_t>(materialIndices), 0),
-        "RendererBatch.MaterialIndex");
-
-    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<GPUObjectData>>(_device,
-        _objectDataBuffer.Get(), move(objectData), 0),
-        "RendererBatch.ObjectData");
-
-    transfer.Enqueue(make_unique<Core::VkBufferCopyJob<uint>>(_device,
-        _instanceBuffer.Get(), move(instanceData), 0),
-        "RendererBatch.Instance");
-
-    // A transform buffer job only exists when there were transforms to upload.
+    // A transform copy only exists when there were transforms to upload.
     if (anyTransform)
-    {
-        transfer.Enqueue(make_unique<Core::VkBufferCopyJob<mat4>>(_device,
-            _transformBatch.TransformBuffer.Get(), move(transforms), 0),
-            "RendererBatch.Transform");
-    }
+        batch.copies.push_back({ _transformBatch.TransformBuffer, ToBytes(transforms), 0 });
+
+    copyQueue.Push(move(batch));
 
     _hasGpuBuffers = true;
 }
 
-void Core::RendererBatch::Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents)
+void Core::RendererBatch::Sync(Scene& scene, GeometryCopyQueue& copyQueue, VkExtent2D extents)
 {
     if (!_dirty)
         return;
@@ -266,5 +264,5 @@ void Core::RendererBatch::Sync(Scene& scene, TransferContext& transfer, VkExtent
     _transforms.clear();
 
     InitializeFromScene(scene);
-    RebuildGpuBuffers(transfer);
+    RebuildGpuBuffers(copyQueue);
 }

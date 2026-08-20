@@ -1,40 +1,82 @@
 #pragma once
+#include "GeometryUpload.h"
+#include "TextureUpload.h"
 #include "Foundation/Job.h"
 #include "Utils/timer.h"
 
 namespace Core
 {
-	class CommandPool;
+	class Device;
 	class WorkerThreadManager;
+	class CommandPool;
+	class SubMesh;
+
+	// Engine-owned transfer context: the single hand-off point between resource
+	// loading and the GPU. Request queues on top (loaders, terrain, the draw
+	// batch all push requests here), transfer machinery below - worker-recorded
+	// jobs batched into one submit, completion tracked on the upload timeline.
+	// Sibling of RenderContext / SyncContext; the dedicated transfer queue
+	// lives here when it gets enabled.
+	//
+	// Current stage: synchronous model. The staging ring, shared byte budget
+	// and timeline-based async completion land in the follow-up steps.
 	class TransferContext
 	{
 	public:
 		TransferContext(Device& device, WorkerThreadManager& workerThreadManager);
 		~TransferContext();
 
-		void UpdateFrame(uint32_t frame);
+		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
+		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
 
-		// Takes ownership of the job. A name already pending drops the new job
-		// (destroyed on return) — the queued one covers the request.
+		// Hands a prepared job to the transfer machinery (recorded on a worker
+		// thread, submitted by the next Flush). A name already pending drops
+		// the new job (destroyed on return) - the queued one covers the request.
 		void Enqueue(unique_ptr<Job> job, const string& jobName);
-		void Wait();
+
+		// Drain both request queues into transfer jobs.
+		void SubmitQueued();
+
+		// Submit every enqueued job's recording as one batch and block until
+		// the GPU has consumed it.
+		void Flush();
+
+		// Bounds computed by finished geometry jobs. Only valid after Flush().
+		struct CompletedBounds
+		{
+			SubMesh* target;
+			GeometryBounds bounds;
+		};
+		vector<CompletedBounds> TakeCompletedBounds();
+
 	private:
 		void ClearJobs();
-	private:
-		Device& _device;
 
+		// A result an in-flight job is still writing into (stable address).
+		struct PendingBounds
+		{
+			SubMesh* target;
+			unique_ptr<GeometryBounds> result;
+		};
+
+		Device& _device;
 		WorkerThreadManager& _workerThreadManager;
 
-		CommandPool* _primaryCommandPool;
-		uint32_t _currentFrame;
-		vector<VkFence> _inFlightFences;
+		TextureUploadQueue _textureUploads;
+		GeometryCopyQueue _geometryCopies;
+		vector<PendingBounds> _pendingBounds;
 
-		condition_variable _fenceWait;
+		unique_ptr<CommandPool> _primaryCommandPool;
+
+		// Monotonic upload timeline: each Flush submit signals the next value.
+		// Today Flush waits on it synchronously; the async step turns the wait
+		// into per-frame counter polling that promotes completed uploads.
+		VkSemaphore _timeline = VK_NULL_HANDLE;
+		uint64_t _submittedValue = 0;
+
+		condition_variable _jobWait;
 		mutex _lock;
-
 		Core::Timer _timer;
-
 		unordered_map<string, unique_ptr<Job>> _pendingJobs;
 	};
 }
-

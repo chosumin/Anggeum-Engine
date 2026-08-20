@@ -8,14 +8,13 @@ namespace Core
 {
 	class Device;
 	class Scene;
-	class TransferContext;
 	class CommandBuffer;
 	class Shader;
 	class Pipeline;
 	class Buffer;
 	class DescriptorSetBuilder;
 	class TerrainSystem;
-	class UploadScheduler;
+	class TransferContext;
 	class GeometryCopyQueue;
 	class TextureUploadQueue;
 
@@ -38,7 +37,7 @@ namespace Core
 	public:
 		// The CPU scene this render scene mirrors. The scene object is created
 		// first (empty) and loaded later, so it can be a constructor argument.
-		RenderScene(Device& device, Scene& scene, UploadScheduler& uploads);
+		RenderScene(Device& device, Scene& scene, TransferContext& transfer);
 		~RenderScene();
 
 		Scene& GetScene() const { return _scene; }
@@ -80,7 +79,7 @@ namespace Core
 
 	private:
 		Scene& _scene;
-		UploadScheduler& _uploads;
+		TransferContext& _transfer;
 		unique_ptr<BindlessTextureManager> _bindless;
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;

@@ -6,7 +6,6 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/TransferContext.h"
-#include "Graphics/UploadScheduler.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -16,10 +15,10 @@
 
 using namespace Core;
 
-RenderScene::RenderScene(Device& device, Scene& scene, UploadScheduler& uploads)
+RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer)
 	: _device(&device)
 	, _scene(scene)
-	, _uploads(uploads)
+	, _transfer(transfer)
 {
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
@@ -31,7 +30,7 @@ RenderScene::RenderScene(Device& device, Scene& scene, UploadScheduler& uploads)
 
 	// The terrain's static grid geometry lands in the scheduler's geometry
 	// queue and is uploaded by the first Sync, like any other loaded geometry.
-	_terrainSystem = make_unique<TerrainSystem>(device, uploads.GetGeometryCopyQueue());
+	_terrainSystem = make_unique<TerrainSystem>(device, transfer.GetGeometryCopyQueue());
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.
@@ -42,12 +41,12 @@ void RenderScene::Sync(Scene& scene, VkExtent2D extents)
 	// Every manager self-gates on its own dirty state; this only fixes the order.
 	// Space was already reserved at load time, so the scheduler just turns the
 	// pending requests into data-copy jobs...
-	_uploads.SubmitQueued();
+	_transfer.SubmitQueued();
 
 	// ...and flush them before the steps below: the bindless descriptor writes need
 	// the uploaded textures' image views (created by the image jobs), and the draw
 	// set references the uploaded geometry and the bounds those jobs computed.
-	_uploads.Flush();
+	_transfer.Flush();
 
 	ApplyComputedBounds();
 
@@ -56,10 +55,12 @@ void RenderScene::Sync(Scene& scene, VkExtent2D extents)
 
 	_material->Sync();
 
-	// The batch enqueues its own buffer fills rather than submitting them, so flush
-	// once more: the passes read the draw set on the GPU during this frame.
-	_batch->Sync(scene, _uploads.GetTransferContext(), extents);
-	_uploads.Flush();
+	// The batch pushes its table fills as copy requests like every loader, so
+	// run the scheduler once more: the passes read the draw set on the GPU
+	// during this frame.
+	_batch->Sync(scene, _transfer.GetGeometryCopyQueue(), extents);
+	_transfer.SubmitQueued();
+	_transfer.Flush();
 
 	// Freezes this frame's terrain streaming uploads and render list before pass Setup.
 	if (auto* camera = scene.GetMainCamera())
@@ -68,19 +69,19 @@ void RenderScene::Sync(Scene& scene, VkExtent2D extents)
 
 GeometryCopyQueue& RenderScene::GetGeometryCopyQueue()
 {
-	return _uploads.GetGeometryCopyQueue();
+	return _transfer.GetGeometryCopyQueue();
 }
 
 TextureUploadQueue& RenderScene::GetTextureUploadQueue()
 {
-	return _uploads.GetTextureUploadQueue();
+	return _transfer.GetTextureUploadQueue();
 }
 
 void RenderScene::ApplyComputedBounds()
 {
 	// The scene mirror's side of the bounds hand-off: the scheduler's jobs
 	// measured them, the mesh and the scene-wide bounds live here.
-	for (auto& completed : _uploads.TakeCompletedBounds())
+	for (auto& completed : _transfer.TakeCompletedBounds())
 	{
 		completed.target->SetBoundingSphere(completed.bounds.center, completed.bounds.radius);
 
