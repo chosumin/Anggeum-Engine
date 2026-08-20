@@ -1,6 +1,7 @@
 #pragma once
 #include "GeometryUpload.h"
 #include "TextureUpload.h"
+#include "StagingRing.h"
 #include "Foundation/Job.h"
 #include "Utils/timer.h"
 
@@ -67,6 +68,11 @@ namespace Core
 		vector<PendingBounds> _pendingBounds;
 
 		unique_ptr<CommandPool> _primaryCommandPool;
+
+		// Steady-state staging memory, recycled by timeline value. Jobs whose
+		// data does not fit (initial load spike) fall back to their own
+		// one-shot staging buffers.
+		unique_ptr<StagingRing> _stagingRing;
 
 		// Monotonic upload timeline: each Flush submit signals the next value.
 		// Today Flush waits on it synchronously; the async step turns the wait

@@ -78,7 +78,8 @@ namespace Core
 		void CopyImage(Texture& srcTexture, Texture& dstTexture,
 			uint32_t srcMipLevel, uint32_t srcLayer,
 			uint32_t dstMipLevel, uint32_t dstLayer);
-		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height);
+		void CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height,
+			VkDeviceSize bufferOffset = 0);
 		void CopyBufferToImage(Buffer& buffer, Texture& texture,
 			const vector<VkBufferImageCopy>& regions);
 		// Mip 0 -> buffer offset 0; `layout` is the image's current layout.

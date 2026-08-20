@@ -95,7 +95,8 @@ void* Core::Buffer::GetPersistentMappedPtr()
 {
 	if (_mapped == nullptr)
 	{
-		assert(_allocation->type == MemoryType::UNIFORM &&
+		assert((_allocation->type == MemoryType::UNIFORM
+			|| _allocation->type == MemoryType::STAGE) &&
 			"Update requires a persistently mapped memory type");
 
 		_allocator->GetMappedPtr(&_mapped, *_allocation);
@@ -104,12 +105,3 @@ void* Core::Buffer::GetPersistentMappedPtr()
 	return _mapped;
 }
 
-void Core::Buffer::Map(void** data)
-{
-	_allocator->MapMemory(data, *_allocation);
-}
-
-void Core::Buffer::Unmap()
-{
-	_allocator->UnmapMemory(*_allocation);
-}

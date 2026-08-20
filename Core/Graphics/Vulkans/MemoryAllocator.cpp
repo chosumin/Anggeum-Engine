@@ -113,47 +113,31 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 	// the alignment, so the reservation is always larger than the data behind srcData.
 	assert(size <= allocation.size && "copy larger than the allocation");
 
-	lock_guard<mutex> lock(_mutex);
+	// Resolve the block under the lock (AddBlock may relocate the vector), but
+	// memcpy outside it: the mapping itself is stable for the block's lifetime.
+	uint8_t* mapped = nullptr;
+	{
+		lock_guard<mutex> lock(_mutex);
+		auto& block = *FindMemoryBlock(allocation.id);
+		if (block.mapped != nullptr)
+			mapped = static_cast<uint8_t*>(block.mapped) + allocation.offset;
+	}
 
-	auto device = _device.GetDevice();
+	// Every host-visible pool (STAGE, UNIFORM) is persistently mapped; a copy
+	// into an unmapped (device-local) allocation is a caller bug.
+	assert(mapped != nullptr && "CopyBuffer into a non-host-visible pool");
 
-	void* tempData;
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkMapMemory(device, block.memory,
-		allocation.offset, allocation.size, 0, &tempData);
-	memcpy(tempData, srcData, (size_t)size);
-	vkUnmapMemory(device, block.memory);
+	memcpy(mapped, srcData, (size_t)size);
 }
 
 void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
-	// Only persistently mapped allocators (e.g. UNIFORM) populate block.mapped.
-	// STAGE memory is NOT persistently mapped: use MapMemory/UnmapMemory instead.
+	// Only persistently mapped allocators (UNIFORM, STAGE) populate block.mapped;
+	// device-local pools return garbage here.
 	auto& block = *FindMemoryBlock(allocation.id);
 
 	uint8_t* mappedPtr = static_cast<uint8_t*>(block.mapped);
 	*outMappedPtr = mappedPtr + allocation.offset;
-}
-
-void Core::MemoryAllocator::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
-{
-	lock_guard<mutex> lock(_mutex);
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkMapMemory(_device.GetDevice(), block.memory,
-		allocation.offset, allocation.size, 0, outMappedPtr);
-}
-
-void Core::MemoryAllocator::UnmapMemory(MemoryAllocation& allocation)
-{
-	lock_guard<mutex> lock(_mutex);
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkUnmapMemory(_device.GetDevice(), block.memory);
 }
 
 void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation)
@@ -221,12 +205,12 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 		throw std::runtime_error("failed to allocate buffer memory!");
 	}
 
-	if (_allocatorType == MemoryType::UNIFORM)
+	if (_allocatorType == MemoryType::UNIFORM || _allocatorType == MemoryType::STAGE)
 	{
-		//persistent mapping
-		//The uniform data will be used for all draw calls, 
-		//so the buffer containing it should only be destroyed when we stop rendering.
-
+		// Persistent mapping for every host-visible pool. UNIFORM: written every
+		// frame. STAGE: lets uploads memcpy straight into their staging spans -
+		// no vkMapMemory per copy, so concurrent jobs sharing a block can never
+		// double-map it (VUID-vkMapMemory-memory-00678).
 		vkMapMemory(_device.GetDevice(), newBlock.memory,
 			0, newPoolSize, 0, &newBlock.mapped);
 	}
@@ -377,16 +361,6 @@ void Core::MemoryAllocatorManager::BindImageMemory(Image& image, MemoryAllocatio
 void Core::MemoryAllocatorManager::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
 	_memoryAllocators[allocation.type]->GetMappedPtr(outMappedPtr, allocation);
-}
-
-void Core::MemoryAllocatorManager::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
-{
-	_memoryAllocators[allocation.type]->MapMemory(outMappedPtr, allocation);
-}
-
-void Core::MemoryAllocatorManager::UnmapMemory(MemoryAllocation& allocation)
-{
-	_memoryAllocators[allocation.type]->UnmapMemory(allocation);
 }
 
 void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size)

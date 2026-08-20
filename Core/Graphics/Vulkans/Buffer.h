@@ -35,8 +35,6 @@ namespace Core
 
 		void CopyBuffer(void* data, VkDeviceSize size);
 		void GetMappedPtr(void** data);
-		void Map(void** data);
-		void Unmap();
 
 		// Upload `data` into the persistent mapping.
 		template<typename T>

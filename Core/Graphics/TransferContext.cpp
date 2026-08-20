@@ -26,6 +26,10 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 
 	_primaryCommandPool = make_unique<CommandPool>(_device,
 		_device.GetQueueFamilyIndices().TransferFamily.value());
+
+	// Sized for steady-state traffic (terrain tiles, table refills); the
+	// initial scene load intentionally overflows into per-job fallbacks.
+	_stagingRing = make_unique<StagingRing>(_device, 32ull * 1024 * 1024);
 }
 
 TransferContext::~TransferContext()
@@ -55,8 +59,8 @@ void TransferContext::SubmitQueued()
 		for (auto& request : _textureUploads.Take())
 		{
 			auto& texture = request.texture.Get();
-			Enqueue(make_unique<VkImageJob>(_device, texture, request.filePath),
-				texture.GetName());
+			Enqueue(make_unique<VkImageJob>(_device, texture, request.filePath,
+				_stagingRing.get()), texture.GetName());
 		}
 	}
 
@@ -86,7 +90,8 @@ void TransferContext::SubmitQueued()
 		}
 
 		Enqueue(
-			make_unique<VkBufferCopyBatchJob>(_device, move(copies), move(boundsTasks)),
+			make_unique<VkBufferCopyBatchJob>(_device, move(copies), move(boundsTasks),
+				_stagingRing.get()),
 			batch.debugName + "_" + std::to_string(batchIndex));
 
 		++batchIndex;
@@ -128,6 +133,9 @@ void TransferContext::Flush()
 
 	uint64_t signalValue = ++_submittedValue;
 
+	// Every span the jobs acquired belongs to this submission.
+	_stagingRing->Stamp(signalValue);
+
 	VkTimelineSemaphoreSubmitInfo timelineInfo{};
 	timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
 	timelineInfo.signalSemaphoreValueCount = 1;
@@ -157,6 +165,8 @@ void TransferContext::Flush()
 	waitInfo.pSemaphores = &_timeline;
 	waitInfo.pValues = &signalValue;
 	vkWaitSemaphores(_device.GetDevice(), &waitInfo, UINT64_MAX);
+
+	_stagingRing->Reclaim(signalValue);
 
 	ClearJobs();
 

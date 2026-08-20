@@ -237,12 +237,13 @@ void Core::CommandBuffer::CopyImage(Texture& srcTexture, Texture& dstTexture,
         &copyRegion);
 }
 
-void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height)
+void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height,
+    VkDeviceSize bufferOffset)
 {
     Image& image = texture.GetImage();
 
     VkBufferImageCopy region{};
-    region.bufferOffset = 0;
+    region.bufferOffset = bufferOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
 

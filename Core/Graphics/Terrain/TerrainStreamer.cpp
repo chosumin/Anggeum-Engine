@@ -42,8 +42,6 @@ namespace Core
 		_descMirror.resize(config.atlasCapacity);
 
 		// Budgeted tile payloads + the full desc table + all index mips.
-		// UNIFORM memory type: persistently mapped by the allocator, which
-		// avoids the concurrent-map hazard of the shared STAGE blocks.
 		VkDeviceSize tileBytes =
 			VkDeviceSize(config.HeightTexels()) * config.HeightTexels() * 2
 			+ VkDeviceSize(config.ColorTexels()) * config.ColorTexels() * 4 * 2;
@@ -54,7 +52,7 @@ namespace Core
 
 		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
 			_staging[slot] = device.GetResourceManager().LoadBuffer(
-				{ stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::UNIFORM },
+				{ stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE },
 				"Terrain.Staging" + to_string(slot));
 	}
 

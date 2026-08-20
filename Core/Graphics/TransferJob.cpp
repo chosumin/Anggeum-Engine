@@ -2,8 +2,10 @@
 #include "TransferJob.h"
 #include "Graphics/Vulkans/Texture.h"
 
-Core::VkImageJob::VkImageJob(Device& device, Texture& dstTexture, string filePath)
-	:Job(JobType::TRANSFER), _device(device), _dstTexture(dstTexture), _filePath(filePath)
+Core::VkImageJob::VkImageJob(Device& device, Texture& dstTexture, string filePath,
+	StagingRing* stagingRing)
+	:Job(JobType::TRANSFER), _device(device), _dstTexture(dstTexture), _filePath(filePath),
+	_stagingRing(stagingRing)
 {
 }
 
@@ -27,12 +29,28 @@ void Core::VkImageJob::Execute()
 
 	VkDeviceSize bufferSize = imageData.size();
 
-	_stagingBuffer = make_unique<Core::Buffer>(_device,
-		bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		MemoryType::STAGE);
+	StagingRing::Span span = _stagingRing != nullptr
+		? _stagingRing->Acquire(bufferSize) : StagingRing::Span{};
 
-	_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
+	Buffer* source = nullptr;
+	VkDeviceSize sourceOffset = 0;
+	if (span.IsValid())
+	{
+		memcpy(span.mapped, imageData.data(), imageData.size());
+		source = span.buffer;
+		sourceOffset = span.offset;
+	}
+	else
+	{
+		// Ring full (typical on the initial load spike) or absent: dedicated
+		// staging, freed with the job.
+		_stagingBuffer = make_unique<Core::Buffer>(_device,
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			MemoryType::STAGE);
+		_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
+		source = _stagingBuffer.get();
+	}
 
 	commandBuffer->CreateBarrierBatch()
 		.Image(_dstTexture, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -40,7 +58,8 @@ void Core::VkImageJob::Execute()
 		.Submit();
 
 	auto extent = image.GetExtent();
-	commandBuffer->CopyBufferToImage(*_stagingBuffer, _dstTexture, extent.width, extent.height);
+	commandBuffer->CopyBufferToImage(*source, _dstTexture, extent.width, extent.height,
+		sourceOffset);
 
 	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
 	if (image.GetMipLevel() > 1)

@@ -412,9 +412,8 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	header.format = VK_FORMAT_R32_SFLOAT;
 
 	void* boundsMapped = nullptr;
-	boundsStaging->Map(&boundsMapped);
+	boundsStaging->GetMappedPtr(&boundsMapped);
 	memcpy(header.rawBounds, boundsMapped, sizeof(header.rawBounds));
-	boundsStaging->Unmap();
 
 	VkDeviceSize voxelBytes = VkDeviceSize(resolution) * resolution * resolution * sizeof(float);
 
@@ -423,9 +422,8 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	memcpy(fileData.data(), &header, sizeof(SDFFileHeader));
 
 	void* imageMapped = nullptr;
-	imageStaging->Map(&imageMapped);
+	imageStaging->GetMappedPtr(&imageMapped);
 	memcpy(fileData.data() + sizeof(SDFFileHeader), imageMapped, static_cast<size_t>(voxelBytes));
-	imageStaging->Unmap();
 
 	delete imageStaging;
 	delete boundsStaging;
@@ -478,18 +476,12 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	// Voxel staging
 	auto* imageStaging = new Buffer(_device, voxelBytes,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
-	void* imageMapped = nullptr;
-	imageStaging->Map(&imageMapped);
-	memcpy(imageMapped, fileData.data() + sizeof(SDFFileHeader), static_cast<size_t>(voxelBytes));
-	imageStaging->Unmap();
+	imageStaging->CopyBuffer(fileData.data() + sizeof(SDFFileHeader), voxelBytes);
 
 	// Bounds staging
 	auto* boundsStaging = new Buffer(_device, _boundsBuffer.Get().GetSize(),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
-	void* boundsMapped = nullptr;
-	boundsStaging->Map(&boundsMapped);
-	memcpy(boundsMapped, header.rawBounds, sizeof(header.rawBounds));
-	boundsStaging->Unmap();
+	boundsStaging->CopyBuffer(header.rawBounds, sizeof(header.rawBounds));
 
 	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(header.resolution);
