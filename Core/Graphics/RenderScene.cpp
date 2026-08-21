@@ -28,9 +28,10 @@ RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer
 	_material = make_unique<MaterialManager>(device);
 	_batch = make_unique<RendererBatch>(device);
 
-	// The terrain's static grid geometry lands in the scheduler's geometry
-	// queue and is uploaded by the first Sync, like any other loaded geometry.
-	_terrainSystem = make_unique<TerrainSystem>(device, transfer.GetGeometryCopyQueue());
+	// The terrain's static grid geometry lands in the transfer context's
+	// geometry queue and is uploaded by the first Sync, like any other loaded
+	// geometry; its streamer stages tiles from the context's ring.
+	_terrainSystem = make_unique<TerrainSystem>(device, transfer);
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.

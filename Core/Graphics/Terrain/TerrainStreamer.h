@@ -8,6 +8,7 @@ namespace Core
 	class Buffer;
 	class TerrainNodeStore;
 	class TerrainQuadTree;
+	class TransferContext;
 
 	struct TerrainStreamingStats
 	{
@@ -43,8 +44,8 @@ namespace Core
 			}
 		};
 
-		TerrainStreamer(Device& device, const TerrainConfig& config,
-			const TerrainNodeStore& store, TerrainQuadTree& quadTree);
+		TerrainStreamer(const TerrainConfig& config, const TerrainNodeStore& store,
+			TerrainQuadTree& quadTree, TransferContext& transfer);
 		~TerrainStreamer();
 
 		// Main thread, once per frame, before frame-graph Setup.
@@ -76,6 +77,7 @@ namespace Core
 	private:
 		// Distance from a point to a node's XZ bounds (0 inside).
 		float DistanceToNode(vec2 point, const TerrainNodeId& id) const;
+		void CountResident();
 		bool IsRequested(vec2 cameraXZ, const TerrainNodeId& id, float radiusScale) const;
 		void UploadNode(const TerrainNodeId& id, uint8_t* stagingBase,
 			VkDeviceSize& offset);
@@ -83,13 +85,13 @@ namespace Core
 		const TerrainConfig& _config;
 		const TerrainNodeStore& _store;
 		TerrainQuadTree& _quadTree;
+		TransferContext& _transfer;
 
 		vector<TerrainNodeRuntime> _runtime;             // by global linear index
 		vector<vector<uint16_t>> _indexMirror;           // CPU copy, per LOD
 		vector<TerrainNodeDescGPU> _descMirror;          // by atlas slot
 		bool _tablesDirty = true;                        // desc + index textures
 
-		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _staging;
 		FrameUploads _uploads;
 		TerrainStreamingStats _stats;
 	};

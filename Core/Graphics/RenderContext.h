@@ -3,6 +3,7 @@
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
 #include "RenderScene.h"
+#include "FrameCounter.h"
 
 namespace Core
 {
@@ -11,15 +12,6 @@ namespace Core
 	 * It swaps between RenderFrame objects and forwards a request for vulkan resources to the active frame.
 	 * More than one frame can be in-flight in the GPU, thus the need for per-frame resources.
 	 */
-	class FrameCounter
-	{
-	public:
-		static void IncreaseFrame() { ++_frameNumber; }
-		static uint64_t GetFrameNumber() { return _frameNumber; }
-	private:
-		static inline uint64_t _frameNumber = 0;
-	};
-
 	class CommandBuffer;
 	class SwapChain;
 	class CommandPool;

@@ -7,19 +7,20 @@
 #include "Components/Transform.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/GeometryUpload.h"
-#include "Graphics/RenderContext.h"
+#include "Graphics/FrameCounter.h"
+#include "Graphics/TransferContext.h"
 #include "Graphics/Vulkans/Buffer.h"
 
 namespace Core
 {
-	TerrainSystem::TerrainSystem(Device& device, GeometryCopyQueue& geometryCopyQueue)
+	TerrainSystem::TerrainSystem(Device& device, TransferContext& transfer)
 		: _store(TerrainNodeStore::Load(_config,
 			ProceduralTerrainHeightSource(TerrainNoiseParams{},
 				_config.heightMin, _config.heightMax)))
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, _config);
-		_streamer = make_unique<TerrainStreamer>(device, _config, _store, *_quadTree);
-		CreateGridIndexBuffer(device, geometryCopyQueue);
+		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
+		CreateGridIndexBuffer(device, transfer.GetGeometryCopyQueue());
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
 		// each slot before its first GPU write has happened.

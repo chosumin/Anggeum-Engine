@@ -9,6 +9,7 @@ namespace Core
 	class Device;
 	class PerspectiveCamera;
 	class GeometryCopyQueue;
+	class TransferContext;
 	class Light;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
@@ -16,9 +17,7 @@ namespace Core
 	class TerrainSystem
 	{
 	public:
-		// The queue is RenderScene's: static geometry uploads go through the
-		// shared path (drained by the next Sync), never ImmediateSubmit.
-		TerrainSystem(Device& device, GeometryCopyQueue& geometryCopyQueue);
+		TerrainSystem(Device& device, TransferContext& transfer);
 
 		void Update(PerspectiveCamera& camera);
 

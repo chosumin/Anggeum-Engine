@@ -86,6 +86,11 @@ void Core::Engine::Draw()
 	// frame-slot staging writes require this slot's in-flight wait in Begin.
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
+
+		// After Begin: frame-slot staging spans retire against its in-flight
+		// wait, and the upload budget window opens for this frame's Sync.
+		_transferContext->BeginFrame();
+
 		// Sync drives the upload scheduler internally (submit + flush) before it
 		// writes descriptors and rebuilds the draw set, so no separate Wait is
 		// needed here. Each manager self-gates and clears its own dirty state.
@@ -96,6 +101,7 @@ void Core::Engine::Draw()
 		ScopedCpuTimer timer(phases.guiMs);
 		_renderPipeline->OnGUI(_renderContext->GetCurrentFrame());
 		_status->OnGUI();
+		_transferContext->OnGUI();
 	}
 
 	uint32_t imageIndex = _renderContext->GetImageIndex();
@@ -108,6 +114,8 @@ void Core::Engine::Draw()
 		ScopedCpuTimer timer(phases.submitMs);
 		_renderContext->Submit();
 	}
+
+	FrameCounter::IncreaseFrame();
 }
 
 void Core::Engine::WaitIdle()

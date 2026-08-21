@@ -29,6 +29,20 @@ namespace Core
 
 		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
 		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
+		StagingRing& GetStagingRing() { return *_stagingRing; }
+
+		// Once per frame, after Begin's in-flight wait: retires frame-slot
+		// staging spans and opens a fresh upload-budget window.
+		void BeginFrame();
+
+		// Shared per-frame upload budget. Returns how many of `requested`
+		// bytes the caller may stage this frame, measured against everything
+		// already asked of the staging ring (fallback traffic included) 
+		// - a scene load spike automatically starves later callers.
+		VkDeviceSize GrantUploadBudget(VkDeviceSize requested);
+
+		// Appends the upload/staging stats to the engine "Status" window.
+		void OnGUI();
 
 		// Hands a prepared job to the transfer machinery (recorded on a worker
 		// thread, submitted by the next Flush). A name already pending drops
@@ -73,6 +87,7 @@ namespace Core
 		// data does not fit (initial load spike) fall back to their own
 		// one-shot staging buffers.
 		unique_ptr<StagingRing> _stagingRing;
+		VkDeviceSize _uploadBudgetPerFrame = 16ull * 1024 * 1024;
 
 		// Monotonic upload timeline: each Flush submit signals the next value.
 		// Today Flush waits on it synchronously; the async step turns the wait

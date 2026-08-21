@@ -2,8 +2,8 @@
 #include "TerrainStreamer.h"
 #include "TerrainNodeStore.h"
 #include "TerrainQuadTree.h"
-#include "Graphics/RenderContext.h"
-#include "Graphics/ResourceManager.h"
+#include "Graphics/FrameCounter.h"
+#include "Graphics/TransferContext.h"
 #include "Graphics/Vulkans/Buffer.h"
 
 namespace
@@ -29,9 +29,10 @@ namespace
 
 namespace Core
 {
-	TerrainStreamer::TerrainStreamer(Device& device, const TerrainConfig& config,
-		const TerrainNodeStore& store, TerrainQuadTree& quadTree)
-		: _config(config), _store(store), _quadTree(quadTree)
+	TerrainStreamer::TerrainStreamer(const TerrainConfig& config,
+		const TerrainNodeStore& store, TerrainQuadTree& quadTree,
+		TransferContext& transfer)
+		: _config(config), _store(store), _quadTree(quadTree), _transfer(transfer)
 	{
 		_runtime.resize(config.TotalNodeCount());
 
@@ -40,20 +41,6 @@ namespace Core
 			_indexMirror[lod].assign(config.NodeCount(lod), TERRAIN_NODE_EMPTY);
 
 		_descMirror.resize(config.atlasCapacity);
-
-		// Budgeted tile payloads + the full desc table + all index mips.
-		VkDeviceSize tileBytes =
-			VkDeviceSize(config.HeightTexels()) * config.HeightTexels() * 2
-			+ VkDeviceSize(config.ColorTexels()) * config.ColorTexels() * 4 * 2;
-		VkDeviceSize stagingSize = Align(
-			config.uploadBudgetPerFrame * (tileBytes + 64)
-			+ config.atlasCapacity * sizeof(TerrainNodeDescGPU)
-			+ config.TotalNodeCount() * sizeof(uint16_t) + 1024, 65536);
-
-		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
-			_staging[slot] = device.GetResourceManager().LoadBuffer(
-				{ stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE },
-				"Terrain.Staging" + to_string(slot));
 	}
 
 	TerrainStreamer::~TerrainStreamer() = default;
@@ -155,14 +142,54 @@ namespace Core
 				return DistanceToNode(cameraXZ, a) < DistanceToNode(cameraXZ, b);
 			});
 
-		Buffer& staging = _staging[FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT].Get();
-		uint8_t* stagingBase = nullptr;
-		staging.GetMappedPtr(reinterpret_cast<void**>(&stagingBase));
-		VkDeviceSize offset = 0;
+		// The tile cap converts to bytes and asks the SHARED upload budget:
+		// a scene load spike that already staged its bytes this frame shrinks
+		// what terrain may stream, and vice versa once loads are budgeted too.
+		VkDeviceSize tileBytes =
+			VkDeviceSize(_config.HeightTexels()) * _config.HeightTexels() * 2
+			+ VkDeviceSize(_config.ColorTexels()) * _config.ColorTexels() * 4 * 2
+			+ 64; // per-tile alignment slack
+		VkDeviceSize tableBytes = _config.atlasCapacity * sizeof(TerrainNodeDescGPU)
+			+ _config.TotalNodeCount() * sizeof(uint16_t)
+			+ 16 * (_config.lodCount + 1);
+
+		uint32_t budgetTiles = std::min<uint32_t>(_config.uploadBudgetPerFrame,
+			uint32_t(toLoad.size()));
+		if (budgetTiles > 0)
+		{
+			VkDeviceSize granted = _transfer.GrantUploadBudget(budgetTiles * tileBytes);
+			budgetTiles = uint32_t(granted / tileBytes);
+		}
+
+		if (budgetTiles == 0 && !_tablesDirty)
+		{
+			// Nothing to write: no span, no uploads published this frame.
+			_stats.pending += uint32_t(toLoad.size());
+			CountResident();
+			return;
+		}
+
+		StagingRing::Span span = _transfer.GetStagingRing().Acquire(
+			budgetTiles * tileBytes + tableBytes);
+		if (!span.IsValid())
+		{
+			// Ring exhausted (load spike): stream nothing this frame. The
+			// requested state is unchanged, so everything retries next frame.
+			_stats.pending += uint32_t(toLoad.size());
+			CountResident();
+			return;
+		}
+
+		// Regions carry offsets into the ring BUFFER, so rebase the write
+		// pointer to the buffer's origin: the append math below then works in
+		// absolute offsets exactly as it did on a dedicated buffer.
+		uint8_t* stagingBase = span.mapped - span.offset;
+		VkDeviceSize offset = span.offset;
+		const VkDeviceSize spanEnd = offset + budgetTiles * tileBytes + tableBytes;
 
 		for (const TerrainNodeId& id : toLoad)
 		{
-			if (_stats.uploadedThisFrame >= _config.uploadBudgetPerFrame)
+			if (_stats.uploadedThisFrame >= budgetTiles)
 			{
 				++_stats.pending;
 				continue;
@@ -203,9 +230,19 @@ namespace Core
 			_tablesDirty = false;
 		}
 
-		assert(offset <= staging.GetSize());
-		_uploads.staging = &staging;
+		assert(offset <= spanEnd);
+		_uploads.staging = span.buffer;
 
+		// The frame graph consumes this span on the graphics queue; it may be
+		// reused once Begin's wait has retired this frame's slot.
+		_transfer.GetStagingRing().StampForFrameSlot(
+			FrameCounter::GetFrameNumber() + MAX_FRAMES_IN_FLIGHT);
+
+		CountResident();
+	}
+
+	void TerrainStreamer::CountResident()
+	{
 		for (const auto& runtime : _runtime)
 			if (runtime.state == TerrainNodeState::Resident)
 				++_stats.resident;

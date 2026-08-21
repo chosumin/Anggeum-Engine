@@ -23,6 +23,8 @@ StagingRing::Span StagingRing::Acquire(VkDeviceSize size)
 
 	lock_guard<mutex> lock(_mutex);
 
+	_frameRequested += size;
+
 	// A span never wraps: when it does not fit before the ring's end, the
 	// remainder is skipped (and counted as used, so it reclaims with this
 	// stamp range like any other bytes).
@@ -35,11 +37,15 @@ StagingRing::Span StagingRing::Acquire(VkDeviceSize size)
 	}
 
 	if (_used + skip + aligned > _capacity)
+	{
+		++_fallbacks;
 		return {};
+	}
 
 	_head = start + aligned;
 	_used += skip + aligned;
 	_pendingUsed += skip + aligned;
+	_peakUsed = std::max(_peakUsed, _used);
 
 	Span span;
 	span.buffer = _buffer.get();
@@ -55,18 +61,68 @@ void StagingRing::Stamp(uint64_t timelineValue)
 	if (_pendingUsed == 0)
 		return;
 
-	_stamps.push_back({ timelineValue, _pendingUsed });
+	_stamps.push_back({ false, timelineValue, _pendingUsed });
 	_pendingUsed = 0;
 }
 
-void StagingRing::Reclaim(uint64_t completedValue)
+void StagingRing::StampForFrameSlot(uint64_t firstSafeFrame)
 {
 	lock_guard<mutex> lock(_mutex);
 
-	// Stamps are monotonic, so completed ranges always form a prefix.
-	while (!_stamps.empty() && _stamps.front().value <= completedValue)
+	if (_pendingUsed == 0)
+		return;
+
+	_stamps.push_back({ true, firstSafeFrame, _pendingUsed });
+	_pendingUsed = 0;
+}
+
+void StagingRing::Reclaim(uint64_t transferCompleted, uint64_t currentFrame)
+{
+	lock_guard<mutex> lock(_mutex);
+
+	// Stamps are FIFO and reclamation is positional, so only a completed
+	// PREFIX can free. A still-pending range blocks the ones behind it - fine,
+	// both timelines retire within a couple of frames.
+	while (!_stamps.empty())
 	{
-		_used -= _stamps.front().used;
+		const StampedRange& front = _stamps.front();
+		bool completed = front.frameSlot
+			? currentFrame >= front.value
+			: transferCompleted >= front.value;
+		if (!completed)
+			break;
+
+		_used -= front.used;
 		_stamps.pop_front();
 	}
+}
+
+void StagingRing::BeginFrame()
+{
+	lock_guard<mutex> lock(_mutex);
+	_frameRequested = 0;
+}
+
+VkDeviceSize StagingRing::GetUsed()
+{
+	lock_guard<mutex> lock(_mutex);
+	return _used;
+}
+
+VkDeviceSize StagingRing::GetPeakUsed()
+{
+	lock_guard<mutex> lock(_mutex);
+	return _peakUsed;
+}
+
+VkDeviceSize StagingRing::GetFrameRequested()
+{
+	lock_guard<mutex> lock(_mutex);
+	return _frameRequested;
+}
+
+uint32_t StagingRing::GetFallbackCount()
+{
+	lock_guard<mutex> lock(_mutex);
+	return _fallbacks;
 }

@@ -88,6 +88,10 @@ void RenderContext::RecreateSwapChain()
 
 void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 {
+	// The frame slot DERIVES from the engine-owned frame counter 
+	// (Engine advances it once per loop, after Submit).
+	_currentFrame = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+
 	// Acquire swap chain image and wait
 	AcquireSwapChainAndResetFence(*_swapChain);
 
@@ -243,6 +247,4 @@ void RenderContext::EndFrame(VkSemaphore* semaphore)
 	else if (result != VK_SUCCESS)
 		throw runtime_error("failed to present swap chain image!");
 
-	FrameCounter::IncreaseFrame();
-	_currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }

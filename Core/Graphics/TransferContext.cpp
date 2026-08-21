@@ -2,6 +2,7 @@
 #include "TransferContext.h"
 #include "TransferJob.h"
 #include "Foundation/WorkerThread.h"
+#include "Graphics/FrameCounter.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
@@ -35,6 +36,35 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 TransferContext::~TransferContext()
 {
 	vkDestroySemaphore(_device.GetDevice(), _timeline, nullptr);
+}
+
+void TransferContext::BeginFrame()
+{
+	// Frame-slot spans stamped "safe at frame N" retire here: Begin's
+	// in-flight wait (which precedes this) has retired that slot's frame.
+	_stagingRing->Reclaim(_submittedValue, FrameCounter::GetFrameNumber());
+	_stagingRing->BeginFrame();
+}
+
+VkDeviceSize TransferContext::GrantUploadBudget(VkDeviceSize requested)
+{
+	VkDeviceSize used = _stagingRing->GetFrameRequested();
+	VkDeviceSize remaining = used < _uploadBudgetPerFrame
+		? _uploadBudgetPerFrame - used : 0;
+	return std::min(requested, remaining);
+}
+
+void TransferContext::OnGUI()
+{
+	// Appends to the engine-level "Status" window (same-name Begin appends).
+	ImGui::Begin("Status");
+	ImGui::Separator();
+	ImGui::Text("Upload budget: %llu / %llu KB this frame",
+		_stagingRing->GetFrameRequested() / 1024, _uploadBudgetPerFrame / 1024);
+	ImGui::Text("Staging ring: %llu / %llu KB (peak %llu), fallbacks %u",
+		_stagingRing->GetUsed() / 1024, _stagingRing->GetCapacity() / 1024,
+		_stagingRing->GetPeakUsed() / 1024, _stagingRing->GetFallbackCount());
+	ImGui::End();
 }
 
 void TransferContext::Enqueue(unique_ptr<Job> job, const string& jobName)
@@ -166,7 +196,7 @@ void TransferContext::Flush()
 	waitInfo.pValues = &signalValue;
 	vkWaitSemaphores(_device.GetDevice(), &waitInfo, UINT64_MAX);
 
-	_stagingRing->Reclaim(signalValue);
+	_stagingRing->Reclaim(signalValue, FrameCounter::GetFrameNumber());
 
 	ClearJobs();
 

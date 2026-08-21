@@ -8,7 +8,7 @@
 #include "Image.h"
 #include "BindlessTextureManager.h"
 #include "DescriptorPool.h"
-#include "Graphics/RenderContext.h"
+#include "Graphics/FrameCounter.h"
 #include "Graphics/RenderFrame.h"
 #include "Foundation/Job.h"
 

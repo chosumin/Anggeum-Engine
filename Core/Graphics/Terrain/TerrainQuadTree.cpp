@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "TerrainQuadTree.h"
 #include "Graphics/ResourceManager.h"
-#include "Graphics/RenderContext.h"
+#include "Graphics/FrameCounter.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
