@@ -3,6 +3,7 @@
 #include "TransferJob.h"
 #include "Foundation/WorkerThread.h"
 #include "Graphics/FrameCounter.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
@@ -10,21 +11,12 @@
 
 using namespace Core;
 
-TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager)
+TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
+	SyncContext& syncContext)
 	: _device(device)
 	, _workerThreadManager(workerThreadManager)
+	, _sync(syncContext)
 {
-	VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
-	semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-	semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-
-	VkSemaphoreCreateInfo semaphoreInfo{};
-	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-	semaphoreInfo.pNext = &semaphoreTypeInfo;
-
-	if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_timeline) != VK_SUCCESS)
-		throw runtime_error("failed to create the upload timeline semaphore!");
-
 	_primaryCommandPool = make_unique<CommandPool>(_device,
 		_device.GetQueueFamilyIndices().TransferFamily.value());
 
@@ -33,16 +25,13 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 	_stagingRing = make_unique<StagingRing>(_device, 32ull * 1024 * 1024);
 }
 
-TransferContext::~TransferContext()
-{
-	vkDestroySemaphore(_device.GetDevice(), _timeline, nullptr);
-}
+TransferContext::~TransferContext() = default;
 
 void TransferContext::BeginFrame()
 {
 	// Frame-slot spans stamped "safe at frame N" retire here: Begin's
 	// in-flight wait (which precedes this) has retired that slot's frame.
-	_stagingRing->Reclaim(_submittedValue, FrameCounter::GetFrameNumber());
+	_stagingRing->Reclaim(_lastSubmittedValue, FrameCounter::GetFrameNumber());
 	_stagingRing->BeginFrame();
 }
 
@@ -160,39 +149,27 @@ void TransferContext::Flush()
 		[](const auto& job) { return job.second->commandBuffer; });
 
 	primary.ExecuteCommands(secondaryCommands);
+	primary.EndCommandBuffer();
 
-	uint64_t signalValue = ++_submittedValue;
+	// The SyncContext owns the transfer timeline and remembers the value so
+	// the frame's queue submits gate on it (pre-signalled while this stays
+	// synchronous; load-bearing once the CPU wait below goes away).
+	uint64_t signalValue = _sync.SubmitTransfer(primary.GetHandle());
+	_lastSubmittedValue = signalValue;
 
 	// Every span the jobs acquired belongs to this submission.
 	_stagingRing->Stamp(signalValue);
-
-	VkTimelineSemaphoreSubmitInfo timelineInfo{};
-	timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-	timelineInfo.signalSemaphoreValueCount = 1;
-	timelineInfo.pSignalSemaphoreValues = &signalValue;
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = &timelineInfo;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &primary.GetHandle();
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &_timeline;
-
-	primary.EndCommandBuffer();
-
-	VkQueue queue = _device.GetTransferQueue();
-	vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
 
 	lock.unlock();
 
 	// Still synchronous: block until this submission's value signals. The
 	// async step replaces this with per-frame vkGetSemaphoreCounterValue
 	// polling that promotes completed uploads instead of stalling here.
+	VkSemaphore transferSemaphore = _sync.GetSemaphore(QueueType::Transfer);
 	VkSemaphoreWaitInfo waitInfo{};
 	waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
 	waitInfo.semaphoreCount = 1;
-	waitInfo.pSemaphores = &_timeline;
+	waitInfo.pSemaphores = &transferSemaphore;
 	waitInfo.pValues = &signalValue;
 	vkWaitSemaphores(_device.GetDevice(), &waitInfo, UINT64_MAX);
 

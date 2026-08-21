@@ -28,7 +28,7 @@ using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	WorkerThreadManager& workerThreadManager,
-	RenderScene& renderScene, SwapChain& swapChain)
+	RenderScene& renderScene, SwapChain& swapChain, SyncContext& syncContext)
 	:_device(device)
 	,_renderScene(renderScene)
 	,_swapChainExtents(swapChain.GetSwapChainExtent())
@@ -82,7 +82,8 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	_frameGraph->AddPass(make_unique<TerrainPass>(device, renderScene,
 		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
 
-	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));
+	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples,
+		syncContext));
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()

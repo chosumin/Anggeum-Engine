@@ -30,7 +30,7 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device, RenderScene& renderScene);
+		RenderContext(Device& device, RenderScene& renderScene, SyncContext& syncContext);
 		~RenderContext();
 
 		void RecreateSwapChain();
@@ -77,7 +77,7 @@ namespace Core
 
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
-		SyncContext& GetSyncContext() { return *_syncContext; }
+		SyncContext& GetSyncContext() { return _syncContext; }
 	private:
 		void CreateRenderFrames();
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
@@ -99,7 +99,7 @@ namespace Core
 		uint32_t _currentFrame = 0;
 		
 		// Sync primitives (timeline semaphores, timeline values, frame snapshots)
-		unique_ptr<SyncContext> _syncContext;
+		SyncContext& _syncContext;
 		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
 
 		// GPU-side measurement of how much the two queues actually overlap

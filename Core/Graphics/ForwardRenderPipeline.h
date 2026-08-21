@@ -12,12 +12,14 @@ namespace Core
 	class Buffer;
 	class RenderContext;
 	class FrameGraph;
+	class SyncContext;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
-		ForwardRenderPipeline(Device& device, 
-			WorkerThreadManager& workerThreadManager, RenderScene& renderScene, SwapChain& swapChain);
+		ForwardRenderPipeline(Device& device,
+			WorkerThreadManager& workerThreadManager, RenderScene& renderScene,
+			SwapChain& swapChain, SyncContext& syncContext);
 		virtual ~ForwardRenderPipeline() override;
 
 		virtual void Draw(RenderContext& renderContext, RenderFrame& renderFrame, uint32_t imageIndex) override;

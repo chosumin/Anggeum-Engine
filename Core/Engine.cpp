@@ -3,6 +3,7 @@
 #include "Foundation/WorkerThread.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/ResourceManager.h"
@@ -19,12 +20,14 @@ Core::Engine::Engine(const EngineOptions& options)
 
     _device = new Core::Device(*options.window);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
-    _transferContext = new Core::TransferContext(*_device, *_workerThreadManager);
+    _syncContext = new Core::SyncContext(*_device);
+    _transferContext = new Core::TransferContext(*_device, *_workerThreadManager,
+        *_syncContext);
 
     auto* sampleScene = new SampleScene(*_device);
     _scene = sampleScene;
     _renderScene = new Core::RenderScene(*_device, *_scene, *_transferContext);
-    _renderContext = new Core::RenderContext(*_device, *_renderScene);
+    _renderContext = new Core::RenderContext(*_device, *_renderScene, *_syncContext);
     _status = make_unique<Core::Status>(*_renderContext);
 
     auto& resourceManager = _device->GetResourceManager();
@@ -36,7 +39,7 @@ Core::Engine::Engine(const EngineOptions& options)
     sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
     _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
-        *_renderScene, swapChain);
+        *_renderScene, swapChain, *_syncContext);
 }
 
 Core::Engine::~Engine()
@@ -48,6 +51,7 @@ Core::Engine::~Engine()
     delete(_renderScene);
     delete(_scene);
     delete(_transferContext);
+    delete(_syncContext);
     delete(_workerThreadManager);
     delete(_device);
 

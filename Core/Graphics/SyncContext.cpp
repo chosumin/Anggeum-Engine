@@ -10,6 +10,12 @@ SyncContext::SyncContext(Device& device)
 {
     auto device_ = _device.GetDevice();
 
+    const auto& families = _device.GetQueueFamilyIndices();
+    vkGetDeviceQueue(device_, families.GraphicsFamily.value(), 0, &_graphicsQueue);
+    vkGetDeviceQueue(device_, families.ComputeFamily.value(), 0, &_computeQueue);
+    vkGetDeviceQueue(device_, families.PresentFamily.value(), 0, &_presentQueue);
+    vkGetDeviceQueue(device_, families.TransferFamily.value(), 0, &_transferQueue);
+
     VkSemaphoreTypeCreateInfo semaphoreTypeInfo{};
     semaphoreTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
     semaphoreTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
@@ -20,7 +26,8 @@ SyncContext::SyncContext(Device& device)
 
     if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &_graphicsSemaphore) != VK_SUCCESS ||
         vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &_computeSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &_resourceSemaphore) != VK_SUCCESS)
+        vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &_resourceSemaphore) != VK_SUCCESS ||
+        vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &_transferSemaphore) != VK_SUCCESS)
     {
         throw runtime_error("Failed to create timeline semaphores!");
     }
@@ -35,16 +42,28 @@ SyncContext::~SyncContext()
         vkDestroySemaphore(device_, _computeSemaphore, nullptr);
     if (_resourceSemaphore != VK_NULL_HANDLE)
         vkDestroySemaphore(device_, _resourceSemaphore, nullptr);
+    if (_transferSemaphore != VK_NULL_HANDLE)
+        vkDestroySemaphore(device_, _transferSemaphore, nullptr);
 }
 
 VkSemaphore SyncContext::GetSemaphore(QueueType queueType) const
 {
-    return (queueType == QueueType::Compute) ? _computeSemaphore : _graphicsSemaphore;
+    switch (queueType)
+    {
+    case QueueType::Compute:  return _computeSemaphore;
+    case QueueType::Transfer: return _transferSemaphore;
+    default:                  return _graphicsSemaphore;
+    }
 }
 
 u64 SyncContext::GetCurrentValue(QueueType queueType) const
 {
-    return (queueType == QueueType::Compute) ? _computeSemaphoreValue : _graphicsSemaphoreValue;
+    switch (queueType)
+    {
+    case QueueType::Compute:  return _computeSemaphoreValue;
+    case QueueType::Transfer: return _transferSemaphoreValue;
+    default:                  return _graphicsSemaphoreValue;
+    }
 }
 
 u64 SyncContext::AcquireNextValue(QueueType queueType)
@@ -76,10 +95,40 @@ void SyncContext::SubmitResourceInit(VkCommandBuffer commandBuffer)
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &_resourceSemaphore;
 
-    if (vkQueueSubmit(_device.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+    if (vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
         throw runtime_error("failed to submit resource init commands!");
 
     _pendingResourceWait = signalValue;
+}
+
+VkResult SyncContext::Present(const VkPresentInfoKHR& presentInfo)
+{
+    return vkQueuePresentKHR(_presentQueue, &presentInfo);
+}
+
+u64 SyncContext::SubmitTransfer(VkCommandBuffer commandBuffer)
+{
+    u64 signalValue = ++_transferSemaphoreValue;
+
+    VkTimelineSemaphoreSubmitInfo timelineInfo{};
+    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timelineInfo.signalSemaphoreValueCount = 1;
+    timelineInfo.pSignalSemaphoreValues = &signalValue;
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = &timelineInfo;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &_transferSemaphore;
+
+    if (vkQueueSubmit(_transferQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+        throw runtime_error("failed to submit transfer commands!");
+
+    // Monotonic: a later submit's value covers every earlier one.
+    _pendingTransferWait = signalValue;
+    return signalValue;
 }
 
 void SyncContext::SubmitToQueues(
@@ -105,12 +154,15 @@ void SyncContext::SubmitToQueues(
         }
     }
 
-    // Resource init already went out on the graphics queue, ahead of this frame.
-    // Gate the first submit of each queue on it: a pass may sample a target it
-    // transitioned or read a buffer it filled, and the compute queue has no
-    // implicit ordering against the graphics queue at all.
-    if (_pendingResourceWait != 0)
+    // Work that went out ahead of this frame (resource init on graphics,
+    // uploads on transfer) gates the first submit of each queue: a pass may
+    // sample a target it transitioned or read a buffer it filled, and the
+    // compute queue has no implicit ordering against the other queues at all.
+    auto gateBothQueues = [&](VkSemaphore semaphore, u64& pendingWait)
     {
+        if (pendingWait == 0)
+            return;
+
         bool graphicsGated = false;
         bool computeGated = false;
 
@@ -122,7 +174,7 @@ void SyncContext::SubmitToQueues(
             if (gated)
                 continue;
 
-            info.AddTimelineWaitSemaphore(_resourceSemaphore, _pendingResourceWait,
+            info.AddTimelineWaitSemaphore(semaphore, pendingWait,
                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
             gated = true;
 
@@ -130,8 +182,11 @@ void SyncContext::SubmitToQueues(
                 break;
         }
 
-        _pendingResourceWait = 0;
-    }
+        pendingWait = 0;
+    };
+
+    gateBothQueues(_resourceSemaphore, _pendingResourceWait);
+    gateBothQueues(_transferSemaphore, _pendingTransferWait);
 
     // renderFinished binary + graphics timeline signal -> last graphics submit
     for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
@@ -167,8 +222,8 @@ void SyncContext::SubmitToQueues(
             scratch.push_back(submitInfos[runEnd].Build());
 
         VkQueue queue = (queueType == QueueType::Compute)
-            ? _device.GetComputeQueue()
-            : _device.GetGraphicsQueue();
+            ? _computeQueue
+            : _graphicsQueue;
 
         if (vkQueueSubmit(queue,
             static_cast<uint32_t>(scratch.size()),

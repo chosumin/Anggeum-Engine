@@ -6,7 +6,8 @@ namespace Core
     {
         None,
         Graphics,
-        Compute
+        Compute,
+        Transfer
     };
 
     class Device;
@@ -46,28 +47,50 @@ namespace Core
         // first submit of *both* queues on it.
         void SubmitResourceInit(VkCommandBuffer commandBuffer);
 
+        // Submits an upload batch on the transfer queue, signalling the
+        // transfer timeline; returns the signalled value.
+        u64 SubmitTransfer(VkCommandBuffer commandBuffer);
+
         // Injects the frame-level semaphores and submits the frame
         void SubmitToQueues(deque<SubmitInfo>& submitInfos,
                             vector<VkSubmitInfo>& scratch,
                             VkSemaphore imageAvailable,
                             VkSemaphore renderFinished);
 
+        // Presentation is a queue operation too, so it goes through the
+        // submission authority like every submit.
+        VkResult Present(const VkPresentInfoKHR& presentInfo);
+
         // Direct handle accessors (for RenderContext internal use)
         VkSemaphore GetGraphicsSemaphore() const { return _graphicsSemaphore; }
         VkSemaphore GetComputeSemaphore() const { return _computeSemaphore; }
+
+        // For third-party init only (ImGui's backend wants the raw handle);
+        // engine code submits through this class, never through the handle.
+        VkQueue GetGraphicsQueueForExternalInit() const { return _graphicsQueue; }
     private:
         Device& _device;
+
+        // The queue handles live here, not on Device: submission (and its
+        // timeline bookkeeping) has exactly one owner.
+        VkQueue _graphicsQueue = VK_NULL_HANDLE;
+        VkQueue _computeQueue = VK_NULL_HANDLE;
+        VkQueue _presentQueue = VK_NULL_HANDLE;
+        VkQueue _transferQueue = VK_NULL_HANDLE;
 
         VkSemaphore _graphicsSemaphore = VK_NULL_HANDLE;
         VkSemaphore _computeSemaphore = VK_NULL_HANDLE;
         VkSemaphore _resourceSemaphore = VK_NULL_HANDLE;
+        VkSemaphore _transferSemaphore = VK_NULL_HANDLE;
 
         u64 _graphicsSemaphoreValue = 0;
         u64 _computeSemaphoreValue = 0;
         u64 _resourceSemaphoreValue = 0;
+        u64 _transferSemaphoreValue = 0;
 
-        // Value the next SubmitToQueues must wait on, or 0 when no resource-init
-        // work was submitted for this frame. Cleared once the wait is injected.
+        // Values the next SubmitToQueues must wait on, or 0 when nothing was
+        // submitted for this frame. Cleared once the wait is injected.
         u64 _pendingResourceWait = 0;
+        u64 _pendingTransferWait = 0;
     };
 }

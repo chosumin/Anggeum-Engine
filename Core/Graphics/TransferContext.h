@@ -11,6 +11,7 @@ namespace Core
 	class WorkerThreadManager;
 	class CommandPool;
 	class SubMesh;
+	class SyncContext;
 
 	// Engine-owned transfer context: the single hand-off point between resource
 	// loading and the GPU. Request queues on top (loaders, terrain, the draw
@@ -24,7 +25,8 @@ namespace Core
 	class TransferContext
 	{
 	public:
-		TransferContext(Device& device, WorkerThreadManager& workerThreadManager);
+		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
+			SyncContext& syncContext);
 		~TransferContext();
 
 		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
@@ -89,11 +91,13 @@ namespace Core
 		unique_ptr<StagingRing> _stagingRing;
 		VkDeviceSize _uploadBudgetPerFrame = 16ull * 1024 * 1024;
 
-		// Monotonic upload timeline: each Flush submit signals the next value.
-		// Today Flush waits on it synchronously; the async step turns the wait
-		// into per-frame counter polling that promotes completed uploads.
-		VkSemaphore _timeline = VK_NULL_HANDLE;
-		uint64_t _submittedValue = 0;
+		SyncContext& _sync;
+
+		// The transfer timeline value of the latest submitted batch (the
+		// timeline itself lives on the SyncContext). Today Flush waits on it
+		// synchronously; the async step turns the wait into per-frame counter
+		// polling that promotes completed uploads.
+		uint64_t _lastSubmittedValue = 0;
 
 		condition_variable _jobWait;
 		mutex _lock;

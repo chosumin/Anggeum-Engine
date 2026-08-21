@@ -45,11 +45,6 @@ namespace Core
 		}
 		VkSurfaceKHR GetSurface() { return _surface; }
 
-		VkQueue GetGraphicsQueue() { return _graphicsQueue; }
-		VkQueue GetComputeQueue() { return _computeQueue; }
-		VkQueue GetPresentQueue() { return _presentQueue; }
-		VkQueue GetTransferQueue() { return _transferQueue; }
-
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
@@ -96,10 +91,10 @@ namespace Core
 		VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 		VkDevice _device;
 		
+		// HACK: only EndSingleTimeCommands submits here, bypassing the
+		// SyncContext timelines. Delete once the SDF bake paths migrate to
+		// transfer jobs; every other queue handle lives on SyncContext.
 		VkQueue _graphicsQueue;
-		VkQueue _computeQueue;
-		VkQueue _presentQueue;
-		VkQueue _transferQueue;
 
 		ResourceManager* _resourceManager;
 
