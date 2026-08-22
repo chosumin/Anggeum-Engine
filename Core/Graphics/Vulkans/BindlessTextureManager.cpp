@@ -1,11 +1,15 @@
 #include "stdafx.h"
 #include "BindlessTextureManager.h"
+#include "Graphics/ResourceManager.h"
 
 namespace Core
 {
 	BindlessTextureManager::BindlessTextureManager(Device& device, uint32_t maxTextures)
 		: _device(device), _maxTextures(maxTextures)
 	{
+		_defaultTexture = device.GetResourceManager().GetDefaultTextureHandle();
+		_defaultTextureBuffer.rawTexture = &_defaultTexture.Get();
+
 		_texture2DSlots.resize(maxTextures);
 		_cubemapSlots.resize(maxTextures);
 		
@@ -100,8 +104,26 @@ namespace Core
 		_needsUpdate = true;
 	}
 
+	// The texture's data path exists: its VkImage was created by the upload
+	// job (T2 replaces this probe with the pool slot's residency state).
+	static bool IsTextureReady(Handle<Texture>& handle)
+	{
+		Texture* texture = handle.TryGet();
+		return texture != nullptr
+			&& texture->GetImage().GetImage() != VK_NULL_HANDLE;
+	}
+
 	void BindlessTextureManager::Sync()
 	{
+		// Once their upload created the real image, the write below patches them in place.
+		if (!_awaitingReal.empty())
+		{
+			for (uint32_t packedIndex : _awaitingReal)
+				_pendingUpdates.push_back(packedIndex);
+			_awaitingReal.clear();
+			_needsUpdate = true;
+		}
+
 		if (!_needsUpdate || _pendingUpdates.empty())
 			return;
 
@@ -118,19 +140,39 @@ namespace Core
 		{
 			bool isCubemap = (packedIndex & BindlessCubemapFlag) != 0;
 			uint32_t slotIndex = packedIndex & ~BindlessCubemapFlag;
-			
+
 			auto& slot = isCubemap ? _cubemapSlots[slotIndex] : _texture2DSlots[slotIndex];
-			
+
 			uint binding = isCubemap ? 1 : 0;
 
-			VkDescriptorImageInfo imageInfo{};
 			if (slot.isActive && slot.texture.IsValid())
 			{
-				slot.textureBuffer.rawTexture = &slot.texture.Get();
-				auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-				write.dstSet = _descriptorSet;
-				write.dstArrayElement = slotIndex;
-				writes.push_back(write);
+				if (IsTextureReady(slot.texture))
+				{
+					slot.textureBuffer.rawTexture = &slot.texture.Get();
+					auto write = slot.textureBuffer.CreateWriteDescriptorSet(binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					write.dstSet = _descriptorSet;
+					write.dstArrayElement = slotIndex;
+					writes.push_back(write);
+				}
+				else
+				{
+					// Not uploaded yet: publish the placeholder so the slot is
+					// valid to sample from the moment it is registered, and
+					// patch the real texture in a later Sync. (2D only - the
+					// placeholder is a 2D image; a cubemap slot stays
+					// unwritten, which PARTIALLY_BOUND permits until use.)
+					if (!isCubemap)
+					{
+						auto write = _defaultTextureBuffer.CreateWriteDescriptorSet(
+							binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+						write.dstSet = _descriptorSet;
+						write.dstArrayElement = slotIndex;
+						writes.push_back(write);
+					}
+
+					_awaitingReal.push_back(packedIndex);
+				}
 			}
 			else
 			{
@@ -147,8 +189,11 @@ namespace Core
 			}
 		}
 
-		vkUpdateDescriptorSets(_device.GetDevice(), 
-			static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+		if (!writes.empty())
+		{
+			vkUpdateDescriptorSets(_device.GetDevice(),
+				static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+		}
 
 		_pendingUpdates.clear();
 		_needsUpdate = false;
