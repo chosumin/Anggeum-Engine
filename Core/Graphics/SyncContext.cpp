@@ -66,6 +66,13 @@ u64 SyncContext::GetCurrentValue(QueueType queueType) const
     }
 }
 
+u64 SyncContext::QueryCompletedValue(QueueType queueType) const
+{
+    u64 value = 0;
+    vkGetSemaphoreCounterValue(_device.GetDevice(), GetSemaphore(queueType), &value);
+    return value;
+}
+
 u64 SyncContext::AcquireNextValue(QueueType queueType)
 {
     return (queueType == QueueType::Compute) ? ++_computeSemaphoreValue : ++_graphicsSemaphoreValue;

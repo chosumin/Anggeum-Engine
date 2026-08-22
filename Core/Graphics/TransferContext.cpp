@@ -29,10 +29,20 @@ TransferContext::~TransferContext() = default;
 
 void TransferContext::BeginFrame()
 {
-	// Frame-slot spans stamped "safe at frame N" retire here: Begin's
-	// in-flight wait (which precedes this) has retired that slot's frame.
-	_stagingRing->Reclaim(_lastSubmittedValue, FrameCounter::GetFrameNumber());
+	// Non-blocking completion poll: everything the GPU has passed retires
+	// here - transfer-stamped ring spans, the jobs (and fallback staging)
+	// of completed batches, and frame-slot spans whose frame Begin's
+	// in-flight wait (which precedes this) has retired.
+	uint64_t completed = _sync.QueryCompletedValue(QueueType::Transfer);
+	CollectCompletedJobs(completed);
+	_stagingRing->Reclaim(completed, FrameCounter::GetFrameNumber());
 	_stagingRing->BeginFrame();
+}
+
+void TransferContext::CollectCompletedJobs(uint64_t completedValue)
+{
+	while (!_inFlightJobs.empty() && _inFlightJobs.front().value <= completedValue)
+		_inFlightJobs.pop_front();
 }
 
 VkDeviceSize TransferContext::GrantUploadBudget(VkDeviceSize requested)
@@ -151,31 +161,22 @@ void TransferContext::Flush()
 	primary.ExecuteCommands(secondaryCommands);
 	primary.EndCommandBuffer();
 
-	// The SyncContext owns the transfer timeline and remembers the value so
-	// the frame's queue submits gate on it (pre-signalled while this stays
-	// synchronous; load-bearing once the CPU wait below goes away).
 	uint64_t signalValue = _sync.SubmitTransfer(primary.GetHandle());
-	_lastSubmittedValue = signalValue;
 
 	// Every span the jobs acquired belongs to this submission.
 	_stagingRing->Stamp(signalValue);
 
 	lock.unlock();
 
-	// Still synchronous: block until this submission's value signals. The
-	// async step replaces this with per-frame vkGetSemaphoreCounterValue
-	// polling that promotes completed uploads instead of stalling here.
-	VkSemaphore transferSemaphore = _sync.GetSemaphore(QueueType::Transfer);
-	VkSemaphoreWaitInfo waitInfo{};
-	waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-	waitInfo.semaphoreCount = 1;
-	waitInfo.pSemaphores = &transferSemaphore;
-	waitInfo.pValues = &signalValue;
-	vkWaitSemaphores(_device.GetDevice(), &waitInfo, UINT64_MAX);
-
-	_stagingRing->Reclaim(signalValue, FrameCounter::GetFrameNumber());
-
-	ClearJobs();
+	// The jobs (owning any fallback staging) stay alive until BeginFrame's
+	// completion poll sees the GPU pass this value.
+	InFlightJobs batch;
+	batch.value = signalValue;
+	batch.jobs.reserve(_pendingJobs.size());
+	for (auto& [name, job] : _pendingJobs)
+		batch.jobs.push_back(std::move(job));
+	_pendingJobs.clear();
+	_inFlightJobs.push_back(std::move(batch));
 
 	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
 	cout << "Transfer Time : " << deltaTime << endl;
@@ -193,9 +194,3 @@ vector<TransferContext::CompletedBounds> TransferContext::TakeCompletedBounds()
 	return completed;
 }
 
-void TransferContext::ClearJobs()
-{
-	// Flush() only reaches here after every job reported COMPLETE and the GPU fence
-	// signaled, so destroying them (and the staging buffers they own) is safe.
-	_pendingJobs.clear();
-}

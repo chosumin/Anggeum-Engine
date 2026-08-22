@@ -39,6 +39,10 @@ namespace Core
         u64 GetCurrentValue(QueueType queueType) const;
         u64 AcquireNextValue(QueueType queueType);
 
+        // The GPU-side progress of a queue's timeline (non-blocking poll):
+        // every submission whose value is <= this has fully executed.
+        u64 QueryCompletedValue(QueueType queueType) const;
+
         // Frame slot snapshots (for reusing a frame slot safely)
         void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
 

@@ -20,8 +20,8 @@ namespace Core
 	// Sibling of RenderContext / SyncContext; the dedicated transfer queue
 	// lives here when it gets enabled.
 	//
-	// Current stage: synchronous model. The staging ring, shared byte budget
-	// and timeline-based async completion land in the follow-up steps.
+	// Upload completion is asynchronous: Flush blocks only on worker-thread
+	// recording, while GPU consumption is ordered by the transfer-timeline gate.
 	class TransferContext
 	{
 	public:
@@ -54,8 +54,8 @@ namespace Core
 		// Drain both request queues into transfer jobs.
 		void SubmitQueued();
 
-		// Submit every enqueued job's recording as one batch and block until
-		// the GPU has consumed it.
+		// Submit every enqueued job's recording as one batch. 
+		// Blocks only until the worker RECORDINGS finish: 
 		void Flush();
 
 		// Bounds computed by finished geometry jobs. Only valid after Flush().
@@ -67,13 +67,21 @@ namespace Core
 		vector<CompletedBounds> TakeCompletedBounds();
 
 	private:
-		void ClearJobs();
+		// Destroys in-flight batches the GPU has passed.
+		void CollectCompletedJobs(uint64_t completedValue);
 
 		// A result an in-flight job is still writing into (stable address).
 		struct PendingBounds
 		{
 			SubMesh* target;
 			unique_ptr<GeometryBounds> result;
+		};
+
+		// Jobs submitted at `value`, awaiting GPU completion before they die.
+		struct InFlightJobs
+		{
+			uint64_t value;
+			vector<unique_ptr<Job>> jobs;
 		};
 
 		Device& _device;
@@ -93,15 +101,10 @@ namespace Core
 
 		SyncContext& _sync;
 
-		// The transfer timeline value of the latest submitted batch (the
-		// timeline itself lives on the SyncContext). Today Flush waits on it
-		// synchronously; the async step turns the wait into per-frame counter
-		// polling that promotes completed uploads.
-		uint64_t _lastSubmittedValue = 0;
-
 		condition_variable _jobWait;
 		mutex _lock;
 		Core::Timer _timer;
 		unordered_map<string, unique_ptr<Job>> _pendingJobs;
+		deque<InFlightJobs> _inFlightJobs;
 	};
 }
