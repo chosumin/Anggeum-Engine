@@ -160,17 +160,15 @@ namespace Core
 		Handle<Texture> handle = _texturePool.Add(texture);
 		_textureHandles[newName] = handle;
 
-		if (_renderContext)
+		if (_renderContext->HasBindlessSupport())
 		{
-			if (_renderContext->HasBindlessSupport())
-			{
-				auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-				uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
-				texture->SetBindlessIndex(bindlessIndex);
-			}
-
-			_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
+			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+			uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
+			texture->SetBindlessIndex(bindlessIndex);
 		}
+
+		handle.SetLoading();
+		_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
 
 		return handle;
 	}
@@ -211,8 +209,13 @@ namespace Core
 		auto subMesh = make_shared<Core::SubMesh>(_device, name);
 		subMesh->SetIndexCount(IndexCountOf(geometry));
 
+		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
+		_subMeshHandles[name] = handle;
+
 		GeometryCopyBatch batch;
 		batch.debugName = "Geometry_" + name;
+		batch.subMesh = handle;
+
 		// Scanning every vertex for bounds is the expensive part, so the upload job
 		// does it on a worker thread and reports back here.
 		batch.boundsTarget = subMesh.get();
@@ -221,10 +224,11 @@ namespace Core
 		subMesh->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
 
 		if (!batch.copies.empty())
+		{
+			handle.SetLoading();
 			_renderContext->GetGeometryCopyQueue().Push(move(batch));
+		}
 
-		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
-		_subMeshHandles[name] = handle;
 		return handle;
 	}
 
@@ -251,6 +255,7 @@ namespace Core
 		// LoadBuffer takes its own lock, hence outside the guard above.
 		GeometryCopyBatch batch;
 		batch.debugName = "Standalone_" + name;
+		batch.subMesh = handle;
 
 		for (auto& attr : geometry.attributes)
 		{
@@ -275,7 +280,10 @@ namespace Core
 		}
 
 		if (!batch.copies.empty())
+		{
+			handle.SetLoading();
 			_renderContext->GetGeometryCopyQueue().Push(move(batch));
+		}
 
 		return handle;
 	}

@@ -88,6 +88,8 @@ namespace Core
 		// Where the computed bounds land. Resolved on the main thread; the pool owns
 		// the SubMesh for the app's lifetime, so the pointer stays valid.
 		SubMesh* boundsTarget = nullptr;
+
+		Handle<SubMesh> subMesh;
 	};
 
 	// One-shot hand-off from resource loading to the GPU upload: ResourceManager pushes

@@ -56,6 +56,11 @@ void RenderScene::Sync(Scene& scene, VkExtent2D extents)
 
 	_material->Sync();
 
+	// Geometry the promotion pump flipped Resident this frame must join the
+	// draw set, which only a rebuild can do.
+	if (_transfer.TakePromotedCount() > 0)
+		_batch->MarkDirty();
+
 	// The batch pushes its table fills as copy requests like every loader, so
 	// run the scheduler once more: the passes read the draw set on the GPU
 	// during this frame.

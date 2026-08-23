@@ -104,13 +104,11 @@ namespace Core
 		_needsUpdate = true;
 	}
 
-	// The texture's data path exists: its VkImage was created by the upload
-	// job (T2 replaces this probe with the pool slot's residency state).
+	// Residency flips in the promotion pump once the texture's upload has
+	// completed on the GPU; GPU-generated textures are born Resident.
 	static bool IsTextureReady(Handle<Texture>& handle)
 	{
-		Texture* texture = handle.TryGet();
-		return texture != nullptr
-			&& texture->GetImage().GetImage() != VK_NULL_HANDLE;
+		return handle.IsResident();
 	}
 
 	void BindlessTextureManager::Sync()

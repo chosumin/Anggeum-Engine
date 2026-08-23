@@ -4,6 +4,8 @@
 #include "Foundation/WorkerThread.h"
 #include "Graphics/FrameCounter.h"
 #include "Graphics/SyncContext.h"
+#include "Graphics/ResourcePool.h"
+#include "Graphics/SubMesh.h"
 #include "Graphics/Vulkans/CommandPool.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
@@ -42,7 +44,24 @@ void TransferContext::BeginFrame()
 void TransferContext::CollectCompletedJobs(uint64_t completedValue)
 {
 	while (!_inFlightJobs.empty() && _inFlightJobs.front().value <= completedValue)
+	{
+		InFlightJobs& done = _inFlightJobs.front();
+		for (auto& texture : done.promotions.textures)
+			texture.SetResident();
+		for (auto& subMesh : done.promotions.subMeshes)
+			subMesh.SetResident();
+		_promotedCount += uint32_t(done.promotions.textures.size()
+			+ done.promotions.subMeshes.size());
+
 		_inFlightJobs.pop_front();
+	}
+}
+
+uint32_t TransferContext::TakePromotedCount()
+{
+	uint32_t count = _promotedCount;
+	_promotedCount = 0;
+	return count;
 }
 
 VkDeviceSize TransferContext::GrantUploadBudget(VkDeviceSize requested)
@@ -90,6 +109,7 @@ void TransferContext::SubmitQueued()
 			auto& texture = request.texture.Get();
 			Enqueue(make_unique<VkImageJob>(_device, texture, request.filePath,
 				_stagingRing.get()), texture.GetName());
+			_pendingPromotions.textures.push_back(request.texture);
 		}
 	}
 
@@ -100,6 +120,9 @@ void TransferContext::SubmitQueued()
 	size_t batchIndex = 0;
 	for (auto& batch : _geometryCopies.Take())
 	{
+		if (batch.subMesh.IsValid())
+			_pendingPromotions.subMeshes.push_back(batch.subMesh);
+
 		vector<BufferCopyRegion> copies;
 		copies.reserve(batch.copies.size());
 
@@ -176,6 +199,8 @@ void TransferContext::Flush()
 	for (auto& [name, job] : _pendingJobs)
 		batch.jobs.push_back(std::move(job));
 	_pendingJobs.clear();
+	batch.promotions = std::move(_pendingPromotions);
+	_pendingPromotions = {};
 	_inFlightJobs.push_back(std::move(batch));
 
 	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());

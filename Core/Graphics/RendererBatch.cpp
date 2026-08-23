@@ -163,8 +163,12 @@ void Core::RendererBatch::RebuildGpuBuffers(GeometryCopyQueue& copyQueue)
 
         for (auto& [subMeshName, subMeshBatch] : materialBatch.SubMeshBatches)
         {
+            // Only Resident geometry draws: a Loading submesh has reserved
+            // its allocation but holds no data yet - it joins the draw set
+            // when its promotion marks the batch dirty.
             auto* subMesh = subMeshBatch.SubMesh.TryGet();
-            if (!subMesh || !subMesh->HasAllocation())
+            if (!subMesh || !subMesh->HasAllocation()
+                || !subMeshBatch.SubMesh.IsResident())
                 continue;
 
             const auto& allocation = subMesh->GetAllocation();

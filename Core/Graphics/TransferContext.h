@@ -66,6 +66,9 @@ namespace Core
 		};
 		vector<CompletedBounds> TakeCompletedBounds();
 
+		// How many resources the promotion pump flipped Resident since the last call.
+		uint32_t TakePromotedCount();
+
 	private:
 		// Destroys in-flight batches the GPU has passed.
 		void CollectCompletedJobs(uint64_t completedValue);
@@ -77,11 +80,21 @@ namespace Core
 			unique_ptr<GeometryBounds> result;
 		};
 
-		// Jobs submitted at `value`, awaiting GPU completion before they die.
+		// Handles a submitted batch promotes to Resident once the GPU passes
+		// its timeline value (the residency half of the promotion pump).
+		struct PendingPromotions
+		{
+			vector<Handle<Texture>> textures;
+			vector<Handle<SubMesh>> subMeshes;
+		};
+
+		// Jobs submitted at `value`, awaiting GPU completion before they die
+		// (and before their resources may be promoted).
 		struct InFlightJobs
 		{
 			uint64_t value;
 			vector<unique_ptr<Job>> jobs;
+			PendingPromotions promotions;
 		};
 
 		Device& _device;
@@ -106,5 +119,8 @@ namespace Core
 		Core::Timer _timer;
 		unordered_map<string, unique_ptr<Job>> _pendingJobs;
 		deque<InFlightJobs> _inFlightJobs;
+
+		PendingPromotions _pendingPromotions;
+		uint32_t _promotedCount = 0;
 	};
 }
