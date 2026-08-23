@@ -31,7 +31,7 @@ Core::Engine::Engine(const EngineOptions& options)
     _status = make_unique<Core::Status>(*_renderContext);
 
     auto& resourceManager = _device->GetResourceManager();
-    resourceManager.Prepare(*_renderContext);
+    resourceManager.Prepare(*_renderContext, *_transferContext);
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
@@ -86,19 +86,26 @@ void Core::Engine::Draw()
 		_renderContext->Begin(*_scene, extents);
 	}
 
-	// After Begin on purpose: Sync now also drives the terrain update, whose
-	// frame-slot staging writes require this slot's in-flight wait in Begin.
+	// After Begin on purpose: the upload phases and the terrain update stage
+	// frame-slot memory, which requires this slot's in-flight wait in Begin.
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 
-		// After Begin: frame-slot staging spans retire against its in-flight
-		// wait, and the upload budget window opens for this frame's Sync.
-		_transferContext->BeginFrame();
+		// The upload frame: retire/promote what the GPU finished, drain new
+		// requests, submit finished recordings - never blocking on file IO.
+		_transferContext->Update();
 
-		// Sync drives the upload scheduler internally (submit + flush) before it
-		// writes descriptors and rebuilds the draw set, so no separate Wait is
-		// needed here. Each manager self-gates and clears its own dirty state.
-		_renderScene->Sync(*_scene, extents);
+		_renderScene->SyncManagers(*_scene, _transferContext->GetGeometryCopyQueue(),
+			extents, _transferContext->TakePromotedCount());
+
+		// The batch's table fills must land THIS frame (the CPU-side draw set
+		// already changed), so this flush waits for their recording - a
+		// memcpy, and only on rebuild frames, which already device-idle.
+		if (!_transferContext->GetGeometryCopyQueue().Empty())
+		{
+			_transferContext->SubmitQueued();
+			_transferContext->Flush(/*waitForRecordings*/ true);
+		}
 	}
 
 	{

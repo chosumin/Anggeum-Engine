@@ -70,11 +70,6 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _renderScene.GetMaterialManager(); }
 		RendererBatch* GetRendererBatch() const { return _renderScene.GetRendererBatch(); }
 
-		// Where asset loaders drop upload requests for the render side; loaders never
-		// issue transfer jobs themselves (RenderScene::Sync does).
-		GeometryCopyQueue& GetGeometryCopyQueue() const { return _renderScene.GetGeometryCopyQueue(); }
-		TextureUploadQueue& GetTextureUploadQueue() const { return _renderScene.GetTextureUploadQueue(); }
-
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
 		SyncContext& GetSyncContext() { return _syncContext; }

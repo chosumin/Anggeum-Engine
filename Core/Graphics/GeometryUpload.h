@@ -1,6 +1,6 @@
 #pragma once
 #include "ResourceHandle.h"
-#include "Foundation/Job.h"
+#include "UploadJob.h"
 
 namespace Core
 {
@@ -9,14 +9,12 @@ namespace Core
 	class SubMesh;
 	class StagingRing;
 
-	// Bounds computed from a POSITION stream. Filled on a worker thread and applied to
-	// the SubMesh / scene bounds once the upload jobs are done.
+	// Bounding sphere computed from a POSITION stream. Filled on a worker
+	// thread and applied to the SubMesh once its upload has completed.
 	struct GeometryBounds
 	{
 		glm::vec3 center{ 0.0f };
 		float radius = 0.0f;
-		glm::vec3 min{ FLT_MAX };
-		glm::vec3 max{ -FLT_MAX };
 	};
 
 	// Two passes over the positions (extent, then radius). Called from worker threads,
@@ -53,8 +51,6 @@ namespace Core
 
 		out.center = center;
 		out.radius = radius;
-		out.min = min;
-		out.max = max;
 	}
 
 	// Raw geometry for one submesh, handed to ResourceManager at load time. Space is
@@ -114,13 +110,11 @@ namespace Core
 	// Executes one batch: packs every copy into a single staging span and
 	// records the copies out of its sub-ranges, so a mesh upload is one
 	// worker-thread task with one staging allocation.
-	// When `boundsResult` is set, the job also measures the POSITION stream (the
-	// copy with boundsStride > 0) while it already holds the data.
-	class GeometryUploadJob : public Job
+	class GeometryUploadJob : public UploadJob
 	{
 	public:
 		GeometryUploadJob(Device& device, GeometryCopyBatch&& batch,
-			GeometryBounds* boundsResult, StagingRing* stagingRing = nullptr);
+			StagingRing* stagingRing = nullptr);
 		~GeometryUploadJob();
 
 		void Execute() override;
@@ -129,7 +123,6 @@ namespace Core
 		Device& _device;
 		GeometryCopyBatch _batch;
 		vector<Buffer*> _destinations;   // resolved 1:1 with _batch.copies
-		GeometryBounds* _boundsResult;
 		StagingRing* _stagingRing;
 		unique_ptr<Buffer> _stagingBuffer;
 	};

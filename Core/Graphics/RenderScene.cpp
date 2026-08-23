@@ -11,6 +11,7 @@
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Foundation/Scene.h"
+#include "Components/PerspectiveCamera.h"
 #include "Graphics/Terrain/TerrainSystem.h"
 
 using namespace Core;
@@ -18,7 +19,6 @@ using namespace Core;
 RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer)
 	: _device(&device)
 	, _scene(scene)
-	, _transfer(transfer)
 {
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
@@ -37,63 +37,22 @@ RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer
 // Out of line for the unique_ptr members forward-declared in the header.
 RenderScene::~RenderScene() = default;
 
-void RenderScene::Sync(Scene& scene, VkExtent2D extents)
+void RenderScene::SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
+	VkExtent2D extents, uint32_t promotedCount)
 {
-	// Every manager self-gates on its own dirty state; this only fixes the order.
-	// Space was already reserved at load time, so the scheduler just turns the
-	// pending requests into data-copy jobs...
-	_transfer.SubmitQueued();
-
-	// ...and flush them before the steps below: the bindless descriptor writes need
-	// the uploaded textures' image views (created by the image jobs), and the draw
-	// set references the uploaded geometry and the bounds those jobs computed.
-	_transfer.Flush();
-
-	ApplyComputedBounds();
+	// Newly-Resident geometry can only join the draw set through a rebuild.
+	if (promotedCount > 0)
+		_batch->MarkDirty();
 
 	if (_bindless)
 		_bindless->Sync();
 
 	_material->Sync();
 
-	// Geometry the promotion pump flipped Resident this frame must join the
-	// draw set, which only a rebuild can do.
-	if (_transfer.TakePromotedCount() > 0)
-		_batch->MarkDirty();
+	_batch->Sync(scene, copyQueue, extents);
 
-	// The batch pushes its table fills as copy requests like every loader, so
-	// run the scheduler once more: the passes read the draw set on the GPU
-	// during this frame.
-	_batch->Sync(scene, _transfer.GetGeometryCopyQueue(), extents);
-	_transfer.SubmitQueued();
-	_transfer.Flush();
-
-	// Freezes this frame's terrain streaming uploads and render list before pass Setup.
 	if (auto* camera = scene.GetMainCamera())
 		_terrainSystem->Update(*camera);
-}
-
-GeometryCopyQueue& RenderScene::GetGeometryCopyQueue()
-{
-	return _transfer.GetGeometryCopyQueue();
-}
-
-TextureUploadQueue& RenderScene::GetTextureUploadQueue()
-{
-	return _transfer.GetTextureUploadQueue();
-}
-
-void RenderScene::ApplyComputedBounds()
-{
-	// The scene mirror's side of the bounds hand-off: the scheduler's jobs
-	// measured them, the mesh and the scene-wide bounds live here.
-	for (auto& completed : _transfer.TakeCompletedBounds())
-	{
-		completed.target->SetBoundingSphere(completed.bounds.center, completed.bounds.radius);
-
-		_sceneBoundsMin = glm::min(_sceneBoundsMin, completed.bounds.min);
-		_sceneBoundsMax = glm::max(_sceneBoundsMax, completed.bounds.max);
-	}
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,

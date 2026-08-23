@@ -26,8 +26,8 @@ StagingRing::Span StagingRing::Acquire(VkDeviceSize size)
 	_frameRequested += size;
 
 	// A span never wraps: when it does not fit before the ring's end, the
-	// remainder is skipped (and counted as used, so it reclaims with this
-	// stamp range like any other bytes).
+	// remainder is skipped (and counted as this span's bytes, so it reclaims
+	// with it).
 	VkDeviceSize start = _head;
 	VkDeviceSize skip = 0;
 	if (start + aligned > _capacity)
@@ -44,56 +44,62 @@ StagingRing::Span StagingRing::Acquire(VkDeviceSize size)
 
 	_head = start + aligned;
 	_used += skip + aligned;
-	_pendingUsed += skip + aligned;
 	_peakUsed = std::max(_peakUsed, _used);
 
 	Span span;
 	span.buffer = _buffer.get();
 	span.offset = start;
 	span.mapped = _mapped + start;
+	span.id = _baseId + _records.size();
+	_records.push_back({ skip + aligned });
 	return span;
 }
 
-void StagingRing::Stamp(uint64_t timelineValue)
+void StagingRing::Close(uint64_t spanId, uint64_t transferValue)
 {
 	lock_guard<mutex> lock(_mutex);
 
-	if (_pendingUsed == 0)
-		return;
+	assert(spanId >= _baseId && spanId - _baseId < _records.size()
+		&& "closing an unknown or already reclaimed span");
 
-	_stamps.push_back({ false, timelineValue, _pendingUsed });
-	_pendingUsed = 0;
+	SpanRecord& record = _records[size_t(spanId - _baseId)];
+	record.closed = true;
+	record.frameSlot = false;
+	record.value = transferValue;
 }
 
-void StagingRing::StampForFrameSlot(uint64_t firstSafeFrame)
+void StagingRing::CloseForFrameSlot(uint64_t spanId, uint64_t firstSafeFrame)
 {
 	lock_guard<mutex> lock(_mutex);
 
-	if (_pendingUsed == 0)
-		return;
+	assert(spanId >= _baseId && spanId - _baseId < _records.size()
+		&& "closing an unknown or already reclaimed span");
 
-	_stamps.push_back({ true, firstSafeFrame, _pendingUsed });
-	_pendingUsed = 0;
+	SpanRecord& record = _records[size_t(spanId - _baseId)];
+	record.closed = true;
+	record.frameSlot = true;
+	record.value = firstSafeFrame;
 }
 
 void StagingRing::Reclaim(uint64_t transferCompleted, uint64_t currentFrame)
 {
 	lock_guard<mutex> lock(_mutex);
 
-	// Stamps are FIFO and reclamation is positional, so only a completed
-	// PREFIX can free. A still-pending range blocks the ones behind it - fine,
-	// both timelines retire within a couple of frames.
-	while (!_stamps.empty())
+	// An unclosed span (its job is still recording) blocks the ranges behind it - 
+	// conservative but safe, and it resolves as soon as that job submits.
+	while (!_records.empty())
 	{
-		const StampedRange& front = _stamps.front();
-		bool completed = front.frameSlot
-			? currentFrame >= front.value
-			: transferCompleted >= front.value;
+		const SpanRecord& front = _records.front();
+		bool completed = front.closed
+			&& (front.frameSlot
+				? currentFrame >= front.value
+				: transferCompleted >= front.value);
 		if (!completed)
 			break;
 
 		_used -= front.used;
-		_stamps.pop_front();
+		_records.pop_front();
+		++_baseId;
 	}
 }
 

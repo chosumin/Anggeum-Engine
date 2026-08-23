@@ -1,6 +1,6 @@
 #pragma once
 #include "ResourceHandle.h"
-#include "Foundation/Job.h"
+#include "UploadJob.h"
 
 namespace Core
 {
@@ -50,7 +50,7 @@ namespace Core
 	// records the copy + mip generation, all on a worker thread.
 	// Oversized loads (and callers without one) fall back to a dedicated
 	// one-shot staging buffer that lives and dies with the job.
-	class TextureUploadJob : public Job
+	class TextureUploadJob : public UploadJob
 	{
 	public:
 		TextureUploadJob(Device& device, Texture& dstTexture, string filePath,

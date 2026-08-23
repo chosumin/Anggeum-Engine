@@ -235,7 +235,7 @@ namespace Core
 
 		// The frame graph consumes this span on the graphics queue; it may be
 		// reused once Begin's wait has retired this frame's slot.
-		_transfer.GetStagingRing().StampForFrameSlot(
+		_transfer.GetStagingRing().CloseForFrameSlot(span.id,
 			FrameCounter::GetFrameNumber() + MAX_FRAMES_IN_FLIGHT);
 
 		CountResident();

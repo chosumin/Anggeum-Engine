@@ -17,6 +17,7 @@ namespace Core
 	class Device;
 	class Image;
 	class RenderContext;
+	class TransferContext;
 
 	class ResourceManager
 	{
@@ -24,7 +25,7 @@ namespace Core
 		ResourceManager(Device& device);
 		~ResourceManager();
 
-		void Prepare(RenderContext& renderContext);
+		void Prepare(RenderContext& renderContext, TransferContext& transferContext);
 
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Material> LoadMaterial(const string materialName, const string& shaderName);
@@ -71,6 +72,7 @@ namespace Core
 	private:
 		Device& _device;
 		RenderContext* _renderContext = nullptr;
+		TransferContext* _transfer = nullptr;
 
 		Handle<Texture> _defaultTexture;
 

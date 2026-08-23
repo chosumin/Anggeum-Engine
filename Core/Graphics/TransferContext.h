@@ -2,7 +2,7 @@
 #include "GeometryUpload.h"
 #include "TextureUpload.h"
 #include "StagingRing.h"
-#include "Foundation/Job.h"
+#include "UploadJob.h"
 #include "Utils/timer.h"
 
 namespace Core
@@ -33,9 +33,7 @@ namespace Core
 		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
 		StagingRing& GetStagingRing() { return *_stagingRing; }
 
-		// Once per frame, after Begin's in-flight wait: retires frame-slot
-		// staging spans and opens a fresh upload-budget window.
-		void BeginFrame();
+		void Update();
 
 		// Shared per-frame upload budget. Returns how many of `requested`
 		// bytes the caller may stage this frame, measured against everything
@@ -46,55 +44,46 @@ namespace Core
 		// Appends the upload/staging stats to the engine "Status" window.
 		void OnGUI();
 
-		// Hands a prepared job to the transfer machinery (recorded on a worker
-		// thread, submitted by the next Flush). A name already pending drops
-		// the new job (destroyed on return) - the queued one covers the request.
-		void Enqueue(unique_ptr<Job> job, const string& jobName);
-
 		// Drain both request queues into transfer jobs.
 		void SubmitQueued();
 
-		// Submit every enqueued job's recording as one batch. 
-		// Blocks only until the worker RECORDINGS finish: 
-		void Flush();
-
-		// Bounds computed by finished geometry jobs. Only valid after Flush().
-		struct CompletedBounds
-		{
-			SubMesh* target;
-			GeometryBounds bounds;
-		};
-		vector<CompletedBounds> TakeCompletedBounds();
+		// Submit the jobs whose worker RECORDING has finished, as one batch. 
+		// `waitForRecordings` forces the old blocking behaviour for uploads that must land this frame.
+		void Flush(bool waitForRecordings = false);
 
 		// How many resources the promotion pump flipped Resident since the last call.
 		uint32_t TakePromotedCount();
 
 	private:
-		// Destroys in-flight batches the GPU has passed.
+		// One upload with everything that must follow ITS lifecycle: the
+		// handles promoted when its submission completes. 
+		struct PendingUpload
+		{
+			unique_ptr<UploadJob> job;
+			Handle<Texture> texture;
+			Handle<SubMesh> subMesh;
+
+			// Which SubmitQueued round enqueued it: Flush's recording wait only
+			// covers the LATEST round, so waiting for this frame's table fills
+			// never re-blocks on an older frame's slow file read.
+			uint32_t round = 0;
+		};
+
+		// Retires frame-slot staging spans, promotes completed
+		// batches and opens a fresh upload-budget window.
+		void BeginFrame();
+
+		void EnqueueUpload(PendingUpload&& upload, const string& jobName);
+
+		// Promotes + destroys in-flight batches the GPU has passed.
 		void CollectCompletedJobs(uint64_t completedValue);
 
-		// A result an in-flight job is still writing into (stable address).
-		struct PendingBounds
-		{
-			SubMesh* target;
-			unique_ptr<GeometryBounds> result;
-		};
-
-		// Handles a submitted batch promotes to Resident once the GPU passes
-		// its timeline value (the residency half of the promotion pump).
-		struct PendingPromotions
-		{
-			vector<Handle<Texture>> textures;
-			vector<Handle<SubMesh>> subMeshes;
-		};
-
-		// Jobs submitted at `value`, awaiting GPU completion before they die
-		// (and before their resources may be promoted).
+		// Uploads submitted at `value`, awaiting GPU completion before their
+		// resources promote and their jobs (fallback staging included) die.
 		struct InFlightJobs
 		{
 			uint64_t value;
-			vector<unique_ptr<Job>> jobs;
-			PendingPromotions promotions;
+			vector<PendingUpload> uploads;
 		};
 
 		Device& _device;
@@ -102,7 +91,6 @@ namespace Core
 
 		TextureUploadQueue _textureUploads;
 		GeometryCopyQueue _geometryCopies;
-		vector<PendingBounds> _pendingBounds;
 
 		unique_ptr<CommandPool> _primaryCommandPool;
 
@@ -117,10 +105,10 @@ namespace Core
 		condition_variable _jobWait;
 		mutex _lock;
 		Core::Timer _timer;
-		unordered_map<string, unique_ptr<Job>> _pendingJobs;
+		unordered_map<string, PendingUpload> _pendingJobs;
 		deque<InFlightJobs> _inFlightJobs;
 
-		PendingPromotions _pendingPromotions;
 		uint32_t _promotedCount = 0;
+		uint32_t _submitRound = 0;
 	};
 }

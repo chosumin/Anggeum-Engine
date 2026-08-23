@@ -29,6 +29,13 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 
 TransferContext::~TransferContext() = default;
 
+void TransferContext::Update()
+{
+	BeginFrame();
+	SubmitQueued();
+	Flush();
+}
+
 void TransferContext::BeginFrame()
 {
 	// Non-blocking completion poll: everything the GPU has passed retires
@@ -45,13 +52,21 @@ void TransferContext::CollectCompletedJobs(uint64_t completedValue)
 {
 	while (!_inFlightJobs.empty() && _inFlightJobs.front().value <= completedValue)
 	{
-		InFlightJobs& done = _inFlightJobs.front();
-		for (auto& texture : done.promotions.textures)
-			texture.SetResident();
-		for (auto& subMesh : done.promotions.subMeshes)
-			subMesh.SetResident();
-		_promotedCount += uint32_t(done.promotions.textures.size()
-			+ done.promotions.subMeshes.size());
+		// Activate-on-completion, per upload: residency flips and bounds
+		// deliver exactly when this upload's data is known to be on the GPU.
+		for (PendingUpload& upload : _inFlightJobs.front().uploads)
+		{
+			if (upload.texture.IsValid())
+			{
+				upload.texture.SetResident();
+				++_promotedCount;
+			}
+			if (upload.subMesh.IsValid())
+			{
+				upload.subMesh.SetResident();
+				++_promotedCount;
+			}
+		}
 
 		_inFlightJobs.pop_front();
 	}
@@ -85,21 +100,26 @@ void TransferContext::OnGUI()
 	ImGui::End();
 }
 
-void TransferContext::Enqueue(unique_ptr<Job> job, const string& jobName)
+void TransferContext::EnqueueUpload(PendingUpload&& upload, const string& jobName)
 {
-	// Already enqueued: the pending job covers the request; this one is destroyed.
+	// Already enqueued: the pending upload covers the request; this one is
+	// destroyed on return.
 	if (_pendingJobs.find(jobName) != _pendingJobs.end())
 		return;
 
-	Job* raw = job.get();
+	upload.round = _submitRound;
+
+	Job* raw = upload.job.get();
 	raw->completionWait = &_jobWait;
 
-	_pendingJobs.insert({ jobName, std::move(job) });
+	_pendingJobs.insert({ jobName, std::move(upload) });
 	_workerThreadManager.Enqueue(raw);
 }
 
 void TransferContext::SubmitQueued()
 {
+	++_submitRound;
+
 	if (!_textureUploads.Empty())
 	{
 		// The job takes the resolved Texture&; handles resolve here on the
@@ -107,9 +127,13 @@ void TransferContext::SubmitQueued()
 		for (auto& request : _textureUploads.Take())
 		{
 			auto& texture = request.texture.Get();
-			Enqueue(make_unique<TextureUploadJob>(_device, texture, request.filePath,
-				_stagingRing.get()), texture.GetName());
-			_pendingPromotions.textures.push_back(request.texture);
+			string jobName = texture.GetName();
+
+			PendingUpload upload;
+			upload.texture = request.texture;
+			upload.job = make_unique<TextureUploadJob>(_device, texture,
+				request.filePath, _stagingRing.get());
+			EnqueueUpload(std::move(upload), jobName);
 		}
 	}
 
@@ -121,93 +145,91 @@ void TransferContext::SubmitQueued()
 	size_t batchIndex = 0;
 	for (auto& batch : _geometryCopies.Take())
 	{
-		if (batch.subMesh.IsValid())
-			_pendingPromotions.subMeshes.push_back(batch.subMesh);
-
-		// The job measures bounds while it holds the data; the result slot is
-		// owned here and read back after the recordings complete.
-		GeometryBounds* boundsResult = nullptr;
-		if (batch.boundsTarget != nullptr)
-		{
-			auto result = make_unique<GeometryBounds>();
-			boundsResult = result.get();
-			_pendingBounds.push_back({ batch.boundsTarget, move(result) });
-		}
+		PendingUpload upload;
+		upload.subMesh = batch.subMesh;
 
 		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
-		Enqueue(make_unique<GeometryUploadJob>(_device, move(batch), boundsResult,
-			_stagingRing.get()), jobName);
+		upload.job = make_unique<GeometryUploadJob>(_device, move(batch),
+			_stagingRing.get());
+		EnqueueUpload(std::move(upload), jobName);
 
 		++batchIndex;
 	}
 }
 
-void TransferContext::Flush()
+void TransferContext::Flush(bool waitForRecordings)
 {
 	if (_pendingJobs.empty())
 		return;
 
 	_timer.tick();
 
-	// Every job records its copy commands on a worker thread; wait for the
-	// recordings, then execute them all as one submit.
 	unique_lock<mutex> lock(_lock);
-	_jobWait.wait(lock, [&]
+	if (waitForRecordings)
 	{
-		for (auto&& jobs : _pendingJobs)
+		// Only the latest round: this frame's must-land uploads (table fills)
+		// finish in microseconds; an older round's slow file read keeps
+		// carrying over instead of re-blocking the frame here.
+		_jobWait.wait(lock, [&]
 		{
-			if (jobs.second->status != JobStatus::COMPLETE)
+			for (auto&& upload : _pendingJobs)
 			{
-				return false;
+				if (upload.second.round == _submitRound
+					&& upload.second.job->status != JobStatus::COMPLETE)
+				{
+					return false;
+				}
 			}
+			return true;
+		});
+	}
+
+	// Submit what finished recording; the rest (slow file reads) stay pending
+	// and ride a later Flush instead of stalling this frame.
+	InFlightJobs batch;
+	vector<CommandBuffer*> secondaryCommands;
+	for (auto it = _pendingJobs.begin(); it != _pendingJobs.end();)
+	{
+		if (it->second.job->status == JobStatus::COMPLETE)
+		{
+			secondaryCommands.push_back(it->second.job->commandBuffer);
+			batch.uploads.push_back(std::move(it->second));
+			it = _pendingJobs.erase(it);
 		}
-		return true;
-	});
+		else
+		{
+			++it;
+		}
+	}
+
+	if (batch.uploads.empty())
+		return;
 
 	auto& primary = _primaryCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-	size_t commandBufferCount = _pendingJobs.size();
-	vector<CommandBuffer*> secondaryCommands(commandBufferCount);
-	transform(_pendingJobs.begin(), _pendingJobs.end(),
-		secondaryCommands.begin(),
-		[](const auto& job) { return job.second->commandBuffer; });
-
 	primary.ExecuteCommands(secondaryCommands);
 	primary.EndCommandBuffer();
 
 	uint64_t signalValue = _sync.SubmitTransfer(primary.GetHandle());
+	batch.value = signalValue;
 
-	// Every span the jobs acquired belongs to this submission.
-	_stagingRing->Stamp(signalValue);
+	// Close each submitted upload's staging span on THIS submission's value;
+	// spans of still-recording jobs stay open and block ring reclamation
+	// behind them until their own submission closes them.
+	for (PendingUpload& upload : batch.uploads)
+	{
+		if (upload.job->stagingSpanId != UINT64_MAX)
+			_stagingRing->Close(upload.job->stagingSpanId, signalValue);
+	}
 
 	lock.unlock();
 
-	// The jobs (owning any fallback staging) stay alive until BeginFrame's
+	// The uploads (owning any fallback staging) stay alive until BeginFrame's
 	// completion poll sees the GPU pass this value.
-	InFlightJobs batch;
-	batch.value = signalValue;
-	batch.jobs.reserve(_pendingJobs.size());
-	for (auto& [name, job] : _pendingJobs)
-		batch.jobs.push_back(std::move(job));
-	_pendingJobs.clear();
-	batch.promotions = std::move(_pendingPromotions);
-	_pendingPromotions = {};
 	_inFlightJobs.push_back(std::move(batch));
 
 	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
 	cout << "Transfer Time : " << deltaTime << endl;
 }
 
-vector<TransferContext::CompletedBounds> TransferContext::TakeCompletedBounds()
-{
-	// Flush() has completed the jobs, so every result is safe to read.
-	vector<CompletedBounds> completed;
-	completed.reserve(_pendingBounds.size());
-	for (auto& pending : _pendingBounds)
-		completed.push_back({ pending.target, *pending.result });
-
-	_pendingBounds.clear();
-	return completed;
-}
 

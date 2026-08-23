@@ -25,6 +25,7 @@ namespace Core
 			Buffer* buffer = nullptr;
 			VkDeviceSize offset = 0;
 			uint8_t* mapped = nullptr;
+			uint64_t id = UINT64_MAX;
 
 			bool IsValid() const { return buffer != nullptr; }
 		};
@@ -35,14 +36,15 @@ namespace Core
 		// Thread-safe: jobs acquire on worker threads while they record.
 		Span Acquire(VkDeviceSize size);
 
-		// Everything acquired since the previous stamp retires when the upload
-		// timeline reaches `timelineValue` (stamped at submit)...
-		void Stamp(uint64_t timelineValue);
-		// ...or, for spans the frame graph consumes, when the frame counter
+		// Every acquired span must be closed exactly once, with the timeline
+		// that retires it: a slow job's span must ride ITS OWN submission's
+		// value, not whatever submission happened to go out first.
+		void Close(uint64_t spanId, uint64_t transferValue);
+		// For spans the frame graph consumes: retires when the frame counter
 		// reaches `firstSafeFrame` (Begin's wait has retired their slot).
-		void StampForFrameSlot(uint64_t firstSafeFrame);
+		void CloseForFrameSlot(uint64_t spanId, uint64_t firstSafeFrame);
 
-		// Free every range whose stamped timeline has passed.
+		// Free the closed-and-completed PREFIX.
 		void Reclaim(uint64_t transferCompleted, uint64_t currentFrame);
 
 		// Starts a budget window: resets the requested-bytes tally the shared
@@ -70,15 +72,17 @@ namespace Core
 		// skipped at the ring's end on wrap, so "fits" is a pure byte check.
 		VkDeviceSize _head = 0;
 		VkDeviceSize _used = 0;
-		VkDeviceSize _pendingUsed = 0; // acquired since the last stamp
 
-		struct StampedRange
+		// One record per Acquire, FIFO in ring order.
+		struct SpanRecord
 		{
-			bool frameSlot;  // which timeline `value` belongs to
-			uint64_t value;
-			VkDeviceSize used;
+			VkDeviceSize used;   // span bytes + any wrap padding it caused
+			bool closed = false;
+			bool frameSlot = false;
+			uint64_t value = 0;
 		};
-		deque<StampedRange> _stamps;
+		deque<SpanRecord> _records;
+		uint64_t _baseId = 0;
 
 		VkDeviceSize _peakUsed = 0;
 		VkDeviceSize _frameRequested = 0;

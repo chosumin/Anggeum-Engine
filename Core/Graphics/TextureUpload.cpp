@@ -11,7 +11,7 @@ using namespace Core;
 
 TextureUploadJob::TextureUploadJob(Device& device, Texture& dstTexture, string filePath,
 	StagingRing* stagingRing)
-	: Job(JobType::TRANSFER)
+	: UploadJob()
 	, _device(device)
 	, _filePath(filePath)
 	, _dstTexture(dstTexture)
@@ -49,6 +49,7 @@ void TextureUploadJob::Execute()
 		memcpy(span.mapped, imageData.data(), imageData.size());
 		source = span.buffer;
 		sourceOffset = span.offset;
+		stagingSpanId = span.id; // closed by the submitter with its value
 	}
 	else
 	{

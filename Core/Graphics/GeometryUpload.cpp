@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "GeometryUpload.h"
 #include "StagingRing.h"
+#include "Graphics/SubMesh.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/MemoryAllocator.h"
@@ -8,11 +9,10 @@
 using namespace Core;
 
 GeometryUploadJob::GeometryUploadJob(Device& device, GeometryCopyBatch&& batch,
-	GeometryBounds* boundsResult, StagingRing* stagingRing)
-	: Job(JobType::TRANSFER)
+	StagingRing* stagingRing)
+	: UploadJob()
 	, _device(device)
 	, _batch(std::move(batch))
-	, _boundsResult(boundsResult)
 	, _stagingRing(stagingRing)
 {
 	// Handles resolve here, on the constructing (main) thread.
@@ -26,16 +26,19 @@ GeometryUploadJob::~GeometryUploadJob() = default;
 void GeometryUploadJob::Execute()
 {
 	// Runs here rather than on the loading thread: scanning every vertex is the
-	// expensive part of a mesh upload, and the data is already resident.
-	if (_boundsResult != nullptr)
+	// expensive part of a mesh upload, and the data is already in hand. The
+	// sphere lands directly on the SubMesh.
+	if (_batch.boundsTarget != nullptr)
 	{
 		for (auto& copy : _batch.copies)
 		{
 			if (copy.boundsStride == 0)
 				continue;
 
+			GeometryBounds bounds;
 			ComputeGeometryBounds(copy.data.data(), copy.data.size(),
-				copy.boundsStride, *_boundsResult);
+				copy.boundsStride, bounds);
+			_batch.boundsTarget->SetBoundingSphere(bounds.center, bounds.radius);
 		}
 	}
 
@@ -60,6 +63,7 @@ void GeometryUploadJob::Execute()
 		}
 		source = span.buffer;
 		base = span.offset;
+		stagingSpanId = span.id; // closed by the submitter with its value
 	}
 	else
 	{
