@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "TransferContext.h"
-#include "TransferJob.h"
+
 #include "Foundation/WorkerThread.h"
 #include "Graphics/FrameCounter.h"
 #include "Graphics/SyncContext.h"
@@ -102,12 +102,12 @@ void TransferContext::SubmitQueued()
 {
 	if (!_textureUploads.Empty())
 	{
-		// The job reads the file on a worker thread; resolve the handle here on
-		// the main thread (the pool is not thread-safe).
+		// The job takes the resolved Texture&; handles resolve here on the
+		// main thread (the pool is not thread-safe).
 		for (auto& request : _textureUploads.Take())
 		{
 			auto& texture = request.texture.Get();
-			Enqueue(make_unique<VkImageJob>(_device, texture, request.filePath,
+			Enqueue(make_unique<TextureUploadJob>(_device, texture, request.filePath,
 				_stagingRing.get()), texture.GetName());
 			_pendingPromotions.textures.push_back(request.texture);
 		}
@@ -116,35 +116,27 @@ void TransferContext::SubmitQueued()
 	if (_geometryCopies.Empty())
 		return;
 
-	// One transfer job per batch (i.e. per submesh).
+	// One upload job per batch (i.e. per submesh); the job consumes the
+	// request whole and resolves its destination handles itself.
 	size_t batchIndex = 0;
 	for (auto& batch : _geometryCopies.Take())
 	{
 		if (batch.subMesh.IsValid())
 			_pendingPromotions.subMeshes.push_back(batch.subMesh);
 
-		vector<BufferCopyRegion> copies;
-		copies.reserve(batch.copies.size());
-
-		vector<BoundsTask> boundsTasks;
-
-		for (auto& copy : batch.copies)
+		// The job measures bounds while it holds the data; the result slot is
+		// owned here and read back after the recordings complete.
+		GeometryBounds* boundsResult = nullptr;
+		if (batch.boundsTarget != nullptr)
 		{
-			// The job computes bounds from the POSITION stream while it holds the data.
-			if (copy.boundsStride > 0 && batch.boundsTarget)
-			{
-				auto result = make_unique<GeometryBounds>();
-				boundsTasks.push_back({ copies.size(), copy.boundsStride, result.get() });
-				_pendingBounds.push_back({ batch.boundsTarget, move(result) });
-			}
-
-			copies.push_back({ &copy.destination.Get(), move(copy.data), copy.offset });
+			auto result = make_unique<GeometryBounds>();
+			boundsResult = result.get();
+			_pendingBounds.push_back({ batch.boundsTarget, move(result) });
 		}
 
-		Enqueue(
-			make_unique<VkBufferCopyBatchJob>(_device, move(copies), move(boundsTasks),
-				_stagingRing.get()),
-			batch.debugName + "_" + std::to_string(batchIndex));
+		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
+		Enqueue(make_unique<GeometryUploadJob>(_device, move(batch), boundsResult,
+			_stagingRing.get()), jobName);
 
 		++batchIndex;
 	}

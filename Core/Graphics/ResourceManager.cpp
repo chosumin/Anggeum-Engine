@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "ResourceManager.h"
 #include "Utils/Utility.h"
-#include "Graphics/TransferJob.h"
+#include "Graphics/TextureUpload.h"
 #include "Graphics/GeometryUpload.h"
 #include "Graphics/TextureUpload.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -17,7 +17,7 @@ namespace Core
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
 		auto& defaultTex = _defaultTexture.Get();
-		VkImageJob job(_device, defaultTex, defaultTex.GetName());
+		TextureUploadJob job(_device, defaultTex, defaultTex.GetName());
 
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}
@@ -160,15 +160,20 @@ namespace Core
 		Handle<Texture> handle = _texturePool.Add(texture);
 		_textureHandles[newName] = handle;
 
-		if (_renderContext->HasBindlessSupport())
+		// Only the ctor's default texture takes that path. 
+		// The ctor needs neither the queue nor the Loading state.
+		if (_renderContext != nullptr)
 		{
-			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-			uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
-			texture->SetBindlessIndex(bindlessIndex);
-		}
+			if (_renderContext->HasBindlessSupport())
+			{
+				auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+				uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
+				texture->SetBindlessIndex(bindlessIndex);
+			}
 
-		handle.SetLoading();
-		_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
+			handle.SetLoading();
+			_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
+		}
 
 		return handle;
 	}

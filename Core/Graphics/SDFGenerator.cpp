@@ -12,7 +12,7 @@
 #include "FrameResources.h"
 #include "RenderFrame.h"
 #include "ResourceManager.h"
-#include "TransferJob.h"
+#include "BufferUpload.h"
 #include "Utils/FileSystem.h"
 
 using namespace Core;
@@ -190,7 +190,7 @@ SDFGenerator::SDFGenerator(Device& device)
 		  MemoryType::DEVICE_LOCAL },
 		"SDF.Bounds");
 
-	VkBufferCopyJob<uint32_t> boundsJob(_device, _boundsBuffer.Get(), move(initData), 0);
+	BufferUploadJob<uint32_t> boundsJob(_device, _boundsBuffer.Get(), move(initData), 0);
 	CommandBuffer::ImmediateSubmit(_device, boundsJob);
 }
 

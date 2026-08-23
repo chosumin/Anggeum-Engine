@@ -1,10 +1,13 @@
 #pragma once
 #include "ResourceHandle.h"
+#include "Foundation/Job.h"
 
 namespace Core
 {
+	class Device;
 	class Buffer;
 	class SubMesh;
+	class StagingRing;
 
 	// Bounds computed from a POSITION stream. Filled on a worker thread and applied to
 	// the SubMesh / scene bounds once the upload jobs are done.
@@ -92,9 +95,8 @@ namespace Core
 		Handle<SubMesh> subMesh;
 	};
 
-	// One-shot hand-off from resource loading to the GPU upload: ResourceManager pushes
-	// resolved copies here, RenderScene::Sync turns them into transfer jobs. A
-	// non-empty queue is the "geometry needs uploading" dirty state.
+	// One-shot hand-off from resource loading to the GPU upload.
+	// A non-empty queue is the "geometry needs uploading" dirty state.
 	class GeometryCopyQueue
 	{
 	public:
@@ -107,5 +109,28 @@ namespace Core
 
 	private:
 		vector<GeometryCopyBatch> _batches;
+	};
+
+	// Executes one batch: packs every copy into a single staging span and
+	// records the copies out of its sub-ranges, so a mesh upload is one
+	// worker-thread task with one staging allocation.
+	// When `boundsResult` is set, the job also measures the POSITION stream (the
+	// copy with boundsStride > 0) while it already holds the data.
+	class GeometryUploadJob : public Job
+	{
+	public:
+		GeometryUploadJob(Device& device, GeometryCopyBatch&& batch,
+			GeometryBounds* boundsResult, StagingRing* stagingRing = nullptr);
+		~GeometryUploadJob();
+
+		void Execute() override;
+
+	private:
+		Device& _device;
+		GeometryCopyBatch _batch;
+		vector<Buffer*> _destinations;   // resolved 1:1 with _batch.copies
+		GeometryBounds* _boundsResult;
+		StagingRing* _stagingRing;
+		unique_ptr<Buffer> _stagingBuffer;
 	};
 }

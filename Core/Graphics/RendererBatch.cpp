@@ -10,7 +10,7 @@
 #include "Foundation/Scene.h"
 #include "Components/Mesh.h"
 #include "Components/Transform.h"
-#include "TransferJob.h"
+
 #include "Graphics/GeometryUpload.h"
 
 using namespace Core;

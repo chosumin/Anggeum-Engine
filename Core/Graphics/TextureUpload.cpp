@@ -1,17 +1,27 @@
 #include "stdafx.h"
-#include "TransferJob.h"
+#include "TextureUpload.h"
+#include "StagingRing.h"
 #include "Graphics/Vulkans/Texture.h"
+#include "Graphics/Vulkans/Image.h"
+#include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/MemoryAllocator.h"
 
-Core::VkImageJob::VkImageJob(Device& device, Texture& dstTexture, string filePath,
+using namespace Core;
+
+TextureUploadJob::TextureUploadJob(Device& device, Texture& dstTexture, string filePath,
 	StagingRing* stagingRing)
-	:Job(JobType::TRANSFER), _device(device), _dstTexture(dstTexture), _filePath(filePath),
-	_stagingRing(stagingRing)
+	: Job(JobType::TRANSFER)
+	, _device(device)
+	, _filePath(filePath)
+	, _dstTexture(dstTexture)
+	, _stagingRing(stagingRing)
 {
 }
 
-Core::VkImageJob::~VkImageJob() = default;
+TextureUploadJob::~TextureUploadJob() = default;
 
-void Core::VkImageJob::Execute()
+void TextureUploadJob::Execute()
 {
 	// The command methods take the Texture&; the Image is only needed for the
 	// CPU-side file load and dimension queries.

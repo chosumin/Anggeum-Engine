@@ -1,9 +1,13 @@
 #pragma once
 #include "ResourceHandle.h"
+#include "Foundation/Job.h"
 
 namespace Core
 {
+	class Device;
 	class Texture;
+	class Buffer;
+	class StagingRing;
 
 	// A texture whose pixel data should be read from `filePath` and uploaded. The job
 	// itself reads the file on a worker thread, so only the path is handed over.
@@ -40,5 +44,27 @@ namespace Core
 	private:
 		vector<TextureUploadRequest> _requests;
 		unordered_set<Handle<Texture>> _queued;
+	};
+
+	// Executes one texture upload: reads the file, stages the pixels and
+	// records the copy + mip generation, all on a worker thread.
+	// Oversized loads (and callers without one) fall back to a dedicated
+	// one-shot staging buffer that lives and dies with the job.
+	class TextureUploadJob : public Job
+	{
+	public:
+		TextureUploadJob(Device& device, Texture& dstTexture, string filePath,
+			StagingRing* stagingRing = nullptr);
+		~TextureUploadJob();
+
+		void Execute() override;
+
+	private:
+		Device& _device;
+		string _filePath;
+
+		Texture& _dstTexture;
+		StagingRing* _stagingRing;
+		unique_ptr<Buffer> _stagingBuffer;
 	};
 }
