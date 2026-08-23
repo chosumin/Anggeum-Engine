@@ -46,6 +46,24 @@ void TransferContext::BeginFrame()
 	CollectCompletedJobs(completed);
 	_stagingRing->Reclaim(completed, FrameCounter::GetFrameNumber());
 	_stagingRing->BeginFrame();
+	_frameAdmittedBytes = 0;
+}
+
+bool TransferContext::TryAdmit(VkDeviceSize bytes)
+{
+	// The oversized-resource exception: better one over-budget frame than a
+	// request that can never be admitted.
+	if (_frameAdmittedBytes == 0 && bytes > _uploadBudgetPerFrame)
+	{
+		_frameAdmittedBytes += bytes;
+		return true;
+	}
+
+	if (_frameAdmittedBytes + bytes > _uploadBudgetPerFrame)
+		return false;
+
+	_frameAdmittedBytes += bytes;
+	return true;
 }
 
 void TransferContext::CollectCompletedJobs(uint64_t completedValue)
@@ -81,10 +99,11 @@ uint32_t TransferContext::TakePromotedCount()
 
 VkDeviceSize TransferContext::GrantUploadBudget(VkDeviceSize requested)
 {
-	VkDeviceSize used = _stagingRing->GetFrameRequested();
-	VkDeviceSize remaining = used < _uploadBudgetPerFrame
-		? _uploadBudgetPerFrame - used : 0;
-	return std::min(requested, remaining);
+	VkDeviceSize remaining = _frameAdmittedBytes < _uploadBudgetPerFrame
+		? _uploadBudgetPerFrame - _frameAdmittedBytes : 0;
+	VkDeviceSize granted = std::min(requested, remaining);
+	_frameAdmittedBytes += granted;
+	return granted;
 }
 
 void TransferContext::OnGUI()
@@ -92,8 +111,9 @@ void TransferContext::OnGUI()
 	// Appends to the engine-level "Status" window (same-name Begin appends).
 	ImGui::Begin("Status");
 	ImGui::Separator();
-	ImGui::Text("Upload budget: %llu / %llu KB this frame",
-		_stagingRing->GetFrameRequested() / 1024, _uploadBudgetPerFrame / 1024);
+	ImGui::Text("Upload budget: %llu / %llu KB admitted (staged %llu)",
+		_frameAdmittedBytes / 1024, _uploadBudgetPerFrame / 1024,
+		_stagingRing->GetFrameRequested() / 1024);
 	ImGui::Text("Staging ring: %llu / %llu KB (peak %llu), fallbacks %u",
 		_stagingRing->GetUsed() / 1024, _stagingRing->GetCapacity() / 1024,
 		_stagingRing->GetPeakUsed() / 1024, _stagingRing->GetFallbackCount());
@@ -120,31 +140,54 @@ void TransferContext::SubmitQueued()
 {
 	++_submitRound;
 
-	if (!_textureUploads.Empty())
+	// Admission control, FIFO: each request charges the shared frame budget
+	// before it becomes a job; the first one the budget cannot cover stops
+	// the drain, and everything behind it retries next frame in order.
+	while (!_textureUploads.Empty())
 	{
+		if (!TryAdmit(_textureUploads.Front().stagingBytes))
+			break;
+
 		// The job takes the resolved Texture&; handles resolve here on the
 		// main thread (the pool is not thread-safe).
-		for (auto& request : _textureUploads.Take())
-		{
-			auto& texture = request.texture.Get();
-			string jobName = texture.GetName();
+		TextureUploadRequest request = _textureUploads.PopFront();
+		auto& texture = request.texture.Get();
+		string jobName = texture.GetName();
 
-			PendingUpload upload;
-			upload.texture = request.texture;
-			upload.job = make_unique<TextureUploadJob>(_device, texture,
-				request.filePath, _stagingRing.get());
-			EnqueueUpload(std::move(upload), jobName);
-		}
+		PendingUpload upload;
+		upload.texture = request.texture;
+		upload.job = make_unique<TextureUploadJob>(_device, texture,
+			request.filePath, _stagingRing.get());
+		EnqueueUpload(std::move(upload), jobName);
 	}
-
-	if (_geometryCopies.Empty())
-		return;
 
 	// One upload job per batch (i.e. per submesh); the job consumes the
 	// request whole and resolves its destination handles itself.
+	//
+	// table-class batches (no submesh handle - draw-set tables,
+	// the terrain grid) bypass the budget and MUST drain the frame they were
+	// pushed. A table batch carried across a rebuild would record into the
+	// very buffers the rebuild replaces.
+	vector<GeometryCopyBatch> deferred;
 	size_t batchIndex = 0;
-	for (auto& batch : _geometryCopies.Take())
+	while (!_geometryCopies.Empty())
 	{
+		GeometryCopyBatch batch = _geometryCopies.PopFront();
+
+		if (batch.subMesh.IsValid())
+		{
+			VkDeviceSize bytes = 0;
+			for (const auto& copy : batch.copies)
+				bytes += copy.data.size();
+
+			// Unaffordable batches are SKIPPED (kept in order for next frame)
+			if (!TryAdmit(bytes))
+			{
+				deferred.push_back(std::move(batch));
+				continue;
+			}
+		}
+
 		PendingUpload upload;
 		upload.subMesh = batch.subMesh;
 
@@ -155,6 +198,9 @@ void TransferContext::SubmitQueued()
 
 		++batchIndex;
 	}
+
+	for (auto& batch : deferred)
+		_geometryCopies.Push(std::move(batch));
 }
 
 void TransferContext::Flush(bool waitForRecordings)

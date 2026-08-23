@@ -79,6 +79,8 @@ namespace Core
 
 		void Load(vector<uint8_t>& outImageData);
 
+		static VkDeviceSize QueryStagingBytes(const string& filePath);
+
 		string& GetFilePath() { return _filePath; }
 	private:
 		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);

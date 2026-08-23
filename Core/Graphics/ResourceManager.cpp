@@ -174,7 +174,8 @@ namespace Core
 			}
 
 			handle.SetLoading();
-			_transfer->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
+			_transfer->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath,
+				Image::QueryStagingBytes(imageCreateInfo.filePath) });
 		}
 
 		return handle;

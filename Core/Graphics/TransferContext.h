@@ -35,10 +35,10 @@ namespace Core
 
 		void Update();
 
-		// Shared per-frame upload budget. Returns how many of `requested`
-		// bytes the caller may stage this frame, measured against everything
-		// already asked of the staging ring (fallback traffic included) 
-		// - a scene load spike automatically starves later callers.
+		// Shared per-frame upload budget. Grants (and CONSUMES) up to
+		// `requested` bytes of what remains this frame - scene admission in
+		// SubmitQueued charges the same tally, so a load-heavy frame
+		// automatically shrinks what later callers (terrain) may stream.
 		VkDeviceSize GrantUploadBudget(VkDeviceSize requested);
 
 		// Appends the upload/staging stats to the engine "Status" window.
@@ -72,6 +72,11 @@ namespace Core
 		// Retires frame-slot staging spans, promotes completed
 		// batches and opens a fresh upload-budget window.
 		void BeginFrame();
+
+		// Admission control: charges `bytes` against the frame budget, or
+		// refuses. A single resource larger than the whole budget gets an
+		// exclusive frame (nothing else admitted yet) rather than starving.
+		bool TryAdmit(VkDeviceSize bytes);
 
 		void EnqueueUpload(PendingUpload&& upload, const string& jobName);
 
@@ -110,5 +115,7 @@ namespace Core
 
 		uint32_t _promotedCount = 0;
 		uint32_t _submitRound = 0;
+
+		VkDeviceSize _frameAdmittedBytes = 0;
 	};
 }

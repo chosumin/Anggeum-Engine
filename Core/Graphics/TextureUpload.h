@@ -15,6 +15,9 @@ namespace Core
 	{
 		Handle<Texture> texture;
 		string filePath;
+
+		// Bytes this upload will stage, for budget admission.
+		VkDeviceSize stagingBytes = 0;
 	};
 
 	// One-shot hand-off between asset loading and the GPU upload: loaders push
@@ -34,11 +37,16 @@ namespace Core
 
 		bool Empty() const { return _requests.empty(); }
 
-		// Hands the queued requests to the caller and resets the queue.
-		vector<TextureUploadRequest> Take()
+		// FIFO partial draining, so admission control can stop at the first
+		// request the frame budget cannot cover and leave the rest queued.
+		const TextureUploadRequest& Front() const { return _requests.front(); }
+
+		TextureUploadRequest PopFront()
 		{
-			_queued.clear();
-			return std::move(_requests);
+			TextureUploadRequest request = std::move(_requests.front());
+			_requests.erase(_requests.begin());
+			_queued.erase(request.texture);
+			return request;
 		}
 
 	private:

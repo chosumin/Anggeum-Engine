@@ -313,6 +313,36 @@ void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
     stbi_image_free(pixels);
 }
 
+VkDeviceSize Core::Image::QueryStagingBytes(const string& filePath)
+{
+	if (FileSystem::GetExtension(filePath) == "ktx")
+	{
+		// Header-only open: with NO_FLAGS the pixel data stays on disk, but
+		// dataSize (every mip and layer, what LoadKtxImage stages) is known.
+		ktxTexture* texture = nullptr;
+		if (ktxTexture_CreateFromNamedFile(filePath.c_str(),
+			KTX_TEXTURE_CREATE_NO_FLAGS, &texture) == KTX_SUCCESS)
+		{
+			VkDeviceSize size = texture->dataSize;
+			ktxTexture_Destroy(texture);
+			return size;
+		}
+	}
+	else
+	{
+		int width = 0, height = 0, comp = 0;
+		if (stbi_info(filePath.c_str(), &width, &height, &comp))
+		{
+			VkDeviceSize texelBytes = stbi_is_hdr(filePath.c_str()) ? 16 : 4;
+			return VkDeviceSize(width) * VkDeviceSize(height) * texelBytes;
+		}
+	}
+
+	std::error_code ec;
+	uintmax_t size = std::filesystem::file_size(filePath, ec);
+	return ec ? VkDeviceSize(1) << 20 : VkDeviceSize(size);
+}
+
 void Core::Image::LoadStbImage(vector<uint8_t>& data, const string& filePath)
 {
     int width, height, comp;

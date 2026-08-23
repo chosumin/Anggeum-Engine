@@ -100,8 +100,14 @@ namespace Core
 
 		bool Empty() const { return _batches.empty(); }
 
-		// Hands the queued batches to the caller and resets the queue.
-		vector<GeometryCopyBatch> Take() { return std::move(_batches); }
+		const GeometryCopyBatch& Front() const { return _batches.front(); }
+
+		GeometryCopyBatch PopFront()
+		{
+			GeometryCopyBatch batch = std::move(_batches.front());
+			_batches.erase(_batches.begin());
+			return batch;
+		}
 
 	private:
 		vector<GeometryCopyBatch> _batches;
