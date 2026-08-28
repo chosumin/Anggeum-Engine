@@ -39,7 +39,12 @@ namespace Core
 		void UnregisterTexture(uint32_t bindlessIndex);
 
 		// Descriptor management
-		// Flush pending descriptor writes; no-op when nothing was registered/freed.
+		// Flush pending descriptor writes; no-op when nothing was registered,
+		// freed, or awaiting its real texture. A registered texture whose data
+		// has not arrived yet is published pointing at the DEFAULT texture and
+		// re-checked here every call until the real one can be patched in - so
+		// a descriptor is valid the moment it is registered, with no ordering
+		// dependency on the upload.
 		void Sync();
 		VkDescriptorSet GetDescriptorSet() const { return _descriptorSet; }
 		VkDescriptorSetLayout GetDescriptorSetLayout() const { return _descriptorSetLayout; }
@@ -80,5 +85,13 @@ namespace Core
 		
 		vector<uint32_t> _pendingUpdates;
 		bool _needsUpdate = false;
+
+		// Slots currently published with the placeholder, waiting for their
+		// texture's data to arrive so the real descriptor can be written.
+		vector<uint32_t> _awaitingReal;
+
+		// The always-resident placeholder.
+		Handle<Texture> _defaultTexture;
+		TextureBuffer _defaultTextureBuffer;
 	};
 }

@@ -36,6 +36,10 @@ namespace Core
 
 			auto& slot = _slots[index];
 			slot.resource = std::move(resource);
+
+			// Reused slots may carry a stale state; resources are Resident by
+			// default and only deferred-upload loaders mark Loading.
+			slot.state = ResourceState::Resident;
 			++_liveCount;
 
 			return Handle<T>{ this, index, slot.generation };
@@ -86,6 +90,20 @@ namespace Core
 
 		bool IsAlive(Handle<T> handle) const { return Get(handle) != nullptr; }
 
+		// Residency is slot metadata beside the generation - never a member on
+		// the resource object (transient load state must not outlive loading).
+		bool IsResident(Handle<T> handle) const
+		{
+			return IsAlive(handle)
+				&& _slots[handle.index].state == ResourceState::Resident;
+		}
+
+		void SetState(Handle<T> handle, ResourceState state)
+		{
+			if (IsAlive(handle))
+				_slots[handle.index].state = state;
+		}
+
 		uint32_t GetLiveCount() const { return _liveCount; }
 		uint32_t GetSlotCount() const { return static_cast<uint32_t>(_slots.size()); }
 
@@ -94,6 +112,7 @@ namespace Core
 		{
 			shared_ptr<T> resource;
 			uint32_t generation = 0;
+			ResourceState state = ResourceState::Resident;
 		};
 
 		vector<Slot> _slots;
@@ -114,5 +133,25 @@ namespace Core
 		T* resource = TryGet();
 		assert(resource != nullptr && "Get() on an invalid or stale handle");
 		return *resource;
+	}
+
+	template<typename T>
+	bool Handle<T>::IsResident() const
+	{
+		return pool ? pool->IsResident(*this) : false;
+	}
+
+	template<typename T>
+	void Handle<T>::SetLoading() const
+	{
+		if (pool)
+			pool->SetState(*this, ResourceState::Loading);
+	}
+
+	template<typename T>
+	void Handle<T>::SetResident() const
+	{
+		if (pool)
+			pool->SetState(*this, ResourceState::Resident);
 	}
 }

@@ -35,7 +35,7 @@ namespace Core
 	};
 
 	Device::Device(Window& window)
-		:_device(), _graphicsQueue(), _presentQueue(), _instance(), _surface(), _computeQueue(),
+		:_device(), _graphicsQueue(), _instance(), _surface(),
 		_deviceExtensions{
 			// Timeline semaphores and descriptor indexing are core since 1.2
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -49,6 +49,8 @@ namespace Core
 		// enables the same chain, so the features are queried exactly once.
 		DeviceFeatureChain featureChain;
 	    PickPhysicalDevice(featureChain);
+
+		_supportsDrawIndirectCount = featureChain.features12.drawIndirectCount;
 
 		_queueFamilyIndices = FindQueueFamilies(_physicalDevice);
 
@@ -388,9 +390,6 @@ namespace Core
 	    }
 
 	    vkGetDeviceQueue(_device, _queueFamilyIndices.GraphicsFamily.value(), 0, &_graphicsQueue);
-	    vkGetDeviceQueue(_device, _queueFamilyIndices.ComputeFamily.value(), 0, &_computeQueue);
-	    vkGetDeviceQueue(_device, _queueFamilyIndices.PresentFamily.value(), 0, &_presentQueue);
-	    vkGetDeviceQueue(_device, _queueFamilyIndices.TransferFamily.value(), 0, &_transferQueue);
 	}
 
 	SwapChainSupportDetails Device::QuerySwapChainSupport(VkPhysicalDevice device)

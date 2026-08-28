@@ -8,7 +8,7 @@
 #include "Image.h"
 #include "BindlessTextureManager.h"
 #include "DescriptorPool.h"
-#include "Graphics/RenderContext.h"
+#include "Graphics/FrameCounter.h"
 #include "Graphics/RenderFrame.h"
 #include "Foundation/Job.h"
 
@@ -237,12 +237,13 @@ void Core::CommandBuffer::CopyImage(Texture& srcTexture, Texture& dstTexture,
         &copyRegion);
 }
 
-void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height)
+void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, uint32_t width, uint32_t height,
+    VkDeviceSize bufferOffset)
 {
     Image& image = texture.GetImage();
 
     VkBufferImageCopy region{};
-    region.bufferOffset = 0;
+    region.bufferOffset = bufferOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
 
@@ -259,6 +260,39 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, ui
         buffer.GetBuffer(),
         image.GetImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &region
+    );
+}
+
+void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture,
+    const vector<VkBufferImageCopy>& regions)
+{
+    assert(!regions.empty());
+
+    vkCmdCopyBufferToImage(
+        _commandBuffer,
+        buffer.GetBuffer(),
+        texture.GetImage().GetImage(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        static_cast<uint32_t>(regions.size()),
+        regions.data()
+    );
+}
+
+void Core::CommandBuffer::CopyImageToBuffer(Texture& texture, VkImageLayout layout,
+    Buffer& buffer, uint32_t width, uint32_t height)
+{
+    VkBufferImageCopy region{};
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = { width, height, 1 };
+
+    vkCmdCopyImageToBuffer(
+        _commandBuffer,
+        texture.GetImage().GetImage(),
+        layout,
+        buffer.GetBuffer(),
         1,
         &region
     );
@@ -407,6 +441,29 @@ void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t d
 		drawCount,
 		stride
 	);
+}
+
+void Core::CommandBuffer::DrawIndexedIndirectCount(Buffer& indirectBuffer,
+	VkDeviceSize indirectOffset, Buffer& countBuffer, VkDeviceSize countOffset,
+	uint32_t maxDrawCount, uint32_t stride)
+{
+	assert(_device.SupportsDrawIndirectCount()
+		&& "drawIndirectCount feature is not available on this device");
+
+	vkCmdDrawIndexedIndirectCount(
+		_commandBuffer,
+		indirectBuffer.GetBuffer(),
+		indirectOffset,
+		countBuffer.GetBuffer(),
+		countOffset,
+		maxDrawCount,
+		stride
+	);
+}
+
+void Core::CommandBuffer::DispatchIndirect(Buffer& argsBuffer, VkDeviceSize offset)
+{
+	vkCmdDispatchIndirect(_commandBuffer, argsBuffer.GetBuffer(), offset);
 }
 
 void Core::CommandBuffer::FillBuffer(Buffer& buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data)

@@ -7,13 +7,17 @@ namespace Core
     class Device;
     class SwapChain;
     class Texture;
+    class SyncContext;
 
     class GUIRenderPass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
 
-        GUIRenderPass(Device& device, SwapChain& swapChain, VkSampleCountFlagBits msaaSamples);
+        // The sync context is only tapped at init: ImGui's backend wants the
+        // raw graphics queue handle, which lives on the submission authority.
+        GUIRenderPass(Device& device, SwapChain& swapChain, VkSampleCountFlagBits msaaSamples,
+            SyncContext& syncContext);
         ~GUIRenderPass();
 
         const char* GetName() const override { return "GUIRenderPass"; }

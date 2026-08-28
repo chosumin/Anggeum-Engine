@@ -14,11 +14,19 @@ namespace Core
 		VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
 	};
 
+	struct SpecConstants
+	{
+		vector<pair<uint32_t, uint32_t>> values;
+	};
+
 	class Pipeline
 	{
 	public:
-		Pipeline(Device& device, const PipelineRenderingDesc& renderingDesc, Shader& shader, PipelineState& pipelineState);
-		Pipeline(Device& device, Shader& shader);
+		Pipeline(Device& device, const PipelineRenderingDesc& renderingDesc,
+			Shader& shader, PipelineState& pipelineState,
+			const SpecConstants& specConstants = {});
+		Pipeline(Device& device, Shader& shader,
+			const SpecConstants& specConstants = {});
 		~Pipeline();
 
 		VkPipeline GetPipeline() const { return _pipeline; }
@@ -26,7 +34,8 @@ namespace Core
 	private:
 		void CreateGraphicsPipeline(VkRenderPass renderPass,
 			const VkPipelineRenderingCreateInfo* renderingInfo,
-			Shader& shader, PipelineState& pipelineState);
+			Shader& shader, PipelineState& pipelineState,
+			const SpecConstants& specConstants);
 		VkPipelineViewportStateCreateInfo GetViewportStateCreateInfo();
 		// One entry per color attachment; the vector must outlive pipeline creation.
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(

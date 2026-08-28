@@ -1,9 +1,12 @@
 #include "stdafx.h"
 #include "ResourceManager.h"
 #include "Utils/Utility.h"
-#include "Graphics/TransferJob.h"
+#include "Graphics/TextureUpload.h"
+#include "Graphics/GeometryUpload.h"
+#include "Graphics/TextureUpload.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
+#include "Graphics/AssetStreamer.h"
 
 namespace Core
 {
@@ -15,16 +18,17 @@ namespace Core
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
 		auto& defaultTex = _defaultTexture.Get();
-		VkImageJob job(_device, defaultTex, defaultTex.GetName());
+		TextureUploadJob job(_device, defaultTex, defaultTex.GetName());
 
 		Core::CommandBuffer::ImmediateSubmit(_device, job);
 	}
 
 	ResourceManager::~ResourceManager() = default;
 
-	void ResourceManager::Prepare(RenderContext& renderContext)
+	void ResourceManager::Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer)
 	{
 		_renderContext = &renderContext;
+		_streamer = &assetStreamer;
 		
 		if (_renderContext->HasBindlessSupport())
 		{
@@ -158,7 +162,9 @@ namespace Core
 		Handle<Texture> handle = _texturePool.Add(texture);
 		_textureHandles[newName] = handle;
 
-		if (_renderContext)
+		// Only the ctor's default texture takes that path. 
+		// The ctor needs neither the queue nor the Loading state.
+		if (_renderContext != nullptr)
 		{
 			if (_renderContext->HasBindlessSupport())
 			{
@@ -167,7 +173,9 @@ namespace Core
 				texture->SetBindlessIndex(bindlessIndex);
 			}
 
-			_renderContext->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath });
+			handle.SetLoading();
+			_streamer->Push({ handle, imageCreateInfo.filePath,
+				Image::QueryStagingBytes(imageCreateInfo.filePath) });
 		}
 
 		return handle;
@@ -209,8 +217,13 @@ namespace Core
 		auto subMesh = make_shared<Core::SubMesh>(_device, name);
 		subMesh->SetIndexCount(IndexCountOf(geometry));
 
+		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
+		_subMeshHandles[name] = handle;
+
 		GeometryCopyBatch batch;
 		batch.debugName = "Geometry_" + name;
+		batch.subMesh = handle;
+
 		// Scanning every vertex for bounds is the expensive part, so the upload job
 		// does it on a worker thread and reports back here.
 		batch.boundsTarget = subMesh.get();
@@ -219,10 +232,11 @@ namespace Core
 		subMesh->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
 
 		if (!batch.copies.empty())
-			_renderContext->GetGeometryCopyQueue().Push(move(batch));
+		{
+			handle.SetLoading();
+			_streamer->Push(move(batch));
+		}
 
-		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
-		_subMeshHandles[name] = handle;
 		return handle;
 	}
 
@@ -249,6 +263,7 @@ namespace Core
 		// LoadBuffer takes its own lock, hence outside the guard above.
 		GeometryCopyBatch batch;
 		batch.debugName = "Standalone_" + name;
+		batch.subMesh = handle;
 
 		for (auto& attr : geometry.attributes)
 		{
@@ -273,7 +288,10 @@ namespace Core
 		}
 
 		if (!batch.copies.empty())
-			_renderContext->GetGeometryCopyQueue().Push(move(batch));
+		{
+			handle.SetLoading();
+			_streamer->Push(move(batch));
+		}
 
 		return handle;
 	}
@@ -330,7 +348,9 @@ namespace Core
 			break;
 		case Utility::HashCode("DepthNormal"):
 			pass = "Depth";
-			vert = "shaders/depthNormal.vert.spv";
+			// Shares lit.vert with the geometry pass: one vertex shader in both
+			// pipelines is what makes the prepass depth exactly re-testable.
+			vert = "shaders/lit.vert.spv";
 			frag = "shaders/depthNormal.frag.spv";
 			break;
 		case Utility::HashCode("Skybox"):
@@ -352,6 +372,16 @@ namespace Core
 			pass = "PreSky";
 			vert = "shaders/brdf_lut.vert.spv";
 			frag = "shaders/brdf_lut.frag.spv";
+			break;
+		case Utility::HashCode("Terrain"):
+			pass = "Terrain";
+			vert = "shaders/Terrain/terrain.vert.spv";
+			frag = "shaders/Terrain/terrain.frag.spv";
+			break;
+		case Utility::HashCode("TerrainDepth"):
+			pass = "Terrain";
+			vert = "shaders/Terrain/terrain.vert.spv";
+			frag = "shaders/Terrain/terrainDepth.frag.spv";
 			break;
 		default:
 			pass = "Geometry";

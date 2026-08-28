@@ -3,6 +3,11 @@
 
 #include "common.glsl"
 
+// Shared by the depth prepass (with depthNormal.frag) and the geometry pass;
+// invariance guarantees both pipelines emit bit-identical positions, so the
+// geometry pass survives LESS_OR_EQUAL on the prepass depth with writes off.
+invariant gl_Position;
+
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texCoord;

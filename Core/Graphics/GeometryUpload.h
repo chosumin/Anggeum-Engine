@@ -1,19 +1,20 @@
 #pragma once
 #include "ResourceHandle.h"
+#include "UploadJob.h"
 
 namespace Core
 {
+	class Device;
 	class Buffer;
 	class SubMesh;
+	class StagingRing;
 
-	// Bounds computed from a POSITION stream. Filled on a worker thread and applied to
-	// the SubMesh / scene bounds once the upload jobs are done.
+	// Bounding sphere computed from a POSITION stream. Filled on a worker
+	// thread and applied to the SubMesh once its upload has completed.
 	struct GeometryBounds
 	{
 		glm::vec3 center{ 0.0f };
 		float radius = 0.0f;
-		glm::vec3 min{ FLT_MAX };
-		glm::vec3 max{ -FLT_MAX };
 	};
 
 	// Two passes over the positions (extent, then radius). Called from worker threads,
@@ -50,8 +51,6 @@ namespace Core
 
 		out.center = center;
 		out.radius = radius;
-		out.min = min;
-		out.max = max;
 	}
 
 	// Raw geometry for one submesh, handed to ResourceManager at load time. Space is
@@ -88,11 +87,12 @@ namespace Core
 		// Where the computed bounds land. Resolved on the main thread; the pool owns
 		// the SubMesh for the app's lifetime, so the pointer stays valid.
 		SubMesh* boundsTarget = nullptr;
+
+		Handle<SubMesh> subMesh;
 	};
 
-	// One-shot hand-off from resource loading to the GPU upload: ResourceManager pushes
-	// resolved copies here, RenderScene::Sync turns them into transfer jobs. A
-	// non-empty queue is the "geometry needs uploading" dirty state.
+	// One-shot hand-off from resource loading to the GPU upload.
+	// A non-empty queue is the "geometry needs uploading" dirty state.
 	class GeometryCopyQueue
 	{
 	public:
@@ -100,10 +100,34 @@ namespace Core
 
 		bool Empty() const { return _batches.empty(); }
 
-		// Hands the queued batches to the caller and resets the queue.
-		vector<GeometryCopyBatch> Take() { return std::move(_batches); }
+		const GeometryCopyBatch& Front() const { return _batches.front(); }
+
+		GeometryCopyBatch PopFront()
+		{
+			GeometryCopyBatch batch = std::move(_batches.front());
+			_batches.erase(_batches.begin());
+			return batch;
+		}
 
 	private:
 		vector<GeometryCopyBatch> _batches;
+	};
+
+	// Executes one batch: packs every copy into a single staging span and
+	// records the copies out of its sub-ranges, so a mesh upload is one
+	// worker-thread task with one staging allocation.
+	class GeometryUploadJob : public UploadJob
+	{
+	public:
+		GeometryUploadJob(Device& device, GeometryCopyBatch&& batch);
+		~GeometryUploadJob();
+
+		void Execute() override;
+
+	private:
+		Device& _device;
+		GeometryCopyBatch _batch;
+		vector<Buffer*> _destinations;   // resolved 1:1 with _batch.copies
+		unique_ptr<Buffer> _stagingBuffer;
 	};
 }

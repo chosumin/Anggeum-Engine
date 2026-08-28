@@ -1,0 +1,164 @@
+#version 450
+
+// Terrain patch culling: expands every listed node into 8x8 patches,
+// culls each against the frustum and the (previous-frame) Hi-Z pyramid, and
+// packs per-edge LOD stitch deltas from the LOD map. Survivors append to the
+// Visible Render Patch List; the draw's instanceCount is bumped atomically.
+//
+// The sphere frustum/occlusion tests mirror gpuCulling.comp's proven mesh
+// path; the patch AABB is wrapped in its bounding sphere (conservative).
+
+layout(local_size_x = 64) in; // = patchesPerNodeEdge^2, asserted on the CPU
+
+#include "terrainCommon.glsl"
+
+layout(set = 0, binding = 0) readonly buffer NodeList
+{
+    uvec2 entries[]; // x = packed coord, y = atlas slot
+} nodeList;
+
+layout(set = 0, binding = 1) readonly buffer NodeDescs
+{
+    uvec2 descs[];   // x = minMaxHeight (unorm16 pair), y = slotLod
+} nodeDescs;
+
+layout(set = 0, binding = 2) uniform usampler2D lodMap;
+layout(set = 0, binding = 3) uniform sampler2D hiZBuffer;
+
+// uvec4 per surviving patch: packed node coord, atlas slot, patch index
+// (y*8+x inside the node), 4x4-bit edge LOD deltas (-x, +x, -z, +z).
+layout(set = 0, binding = 4) writeonly buffer PatchList
+{
+    uvec4 patches[];
+} patchList;
+
+layout(set = 0, binding = 5) buffer PatchDrawArgs
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+} drawArgs;
+
+layout(set = 0, binding = 6) uniform CullData
+{
+    mat4 view;
+    mat4 proj;
+    vec4 frustumPlanes[6];
+    vec4 screenHiZ;    // xy = screen size, z = hiZ mip count, w = occlusion on
+    vec4 heightBounds; // x = min, y = max, z = conservative pad
+} cull;
+
+layout(push_constant) uniform Push
+{
+    TerrainTraversalPush push;
+};
+
+
+
+bool IsVisibleFrustum(vec3 center, float radius)
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        if (dot(cull.frustumPlanes[i].xyz, center) + cull.frustumPlanes[i].w
+            < -radius)
+            return false;
+    }
+    return true;
+}
+
+bool IsOccluded(vec3 worldCenter, float worldRadius)
+{
+    vec4 viewCenter = cull.view * vec4(worldCenter, 1.0);
+    vec4 clipCenter = cull.proj * viewCenter;
+
+    // Behind camera / off screen: the frustum test is the authority.
+    if (clipCenter.w <= 0.0)
+        return false;
+
+    vec3 ndc = clipCenter.xyz / clipCenter.w;
+    vec2 screenUV = ndc.xy * 0.5 + 0.5;
+    if (any(lessThan(screenUV, vec2(0.0))) || any(greaterThan(screenUV, vec2(1.0))))
+        return false;
+
+    // abs(): the Vulkan Y-flip makes proj[1][1] negative.
+    float projRadius = worldRadius * abs(cull.proj[1][1]) / clipCenter.w;
+    float screenPixelRadius = projRadius * cull.screenHiZ.y * 0.5;
+
+    int mipLevel = int(ceil(log2(max(screenPixelRadius * 2.0, 1.0))));
+    mipLevel = clamp(mipLevel, 0, int(cull.screenHiZ.z) - 1);
+
+    float occluderDepth = textureLod(hiZBuffer, screenUV, float(mipLevel)).r;
+
+    // Nearest point of the sphere toward the camera (view looks down -Z).
+    float viewNearZ = viewCenter.z + worldRadius;
+    if (viewNearZ >= 0.0)
+        return false;
+
+    vec4 clipNear = cull.proj * vec4(0.0, 0.0, viewNearZ, 1.0);
+    return clipNear.z / clipNear.w > occluderDepth;
+}
+
+void main()
+{
+    uvec2 entry = nodeList.entries[gl_WorkGroupID.x];
+    uint lod = TerrainUnpackLod(entry.x);
+    uvec2 nodeCoord = TerrainUnpackCoord(entry.x);
+    uint slot = entry.y;
+
+    uint patchIdx = gl_LocalInvocationID.x;
+    uvec2 patchXY = uvec2(patchIdx % TERRAIN_PATCHES_PER_EDGE, patchIdx / TERRAIN_PATCHES_PER_EDGE);
+
+    float nodeSize = TerrainNodeSizeAt(push.rootNodeSize, push.lodCount, lod);
+    float patchSize = nodeSize / float(TERRAIN_PATCHES_PER_EDGE);
+    vec2 patchMin = push.worldOrigin + vec2(nodeCoord) * nodeSize
+        + vec2(patchXY) * patchSize;
+
+    // Height bounds are the NODE's baked min/max (conservative per patch),
+    // padded the same way the CPU culler pads for decimated coarse bakes.
+    uint minMax = nodeDescs.descs[slot].x;
+    float minHeight = mix(cull.heightBounds.x, cull.heightBounds.y,
+        float(minMax & 0xffffu) / 65535.0) - cull.heightBounds.z;
+    float maxHeight = mix(cull.heightBounds.x, cull.heightBounds.y,
+        float(minMax >> 16) / 65535.0) + cull.heightBounds.z;
+
+    vec3 halfExtents = vec3(patchSize * 0.5, (maxHeight - minHeight) * 0.5,
+        patchSize * 0.5);
+    vec3 center = vec3(patchMin.x, minHeight, patchMin.y) + halfExtents;
+    float radius = length(halfExtents);
+
+    if (!IsVisibleFrustum(center, radius))
+        return;
+    if (cull.screenHiZ.w != 0.0 && IsOccluded(center, radius))
+        return;
+
+    // Per-edge stitch deltas: sample the LOD map half a sector beyond each
+    // edge. Interior edges land in this node's own sectors -> delta 0;
+    // out-of-map lookups (world border) also read as delta 0.
+    float sectorSize = TerrainNodeSizeAt(push.rootNodeSize, push.lodCount, 0u);
+    vec2 centerXZ = patchMin + patchSize * 0.5;
+    const vec2 edgeDirs[4] = vec2[](
+        vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0));
+
+    uint deltas = 0u;
+    for (uint edge = 0u; edge < 4u; ++edge)
+    {
+        vec2 probe = centerXZ
+            + edgeDirs[edge] * (patchSize * 0.5 + sectorSize * 0.5);
+        ivec2 sector = ivec2(floor((probe - push.worldOrigin) / sectorSize));
+
+        uint neighborLod = lod;
+        if (all(greaterThanEqual(sector, ivec2(0)))
+            && all(lessThan(sector, textureSize(lodMap, 0))))
+            neighborLod = texelFetch(lodMap, sector, 0).r;
+
+        uint delta = neighborLod > lod ? min(neighborLod - lod, 15u) : 0u;
+        deltas |= delta << (edge * 4u);
+    }
+
+    // No bounds guard: the list is sized for every patch of every listable
+    // node (atlasCapacity * 64), so the counter cannot overflow it.
+    uint dst = atomicAdd(drawArgs.instanceCount, 1u);
+    patchList.patches[dst] = uvec4(entry.x, slot, patchIdx, deltas);
+}

@@ -30,9 +30,11 @@ void RenderContext::RemoveResizeCallback(function<void(SwapChain&)> callback)
 	}
 }
 
-RenderContext::RenderContext(Device& device, RenderScene& renderScene)
+RenderContext::RenderContext(Device& device, RenderScene& renderScene,
+	SyncContext& syncContext)
 	: _device(device)
 	, _renderScene(renderScene)
+	, _syncContext(syncContext)
 {
 	_swapChain = new SwapChain(device);
 
@@ -42,7 +44,6 @@ RenderContext::RenderContext(Device& device, RenderScene& renderScene)
 	_commandPool = new CommandPool(device, queueFamilyIndices.GraphicsFamily.value());
 	_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
 
-	_syncContext = make_unique<SyncContext>(device);
 	_queueTimer = make_unique<GpuQueueTimer>(device);
 
 	CreateRenderFrames();
@@ -55,8 +56,7 @@ RenderContext::~RenderContext()
 	// body) must outlive them.
 	_frames.clear();
 
-	// Clean up sync primitives (must outlive frames only for wait; frames already destroyed)
-	_syncContext.reset();
+	// The sync context is Engine-owned and outlives this frame manager.
 	_queueTimer.reset();
 
 	// Clean up command pools
@@ -88,6 +88,10 @@ void RenderContext::RecreateSwapChain()
 
 void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 {
+	// The frame slot DERIVES from the engine-owned frame counter 
+	// (Engine advances it once per loop, after Submit).
+	_currentFrame = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+
 	// Acquire swap chain image and wait
 	AcquireSwapChainAndResetFence(*_swapChain);
 
@@ -139,18 +143,18 @@ void RenderContext::Submit()
 
 		initCommandBuffer.EndCommandBuffer();
 
-		_syncContext->SubmitResourceInit(initCommandBuffer.GetHandle());
+		_syncContext.SubmitResourceInit(initCommandBuffer.GetHandle());
 	}
 
 	// Submit all queues with semaphore injection
-	_syncContext->SubmitToQueues(
+	_syncContext.SubmitToQueues(
 		submission.submitInfos,
 		submission.submitScratch,
 		submission.imageAvailableSemaphore,
 		submission.renderFinishedSemaphore);
 
 	// Record this frame's final timeline values
-	_syncContext->RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
+	_syncContext.RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
 	auto presentStart = std::chrono::steady_clock::now();
 
@@ -195,7 +199,7 @@ void RenderContext::AcquireSwapChainAndResetFence(SwapChain& swapChain)
 	if (snapshot.valid)
 	{
 		u64 waitValues[] = { snapshot.graphicsValue, snapshot.computeValue };
-		VkSemaphore waitSemaphores[] = { _syncContext->GetGraphicsSemaphore(), _syncContext->GetComputeSemaphore() };
+		VkSemaphore waitSemaphores[] = { _syncContext.GetGraphicsSemaphore(), _syncContext.GetComputeSemaphore() };
 
 		VkSemaphoreWaitInfo waitInfo{};
 		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
@@ -234,7 +238,7 @@ void RenderContext::EndFrame(VkSemaphore* semaphore)
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &_imageIndex;
 
-	VkResult result = vkQueuePresentKHR(_device.GetPresentQueue(), &presentInfo);
+	VkResult result = _syncContext.Present(presentInfo);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || Window::FramebufferResized)
 	{
 		Window::FramebufferResized = false;
@@ -243,6 +247,4 @@ void RenderContext::EndFrame(VkSemaphore* semaphore)
 	else if (result != VK_SUCCESS)
 		throw runtime_error("failed to present swap chain image!");
 
-	FrameCounter::IncreaseFrame();
-	_currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }

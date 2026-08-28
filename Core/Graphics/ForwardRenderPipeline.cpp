@@ -6,6 +6,7 @@
 #include "Components/Light.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/RenderFrame.h"
+#include "Graphics/RenderScene.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
@@ -18,12 +19,15 @@
 #include "Graphics/RenderPasses/IBLPass.h"
 #include "Graphics/RenderPasses/GeometryPass.h"
 #include "Graphics/RenderPasses/GUIRenderPass.h"
+#include "Graphics/RenderPasses/TerrainNodeListPass.h"
+#include "Graphics/RenderPasses/TerrainLodMapPass.h"
+#include "Graphics/RenderPasses/TerrainPass.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
-Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, 
+Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	WorkerThreadManager& workerThreadManager,
-	RenderScene& renderScene, SwapChain& swapChain)
+	RenderScene& renderScene, SwapChain& swapChain, SyncContext& syncContext)
 	:_device(device)
 	,_renderScene(renderScene)
 	,_swapChainExtents(swapChain.GetSwapChainExtent())
@@ -45,6 +49,9 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
+
+	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, renderScene));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
 
@@ -69,7 +76,11 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 	_frameGraph->AddPass(make_unique<GeometryPass>(
 		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
 
-	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples));
+	_frameGraph->AddPass(make_unique<TerrainPass>(device, renderScene,
+		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
+
+	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples,
+		syncContext));
 }
 
 Core::ForwardRenderPipeline::~ForwardRenderPipeline()

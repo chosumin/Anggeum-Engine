@@ -6,19 +6,25 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/TransferContext.h"
-#include "Graphics/TransferJob.h"
+#include "Graphics/AssetStreamer.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/DescriptorSetBuilder.h"
 #include "Foundation/Scene.h"
+#include "Components/PerspectiveCamera.h"
+#include "Graphics/Terrain/TerrainSystem.h"
 
 using namespace Core;
 
-RenderScene::RenderScene(Device& device, Scene& scene)
+RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer)
 	: _device(&device)
 	, _scene(scene)
 {
+	// The world model's own upload scheduler: every producer below (and the
+	// resource loaders) pushes its requests here.
+	_assetStreamer = make_unique<AssetStreamer>(device, transfer);
+
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
 		_bindless = make_unique<BindlessTextureManager>(device, 4096);
@@ -26,97 +32,35 @@ RenderScene::RenderScene(Device& device, Scene& scene)
 	_meshBuffer = make_unique<MeshBufferManager>(device);
 	_material = make_unique<MaterialManager>(device);
 	_batch = make_unique<RendererBatch>(device);
+
+	_terrainSystem = make_unique<TerrainSystem>(device, transfer);
 }
 
-void RenderScene::Sync(Scene& scene, TransferContext& transfer, VkExtent2D extents)
+// Out of line for the unique_ptr members forward-declared in the header.
+RenderScene::~RenderScene() = default;
+
+void RenderScene::SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promotedCount)
 {
-	// Every manager self-gates on its own dirty state; this only fixes the order.
-	// Space was already reserved at load time, so this just enqueues the pending data
-	// copies — every transfer job is issued here.
-	UploadQueuedTextures(transfer);
-	UploadQueuedGeometry(transfer);
+	// Streaming producer: decides this frame's uploads, and submits them.
+	if (auto* camera = scene.GetMainCamera())
+		_terrainSystem->Update(*camera);
 
-	// ...and flush them before the steps below: the bindless descriptor writes need
-	// the uploaded textures' image views (created by the image jobs), and the draw
-	// set references the uploaded geometry and the bounds those jobs computed.
-	transfer.Wait();
+	// The managers below are consumers of COMPLETED uploads: they fold
+	// promoted resources into the GPU mirrors.
 
-	ApplyComputedBounds();
+	// Newly-Resident geometry can only join the draw set through a rebuild.
+	if (promotedCount > 0)
+		_batch->MarkDirty();
 
 	if (_bindless)
 		_bindless->Sync();
 
 	_material->Sync();
 
-	// The batch enqueues its own buffer fills rather than submitting them, so flush
-	// once more: the passes read the draw set on the GPU during this frame.
-	_batch->Sync(scene, transfer, extents);
-	transfer.Wait();
-}
+	_batch->Sync(scene, *_assetStreamer, extents);
 
-void RenderScene::UploadQueuedTextures(TransferContext& transfer)
-{
-	if (_textureUploads.Empty())
-		return;
-
-	// The job reads the file on a worker thread; resolve the handle here on the main
-	// thread (the pool is not thread-safe).
-	for (auto& request : _textureUploads.Take())
-	{
-		auto& texture = request.texture.Get();
-		transfer.Enqueue(make_unique<VkImageJob>(*_device, texture, request.filePath),
-			texture.GetName());
-	}
-}
-
-void RenderScene::UploadQueuedGeometry(TransferContext& transfer)
-{
-	if (_geometryCopies.Empty())
-		return;
-
-	// One transfer job per batch (i.e. per submesh).
-	size_t batchIndex = 0;
-	for (auto& batch : _geometryCopies.Take())
-	{
-		vector<BufferCopyRegion> copies;
-		copies.reserve(batch.copies.size());
-
-		vector<BoundsTask> boundsTasks;
-
-		for (auto& copy : batch.copies)
-		{
-			// The job computes bounds from the POSITION stream while it holds the data.
-			if (copy.boundsStride > 0 && batch.boundsTarget)
-			{
-				auto result = make_unique<GeometryBounds>();
-				boundsTasks.push_back({ copies.size(), copy.boundsStride, result.get() });
-				_pendingBounds.push_back({ batch.boundsTarget, move(result) });
-			}
-
-			copies.push_back({ &copy.destination.Get(), move(copy.data), copy.offset });
-		}
-
-		transfer.Enqueue(
-			make_unique<VkBufferCopyBatchJob>(*_device, move(copies), move(boundsTasks)),
-			batch.debugName + "_" + std::to_string(batchIndex));
-
-		++batchIndex;
-	}
-}
-
-void RenderScene::ApplyComputedBounds()
-{
-	// Called once the upload jobs are done, so each result is safe to read here.
-	for (auto& pending : _pendingBounds)
-	{
-		auto& bounds = *pending.result;
-		pending.target->SetBoundingSphere(bounds.center, bounds.radius);
-
-		_sceneBoundsMin = glm::min(_sceneBoundsMin, bounds.min);
-		_sceneBoundsMax = glm::max(_sceneBoundsMax, bounds.max);
-	}
-
-	_pendingBounds.clear();
+	// Everything this frame produced - loader requests, the rebuild's table fills
+	_assetStreamer->SubmitQueued();
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,

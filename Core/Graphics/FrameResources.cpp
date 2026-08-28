@@ -10,7 +10,7 @@
 #include "ResourceManager.h"
 #include "FrameGraph/TransientResourceAllocator.h"
 #include "Foundation/Job.h"
-#include "TransferJob.h"
+#include "BufferUpload.h"
 #include "RendererBatch.h"
 
 using namespace Core;
@@ -228,7 +228,7 @@ Handle<Buffer> FrameResources::CreateOrReplaceFilledStorageBuffer(const string& 
 {
 	Handle<Buffer> handle = CreateOrReplaceStorageBuffer(name, desc);
 
-	_pendingInitJobs.push_back(make_unique<VkBufferCopyJob<uint8_t>>(
+	_pendingInitJobs.push_back(make_unique<BufferUploadJob<uint8_t>>(
 		_device, handle.Get(), std::move(initialData), 0));
 
 	return handle;

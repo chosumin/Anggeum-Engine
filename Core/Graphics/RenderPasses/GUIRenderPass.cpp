@@ -4,13 +4,14 @@
 #include "Graphics/FrameResources.h"
 #include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/SwapChain.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
 
 using namespace Core;
 
 GUIRenderPass::GUIRenderPass(Device& device, SwapChain& swapChain,
-    VkSampleCountFlagBits msaaSamples)
+    VkSampleCountFlagBits msaaSamples, SyncContext& syncContext)
     : _device(device)
     , _swapChain(swapChain)
     , _msaaSamples(msaaSamples)
@@ -55,7 +56,7 @@ GUIRenderPass::GUIRenderPass(Device& device, SwapChain& swapChain,
     init_info.Instance = _device.GetInstance();
     init_info.PhysicalDevice = _device.GetPhysicalDevice();
     init_info.Device = _device.GetDevice();
-    init_info.Queue = _device.GetGraphicsQueue();
+    init_info.Queue = syncContext.GetGraphicsQueueForExternalInit();
     init_info.DescriptorPool = _pool;
 	const uint32_t imageCount = static_cast<uint32_t>(_swapChain.GetSwapChainCount());
 	init_info.MinImageCount = imageCount;

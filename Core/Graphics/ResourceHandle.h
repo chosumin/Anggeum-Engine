@@ -5,6 +5,21 @@ namespace Core
 	template<typename T>
 	class ResourcePool;
 
+	enum class ResourceState : uint8_t
+	{
+		/// <summary>
+		/// GPU data is not present and the resource is not ready for use. The loader has
+		/// reserved space and assigned slots, but consumers fall back to defaults until
+		/// the promotion pump flips it Resident on upload completion.
+		/// </summary>
+		Loading,
+
+		/// <summary>
+		/// GPU data is present and the resource is ready for use.
+		/// </summary>
+		Resident,
+	};
+
 	/*
 	 * Generational reference to a resource owned by a ResourcePool.
 	 *
@@ -36,6 +51,12 @@ namespace Core
 		T* TryGet() const;
 		// Asserts the handle still resolves; use TryGet() when absence is expected.
 		T& Get() const;
+
+		// Content readiness (pool-slot metadata, see ResourceState). Stale or
+		// invalid handles read as not resident.
+		bool IsResident() const;
+		void SetLoading() const;
+		void SetResident() const;
 
 		bool operator==(const Handle& other) const
 		{

@@ -50,6 +50,11 @@ void SampleScene::Load(float width, float height, Core::RenderContext* renderCon
 		AddEntity(move(cameraEntity));
 	}
 
+	mainCamera->SetFarPlane(4000.0f);
+	// The camera transform doubles as the view matrix, so translating by -y
+	// places the camera at +y in the world (above the terrain).
+	mainCamera->GetEntity().GetTransform().SetTranslation(vec3(0.0f, -60.0f, 0.0f));
+
 	auto& cameraEntity = mainCamera->GetEntity();
 	auto freeCamera = make_unique<FreeCamera>();
 	freeCamera->SetEntity(&cameraEntity);

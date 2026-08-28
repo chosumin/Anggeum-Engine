@@ -7,8 +7,34 @@
 #include "Graphics/RenderPasses/PreEnvironmentPass.h"
 #include "Graphics/RenderPasses/BrdfLutPass.h"
 #include "Foundation/Scene.h"
+#include "Components/Mesh.h"
+#include "Graphics/Material.h"
+#include "Graphics/SubMesh.h"
+#include "Graphics/ResourcePool.h"
+#include "Graphics/Vulkans/Shader.h"
 
 using namespace Core;
+
+// The generators draw the skybox mesh and sample its cubemap; with async
+// uploads either may still be Loading on the first frames, so generation
+// defers until both are Resident (re-checked every frame, generated once).
+static bool EnvironmentReady(Scene& scene)
+{
+	auto meshes = scene.GetComponents<Mesh>();
+	auto it = find_if(meshes.begin(), meshes.end(), [](Mesh* mesh)
+	{
+		auto& material = mesh->GetMaterials()[0].Get();
+		return material.GetShaderHandle().Get().GetPass() == "Skybox";
+	});
+
+	if (it == meshes.end())
+		return true; // no skybox: nothing asynchronous to wait for
+
+	Handle<SubMesh> sky = (*it)->GetSubMeshes()[0];
+	Handle<Texture> cubemap = (*it)->GetMaterials()[0].Get().GetTexture(1);
+	return sky.IsResident()
+		&& (!cubemap.IsValid() || cubemap.IsResident());
+}
 
 IBLPass::IBLPass(Device& device, RenderScene& renderScene)
 	: _device(device)
@@ -32,6 +58,9 @@ void IBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& frameR
 	// After the one generating frame this declares nothing, so the graph culls the
 	// pass and it costs no command buffer or submit.
 	if (_generated)
+		return;
+
+	if (!EnvironmentReady(_renderScene.GetScene()))
 		return;
 
 	// Offscreen (rendered per cubemap face, then copied into the cubemaps)

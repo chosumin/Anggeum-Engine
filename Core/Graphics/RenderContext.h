@@ -3,6 +3,7 @@
 #include "SyncContext.h"
 #include "GpuQueueTimer.h"
 #include "RenderScene.h"
+#include "FrameCounter.h"
 
 namespace Core
 {
@@ -11,15 +12,6 @@ namespace Core
 	 * It swaps between RenderFrame objects and forwards a request for vulkan resources to the active frame.
 	 * More than one frame can be in-flight in the GPU, thus the need for per-frame resources.
 	 */
-	class FrameCounter
-	{
-	public:
-		static void IncreaseFrame() { ++_frameNumber; }
-		static uint64_t GetFrameNumber() { return _frameNumber; }
-	private:
-		static inline uint64_t _frameNumber = 0;
-	};
-
 	class CommandBuffer;
 	class SwapChain;
 	class CommandPool;
@@ -38,7 +30,7 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device, RenderScene& renderScene);
+		RenderContext(Device& device, RenderScene& renderScene, SyncContext& syncContext);
 		~RenderContext();
 
 		void RecreateSwapChain();
@@ -78,14 +70,9 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _renderScene.GetMaterialManager(); }
 		RendererBatch* GetRendererBatch() const { return _renderScene.GetRendererBatch(); }
 
-		// Where asset loaders drop upload requests for the render side; loaders never
-		// issue transfer jobs themselves (RenderScene::Sync does).
-		GeometryCopyQueue& GetGeometryCopyQueue() const { return _renderScene.GetGeometryCopyQueue(); }
-		TextureUploadQueue& GetTextureUploadQueue() const { return _renderScene.GetTextureUploadQueue(); }
-
 		Handle<Texture> GetPreviousFrameDepth() const { return _previousFrameDepth; }
 
-		SyncContext& GetSyncContext() { return *_syncContext; }
+		SyncContext& GetSyncContext() { return _syncContext; }
 	private:
 		void CreateRenderFrames();
 		void AcquireSwapChainAndResetFence(SwapChain& swapChain);
@@ -107,7 +94,7 @@ namespace Core
 		uint32_t _currentFrame = 0;
 		
 		// Sync primitives (timeline semaphores, timeline values, frame snapshots)
-		unique_ptr<SyncContext> _syncContext;
+		SyncContext& _syncContext;
 		array<FrameTimelineSnapshot, MAX_FRAMES_IN_FLIGHT> _frameSnapshots;
 
 		// GPU-side measurement of how much the two queues actually overlap

@@ -79,6 +79,8 @@ namespace Core
 
 		void Load(vector<uint8_t>& outImageData);
 
+		static VkDeviceSize QueryStagingBytes(const string& filePath);
+
 		string& GetFilePath() { return _filePath; }
 	private:
 		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);
@@ -115,7 +117,6 @@ namespace Core
 		VkImageViewType _viewType;
 
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocatorManager* _allocator = nullptr;
 
 		// Aspect requested at construction for the deferred-bind (Unbound) path;
 		// the default view is created with it in BindMemoryAt.

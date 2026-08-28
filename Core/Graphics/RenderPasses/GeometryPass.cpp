@@ -10,6 +10,7 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
+#include "Graphics/ResourcePool.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -77,6 +78,18 @@ void GeometryPass::PrepareSkybox()
         return;
 
     auto skybox = *it;
+
+    // RecordSkybox writes their descriptors every frame, and a
+    // Loading texture has no image view yet. Until then this pass simply
+    // draws no skybox (the background stays the clear color).
+    if (!skybox->GetSubMeshes()[0].IsResident())
+        return;
+    for (auto& [slot, texture] : skybox->GetMaterials()[0].Get().GetTexturesMap())
+    {
+        if (texture.IsValid() && !texture.IsResident())
+            return;
+    }
+
     _skyboxMaterial = &skybox->GetMaterials()[0].Get();
     _skyboxSubMesh = &skybox->GetSubMeshes()[0].Get();
     _skyboxShader = &_skyboxMaterial->GetShaderHandle().Get();

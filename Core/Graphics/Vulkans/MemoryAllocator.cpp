@@ -27,7 +27,9 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation,
 {
 	lock_guard<mutex> lock(_mutex);
 
-	VkDeviceSize requestedAllocSize = ((size / _alignment) + 1) * _alignment;
+	// Round UP to the alignment (exact multiples stay as they are); the
+	// reservation may still exceed `size`, so copies must size from the data.
+	VkDeviceSize requestedAllocSize = ((size + _alignment - 1) / _alignment) * _alignment;
 	_totalAllocSize += requestedAllocSize;
 
 	SpanIndexPair location;
@@ -48,7 +50,7 @@ void Core::MemoryAllocator::Allocate(MemoryAllocation& outAllocation,
 
 	auto& block = _blocks[location.blockIndex];
 
-	outAllocation.id = location.blockIndex;
+	outAllocation.id = block.id;
 	outAllocation.size = requestedAllocSize;
 	outAllocation.offset = block.freeMemories[location.spanIndex].offset;
 	outAllocation.type = _allocatorType;
@@ -63,6 +65,9 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 	OffsetSizePair span = { allocation.offset , allocation.size };
 
 	auto block = FindMemoryBlock(allocation.id);
+	assert(block != _blocks.end() && "deallocating from an unknown block");
+
+	_totalAllocSize -= allocation.size;
 
 	if (block->dedicated)
 	{
@@ -71,26 +76,34 @@ void Core::MemoryAllocator::Deallocate(MemoryAllocation& allocation)
 	}
 	else
 	{
-		bool found = false;
-		for (auto&& freeMemory : block->freeMemories)
+		// Coalesce with both neighbours: `backward` ends where the freed span
+		// starts, `forward` starts where it ends. Merging only one direction
+		// would fragment the free list under load/unload churn.
+		auto& freeList = block->freeMemories;
+		auto backward = find_if(freeList.begin(), freeList.end(),
+			[&](const OffsetSizePair& f) { return f.offset + f.size == span.offset; });
+		auto forward = find_if(freeList.begin(), freeList.end(),
+			[&](const OffsetSizePair& f) { return f.offset == span.offset + span.size; });
+
+		if (backward != freeList.end() && forward != freeList.end())
 		{
-			if (freeMemory.offset == span.size + span.offset)
-			{
-				freeMemory.offset = span.offset;
-				freeMemory.size += allocation.size;
-				found = true;
-
-				break;
-			}
+			// The freed span bridges two free spans into one.
+			backward->size += span.size + forward->size;
+			freeList.erase(forward);
 		}
-
-		if (found == false)
+		else if (backward != freeList.end())
 		{
-			block->freeMemories.emplace_back(span);
-			_totalAllocSize -= allocation.size;
+			backward->size += span.size;
 		}
-
-		//todo : merge when multiple blocks are in sequence
+		else if (forward != freeList.end())
+		{
+			forward->offset = span.offset;
+			forward->size += span.size;
+		}
+		else
+		{
+			freeList.emplace_back(span);
+		}
 	}
 }
 
@@ -100,47 +113,31 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 	// the alignment, so the reservation is always larger than the data behind srcData.
 	assert(size <= allocation.size && "copy larger than the allocation");
 
-	lock_guard<mutex> lock(_mutex);
+	// Resolve the block under the lock (AddBlock may relocate the vector), but
+	// memcpy outside it: the mapping itself is stable for the block's lifetime.
+	uint8_t* mapped = nullptr;
+	{
+		lock_guard<mutex> lock(_mutex);
+		auto& block = *FindMemoryBlock(allocation.id);
+		if (block.mapped != nullptr)
+			mapped = static_cast<uint8_t*>(block.mapped) + allocation.offset;
+	}
 
-	auto device = _device.GetDevice();
+	// The host-visible pool (UNIFORM) is persistently mapped; a copy into an
+	// unmapped (device-local) allocation is a caller bug.
+	assert(mapped != nullptr && "CopyBuffer into a non-host-visible pool");
 
-	void* tempData;
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkMapMemory(device, block.memory,
-		allocation.offset, allocation.size, 0, &tempData);
-	memcpy(tempData, srcData, (size_t)size);
-	vkUnmapMemory(device, block.memory);
+	memcpy(mapped, srcData, (size_t)size);
 }
 
 void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
-	// Only persistently mapped allocators (e.g. UNIFORM) populate block.mapped.
-	// STAGE memory is NOT persistently mapped: use MapMemory/UnmapMemory instead.
+	// Only the persistently mapped allocator (UNIFORM) populates block.mapped;
+	// device-local pools return garbage here.
 	auto& block = *FindMemoryBlock(allocation.id);
 
 	uint8_t* mappedPtr = static_cast<uint8_t*>(block.mapped);
 	*outMappedPtr = mappedPtr + allocation.offset;
-}
-
-void Core::MemoryAllocator::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
-{
-	lock_guard<mutex> lock(_mutex);
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkMapMemory(_device.GetDevice(), block.memory,
-		allocation.offset, allocation.size, 0, outMappedPtr);
-}
-
-void Core::MemoryAllocator::UnmapMemory(MemoryAllocation& allocation)
-{
-	lock_guard<mutex> lock(_mutex);
-
-	auto& block = *FindMemoryBlock(allocation.id);
-
-	vkUnmapMemory(_device.GetDevice(), block.memory);
 }
 
 void Core::MemoryAllocator::BindBufferMemory(Buffer& buffer, MemoryAllocation& allocation)
@@ -177,7 +174,7 @@ bool Core::MemoryAllocator::FindFreeChunkForAllocation(SpanIndexPair& indexPair,
 
 			if (offsetSizePair.size >= size && validOffset)
 			{
-				indexPair.blockIndex = block.id;
+				indexPair.blockIndex = i;
 				indexPair.spanIndex = j;
 
 				return true;
@@ -208,12 +205,12 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 		throw std::runtime_error("failed to allocate buffer memory!");
 	}
 
-	if (_allocatorType == MemoryType::UNIFORM)
+	if (_allocatorType == MemoryType::UNIFORM
+		|| _allocatorType == MemoryType::DEDICATED_HOST)
 	{
-		//persistent mapping
-		//The uniform data will be used for all draw calls, 
-		//so the buffer containing it should only be destroyed when we stop rendering.
-
+		// Host-visible blocks are persistently mapped: a single map per block
+		// means concurrent users can never double-map it
+		// (VUID-vkMapMemory-memory-00678).
 		vkMapMemory(_device.GetDevice(), newBlock.memory,
 			0, newPoolSize, 0, &newBlock.mapped);
 	}
@@ -225,16 +222,22 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 
 	_blocks.push_back(newBlock);
 
-	return static_cast<uint32_t>(newBlock.id);
+	// The new block's VECTOR index (SpanIndexPair::blockIndex), not its id.
+	return static_cast<uint32_t>(_blocks.size() - 1);
 }
 
 void Core::MemoryAllocator::MarkChunkOfMemoryBlockUsed(SpanIndexPair indices, VkDeviceSize size)
 {
-	auto& block = *FindMemoryBlock(indices.blockIndex);
+	auto& block = _blocks[indices.blockIndex];
 
 	auto& offsetSize = block.freeMemories[indices.spanIndex];
 	offsetSize.offset += size;
 	offsetSize.size -= size;
+
+	// Fully consumed spans would otherwise linger as zero-size entries the
+	// free-chunk scan keeps visiting (and Deallocate could merge against).
+	if (offsetSize.size == 0)
+		block.freeMemories.erase(block.freeMemories.begin() + indices.spanIndex);
 }
 
 vector<Core::MemoryAllocator::MemoryBlock>::iterator Core::MemoryAllocator::FindMemoryBlock(size_t id)
@@ -278,12 +281,14 @@ Core::MemoryAllocatorManager::MemoryAllocatorManager(Device& device)
 		32 * 1024 * 1024, memRequirements,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	_memoryAllocators[MemoryType::STAGE] = new MemoryAllocator(device, MemoryType::STAGE,
-		64 * 1024 * 1024, memRequirements,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 	_memoryAllocators[MemoryType::UNIFORM] = new MemoryAllocator(device, MemoryType::UNIFORM,
 		16 * 1024 * 1024, memRequirements,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	// Not a pool: every allocation gets (and frees) its own dedicated block,
+	// so the block-min size is irrelevant.
+	_memoryAllocators[MemoryType::DEDICATED_HOST] = new MemoryAllocator(device,
+		MemoryType::DEDICATED_HOST, 0, memRequirements,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	vkDestroyBuffer(deviceHandle, dummyBuffer, nullptr);
@@ -337,6 +342,11 @@ Core::MemoryAllocator* Core::MemoryAllocatorManager::GetMemoryAllocator(MemoryTy
 
 void Core::MemoryAllocatorManager::Allocate(MemoryAllocation& outAllocation, MemoryType type, VkDeviceSize size, bool needDedicated)
 {
+	// DEDICATED_HOST is dedicated by definition; the caller states it
+	// explicitly (a pooled allocation here would never be block-freed).
+	assert((type != MemoryType::DEDICATED_HOST || needDedicated)
+		&& "DEDICATED_HOST allocations must pass needDedicated");
+
 	_memoryAllocators[type]->Allocate(outAllocation, size, needDedicated);
 }
 
@@ -358,16 +368,6 @@ void Core::MemoryAllocatorManager::BindImageMemory(Image& image, MemoryAllocatio
 void Core::MemoryAllocatorManager::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
 	_memoryAllocators[allocation.type]->GetMappedPtr(outMappedPtr, allocation);
-}
-
-void Core::MemoryAllocatorManager::MapMemory(void** outMappedPtr, MemoryAllocation& allocation)
-{
-	_memoryAllocators[allocation.type]->MapMemory(outMappedPtr, allocation);
-}
-
-void Core::MemoryAllocatorManager::UnmapMemory(MemoryAllocation& allocation)
-{
-	_memoryAllocators[allocation.type]->UnmapMemory(allocation);
 }
 
 void Core::MemoryAllocatorManager::CopyBuffer(void* srcData, MemoryAllocation& allocation, VkDeviceSize size)

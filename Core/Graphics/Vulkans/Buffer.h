@@ -35,8 +35,6 @@ namespace Core
 
 		void CopyBuffer(void* data, VkDeviceSize size);
 		void GetMappedPtr(void** data);
-		void Map(void** data);
-		void Unmap();
 
 		// Upload `data` into the persistent mapping.
 		template<typename T>
@@ -64,8 +62,8 @@ namespace Core
 		Device& _device;
 		VkBuffer _buffer;
 		VkDeviceSize _size;
+
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocatorManager* _allocator;
 
 		// Resolved on first Update() call; the allocator's block mapping is stable
 		// for the buffer's lifetime.
