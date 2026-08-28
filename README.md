@@ -31,6 +31,20 @@ Toy 3D rendering engine for learning modern rendering and Vulkan API.
 **Multithreaded Recording**
 - One command buffer per pass, recorded in parallel by a worker thread pool off the main thread
 
+### [Terrain](Core/Graphics/Terrain/README.md)
+
+**Quadtree LOD Heightfield**
+- Nested quadtree over a root tile grid; the CPU only decides residency, the GPU decides what is drawn
+
+**Atlas Streaming**
+- Ring-based tile requests around the camera with eviction hysteresis, budgeted uploads, and parent fallback under slot pressure
+
+**GPU-Driven Traversal**
+- Node list, LOD map, and 8x8 patch culling (frustum + Hi-Z) in compute; one indirect instanced draw for the whole world
+
+**Seamless LOD Stitching**
+- Per-edge LOD deltas snap edge vertices onto the coarser neighbour's grid, closing T-junctions without skirts
+
 ### Rendering Pipeline
 
 **Renderer Batching**
