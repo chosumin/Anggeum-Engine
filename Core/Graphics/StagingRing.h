@@ -36,16 +36,13 @@ namespace Core
 		// Thread-safe: jobs acquire on worker threads while they record.
 		Span Acquire(VkDeviceSize size);
 
-		// Every acquired span must be closed exactly once, with the timeline
-		// that retires it: a slow job's span must ride ITS OWN submission's
-		// value, not whatever submission happened to go out first.
+		// Every acquired span must be closed exactly once, with the transfer
+		// timeline value that retires it: a slow job's span must ride ITS OWN
+		// submission's value, not whatever submission happened to go out first.
 		void Close(uint64_t spanId, uint64_t transferValue);
-		// For spans the frame graph consumes: retires when the frame counter
-		// reaches `firstSafeFrame` (Begin's wait has retired their slot).
-		void CloseForFrameSlot(uint64_t spanId, uint64_t firstSafeFrame);
 
 		// Free the closed-and-completed PREFIX.
-		void Reclaim(uint64_t transferCompleted, uint64_t currentFrame);
+		void Reclaim(uint64_t transferCompleted);
 
 		// Starts a budget window: resets the requested-bytes tally the shared
 		// upload budget is measured against.
@@ -78,7 +75,6 @@ namespace Core
 		{
 			VkDeviceSize used;   // span bytes + any wrap padding it caused
 			bool closed = false;
-			bool frameSlot = false;
 			uint64_t value = 0;
 		};
 		deque<SpanRecord> _records;

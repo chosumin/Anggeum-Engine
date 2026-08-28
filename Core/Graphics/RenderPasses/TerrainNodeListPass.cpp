@@ -57,10 +57,6 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	_push.rootTiles = config.rootTilesX;
 	_push.patchIndexCount = config.PatchIndexCount();
 
-	_indexTexture = builder.ImportTexture(TerrainQuadTree::QUADTREE_INDEX,
-		_terrain.GetQuadTree().GetIndexTexture());
-	builder.Read(_indexTexture, TextureAccess::SampledCompute);
-
 	_nodeList = builder.CreateBuffer(SB_NODE_LIST,
 		{ config.atlasCapacity * sizeof(uvec2), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 	builder.Write(_nodeList, BufferAccess::StorageComputeWrite);
@@ -92,7 +88,9 @@ void TerrainNodeListPass::Execute(FrameGraphPassContext& context,
 	commandBuffer.BindPipeline(_pipeline.get());
 
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-	builder.SetTextureBuffer(0, context.GetTexture(_indexTexture));
+	// Externally maintained (upload jobs, SHADER_READ_ONLY) - not a graph
+	// resource; see TerrainPass::Execute.
+	builder.SetTextureBuffer(0, _terrain.GetQuadTree().GetIndexTexture().Get());
 	builder.SetStorageBuffer(1, context.GetBuffer(_nodeList));
 	builder.SetStorageBuffer(2, context.GetBuffer(_nodeListCount));
 	builder.SetStorageBuffer(3, context.GetBuffer(_patchDrawArgs));

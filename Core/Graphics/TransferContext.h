@@ -33,7 +33,9 @@ namespace Core
 		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
 		StagingRing& GetStagingRing() { return *_stagingRing; }
 
-		void Update();
+		// Retires completed uploads (promotion pump), reclaims staging spans and
+		// opens a fresh upload-budget window. First transfer call of the frame.
+		void BeginFrame();
 
 		// Shared per-frame upload budget. Grants (and CONSUMES) up to
 		// `requested` bytes of what remains this frame - scene admission in
@@ -47,8 +49,13 @@ namespace Core
 		// Drain both request queues into transfer jobs.
 		void SubmitQueued();
 
-		// Submit the jobs whose worker RECORDING has finished, as one batch. 
-		// `waitForRecordings` forces the old blocking behaviour for uploads that must land this frame.
+		// For streaming clients that build their own upload jobs.
+		// The caller has already charged the budget and acquired its staging.
+		void SubmitStreamingJob(unique_ptr<UploadJob> job, const string& jobName);
+
+		// Submit the jobs whose worker RECORDING has finished, as one batch.
+		// `waitForRecordings` first waits for the must-land jobs' recordings;
+		// IO-bound loads keep cooking and ride a later Flush.
 		void Flush(bool waitForRecordings = false);
 
 		// How many resources the promotion pump flipped Resident since the last call.
@@ -63,15 +70,12 @@ namespace Core
 			Handle<Texture> texture;
 			Handle<SubMesh> subMesh;
 
-			// Which SubmitQueued round enqueued it: Flush's recording wait only
-			// covers the LATEST round, so waiting for this frame's table fills
-			// never re-blocks on an older frame's slow file read.
-			uint32_t round = 0;
+			// Must be submitted the frame it was enqueued (table fills back a
+			// draw set that already changed CPU-side; terrain tiles publish with
+			// their tables). Always memcpy recordings - Flush's wait never
+			// blocks on file IO.
+			bool mustLand = false;
 		};
-
-		// Retires frame-slot staging spans, promotes completed
-		// batches and opens a fresh upload-budget window.
-		void BeginFrame();
 
 		// Admission control: charges `bytes` against the frame budget, or
 		// refuses. A single resource larger than the whole budget gets an
@@ -114,8 +118,6 @@ namespace Core
 		deque<InFlightJobs> _inFlightJobs;
 
 		uint32_t _promotedCount = 0;
-		uint32_t _submitRound = 0;
-
 		VkDeviceSize _frameAdmittedBytes = 0;
 	};
 }

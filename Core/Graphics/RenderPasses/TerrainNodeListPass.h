@@ -42,7 +42,6 @@ namespace Core
 		// specialized with this config's constants.
 		unique_ptr<Pipeline> _pipeline;
 
-		FGTexture _indexTexture;
 		FGBuffer _nodeList, _nodeListCount, _patchDrawArgs;
 		TerrainTraversalPush _push{};
 		bool _active = false;

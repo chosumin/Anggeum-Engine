@@ -39,10 +39,11 @@ namespace Core
 		Handle<Pipeline> _pipeline;
 
 		FGTexture _lodMap, _hiZ;
-		FGBuffer _nodeList, _nodeListCount, _nodeDescs, _patchList,
+		FGBuffer _nodeList, _nodeListCount, _patchList,
 			_patchDrawArgs, _cullData, _readback;
 		TerrainTraversalPush _push{};
 		bool _active = false;
+		bool _hiZBound = false;
 		bool _occlusionEnabled = false;
 	};
 }

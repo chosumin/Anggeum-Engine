@@ -40,6 +40,12 @@ RenderScene::~RenderScene() = default;
 void RenderScene::SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
 	VkExtent2D extents, uint32_t promotedCount)
 {
+	if (auto* camera = scene.GetMainCamera())
+		_terrainSystem->Update(*camera);
+
+	// The managers below are consumers of COMPLETED uploads: they fold
+	// promoted resources into the GPU mirrors.
+
 	// Newly-Resident geometry can only join the draw set through a rebuild.
 	if (promotedCount > 0)
 		_batch->MarkDirty();
@@ -50,9 +56,6 @@ void RenderScene::SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
 	_material->Sync();
 
 	_batch->Sync(scene, copyQueue, extents);
-
-	if (auto* camera = scene.GetMainCamera())
-		_terrainSystem->Update(*camera);
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,

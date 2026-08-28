@@ -64,37 +64,19 @@ void StagingRing::Close(uint64_t spanId, uint64_t transferValue)
 
 	SpanRecord& record = _records[size_t(spanId - _baseId)];
 	record.closed = true;
-	record.frameSlot = false;
 	record.value = transferValue;
 }
 
-void StagingRing::CloseForFrameSlot(uint64_t spanId, uint64_t firstSafeFrame)
+void StagingRing::Reclaim(uint64_t transferCompleted)
 {
 	lock_guard<mutex> lock(_mutex);
 
-	assert(spanId >= _baseId && spanId - _baseId < _records.size()
-		&& "closing an unknown or already reclaimed span");
-
-	SpanRecord& record = _records[size_t(spanId - _baseId)];
-	record.closed = true;
-	record.frameSlot = true;
-	record.value = firstSafeFrame;
-}
-
-void StagingRing::Reclaim(uint64_t transferCompleted, uint64_t currentFrame)
-{
-	lock_guard<mutex> lock(_mutex);
-
-	// An unclosed span (its job is still recording) blocks the ranges behind it - 
+	// An unclosed span (its job is still recording) blocks the ranges behind it -
 	// conservative but safe, and it resolves as soon as that job submits.
 	while (!_records.empty())
 	{
 		const SpanRecord& front = _records.front();
-		bool completed = front.closed
-			&& (front.frameSlot
-				? currentFrame >= front.value
-				: transferCompleted >= front.value);
-		if (!completed)
+		if (!front.closed || transferCompleted < front.value)
 			break;
 
 		_used -= front.used;

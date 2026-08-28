@@ -73,14 +73,6 @@ void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 	depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	builder.SetDepthAttachment(depth);
 
-	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
-	_height = builder.ImportTexture(TerrainQuadTree::HEIGHT_ATLAS, quadTree.GetHeightAtlas());
-	builder.Read(_height, TextureAccess::SampledVertex);
-	_normal = builder.ImportTexture(TerrainQuadTree::NORMAL_ATLAS, quadTree.GetNormalAtlas());
-	builder.Read(_normal, TextureAccess::SampledFragment);
-	_albedo = builder.ImportTexture(TerrainQuadTree::ALBEDO_ATLAS, quadTree.GetAlbedoAtlas());
-	builder.Read(_albedo, TextureAccess::SampledFragment);
-
 	_camera = builder.ImportBuffer(UB_CAMERA,
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformVertex);
@@ -112,13 +104,18 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 		? _wireframePipeline.get() : _pipeline.get();
 	commandBuffer.BindPipeline(pipeline);
 
+	// The atlases are not graph resources: written outside the graph by the
+	// terrain upload jobs (which keep them SHADER_READ_ONLY and order against
+	// the frame via the transfer-timeline gate), read-only in here.
+	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
+
 	Shader& shader = _shader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
-	builder.SetTextureBuffer(2, context.GetTexture(_height));
-	builder.SetTextureBuffer(3, context.GetTexture(_normal));
-	builder.SetTextureBuffer(4, context.GetTexture(_albedo));
+	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get());
+	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get());
+	builder.SetTextureBuffer(4, quadTree.GetAlbedoAtlas().Get());
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
 	auto& resources = builder.Build();
 
@@ -132,4 +129,11 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 		sizeof(VkDrawIndexedIndirectCommand));
 
 	context.EndRendering(commandBuffer);
+}
+
+void TerrainPass::OnGUI(RenderFrame& renderFrame)
+{
+	if (!ImGui::CollapsingHeader("Terrain"))
+		return;
+	_terrain.OnGUI();
 }

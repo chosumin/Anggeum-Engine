@@ -82,24 +82,18 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 	_nodeListCount = builder.GetBuffer(TerrainNodeListPass::SB_NODE_LIST_COUNT);
 	builder.Read(_nodeListCount, BufferAccess::IndirectRead);
 
-	_nodeDescs = builder.ImportBuffer(TerrainQuadTree::NODE_DESC,
-		_terrain.GetQuadTree().GetNodeDescBuffer());
-	builder.Read(_nodeDescs, BufferAccess::StorageComputeRead);
-
 	_lodMap = builder.GetTexture(TerrainLodMapPass::RT_LOD_MAP);
 	builder.Read(_lodMap, TextureAccess::SampledCompute);
 
+	// No pyramid this frame -> Execute binds the height atlas as a dummy
+	// (any resident SHADER_READ_ONLY texture; the shader won't sample it
+	// with occlusion off).
+	_hiZBound = hiZBound;
 	if (hiZBound)
 	{
 		_hiZ = builder.GetTexture(HiZCullPass::RT_HIZ);
+		builder.Read(_hiZ, TextureAccess::SampledCompute);
 	}
-	else
-	{
-		// No pyramid this frame
-		_hiZ = builder.ImportTexture(TerrainQuadTree::HEIGHT_ATLAS,
-			_terrain.GetQuadTree().GetHeightAtlas());
-	}
-	builder.Read(_hiZ, TextureAccess::SampledCompute);
 
 	_patchList = builder.CreateBuffer(SB_PATCH_LIST,
 		{ config.MaxPatches() * sizeof(uvec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
@@ -126,11 +120,16 @@ void TerrainPatchCullPass::Execute(FrameGraphPassContext& context,
 	Shader& shader = _shader.Get();
 	commandBuffer.BindPipeline(&_pipeline.Get());
 
+	// Node descs and the dummy atlas are externally maintained (upload jobs) -
+	// not graph resources; see TerrainPass::Execute.
+	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
+
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetStorageBuffer(0, context.GetBuffer(_nodeList));
-	builder.SetStorageBuffer(1, context.GetBuffer(_nodeDescs));
+	builder.SetStorageBuffer(1, quadTree.GetNodeDescBuffer().Get());
 	builder.SetTextureBuffer(2, context.GetTexture(_lodMap));
-	builder.SetTextureBuffer(3, context.GetTexture(_hiZ));
+	builder.SetTextureBuffer(3, _hiZBound
+		? context.GetTexture(_hiZ) : quadTree.GetHeightAtlas().Get());
 	builder.SetStorageBuffer(4, context.GetBuffer(_patchList));
 	builder.SetStorageBuffer(5, context.GetBuffer(_patchDrawArgs));
 	builder.SetUniformBuffer(6, context.GetBuffer(_cullData));

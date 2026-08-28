@@ -86,26 +86,18 @@ void Core::Engine::Draw()
 		_renderContext->Begin(*_scene, extents);
 	}
 
-	// After Begin on purpose: the upload phases and the terrain update stage
-	// frame-slot memory, which requires this slot's in-flight wait in Begin.
+	// After Begin on purpose: the upload phases stage frame-slot memory,
+	// which requires this slot's in-flight wait in Begin.
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 
-		// The upload frame: retire/promote what the GPU finished, drain new
-		// requests, submit finished recordings - never blocking on file IO.
-		_transferContext->Update();
+		_transferContext->BeginFrame();
 
 		_renderScene->SyncManagers(*_scene, _transferContext->GetGeometryCopyQueue(),
 			extents, _transferContext->TakePromotedCount());
 
-		// The batch's table fills must land THIS frame (the CPU-side draw set
-		// already changed), so this flush waits for their recording - a
-		// memcpy, and only on rebuild frames, which already device-idle.
-		if (!_transferContext->GetGeometryCopyQueue().Empty())
-		{
-			_transferContext->SubmitQueued();
-			_transferContext->Flush(/*waitForRecordings*/ true);
-		}
+		_transferContext->SubmitQueued();
+		_transferContext->Flush(/*waitForRecordings*/ true);
 	}
 
 	{

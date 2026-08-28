@@ -29,22 +29,14 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 
 TransferContext::~TransferContext() = default;
 
-void TransferContext::Update()
-{
-	BeginFrame();
-	SubmitQueued();
-	Flush();
-}
-
 void TransferContext::BeginFrame()
 {
 	// Non-blocking completion poll: everything the GPU has passed retires
-	// here - transfer-stamped ring spans, the jobs (and fallback staging)
-	// of completed batches, and frame-slot spans whose frame Begin's
-	// in-flight wait (which precedes this) has retired.
+	// here - transfer-stamped ring spans and the jobs (and fallback staging)
+	// of completed batches.
 	uint64_t completed = _sync.QueryCompletedValue(QueueType::Transfer);
 	CollectCompletedJobs(completed);
-	_stagingRing->Reclaim(completed, FrameCounter::GetFrameNumber());
+	_stagingRing->Reclaim(completed);
 	_stagingRing->BeginFrame();
 	_frameAdmittedBytes = 0;
 }
@@ -120,14 +112,20 @@ void TransferContext::OnGUI()
 	ImGui::End();
 }
 
+void TransferContext::SubmitStreamingJob(unique_ptr<UploadJob> job, const string& jobName)
+{
+	PendingUpload upload;
+	upload.job = std::move(job);
+	upload.mustLand = true;
+	EnqueueUpload(std::move(upload), jobName);
+}
+
 void TransferContext::EnqueueUpload(PendingUpload&& upload, const string& jobName)
 {
 	// Already enqueued: the pending upload covers the request; this one is
 	// destroyed on return.
 	if (_pendingJobs.find(jobName) != _pendingJobs.end())
 		return;
-
-	upload.round = _submitRound;
 
 	Job* raw = upload.job.get();
 	raw->completionWait = &_jobWait;
@@ -138,8 +136,6 @@ void TransferContext::EnqueueUpload(PendingUpload&& upload, const string& jobNam
 
 void TransferContext::SubmitQueued()
 {
-	++_submitRound;
-
 	// Admission control, FIFO: each request charges the shared frame budget
 	// before it becomes a job; the first one the budget cannot cover stops
 	// the drain, and everything behind it retries next frame in order.
@@ -190,6 +186,9 @@ void TransferContext::SubmitQueued()
 
 		PendingUpload upload;
 		upload.subMesh = batch.subMesh;
+		// Table-class = must-land (see the budget bypass above); its recording
+		// is a memcpy of CPU-built tables.
+		upload.mustLand = !batch.subMesh.IsValid();
 
 		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
 		upload.job = make_unique<GeometryUploadJob>(_device, move(batch),
@@ -213,14 +212,13 @@ void TransferContext::Flush(bool waitForRecordings)
 	unique_lock<mutex> lock(_lock);
 	if (waitForRecordings)
 	{
-		// Only the latest round: this frame's must-land uploads (table fills)
-		// finish in microseconds; an older round's slow file read keeps
-		// carrying over instead of re-blocking the frame here.
+		// Must-land uploads only: memcpy recordings that finish in microseconds. 
+		// IO-bound loads keep carrying over instead of blocking the frame here.
 		_jobWait.wait(lock, [&]
 		{
 			for (auto&& upload : _pendingJobs)
 			{
-				if (upload.second.round == _submitRound
+				if (upload.second.mustLand
 					&& upload.second.job->status != JobStatus::COMPLETE)
 				{
 					return false;

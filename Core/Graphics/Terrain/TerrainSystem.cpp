@@ -105,8 +105,6 @@ namespace Core
 
 		if (!_freezeStreaming)
 			_streamer->Update(cameraXZ);
-		else
-			_streamer->ClearFrameUploads();
 	}
 
 	void TerrainSystem::OnGUI()

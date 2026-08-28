@@ -36,7 +36,7 @@ namespace Core
 
 		Handle<Sampler> _nearestSampler;
 
-		FGTexture _lodMap, _indexTexture;
+		FGTexture _lodMap;
 		TerrainTraversalPush _push{};
 		uint32_t _sectorsPerSide = 0;
 		bool _active = false;

@@ -24,10 +24,6 @@ namespace Core
 		const TerrainConfig& GetConfig() const { return _config; }
 		TerrainQuadTree& GetQuadTree() { return *_quadTree; }
 		TerrainStreamer& GetStreamer() { return *_streamer; }
-		const TerrainStreamer::FrameUploads& GetFrameUploads() const
-		{
-			return _streamer->GetFrameUploads();
-		}
 
 		TerrainParams BuildRenderParams(Light* mainLight) const;
 

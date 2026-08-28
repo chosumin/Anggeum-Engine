@@ -2,30 +2,9 @@
 #include "TerrainStreamer.h"
 #include "TerrainNodeStore.h"
 #include "TerrainQuadTree.h"
+#include "TerrainUpload.h"
 #include "Graphics/FrameCounter.h"
 #include "Graphics/TransferContext.h"
-#include "Graphics/Vulkans/Buffer.h"
-
-namespace
-{
-	VkDeviceSize Align(VkDeviceSize offset, VkDeviceSize alignment)
-	{
-		return (offset + alignment - 1) & ~(alignment - 1);
-	}
-
-	VkBufferImageCopy MakeRegion(VkDeviceSize bufferOffset, glm::uvec2 texelOrigin,
-		uint32_t extent, uint32_t mipLevel = 0)
-	{
-		VkBufferImageCopy region{};
-		region.bufferOffset = bufferOffset;
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = mipLevel;
-		region.imageSubresource.layerCount = 1;
-		region.imageOffset = { int32_t(texelOrigin.x), int32_t(texelOrigin.y), 0 };
-		region.imageExtent = { extent, extent, 1 };
-		return region;
-	}
-}
 
 namespace Core
 {
@@ -64,32 +43,11 @@ namespace Core
 			<= LoadRadius(id.lod) * radiusScale;
 	}
 
-	void TerrainStreamer::UploadNode(const TerrainNodeId& id, uint8_t* stagingBase,
-		VkDeviceSize& offset)
+	void TerrainStreamer::RegisterNode(const TerrainNodeId& id, uint16_t slot)
 	{
 		const TerrainNodePayload& payload = _store.Get(id);
-		TerrainNodeRuntime& runtime = _runtime[ToLinearIndex(id, _config)];
-		uint16_t slot = runtime.atlasSlot;
 
-		auto append = [&](const void* data, VkDeviceSize bytes,
-			vector<VkBufferImageCopy>& regions, uvec2 texelOrigin, uint32_t extent)
-			{
-				offset = Align(offset, 16);
-				memcpy(stagingBase + offset, data, size_t(bytes));
-				regions.push_back(MakeRegion(offset, texelOrigin, extent));
-				offset += bytes;
-			};
-
-		uint32_t heightTexels = _config.HeightTexels();
-		uint32_t colorTexels = _config.ColorTexels();
-		append(payload.height.data(), payload.height.size() * 2,
-			_uploads.heightRegions, _quadTree.HeightTexelOrigin(slot), heightTexels);
-		append(payload.normal.data(), payload.normal.size() * 4,
-			_uploads.normalRegions, _quadTree.ColorTexelOrigin(slot), colorTexels);
-		append(payload.albedo.data(), payload.albedo.size() * 4,
-			_uploads.albedoRegions, _quadTree.ColorTexelOrigin(slot), colorTexels);
-
-		runtime.state = TerrainNodeState::Resident;
+		_runtime[ToLinearIndex(id, _config)].state = TerrainNodeState::Resident;
 		_indexMirror[id.lod][uint32_t(id.y) * _config.NodesPerSide(id.lod) + id.x] = slot;
 		_descMirror[slot].minMaxHeight =
 			uint32_t(payload.minHeight) | (uint32_t(payload.maxHeight) << 16);
@@ -100,7 +58,6 @@ namespace Core
 
 	void TerrainStreamer::Update(vec2 cameraXZ)
 	{
-		_uploads = {};
 		_stats = {};
 
 		// Pass 1: diff requested state against runtime state.
@@ -163,29 +120,28 @@ namespace Core
 
 		if (budgetTiles == 0 && !_tablesDirty)
 		{
-			// Nothing to write: no span, no uploads published this frame.
+			// Nothing to upload this frame.
 			_stats.pending += uint32_t(toLoad.size());
 			CountResident();
 			return;
 		}
 
+		// The span is acquired BEFORE any bookkeeping commits: a full ring
+		// (load spike) skips the whole frame, so the tables never point at
+		// tiles that were not uploaded. Everything retries next frame.
 		StagingRing::Span span = _transfer.GetStagingRing().Acquire(
 			budgetTiles * tileBytes + tableBytes);
 		if (!span.IsValid())
 		{
-			// Ring exhausted (load spike): stream nothing this frame. The
-			// requested state is unchanged, so everything retries next frame.
 			_stats.pending += uint32_t(toLoad.size());
 			CountResident();
 			return;
 		}
 
-		// Regions carry offsets into the ring BUFFER, so rebase the write
-		// pointer to the buffer's origin: the append math below then works in
-		// absolute offsets exactly as it did on a dedicated buffer.
-		uint8_t* stagingBase = span.mapped - span.offset;
-		VkDeviceSize offset = span.offset;
-		const VkDeviceSize spanEnd = offset + budgetTiles * tileBytes + tableBytes;
+		// Pass 2b: commit the admitted tiles (bookkeeping only - the payload
+		// memcpys and copy recording happen in the upload job on a worker).
+		vector<TerrainTileUpload> tiles;
+		tiles.reserve(budgetTiles);
 
 		for (const TerrainNodeId& id : toLoad)
 		{
@@ -204,39 +160,26 @@ namespace Core
 			}
 
 			runtime.atlasSlot = slot;
-			UploadNode(id, stagingBase, offset);
+			RegisterNode(id, slot);
+			tiles.push_back({ id, slot });
 			++_stats.uploadedThisFrame;
 		}
 
-		// Pass 3: republish the (tiny) GPU lookup tables when anything moved.
-		if (_tablesDirty)
-		{
-			offset = Align(offset, 16);
-			_uploads.descOffset = offset;
-			VkDeviceSize descBytes = _descMirror.size() * sizeof(TerrainNodeDescGPU);
-			memcpy(stagingBase + offset, _descMirror.data(), size_t(descBytes));
-			offset += descBytes;
-			_uploads.descDirty = true;
+		// Pass 3: one job carries the tiles and (when dirty) the republished
+		// lookup tables, so GPU-visible residency changes atomically. The
+		// table snapshots are copies - this frame's mirrors, immutable to the
+		// job while the streamer moves on.
+		auto job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
+			std::move(tiles), _tablesDirty,
+			vector<TerrainNodeDescGPU>(_descMirror),
+			vector<vector<uint16_t>>(_indexMirror),
+			_firstUpload, span);
 
-			for (uint32_t lod = 0; lod < _config.lodCount; ++lod)
-			{
-				offset = Align(offset, 16);
-				VkDeviceSize mipBytes = _indexMirror[lod].size() * sizeof(uint16_t);
-				memcpy(stagingBase + offset, _indexMirror[lod].data(), size_t(mipBytes));
-				_uploads.indexRegions.push_back(MakeRegion(offset, uvec2(0),
-					_config.NodesPerSide(lod), lod));
-				offset += mipBytes;
-			}
-			_tablesDirty = false;
-		}
+		_transfer.SubmitStreamingJob(std::move(job),
+			"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber()));
 
-		assert(offset <= spanEnd);
-		_uploads.staging = span.buffer;
-
-		// The frame graph consumes this span on the graphics queue; it may be
-		// reused once Begin's wait has retired this frame's slot.
-		_transfer.GetStagingRing().CloseForFrameSlot(span.id,
-			FrameCounter::GetFrameNumber() + MAX_FRAMES_IN_FLIGHT);
+		_tablesDirty = false;
+		_firstUpload = false;
 
 		CountResident();
 	}

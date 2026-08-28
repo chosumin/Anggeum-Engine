@@ -64,12 +64,6 @@ void TerrainDepthPrePass::Setup(FrameGraphBuilder& builder,
 	depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	builder.SetDepthAttachment(depth);
 
-	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
-	_height = builder.ImportTexture(TerrainQuadTree::HEIGHT_ATLAS, quadTree.GetHeightAtlas());
-	builder.Read(_height, TextureAccess::SampledVertex);
-	_normal = builder.ImportTexture(TerrainQuadTree::NORMAL_ATLAS, quadTree.GetNormalAtlas());
-	builder.Read(_normal, TextureAccess::SampledFragment);
-
 	_camera = builder.ImportBuffer(UB_CAMERA,
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformVertex);
@@ -102,12 +96,16 @@ void TerrainDepthPrePass::Execute(FrameGraphPassContext& context,
 
 	commandBuffer.BindPipeline(_pipeline.get());
 
+	// Atlases are externally maintained (upload jobs, SHADER_READ_ONLY) -
+	// not graph resources; see TerrainPass::Execute.
+	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
+
 	Shader& shader = _shader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
-	builder.SetTextureBuffer(2, context.GetTexture(_height));
-	builder.SetTextureBuffer(3, context.GetTexture(_normal));
+	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get());
+	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get());
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
 	auto& resources = builder.Build();
 

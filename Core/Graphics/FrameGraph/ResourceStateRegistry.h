@@ -7,18 +7,8 @@ namespace Core
 
 	// The state a resource was left in by the frame that last touched it.
 	// Imported (persistent) resources survive across frames, so the compile
-	// phase reads their entry state from here.
-	// Transients always start UNDEFINED and never appear here.
-	//
-	// STATUS: latent infrastructure today. Every current import declares an
-	// explicit entryLayout (bridge mode — legacy passes change layouts outside
-	// the graph's sight), which bypasses the texture lookup, and the buffer
-	// states are redundant while per-slot buffers are gated by the frame-slot
-	// timeline wait. The registry becomes load-bearing with (a) swapchain
-	// imports — 3 images vs 2 slots, not slot-wait aligned — and (b) history
-	// resources. Endgame: once legacy consumers are gone, ImportTexture drops
-	// its layout parameters entirely and this registry is the sole authority
-	// for entry states.
+	// phase reads their entry state from here — this registry is the sole
+	// entry-state authority.
 	struct FGResourceState
 	{
 		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;

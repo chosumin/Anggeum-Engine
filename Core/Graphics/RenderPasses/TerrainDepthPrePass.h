@@ -38,7 +38,7 @@ namespace Core
 		unique_ptr<PipelineState> _pipelineState;
 		unique_ptr<Pipeline> _pipeline;
 
-		FGTexture _mainNormal, _mainDepth, _height, _normal;
+		FGTexture _mainNormal, _mainDepth;
 		FGBuffer _camera, _patchList, _patchDrawArgs, _params;
 		bool _active = false;
 	};

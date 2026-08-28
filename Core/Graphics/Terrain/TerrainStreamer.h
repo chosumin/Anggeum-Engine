@@ -20,41 +20,18 @@ namespace Core
 		uint32_t evictedThisFrame = 0;
 	};
 
-	// CPU streaming: ring-based requests around the camera, load-state diff,
-	// and budgeted staging writes. The requested state and the actual state
-	// are allowed to diverge; the renderer only ever consumes Resident nodes.
+	// CPU streaming: ring-based requests around the camera, load-state diff, and budgeted uploads. 
+	// The requested state and the actual state are allowed to diverge; 
+	// the renderer only ever consumes Resident nodes.
 	class TerrainStreamer
 	{
 	public:
-		// Copies for the streaming pass to record this frame. Regions are
-		// grouped per destination so the pass maps them onto atlas textures.
-		struct FrameUploads
-		{
-			Buffer* staging = nullptr;
-			vector<VkBufferImageCopy> heightRegions;
-			vector<VkBufferImageCopy> normalRegions;
-			vector<VkBufferImageCopy> albedoRegions;
-			vector<VkBufferImageCopy> indexRegions;
-			bool descDirty = false;
-			VkDeviceSize descOffset = 0;
-
-			bool Empty() const
-			{
-				return heightRegions.empty() && indexRegions.empty() && !descDirty;
-			}
-		};
-
 		TerrainStreamer(const TerrainConfig& config, const TerrainNodeStore& store,
 			TerrainQuadTree& quadTree, TransferContext& transfer);
 		~TerrainStreamer();
 
 		// Main thread, once per frame, before frame-graph Setup.
 		void Update(vec2 cameraXZ);
-
-		const FrameUploads& GetFrameUploads() const { return _uploads; }
-
-		// For frozen frames: publish "nothing to upload" without diffing.
-		void ClearFrameUploads() { _uploads = {}; }
 
 		bool IsResident(const TerrainNodeId& id) const
 		{
@@ -79,8 +56,8 @@ namespace Core
 		float DistanceToNode(vec2 point, const TerrainNodeId& id) const;
 		void CountResident();
 		bool IsRequested(vec2 cameraXZ, const TerrainNodeId& id, float radiusScale) const;
-		void UploadNode(const TerrainNodeId& id, uint8_t* stagingBase,
-			VkDeviceSize& offset);
+		// The bookkeeping half of a tile load: runtime state, table mirrors.
+		void RegisterNode(const TerrainNodeId& id, uint16_t slot);
 
 		const TerrainConfig& _config;
 		const TerrainNodeStore& _store;
@@ -92,7 +69,10 @@ namespace Core
 		vector<TerrainNodeDescGPU> _descMirror;          // by atlas slot
 		bool _tablesDirty = true;                        // desc + index textures
 
-		FrameUploads _uploads;
+		// The first job must move every atlas out of UNDEFINED (the sampling
+		// passes bind SHADER_READ_ONLY from frame 0).
+		bool _firstUpload = true;
+
 		TerrainStreamingStats _stats;
 	};
 }

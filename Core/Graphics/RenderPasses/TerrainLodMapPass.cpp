@@ -53,10 +53,6 @@ void TerrainLodMapPass::Setup(FrameGraphBuilder& builder,
 	_push.lodCount = config.lodCount;
 	_push.rootTiles = config.rootTilesX;
 
-	_indexTexture = builder.ImportTexture(TerrainQuadTree::QUADTREE_INDEX,
-		_terrain.GetQuadTree().GetIndexTexture());
-	builder.Read(_indexTexture, TextureAccess::SampledCompute);
-
 	// Pool-owned (not a graph transient) so it can carry a NEAREST sampler:
 	// R8_UINT views reject the default LINEAR one. Content is still fully
 	// rewritten every frame.
@@ -84,7 +80,9 @@ void TerrainLodMapPass::Execute(FrameGraphPassContext& context,
 
 	commandBuffer.BindPipeline(&_pipeline.Get());
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-	builder.SetTextureBuffer(0, context.GetTexture(_indexTexture));
+	// Externally maintained (upload jobs, SHADER_READ_ONLY) - not a graph
+	// resource; see TerrainPass::Execute.
+	builder.SetTextureBuffer(0, _terrain.GetQuadTree().GetIndexTexture().Get());
 	builder.SetTextureBuffer(1, lodMap, 0, VK_IMAGE_LAYOUT_GENERAL);
 	auto& resources = builder.Build();
 	commandBuffer.BindDescriptorSet(_pipeline.Get().GetPipelineBindPoint(),

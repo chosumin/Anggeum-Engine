@@ -44,7 +44,7 @@ namespace Core
 		// with the other managers; Engine drives its per-frame update.
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
-		// Run every manager's self-gated sync, in dependency order.
+		// The frame's world-model update
 		void SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
 			VkExtent2D extents, uint32_t promotedCount);
 

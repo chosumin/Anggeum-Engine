@@ -24,6 +24,7 @@ namespace Core
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
+		void OnGUI(RenderFrame& renderFrame) override;
 
 	private:
 		Device& _device;
@@ -35,7 +36,7 @@ namespace Core
 		unique_ptr<Pipeline> _pipeline;
 		unique_ptr<Pipeline> _wireframePipeline;
 
-		FGTexture _mainColor, _mainDepth, _height, _normal, _albedo;
+		FGTexture _mainColor, _mainDepth;
 		FGBuffer _camera, _patchList, _patchDrawArgs, _params;
 		bool _active = false;
 	};
