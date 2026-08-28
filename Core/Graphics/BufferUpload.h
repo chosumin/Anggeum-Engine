@@ -6,8 +6,13 @@
 
 namespace Core
 {
-	// Generic typed buffer fill, for uploads outside the geometry/texture
-	// domains.
+	// Generic typed buffer fill, for uploads OUTSIDE the transfer pipeline:
+	// frame-resource init (recorded into the frame's resource-init submission
+	// during pass Setup - after the frame's transfer Flush) and legacy
+	// immediate submits. Hence plain Job, not UploadJob, and dedicated
+	// one-shot staging instead of a StagingRing span: the ring reclaims by
+	// TRANSFER-timeline values, which these submissions never produce - an
+	// unclosed span would block all reclamation behind it.
 	template<typename T>
 	class BufferUploadJob : public Job
 	{
@@ -29,7 +34,7 @@ namespace Core
 			_stagingBuffer = make_unique<Core::Buffer>(_device,
 				bufferSize,
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				MemoryType::STAGE);
+				MemoryType::DEDICATED_HOST);
 
 			_stagingBuffer->CopyBuffer(_bufferData.data(), bufferSize);
 

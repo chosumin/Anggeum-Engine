@@ -76,7 +76,7 @@ void GeometryUploadJob::Execute()
 		_stagingBuffer = make_unique<Core::Buffer>(_device,
 			totalSize,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE);
+			MemoryType::DEDICATED_HOST);
 		_stagingBuffer->CopyBuffer(packed.data(), totalSize);
 		source = _stagingBuffer.get();
 	}

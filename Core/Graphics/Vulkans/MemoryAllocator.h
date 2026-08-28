@@ -6,7 +6,7 @@ namespace Core
 {
 	enum class MemoryType
 	{
-		STAGE, DEVICE_LOCAL, UNIFORM, IMAGE
+		DEVICE_LOCAL, UNIFORM, IMAGE, DEDICATED_HOST
 	};
 
 	struct MemoryAllocation

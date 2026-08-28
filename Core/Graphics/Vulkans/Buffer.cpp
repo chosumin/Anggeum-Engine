@@ -7,15 +7,16 @@ Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage
 {
 	CreateVkBuffer(size, usage);
 
-	_allocator = device.GetMemoryAllocatorManager();
+	auto* allocator = device.GetMemoryAllocatorManager();
 
 	_allocation = make_unique<MemoryAllocation>();
-	_allocator->Allocate(*_allocation, memoryType, _size, false);
-	_allocator->BindBufferMemory(*this, *_allocation);
+	allocator->Allocate(*_allocation, memoryType, _size,
+		memoryType == MemoryType::DEDICATED_HOST);
+	allocator->BindBufferMemory(*this, *_allocation);
 }
 
 Core::Buffer::Buffer(Device& device, VkDeviceSize size, VkBufferUsageFlags usage, Unbound)
-	:_device(device), _size(size), _allocator(nullptr)
+	:_device(device), _size(size)
 {
 	CreateVkBuffer(size, usage);
 }
@@ -71,17 +72,19 @@ Core::Buffer::~Buffer()
 
 	// Placed buffers (Unbound + BindMemoryAt) do not own their memory.
 	if (_allocation != nullptr)
-		_allocator->Deallocate(*_allocation);
+		_device.GetMemoryAllocatorManager()->Deallocate(*_allocation);
 }
 
 void Core::Buffer::CopyBuffer(void* data, VkDeviceSize size)
 {
-	_allocator->CopyBuffer(data, *_allocation, size);
+	assert(_allocation != nullptr && "host access on an unbound/placed buffer");
+	_device.GetMemoryAllocatorManager()->CopyBuffer(data, *_allocation, size);
 }
 
 void Core::Buffer::GetMappedPtr(void** data)
 {
-	_allocator->GetMappedPtr(data, *_allocation);
+	assert(_allocation != nullptr && "host access on an unbound/placed buffer");
+	_device.GetMemoryAllocatorManager()->GetMappedPtr(data, *_allocation);
 }
 
 void Core::Buffer::UpdateRaw(const void* data, VkDeviceSize size)
@@ -95,11 +98,12 @@ void* Core::Buffer::GetPersistentMappedPtr()
 {
 	if (_mapped == nullptr)
 	{
-		assert((_allocation->type == MemoryType::UNIFORM
-			|| _allocation->type == MemoryType::STAGE) &&
-			"Update requires a persistently mapped memory type");
+		assert(_allocation != nullptr
+			&& (_allocation->type == MemoryType::UNIFORM
+				|| _allocation->type == MemoryType::DEDICATED_HOST)
+			&& "Update requires a persistently mapped memory type");
 
-		_allocator->GetMappedPtr(&_mapped, *_allocation);
+		_device.GetMemoryAllocatorManager()->GetMappedPtr(&_mapped, *_allocation);
 	}
 
 	return _mapped;

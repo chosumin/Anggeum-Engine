@@ -5,18 +5,15 @@ namespace Core
 	class Device;
 	class Buffer;
 
-	// Persistently-mapped staging arena for uploads. Spans are handed out
-	// circularly and reclaimed when the timeline they were stamped with passes
-	// their value, so steady-state traffic reuses the same memory instead of
-	// allocating a fresh staging buffer per upload.
-	//
-	// Two timelines retire spans: transfer submissions (upload jobs) and frame
-	// slots (spans consumed by frame-graph copies, safe once Begin's in-flight
-	// wait has retired their frame). Both interleave FIFO in one ring.
+	// The engine's staging arena: a persistently-mapped, self-owned allocation
+	// (no pool involved). Spans are handed out circularly, closed with the
+	// transfer-timeline value of the submission that consumed them, and
+	// reclaimed FIFO once the GPU passes that value - steady-state traffic
+	// reuses the same memory instead of allocating per upload.
 	//
 	// Sized for steady-state traffic, not load spikes: a request that does not
 	// fit returns an invalid span and the caller falls back to a dedicated
-	// one-shot staging buffer (initial scene load takes that path).
+	// one-shot DEDICATED_HOST allocation.
 	class StagingRing
 	{
 	public:

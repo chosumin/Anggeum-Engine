@@ -7,8 +7,9 @@ using namespace Core;
 StagingRing::StagingRing(Device& device, VkDeviceSize capacity)
 	: _capacity(capacity)
 {
+	// One dedicated, persistently mapped allocation for the whole arena.
 	_buffer = make_unique<Buffer>(device, capacity,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 
 	void* mapped = nullptr;
 	_buffer->GetMappedPtr(&mapped);

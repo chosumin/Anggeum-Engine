@@ -134,7 +134,7 @@ Core::Image::~Image()
 		vkDestroyImage(device, _image, nullptr);
 
 	if (_allocation != nullptr)
-		_allocator->Deallocate(*_allocation);
+		_device.GetMemoryAllocatorManager()->Deallocate(*_allocation);
 }
 
 VkImageView& Core::Image::GetOrCreateImageView(uint mipLevel)
@@ -486,11 +486,11 @@ void Core::Image::BindImageMemory(VkMemoryPropertyFlags properties)
     bool needDedicated = dedicatedReqs.prefersDedicatedAllocation ||
         dedicatedReqs.requiresDedicatedAllocation;
 
-    _allocator = _device.GetMemoryAllocatorManager();
+    auto* allocator = _device.GetMemoryAllocatorManager();
 
     _allocation = make_unique<MemoryAllocation>();
-    _allocator->Allocate(*_allocation, MemoryType::IMAGE, memRequirements.memoryRequirements.size, needDedicated);
-    _allocator->BindImageMemory(*this, *_allocation);
+    allocator->Allocate(*_allocation, MemoryType::IMAGE, memRequirements.memoryRequirements.size, needDedicated);
+    allocator->BindImageMemory(*this, *_allocation);
 }
 
 VkImageView Core::Image::CreateImageView(uint32_t mipLevels, VkImageViewType imageViewType,

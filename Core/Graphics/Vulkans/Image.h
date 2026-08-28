@@ -117,7 +117,6 @@ namespace Core
 		VkImageViewType _viewType;
 
 		unique_ptr<MemoryAllocation> _allocation;
-		MemoryAllocatorManager* _allocator = nullptr;
 
 		// Aspect requested at construction for the deferred-bind (Unbound) path;
 		// the default view is created with it in BindMemoryAt.

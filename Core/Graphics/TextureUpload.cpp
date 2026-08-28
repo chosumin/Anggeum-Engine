@@ -56,7 +56,7 @@ void TextureUploadJob::Execute()
 		_stagingBuffer = make_unique<Core::Buffer>(_device,
 			bufferSize,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			MemoryType::STAGE);
+			MemoryType::DEDICATED_HOST);
 		_stagingBuffer->CopyBuffer(imageData.data(), bufferSize);
 		source = _stagingBuffer.get();
 	}

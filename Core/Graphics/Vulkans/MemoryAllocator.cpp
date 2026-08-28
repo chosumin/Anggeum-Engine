@@ -123,8 +123,8 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 			mapped = static_cast<uint8_t*>(block.mapped) + allocation.offset;
 	}
 
-	// Every host-visible pool (STAGE, UNIFORM) is persistently mapped; a copy
-	// into an unmapped (device-local) allocation is a caller bug.
+	// The host-visible pool (UNIFORM) is persistently mapped; a copy into an
+	// unmapped (device-local) allocation is a caller bug.
 	assert(mapped != nullptr && "CopyBuffer into a non-host-visible pool");
 
 	memcpy(mapped, srcData, (size_t)size);
@@ -132,7 +132,7 @@ void Core::MemoryAllocator::CopyBuffer(void* srcData, MemoryAllocation& allocati
 
 void Core::MemoryAllocator::GetMappedPtr(void** outMappedPtr, MemoryAllocation& allocation)
 {
-	// Only persistently mapped allocators (UNIFORM, STAGE) populate block.mapped;
+	// Only the persistently mapped allocator (UNIFORM) populates block.mapped;
 	// device-local pools return garbage here.
 	auto& block = *FindMemoryBlock(allocation.id);
 
@@ -205,12 +205,12 @@ uint32_t Core::MemoryAllocator::AddBlock(VkDeviceSize size, bool needDedicated)
 		throw std::runtime_error("failed to allocate buffer memory!");
 	}
 
-	if (_allocatorType == MemoryType::UNIFORM || _allocatorType == MemoryType::STAGE)
+	if (_allocatorType == MemoryType::UNIFORM
+		|| _allocatorType == MemoryType::DEDICATED_HOST)
 	{
-		// Persistent mapping for every host-visible pool. UNIFORM: written every
-		// frame. STAGE: lets uploads memcpy straight into their staging spans -
-		// no vkMapMemory per copy, so concurrent jobs sharing a block can never
-		// double-map it (VUID-vkMapMemory-memory-00678).
+		// Host-visible blocks are persistently mapped: a single map per block
+		// means concurrent users can never double-map it
+		// (VUID-vkMapMemory-memory-00678).
 		vkMapMemory(_device.GetDevice(), newBlock.memory,
 			0, newPoolSize, 0, &newBlock.mapped);
 	}
@@ -281,12 +281,14 @@ Core::MemoryAllocatorManager::MemoryAllocatorManager(Device& device)
 		32 * 1024 * 1024, memRequirements,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	_memoryAllocators[MemoryType::STAGE] = new MemoryAllocator(device, MemoryType::STAGE,
-		64 * 1024 * 1024, memRequirements,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 	_memoryAllocators[MemoryType::UNIFORM] = new MemoryAllocator(device, MemoryType::UNIFORM,
 		16 * 1024 * 1024, memRequirements,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	// Not a pool: every allocation gets (and frees) its own dedicated block,
+	// so the block-min size is irrelevant.
+	_memoryAllocators[MemoryType::DEDICATED_HOST] = new MemoryAllocator(device,
+		MemoryType::DEDICATED_HOST, 0, memRequirements,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	vkDestroyBuffer(deviceHandle, dummyBuffer, nullptr);
@@ -340,6 +342,11 @@ Core::MemoryAllocator* Core::MemoryAllocatorManager::GetMemoryAllocator(MemoryTy
 
 void Core::MemoryAllocatorManager::Allocate(MemoryAllocation& outAllocation, MemoryType type, VkDeviceSize size, bool needDedicated)
 {
+	// DEDICATED_HOST is dedicated by definition; the caller states it
+	// explicitly (a pooled allocation here would never be block-freed).
+	assert((type != MemoryType::DEDICATED_HOST || needDedicated)
+		&& "DEDICATED_HOST allocations must pass needDedicated");
+
 	_memoryAllocators[type]->Allocate(outAllocation, size, needDedicated);
 }
 

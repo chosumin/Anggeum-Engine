@@ -52,9 +52,9 @@ namespace
 			VkDeviceSize voxelBytes = VkDeviceSize(_resolution) * _resolution * _resolution * sizeof(float);
 
 			auto* imageStaging = new Buffer(_device, voxelBytes,
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::STAGE);
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
 			auto* boundsStaging = new Buffer(_device, _boundsBuffer.GetSize(),
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::STAGE);
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
 
 			// Image: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
 			commandBuffer->CreateBarrierBatch()
@@ -475,12 +475,12 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 
 	// Voxel staging
 	auto* imageStaging = new Buffer(_device, voxelBytes,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 	imageStaging->CopyBuffer(fileData.data() + sizeof(SDFFileHeader), voxelBytes);
 
 	// Bounds staging
 	auto* boundsStaging = new Buffer(_device, _boundsBuffer.Get().GetSize(),
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::STAGE);
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 	boundsStaging->CopyBuffer(header.rawBounds, sizeof(header.rawBounds));
 
 	if (!_sdfTexture.IsValid())
