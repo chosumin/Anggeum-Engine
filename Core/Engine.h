@@ -40,7 +40,7 @@ namespace Core
         // Queue-submission authority
         SyncContext* _syncContext;
 
-        // Every render resource upload request funnels through it 
+        // Every render resource upload funnels through it as a job
         // (staging, budget and completion tracking live here).
         TransferContext* _transferContext;
 

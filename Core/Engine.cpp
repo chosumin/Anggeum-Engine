@@ -31,7 +31,7 @@ Core::Engine::Engine(const EngineOptions& options)
     _status = make_unique<Core::Status>(*_renderContext);
 
     auto& resourceManager = _device->GetResourceManager();
-    resourceManager.Prepare(*_renderContext, *_transferContext);
+    resourceManager.Prepare(*_renderContext, _renderScene->GetAssetStreamer());
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
@@ -93,10 +93,13 @@ void Core::Engine::Draw()
 
 		_transferContext->BeginFrame();
 
-		_renderScene->SyncManagers(*_scene, _transferContext->GetGeometryCopyQueue(),
-			extents, _transferContext->TakePromotedCount());
+		// Streams, syncs the GPU mirrors and hands this frame's upload jobs
+		// to the transfer context.
+		_renderScene->SyncManagers(*_scene, extents,
+			_transferContext->TakePromotedCount());
 
-		_transferContext->SubmitQueued();
+		// Waits only for the must-land recordings (memcpys); IO-bound loads
+		// keep cooking.
 		_transferContext->Flush(/*waitForRecordings*/ true);
 	}
 

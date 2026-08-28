@@ -20,7 +20,7 @@ namespace Core
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
-		CreateGridIndexBuffer(device, transfer.GetGeometryCopyQueue());
+		CreateGridIndexBuffer(device, transfer);
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
 		// each slot before its first GPU write has happened.
@@ -37,7 +37,7 @@ namespace Core
 	}
 
 	void TerrainSystem::CreateGridIndexBuffer(Device& device,
-		GeometryCopyQueue& geometryCopyQueue)
+		TransferContext& transfer)
 	{
 		// One shared index buffer over a virtual 17x17 PATCH grid - the draw
 		// instance is one patch of the GPU-culled patch list; terrain.vert
@@ -72,7 +72,11 @@ namespace Core
 		const auto* bytes = reinterpret_cast<const uint8_t*>(indices.data());
 		batch.copies.push_back({ _gridIndexBuffer,
 			vector<uint8_t>(bytes, bytes + indices.size() * sizeof(uint16_t)), 0 });
-		geometryCopyQueue.Push(move(batch));
+
+		TransferContext::PendingUpload upload;
+		upload.job = make_unique<GeometryUploadJob>(device, move(batch));
+		upload.mustLand = true;
+		transfer.SubmitJob(std::move(upload), "Terrain.GridIndices");
 	}
 
 	TerrainParams TerrainSystem::BuildRenderParams(Light* mainLight) const

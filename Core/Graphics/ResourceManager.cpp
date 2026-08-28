@@ -6,7 +6,7 @@
 #include "Graphics/TextureUpload.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/TransferContext.h"
+#include "Graphics/AssetStreamer.h"
 
 namespace Core
 {
@@ -25,10 +25,10 @@ namespace Core
 
 	ResourceManager::~ResourceManager() = default;
 
-	void ResourceManager::Prepare(RenderContext& renderContext, TransferContext& transferContext)
+	void ResourceManager::Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer)
 	{
 		_renderContext = &renderContext;
-		_transfer = &transferContext;
+		_streamer = &assetStreamer;
 		
 		if (_renderContext->HasBindlessSupport())
 		{
@@ -174,7 +174,7 @@ namespace Core
 			}
 
 			handle.SetLoading();
-			_transfer->GetTextureUploadQueue().Push({ handle, imageCreateInfo.filePath,
+			_streamer->Push({ handle, imageCreateInfo.filePath,
 				Image::QueryStagingBytes(imageCreateInfo.filePath) });
 		}
 
@@ -234,7 +234,7 @@ namespace Core
 		if (!batch.copies.empty())
 		{
 			handle.SetLoading();
-			_transfer->GetGeometryCopyQueue().Push(move(batch));
+			_streamer->Push(move(batch));
 		}
 
 		return handle;
@@ -290,7 +290,7 @@ namespace Core
 		if (!batch.copies.empty())
 		{
 			handle.SetLoading();
-			_transfer->GetGeometryCopyQueue().Push(move(batch));
+			_streamer->Push(move(batch));
 		}
 
 		return handle;

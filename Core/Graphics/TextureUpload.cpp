@@ -9,13 +9,11 @@
 
 using namespace Core;
 
-TextureUploadJob::TextureUploadJob(Device& device, Texture& dstTexture, string filePath,
-	StagingRing* stagingRing)
+TextureUploadJob::TextureUploadJob(Device& device, Texture& dstTexture, string filePath)
 	: UploadJob()
 	, _device(device)
 	, _filePath(filePath)
 	, _dstTexture(dstTexture)
-	, _stagingRing(stagingRing)
 {
 }
 
@@ -39,8 +37,8 @@ void TextureUploadJob::Execute()
 
 	VkDeviceSize bufferSize = imageData.size();
 
-	StagingRing::Span span = _stagingRing != nullptr
-		? _stagingRing->Acquire(bufferSize) : StagingRing::Span{};
+	StagingRing::Span span = stagingRing != nullptr
+		? stagingRing->Acquire(bufferSize) : StagingRing::Span{};
 
 	Buffer* source = nullptr;
 	VkDeviceSize sourceOffset = 0;

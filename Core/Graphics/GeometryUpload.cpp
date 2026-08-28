@@ -8,12 +8,10 @@
 
 using namespace Core;
 
-GeometryUploadJob::GeometryUploadJob(Device& device, GeometryCopyBatch&& batch,
-	StagingRing* stagingRing)
+GeometryUploadJob::GeometryUploadJob(Device& device, GeometryCopyBatch&& batch)
 	: UploadJob()
 	, _device(device)
 	, _batch(std::move(batch))
-	, _stagingRing(stagingRing)
 {
 	// Handles resolve here, on the constructing (main) thread.
 	_destinations.reserve(_batch.copies.size());
@@ -46,8 +44,8 @@ void GeometryUploadJob::Execute()
 	for (auto& copy : _batch.copies)
 		totalSize += copy.data.size();
 
-	StagingRing::Span span = _stagingRing != nullptr
-		? _stagingRing->Acquire(totalSize) : StagingRing::Span{};
+	StagingRing::Span span = stagingRing != nullptr
+		? stagingRing->Acquire(totalSize) : StagingRing::Span{};
 
 	Buffer* source = nullptr;
 	VkDeviceSize base = 0;

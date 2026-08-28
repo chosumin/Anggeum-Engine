@@ -12,7 +12,7 @@ namespace Core
 	class Transform;
 	class Buffer;
 	class Scene;
-	class GeometryCopyQueue;
+	class AssetStreamer;
 
 	struct TransformBatch
 	{
@@ -56,7 +56,7 @@ namespace Core
 		// no-op when clean. The buffer fills are pushed as copy REQUESTS - the
 		// upload scheduler turns them into transfer work, so the caller has to
 		// submit + flush it before the frame reads the draw set.
-		void Sync(Scene& scene, GeometryCopyQueue& copyQueue, VkExtent2D extents);
+		void Sync(Scene& scene, AssetStreamer& streamer, VkExtent2D extents);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
@@ -71,7 +71,7 @@ namespace Core
 	private:
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
 		void InitializeFromScene(Scene& scene);
-		void RebuildGpuBuffers(GeometryCopyQueue& copyQueue);
+		void RebuildGpuBuffers(AssetStreamer& streamer);
 
 		// Create the buffer on first use, resize it in place afterwards so the handle
 		// stays valid. Callers must ensure no frame is in flight when resizing.

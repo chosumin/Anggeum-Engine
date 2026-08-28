@@ -129,7 +129,7 @@ namespace Core
 		// The span is acquired BEFORE any bookkeeping commits: a full ring
 		// (load spike) skips the whole frame, so the tables never point at
 		// tiles that were not uploaded. Everything retries next frame.
-		StagingRing::Span span = _transfer.GetStagingRing().Acquire(
+		StagingRing::Span span = _transfer.AcquireStagingSpan(
 			budgetTiles * tileBytes + tableBytes);
 		if (!span.IsValid())
 		{
@@ -169,13 +169,17 @@ namespace Core
 		// lookup tables, so GPU-visible residency changes atomically. The
 		// table snapshots are copies - this frame's mirrors, immutable to the
 		// job while the streamer moves on.
-		auto job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
+		TransferContext::PendingUpload upload;
+		upload.job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
 			std::move(tiles), _tablesDirty,
 			vector<TerrainNodeDescGPU>(_descMirror),
 			vector<vector<uint16_t>>(_indexMirror),
 			_firstUpload, span);
+		// Must-land: the recording is a memcpy, and the tables it publishes
+		// back this frame's bookkeeping.
+		upload.mustLand = true;
 
-		_transfer.SubmitStreamingJob(std::move(job),
+		_transfer.SubmitJob(std::move(upload),
 			"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber()));
 
 		_tablesDirty = false;

@@ -11,7 +11,7 @@
 #include "Components/Mesh.h"
 #include "Components/Transform.h"
 
-#include "Graphics/GeometryUpload.h"
+#include "Graphics/AssetStreamer.h"
 
 using namespace Core;
 
@@ -106,7 +106,7 @@ static vector<uint8_t> ToBytes(const vector<T>& data)
 	return bytes;
 }
 
-void Core::RendererBatch::RebuildGpuBuffers(GeometryCopyQueue& copyQueue)
+void Core::RendererBatch::RebuildGpuBuffers(AssetStreamer& streamer)
 {
     // Bumped before the early-out below so an empty rebuild still counts: the draw
     // set changed either way, and Cullers have to notice.
@@ -249,12 +249,12 @@ void Core::RendererBatch::RebuildGpuBuffers(GeometryCopyQueue& copyQueue)
     if (anyTransform)
         batch.copies.push_back({ _transformBatch.TransformBuffer, ToBytes(transforms), 0 });
 
-    copyQueue.Push(move(batch));
+    streamer.Push(move(batch));
 
     _hasGpuBuffers = true;
 }
 
-void Core::RendererBatch::Sync(Scene& scene, GeometryCopyQueue& copyQueue, VkExtent2D extents)
+void Core::RendererBatch::Sync(Scene& scene, AssetStreamer& streamer, VkExtent2D extents)
 {
     if (!_dirty)
         return;
@@ -268,5 +268,5 @@ void Core::RendererBatch::Sync(Scene& scene, GeometryCopyQueue& copyQueue, VkExt
     _transforms.clear();
 
     InitializeFromScene(scene);
-    RebuildGpuBuffers(copyQueue);
+    RebuildGpuBuffers(streamer);
 }

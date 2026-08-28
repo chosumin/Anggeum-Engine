@@ -119,8 +119,7 @@ namespace Core
 	class GeometryUploadJob : public UploadJob
 	{
 	public:
-		GeometryUploadJob(Device& device, GeometryCopyBatch&& batch,
-			StagingRing* stagingRing = nullptr);
+		GeometryUploadJob(Device& device, GeometryCopyBatch&& batch);
 		~GeometryUploadJob();
 
 		void Execute() override;
@@ -129,7 +128,6 @@ namespace Core
 		Device& _device;
 		GeometryCopyBatch _batch;
 		vector<Buffer*> _destinations;   // resolved 1:1 with _batch.copies
-		StagingRing* _stagingRing;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 }

@@ -15,7 +15,7 @@ namespace Core
 	class DescriptorSetBuilder;
 	class TerrainSystem;
 	class TransferContext;
-	class GeometryCopyQueue;
+	class AssetStreamer;
 
 	// RenderScene: the GPU mirror of the scene used for GPU-driven rendering (bindless
 	// textures, mesh buffers, material table, draw batch). Owned by Engine and shared by
@@ -45,8 +45,9 @@ namespace Core
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
 		// The frame's world-model update
-		void SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
-			VkExtent2D extents, uint32_t promotedCount);
+		void SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promotedCount);
+
+		AssetStreamer& GetAssetStreamer() { return *_assetStreamer; }
 
 		// Null when descriptor indexing is unsupported.
 		BindlessTextureManager* GetBindlessTextureManager() const { return _bindless.get(); }
@@ -66,6 +67,7 @@ namespace Core
 
 	private:
 		Scene& _scene;
+		unique_ptr<AssetStreamer> _assetStreamer;
 		unique_ptr<BindlessTextureManager> _bindless;
 		unique_ptr<MeshBufferManager> _meshBuffer;
 		unique_ptr<MaterialManager> _material;

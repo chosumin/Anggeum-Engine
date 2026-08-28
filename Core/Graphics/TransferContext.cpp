@@ -112,94 +112,20 @@ void TransferContext::OnGUI()
 	ImGui::End();
 }
 
-void TransferContext::SubmitStreamingJob(unique_ptr<UploadJob> job, const string& jobName)
-{
-	PendingUpload upload;
-	upload.job = std::move(job);
-	upload.mustLand = true;
-	EnqueueUpload(std::move(upload), jobName);
-}
-
-void TransferContext::EnqueueUpload(PendingUpload&& upload, const string& jobName)
+void TransferContext::SubmitJob(PendingUpload&& upload, const string& jobName)
 {
 	// Already enqueued: the pending upload covers the request; this one is
 	// destroyed on return.
 	if (_pendingJobs.find(jobName) != _pendingJobs.end())
 		return;
 
+	upload.job->stagingRing = _stagingRing.get();
+
 	Job* raw = upload.job.get();
 	raw->completionWait = &_jobWait;
 
 	_pendingJobs.insert({ jobName, std::move(upload) });
 	_workerThreadManager.Enqueue(raw);
-}
-
-void TransferContext::SubmitQueued()
-{
-	// Admission control, FIFO: each request charges the shared frame budget
-	// before it becomes a job; the first one the budget cannot cover stops
-	// the drain, and everything behind it retries next frame in order.
-	while (!_textureUploads.Empty())
-	{
-		if (!TryAdmit(_textureUploads.Front().stagingBytes))
-			break;
-
-		// The job takes the resolved Texture&; handles resolve here on the
-		// main thread (the pool is not thread-safe).
-		TextureUploadRequest request = _textureUploads.PopFront();
-		auto& texture = request.texture.Get();
-		string jobName = texture.GetName();
-
-		PendingUpload upload;
-		upload.texture = request.texture;
-		upload.job = make_unique<TextureUploadJob>(_device, texture,
-			request.filePath, _stagingRing.get());
-		EnqueueUpload(std::move(upload), jobName);
-	}
-
-	// One upload job per batch (i.e. per submesh); the job consumes the
-	// request whole and resolves its destination handles itself.
-	//
-	// table-class batches (no submesh handle - draw-set tables,
-	// the terrain grid) bypass the budget and MUST drain the frame they were
-	// pushed. A table batch carried across a rebuild would record into the
-	// very buffers the rebuild replaces.
-	vector<GeometryCopyBatch> deferred;
-	size_t batchIndex = 0;
-	while (!_geometryCopies.Empty())
-	{
-		GeometryCopyBatch batch = _geometryCopies.PopFront();
-
-		if (batch.subMesh.IsValid())
-		{
-			VkDeviceSize bytes = 0;
-			for (const auto& copy : batch.copies)
-				bytes += copy.data.size();
-
-			// Unaffordable batches are SKIPPED (kept in order for next frame)
-			if (!TryAdmit(bytes))
-			{
-				deferred.push_back(std::move(batch));
-				continue;
-			}
-		}
-
-		PendingUpload upload;
-		upload.subMesh = batch.subMesh;
-		// Table-class = must-land (see the budget bypass above); its recording
-		// is a memcpy of CPU-built tables.
-		upload.mustLand = !batch.subMesh.IsValid();
-
-		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
-		upload.job = make_unique<GeometryUploadJob>(_device, move(batch),
-			_stagingRing.get());
-		EnqueueUpload(std::move(upload), jobName);
-
-		++batchIndex;
-	}
-
-	for (auto& batch : deferred)
-		_geometryCopies.Push(std::move(batch));
 }
 
 void TransferContext::Flush(bool waitForRecordings)

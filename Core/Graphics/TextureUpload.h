@@ -61,8 +61,7 @@ namespace Core
 	class TextureUploadJob : public UploadJob
 	{
 	public:
-		TextureUploadJob(Device& device, Texture& dstTexture, string filePath,
-			StagingRing* stagingRing = nullptr);
+		TextureUploadJob(Device& device, Texture& dstTexture, string filePath);
 		~TextureUploadJob();
 
 		void Execute() override;
@@ -72,7 +71,6 @@ namespace Core
 		string _filePath;
 
 		Texture& _dstTexture;
-		StagingRing* _stagingRing;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 }

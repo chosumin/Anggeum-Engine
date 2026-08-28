@@ -6,6 +6,7 @@
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/TransferContext.h"
+#include "Graphics/AssetStreamer.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Shader.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -20,6 +21,10 @@ RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer
 	: _device(&device)
 	, _scene(scene)
 {
+	// The world model's own upload scheduler: every producer below (and the
+	// resource loaders) pushes its requests here.
+	_assetStreamer = make_unique<AssetStreamer>(device, transfer);
+
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
 		_bindless = make_unique<BindlessTextureManager>(device, 4096);
@@ -28,18 +33,15 @@ RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer
 	_material = make_unique<MaterialManager>(device);
 	_batch = make_unique<RendererBatch>(device);
 
-	// The terrain's static grid geometry lands in the transfer context's
-	// geometry queue and is uploaded by the first Sync, like any other loaded
-	// geometry; its streamer stages tiles from the context's ring.
 	_terrainSystem = make_unique<TerrainSystem>(device, transfer);
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.
 RenderScene::~RenderScene() = default;
 
-void RenderScene::SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
-	VkExtent2D extents, uint32_t promotedCount)
+void RenderScene::SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promotedCount)
 {
+	// Streaming producer: decides this frame's uploads, and submits them.
 	if (auto* camera = scene.GetMainCamera())
 		_terrainSystem->Update(*camera);
 
@@ -55,7 +57,10 @@ void RenderScene::SyncManagers(Scene& scene, GeometryCopyQueue& copyQueue,
 
 	_material->Sync();
 
-	_batch->Sync(scene, copyQueue, extents);
+	_batch->Sync(scene, *_assetStreamer, extents);
+
+	// Everything this frame produced - loader requests, the rebuild's table fills
+	_assetStreamer->SubmitQueued();
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,

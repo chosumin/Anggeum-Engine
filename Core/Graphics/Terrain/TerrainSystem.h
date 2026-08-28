@@ -8,7 +8,6 @@ namespace Core
 {
 	class Device;
 	class PerspectiveCamera;
-	class GeometryCopyQueue;
 	class TransferContext;
 	class Light;
 
@@ -44,7 +43,7 @@ namespace Core
 		int GetDebugMode() const { return _debugMode; }
 
 	private:
-		void CreateGridIndexBuffer(Device& device, GeometryCopyQueue& geometryCopyQueue);
+		void CreateGridIndexBuffer(Device& device, TransferContext& transfer);
 
 		TerrainConfig _config;
 		TerrainNodeStore _store;

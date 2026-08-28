@@ -1,8 +1,7 @@
 #pragma once
-#include "GeometryUpload.h"
-#include "TextureUpload.h"
 #include "StagingRing.h"
 #include "UploadJob.h"
+#include "ResourceHandle.h"
 #include "Utils/timer.h"
 
 namespace Core
@@ -10,60 +9,22 @@ namespace Core
 	class Device;
 	class WorkerThreadManager;
 	class CommandPool;
+	class Texture;
 	class SubMesh;
 	class SyncContext;
 
-	// Engine-owned transfer context: the single hand-off point between resource
-	// loading and the GPU. Request queues on top (loaders, terrain, the draw
-	// batch all push requests here), transfer machinery below - worker-recorded
-	// jobs batched into one submit, completion tracked on the upload timeline.
-	// Sibling of RenderContext / SyncContext; the dedicated transfer queue
-	// lives here when it gets enabled.
+	// Engine-owned transfer machinery: the single hand-off point between the
+	// upload SCHEDULERS and the GPU - shared budget and staging
+	// ring, worker-recorded jobs batched into one submit, completion tracked
+	// on the upload timeline.
 	//
 	// Upload completion is asynchronous: Flush blocks only on worker-thread
 	// recording, while GPU consumption is ordered by the transfer-timeline gate.
 	class TransferContext
 	{
 	public:
-		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
-			SyncContext& syncContext);
-		~TransferContext();
-
-		GeometryCopyQueue& GetGeometryCopyQueue() { return _geometryCopies; }
-		TextureUploadQueue& GetTextureUploadQueue() { return _textureUploads; }
-		StagingRing& GetStagingRing() { return *_stagingRing; }
-
-		// Retires completed uploads (promotion pump), reclaims staging spans and
-		// opens a fresh upload-budget window. First transfer call of the frame.
-		void BeginFrame();
-
-		// Shared per-frame upload budget. Grants (and CONSUMES) up to
-		// `requested` bytes of what remains this frame - scene admission in
-		// SubmitQueued charges the same tally, so a load-heavy frame
-		// automatically shrinks what later callers (terrain) may stream.
-		VkDeviceSize GrantUploadBudget(VkDeviceSize requested);
-
-		// Appends the upload/staging stats to the engine "Status" window.
-		void OnGUI();
-
-		// Drain both request queues into transfer jobs.
-		void SubmitQueued();
-
-		// For streaming clients that build their own upload jobs.
-		// The caller has already charged the budget and acquired its staging.
-		void SubmitStreamingJob(unique_ptr<UploadJob> job, const string& jobName);
-
-		// Submit the jobs whose worker RECORDING has finished, as one batch.
-		// `waitForRecordings` first waits for the must-land jobs' recordings;
-		// IO-bound loads keep cooking and ride a later Flush.
-		void Flush(bool waitForRecordings = false);
-
-		// How many resources the promotion pump flipped Resident since the last call.
-		uint32_t TakePromotedCount();
-
-	private:
 		// One upload with everything that must follow ITS lifecycle: the
-		// handles promoted when its submission completes. 
+		// handles promoted when its submission completes.
 		struct PendingUpload
 		{
 			unique_ptr<UploadJob> job;
@@ -77,13 +38,47 @@ namespace Core
 			bool mustLand = false;
 		};
 
+		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
+			SyncContext& syncContext);
+		~TransferContext();
+
+		// For self-scheduling streamers that stage BEFORE building their job.
+		StagingRing::Span AcquireStagingSpan(VkDeviceSize size)
+		{
+			return _stagingRing->Acquire(size);
+		}
+
+		// Retires completed uploads (promotion pump), reclaims staging spans and
+		// opens a fresh upload-budget window. First transfer call of the frame.
+		void BeginFrame();
+
+		// Shared per-frame upload budget. Grants (and CONSUMES) up to
+		// `requested` bytes of what remains this frame - scene admission in
+		// SubmitQueued charges the same tally, so a load-heavy frame
+		// automatically shrinks what later callers (terrain) may stream.
+		VkDeviceSize GrantUploadBudget(VkDeviceSize requested);
+
 		// Admission control: charges `bytes` against the frame budget, or
 		// refuses. A single resource larger than the whole budget gets an
 		// exclusive frame (nothing else admitted yet) rather than starving.
 		bool TryAdmit(VkDeviceSize bytes);
 
-		void EnqueueUpload(PendingUpload&& upload, const string& jobName);
+		// Appends the upload/staging stats to the engine "Status" window.
+		void OnGUI();
 
+		// Hands one upload to the worker pool and the pending set. 
+		// A pending job with the same name absorbs the call.
+		void SubmitJob(PendingUpload&& upload, const string& jobName);
+
+		// Submit the jobs whose worker RECORDING has finished, as one batch.
+		// `waitForRecordings` first waits for the must-land jobs' recordings;
+		// IO-bound loads keep cooking and ride a later Flush.
+		void Flush(bool waitForRecordings = false);
+
+		// How many resources the promotion pump flipped Resident since the last call.
+		uint32_t TakePromotedCount();
+
+	private:
 		// Promotes + destroys in-flight batches the GPU has passed.
 		void CollectCompletedJobs(uint64_t completedValue);
 
@@ -97,9 +92,6 @@ namespace Core
 
 		Device& _device;
 		WorkerThreadManager& _workerThreadManager;
-
-		TextureUploadQueue _textureUploads;
-		GeometryCopyQueue _geometryCopies;
 
 		unique_ptr<CommandPool> _primaryCommandPool;
 
