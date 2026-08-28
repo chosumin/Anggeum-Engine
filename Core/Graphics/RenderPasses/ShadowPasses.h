@@ -3,6 +3,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class FrameGraph;
 	class Device;
 	class RenderScene;
@@ -11,7 +12,7 @@ namespace Core
 	class ShadowPasses
 	{
 	public:
-		ShadowPasses(FrameGraph& graph, Device& device, RenderScene& renderScene,
+		ShadowPasses(FrameGraph& graph, Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkFormat depthFormat);
 
 		// CPU-side shadow block shared with SDFShadowPass (transition distances).

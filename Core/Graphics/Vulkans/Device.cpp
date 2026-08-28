@@ -3,7 +3,6 @@
 #include "CommandPool.h"
 #include "CommandBuffer.h"
 #include "MemoryAllocator.h"
-#include "Graphics/ResourceManager.h"
 
 namespace Core
 {
@@ -62,13 +61,10 @@ namespace Core
 	        _queueFamilyIndices.GraphicsFamily.value());
 
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
-
-	    _resourceManager = new ResourceManager(*this);
 	}
 
 	Device::~Device()
 	{
-	    delete(_resourceManager);
 	    delete(_memoryAllocatorManager);
 	    delete(_graphicsCommandPool);
 

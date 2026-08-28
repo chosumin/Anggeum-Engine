@@ -40,9 +40,11 @@ namespace Core
 	// classes carry no test hooks.
 	void RunFrameGraphSelfTests();
 
-	FrameGraph::FrameGraph(Device& device, WorkerThreadManager& workerThreadManager)
+	FrameGraph::FrameGraph(Device& device, ResourceManager& resourceManager,
+		WorkerThreadManager& workerThreadManager)
 		: Threadable(workerThreadManager)
 		, _device(device)
+		, _resourceManager(resourceManager)
 	{
 #ifdef _DEBUG
 		static bool selfTested = false;
@@ -377,7 +379,7 @@ namespace Core
 	void FrameGraph::RealizeTransients(RenderFrame& renderFrame)
 	{
 		if (!_defaultSampler.IsValid())
-			_defaultSampler = _device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
+			_defaultSampler = _resourceManager.LoadSampler(DEFAULT_SAMPLER);
 
 		auto& transients = renderFrame.GetResources().GetTransientAllocator();
 

@@ -46,7 +46,7 @@ namespace Core
 			return it->second;
 
 		auto material =
-			make_shared<Core::Material>(_device, LoadShader(shaderName), materialName);
+			make_shared<Core::Material>(_device, *this, LoadShader(shaderName), materialName);
 
 		Handle<Material> handle = _materialPool.Add(material);
 		_materialHandles[materialName] = handle;

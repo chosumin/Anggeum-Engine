@@ -14,7 +14,7 @@
 
 using namespace Core;
 
-DepthPrePass::DepthPrePass(Device& device, RenderScene& renderScene, VkExtent2D extent,
+DepthPrePass::DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D extent,
 	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase)
 	: _device(device)
 	, _renderScene(renderScene)
@@ -25,7 +25,7 @@ DepthPrePass::DepthPrePass(Device& device, RenderScene& renderScene, VkExtent2D 
 	_pipelineState = make_unique<PipelineState>();
 	_pipelineState->GetMultisampleStateCreateInfo().rasterizationSamples = msaaSamples;
 
-	_depthNormalShader = _device.GetResourceManager().LoadShader("DepthNormal");
+	_depthNormalShader = resourceManager.LoadShader("DepthNormal");
 
 	PipelineRenderingDesc renderingDesc;
 	renderingDesc.colorFormats = { VK_FORMAT_R8G8B8A8_UNORM };

@@ -2,6 +2,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class FrameGraph;
 	class Device;
 	class RenderScene;
@@ -11,7 +12,7 @@ namespace Core
 	class DepthPrePasses
 	{
 	public:
-		DepthPrePasses(FrameGraph& graph, Device& device, RenderScene& renderScene,
+		DepthPrePasses(FrameGraph& graph, Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkExtent2D extent, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples);
 	};
 }

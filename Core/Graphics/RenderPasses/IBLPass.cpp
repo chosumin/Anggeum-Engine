@@ -36,8 +36,9 @@ static bool EnvironmentReady(Scene& scene)
 		&& (!cubemap.IsValid() || cubemap.IsResident());
 }
 
-IBLPass::IBLPass(Device& device, RenderScene& renderScene)
+IBLPass::IBLPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
 	: _device(device)
+	, _resourceManager(resourceManager)
 	, _renderScene(renderScene)
 {
 }
@@ -122,10 +123,10 @@ void IBLPass::CreateResources(FrameGraphBuilder& builder, FrameResources& frameR
 	// The results are consumed through bindless, which the graph cannot see.
 	builder.SetSideEffect();
 
-	_preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _renderScene.GetScene(), offscreenDesc.format);
+	_preEnvironmentPass = make_unique<PreEnvironmentPass>(_device, _resourceManager, _renderScene.GetScene(), offscreenDesc.format);
 	_preEnvironmentPass->Initialize();
 
-	_brdfLutPass = make_unique<BrdfLutPass>(_device, brdfLutDesc.format);
+	_brdfLutPass = make_unique<BrdfLutPass>(_device, _resourceManager, brdfLutDesc.format);
 	_brdfLutPass->Initialize();
 
 	RegisterGiTexturesToBindless(renderFrame, irradianceHandle, prefilteredHandle, brdfLutHandle);

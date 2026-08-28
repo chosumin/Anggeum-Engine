@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class TerrainSystem;
@@ -18,7 +19,7 @@ namespace Core
 	public:
 		static constexpr const char* RT_LOD_MAP = "Terrain.LodMap";
 
-		TerrainLodMapPass(Device& device, RenderScene& renderScene);
+		TerrainLodMapPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene);
 		~TerrainLodMapPass() override;
 
 		const char* GetName() const override { return "TerrainLodMap"; }

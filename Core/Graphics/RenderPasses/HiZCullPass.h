@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
     class Device;
     class RenderScene;
     class Shader;
@@ -33,7 +34,7 @@ namespace Core
         static constexpr const char* RT_HIZ = "OcclusionCull.HiZ";
 
         // Cull2 takes the Cull1 instance to share its CPU state.
-        HiZCullPass(Device& device, RenderScene& renderScene, Phase phase,
+        HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, Phase phase,
             HiZCullPass* cull1 = nullptr);
         ~HiZCullPass();
 
@@ -82,6 +83,7 @@ namespace Core
             Texture& depth);
 
         Device& _device;
+        ResourceManager& _resourceManager;
         RenderScene& _renderScene;
         Phase _phase;
 

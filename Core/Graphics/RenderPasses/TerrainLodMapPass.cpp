@@ -17,11 +17,11 @@
 
 using namespace Core;
 
-TerrainLodMapPass::TerrainLodMapPass(Device& device, RenderScene& renderScene)
+TerrainLodMapPass::TerrainLodMapPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
-	auto& resourceManager = device.GetResourceManager();
+	
 	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainLodMap.comp.spv");
 	_pipeline = resourceManager.LoadComputePipeline("Shaders/Terrain/terrainLodMap.comp.spv");
 

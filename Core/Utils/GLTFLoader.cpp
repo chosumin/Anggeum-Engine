@@ -255,9 +255,10 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
-Core::GLTFLoader::GLTFLoader(Device& device, Scene& scene)
+Core::GLTFLoader::GLTFLoader(Device& device, ResourceManager& resourceManager,
+	Scene& scene)
 	: _device(device), _scene(scene),
-	_resourceManager(device.GetResourceManager())
+	_resourceManager(resourceManager)
 {
 	_model = new tinygltf::Model();
 }

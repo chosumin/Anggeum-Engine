@@ -13,6 +13,7 @@ namespace Core
 	class Buffer;
 	class Scene;
 	class AssetStreamer;
+	class ResourceManager;
 
 	struct TransformBatch
 	{
@@ -40,7 +41,7 @@ namespace Core
 	class RendererBatch
 	{
 	public:
-		RendererBatch(Device& device);
+		RendererBatch(Device& device, ResourceManager& resourceManager);
 		~RendererBatch();
 
 		// Marks the draw set stale — call after adding/removing scene meshes. Kept here
@@ -80,6 +81,7 @@ namespace Core
 
 	private:
 		Device& _device;
+		ResourceManager& _resourceManager;
 
 		TransformBatch _transformBatch;
 		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix

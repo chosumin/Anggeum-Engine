@@ -19,26 +19,26 @@ Core::Engine::Engine(const EngineOptions& options)
     _timer = make_unique<Core::Timer>();
 
     _device = new Core::Device(*options.window);
+    _resourceManager = new Core::ResourceManager(*_device);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _syncContext = new Core::SyncContext(*_device);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager,
         *_syncContext);
 
-    auto* sampleScene = new SampleScene(*_device);
+    auto* sampleScene = new SampleScene(*_device, *_resourceManager);
     _scene = sampleScene;
-    _renderScene = new Core::RenderScene(*_device, *_scene, *_transferContext);
-    _renderContext = new Core::RenderContext(*_device, *_renderScene, *_syncContext);
+    _renderScene = new Core::RenderScene(*_device, *_resourceManager, *_scene, *_transferContext);
+    _renderContext = new Core::RenderContext(*_device, *_resourceManager, *_renderScene, *_syncContext);
     _status = make_unique<Core::Status>(*_renderContext);
 
-    auto& resourceManager = _device->GetResourceManager();
-    resourceManager.Prepare(*_renderContext, _renderScene->GetAssetStreamer());
+    _resourceManager->Prepare(*_renderContext, _renderScene->GetAssetStreamer());
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
 
     sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
-    _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_workerThreadManager,
+    _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_resourceManager, *_workerThreadManager,
         *_renderScene, swapChain, *_syncContext);
 }
 
@@ -53,6 +53,7 @@ Core::Engine::~Engine()
     delete(_transferContext);
     delete(_syncContext);
     delete(_workerThreadManager);
+    delete(_resourceManager);
     delete(_device);
 
     Core::Window::Instance().Delete();

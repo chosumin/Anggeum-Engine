@@ -30,9 +30,10 @@ void RenderContext::RemoveResizeCallback(function<void(SwapChain&)> callback)
 	}
 }
 
-RenderContext::RenderContext(Device& device, RenderScene& renderScene,
-	SyncContext& syncContext)
+RenderContext::RenderContext(Device& device, ResourceManager& resourceManager,
+	RenderScene& renderScene, SyncContext& syncContext)
 	: _device(device)
+	, _resourceManager(resourceManager)
 	, _renderScene(renderScene)
 	, _syncContext(syncContext)
 {
@@ -73,7 +74,7 @@ void RenderContext::CreateRenderFrames()
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		_frames[i] = make_unique<RenderFrame>(_device, _renderScene);
+		_frames[i] = make_unique<RenderFrame>(_device, _resourceManager, _renderScene);
 	}
 }
 

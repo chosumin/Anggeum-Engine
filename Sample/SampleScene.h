@@ -7,10 +7,12 @@ namespace Core
 	class RenderContext;
 }
 
+namespace Core { class ResourceManager; }
+
 class SampleScene : public Core::Scene
 {
 public:
-	explicit SampleScene(Core::Device& device);
+	SampleScene(Core::Device& device, Core::ResourceManager& resourceManager);
 	~SampleScene();
 
 	// Loading needs the render-side managers (reached through the RenderContext),
@@ -23,6 +25,7 @@ private:
 	unique_ptr<Core::GLTFLoader> _gltfLoader;
 	Core::RenderContext* _renderContext;
 	Core::Device& _device;
+	Core::ResourceManager& _resourceManager;
 
 private:
 	glm::vec3 _dirLightEuler{ 45.0f, 45.0f, 0.0f };

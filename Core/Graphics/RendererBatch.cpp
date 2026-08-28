@@ -15,8 +15,8 @@
 
 using namespace Core;
 
-Core::RendererBatch::RendererBatch(Device& device)
-    : _device(device)
+Core::RendererBatch::RendererBatch(Device& device, ResourceManager& resourceManager)
+    : _device(device), _resourceManager(resourceManager)
 {
 }
 
@@ -88,7 +88,7 @@ void Core::RendererBatch::InitializeFromScene(Scene& scene)
 Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> current,
     const BufferDesc& desc, const string& name)
 {
-    auto& cache = _device.GetResourceManager();
+    auto& cache = _resourceManager;
     if (current.IsValid())
     {
         cache.ResizeBuffer(current, desc, name);

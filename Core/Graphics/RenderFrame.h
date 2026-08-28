@@ -8,6 +8,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class BindlessTextureManager;
 	class DescriptorSetBuilder;
 	class RendererBatch;
@@ -19,7 +20,7 @@ namespace Core
 	class RenderFrame
 	{
 	public:
-		RenderFrame(Device& device, RenderScene& renderScene);
+		RenderFrame(Device& device, ResourceManager& resourceManager, RenderScene& renderScene);
 		~RenderFrame();
 		
 		// Reset frame resources

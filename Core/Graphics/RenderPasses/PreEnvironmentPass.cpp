@@ -19,13 +19,13 @@ using namespace Core;
 
 #define PI 3.1415926535897932384626433832795
 
-Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, Scene& scene, VkFormat offscreenFormat)
+Core::PreEnvironmentPass::PreEnvironmentPass(Device& device, ResourceManager& resourceManager, Scene& scene, VkFormat offscreenFormat)
     : _device(device)
     , _scene(scene)
     , _pipelineState(make_unique<PipelineState>())
     , _offscreenFormat(offscreenFormat)
-    , _irradianceShader(&device.GetResourceManager().LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
-    , _prefilteredShader(&device.GetResourceManager().LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
+    , _irradianceShader(&resourceManager.LoadMaterial("irradiance", "Irradiance").Get().GetShaderHandle().Get())
+    , _prefilteredShader(&resourceManager.LoadMaterial("prefiltered", "Prefiltered").Get().GetShaderHandle().Get())
 {
 }
 

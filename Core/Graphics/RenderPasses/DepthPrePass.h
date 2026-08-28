@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class RenderScene;
 	class Device;
 	class Shader;
@@ -19,7 +20,7 @@ namespace Core
 		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 		static constexpr const char* RT_MAIN_NORMAL = "MainNormal";
 
-		DepthPrePass(Device& device, RenderScene& renderScene, VkExtent2D extent,
+		DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D extent,
 			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase);
 		~DepthPrePass();
 

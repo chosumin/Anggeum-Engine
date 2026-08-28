@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
     class Device;
     class RenderScene;
     class Texture;
@@ -25,7 +26,7 @@ namespace Core
     public:
         static constexpr const char* RT_AO = "AOResult";
 
-        AmbientOcclusionPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
+        AmbientOcclusionPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples,
             SDFGenerator* sdfGenerator);
         ~AmbientOcclusionPass();

@@ -6,6 +6,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class RenderScene;
 	class SwapChain;
 	class WorkerThreadManager;
@@ -17,7 +18,7 @@ namespace Core
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
 	public:
-		ForwardRenderPipeline(Device& device,
+		ForwardRenderPipeline(Device& device, ResourceManager& resourceManager,
 			WorkerThreadManager& workerThreadManager, RenderScene& renderScene,
 			SwapChain& swapChain, SyncContext& syncContext);
 		virtual ~ForwardRenderPipeline() override;

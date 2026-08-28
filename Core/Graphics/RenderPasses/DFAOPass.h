@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
     class Device;
     class Scene;
     class Shader;
@@ -18,7 +19,7 @@ namespace Core
     class DFAOPass
     {
     public:
-        DFAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
+        DFAOPass(Device& device, ResourceManager& resourceManager, Scene& scene, VkExtent2D screenExtent,
             VkSampleCountFlagBits msaaSamples,
             SDFGenerator* sdfGenerator);
         ~DFAOPass();

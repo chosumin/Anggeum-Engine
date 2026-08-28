@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class TerrainSystem;
@@ -20,7 +21,7 @@ namespace Core
 	class TerrainDepthPrePass : public FrameGraphPass
 	{
 	public:
-		TerrainDepthPrePass(Device& device, RenderScene& renderScene,
+		TerrainDepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples);
 		~TerrainDepthPrePass() override;
 

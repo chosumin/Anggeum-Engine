@@ -7,11 +7,11 @@
 
 namespace Core
 {
-	Material::Material(Device& device, Handle<Shader> shader, string materialName)
+	Material::Material(Device& device, ResourceManager& resourceManager, Handle<Shader> shader, string materialName)
 		:_device(device), _shader(shader), _name(materialName)
 	{
 		//HACK : In case of empty textures. This should be replaced with the shader variants system later.
-		SetDefault(device.GetResourceManager().GetDefaultTextureHandle());
+		SetDefault(resourceManager.GetDefaultTextureHandle());
 	}
 
 	Material::Material(const Material& other)

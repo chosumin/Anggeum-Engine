@@ -21,7 +21,7 @@ using namespace Core;
 
 static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
 
-SDFShadowPass::SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
+SDFShadowPass::SDFShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D screenExtent,
 	VkSampleCountFlagBits msaaSamples, ShadowUniform* shadowBuffer)
 	: _device(device)
 	, _renderScene(renderScene)
@@ -29,13 +29,13 @@ SDFShadowPass::SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2
 	, _msaaSamples(msaaSamples)
 	, _shadowBuffer(shadowBuffer)
 {
-	_sdfGenerator = make_unique<SDFGenerator>(device);
+	_sdfGenerator = make_unique<SDFGenerator>(device, resourceManager);
 
-	_sdfShadowShader = _device.GetResourceManager().LoadShader("Shaders/sdfShadow.comp.spv");
-	_sdfShadowPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfShadow.comp.spv");
+	_sdfShadowShader = resourceManager.LoadShader("Shaders/sdfShadow.comp.spv");
+	_sdfShadowPipeline = resourceManager.LoadComputePipeline("Shaders/sdfShadow.comp.spv");
 
-	_volumeSliceShader = _device.GetResourceManager().LoadShader("Shaders/sdfVolumeSlice.comp.spv");
-	_volumeSlicePipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/sdfVolumeSlice.comp.spv");
+	_volumeSliceShader = resourceManager.LoadShader("Shaders/sdfVolumeSlice.comp.spv");
+	_volumeSlicePipeline = resourceManager.LoadComputePipeline("Shaders/sdfVolumeSlice.comp.spv");
 }
 
 SDFShadowPass::~SDFShadowPass()

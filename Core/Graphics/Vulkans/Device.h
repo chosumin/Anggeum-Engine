@@ -65,7 +65,6 @@ namespace Core
 			return _queueFamilyIndices;
 		}
 
-		ResourceManager& GetResourceManager() const { return *_resourceManager; }
 
 		bool SupportsDescriptorIndexing() const { return _supportsDescriptorIndexing; }
 		bool SupportsDrawIndirectCount() const { return _supportsDrawIndirectCount; }
@@ -96,7 +95,6 @@ namespace Core
 		// transfer jobs; every other queue handle lives on SyncContext.
 		VkQueue _graphicsQueue;
 
-		ResourceManager* _resourceManager;
 
 		VkSurfaceKHR _surface;
 

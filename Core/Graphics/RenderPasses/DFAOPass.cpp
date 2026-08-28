@@ -13,7 +13,7 @@
 #include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 using namespace Core;
 
-DFAOPass::DFAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
+DFAOPass::DFAOPass(Device& device, ResourceManager& resourceManager, Scene& scene, VkExtent2D screenExtent,
     VkSampleCountFlagBits msaaSamples,
     SDFGenerator* sdfGenerator)
     : _device(device)
@@ -22,8 +22,8 @@ DFAOPass::DFAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
     , _msaaSamples(msaaSamples)
     , _sdfGenerator(sdfGenerator)
 {
-    _dfaoShader   = _device.GetResourceManager().LoadShader("Shaders/dfao.comp.spv");
-    _dfaoPipeline = _device.GetResourceManager().LoadComputePipeline("Shaders/dfao.comp.spv");
+    _dfaoShader   = resourceManager.LoadShader("Shaders/dfao.comp.spv");
+    _dfaoPipeline = resourceManager.LoadComputePipeline("Shaders/dfao.comp.spv");
 }
 
 DFAOPass::~DFAOPass()

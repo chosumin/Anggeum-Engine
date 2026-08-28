@@ -2,6 +2,7 @@
 
 namespace Core
 {
+	class ResourceManager;
     class Device;
     class Texture;
     class Material;
@@ -14,7 +15,7 @@ namespace Core
     class BrdfLutPass
     {
     public:
-        BrdfLutPass(Device& device, VkFormat lutFormat);
+        BrdfLutPass(Device& device, ResourceManager& resourceManager, VkFormat lutFormat);
         ~BrdfLutPass();
 
         void Initialize();
@@ -22,6 +23,7 @@ namespace Core
 
     private:
         Device& _device;
+        ResourceManager& _resourceManager;
         VkFormat _lutFormat;
 
         unique_ptr<PipelineState> _pipelineState;

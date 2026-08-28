@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class Shader;
@@ -21,7 +22,7 @@ namespace Core
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Indirect";
 		}
 
-		ShadowCullPass(Device& device, RenderScene& renderScene, ShadowPass& shadowPass);
+		ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass);
 		~ShadowCullPass();
 
 		const char* GetName() const override { return "ShadowCullPass"; }

@@ -20,7 +20,7 @@ namespace Core
 		// The GPU-side material table, uploaded as a single uniform block.
 		using MaterialTable = array<GPUMaterialData, MAX_MATERIALS>;
 
-		MaterialManager(Device& device);
+		MaterialManager(Device& device, ResourceManager& resourceManager);
 		~MaterialManager();
 
 		uint32_t RegisterMaterial(Handle<Material> material);

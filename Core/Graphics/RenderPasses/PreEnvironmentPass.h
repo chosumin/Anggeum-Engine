@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
     class Device;
     class Scene;
     class Pipeline;
@@ -22,7 +23,7 @@ namespace Core
     class PreEnvironmentPass
     {
     public:
-        PreEnvironmentPass(Device& device, Scene& scene, VkFormat offscreenFormat);
+        PreEnvironmentPass(Device& device, ResourceManager& resourceManager, Scene& scene, VkFormat offscreenFormat);
         ~PreEnvironmentPass();
 
         void Initialize();

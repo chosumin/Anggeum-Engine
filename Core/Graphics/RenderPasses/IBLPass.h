@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class Texture;
@@ -26,7 +27,7 @@ namespace Core
 		// slot owns its own copy of the buffer).
 		static constexpr const char* UB_GI = "IBL.GI";
 
-		IBLPass(Device& device, RenderScene& renderScene);
+		IBLPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene);
 		~IBLPass();
 
 		const char* GetName() const override { return "IBLPass"; }
@@ -45,6 +46,7 @@ namespace Core
 			Handle<Texture> irradiance, Handle<Texture> prefiltered, Handle<Texture> brdfLut);
 
 		Device& _device;
+		ResourceManager& _resourceManager;
 		RenderScene& _renderScene;
 
 		unique_ptr<PreEnvironmentPass> _preEnvironmentPass;

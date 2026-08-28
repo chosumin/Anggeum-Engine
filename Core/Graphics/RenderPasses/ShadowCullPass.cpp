@@ -16,12 +16,12 @@
 
 using namespace Core;
 
-ShadowCullPass::ShadowCullPass(Device& device, RenderScene& renderScene, ShadowPass& shadowPass)
+ShadowCullPass::ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass)
 	: _device(device)
 	, _renderScene(renderScene)
 	, _shadowPass(shadowPass)
 {
-	auto& resourceManager = _device.GetResourceManager();
+	
 
 	_cullShader = resourceManager.LoadShader("Shaders/frustumCulling.comp.spv");
 	_cullPipeline = resourceManager.LoadComputePipeline("Shaders/frustumCulling.comp.spv");

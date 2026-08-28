@@ -5,6 +5,8 @@
 
 namespace Core
 {
+	class ResourceManager;
+
 	class Shader;
 	class Texture;
 
@@ -18,7 +20,7 @@ namespace Core
 	class Material
 	{
 	public:
-		Material(Device& device, Handle<Shader> shader, string materialName);
+		Material(Device& device, ResourceManager& resourceManager, Handle<Shader> shader, string materialName);
 		Material(const Material& other);
 
 		Material& operator=(const Material& other);

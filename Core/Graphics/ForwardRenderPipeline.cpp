@@ -25,7 +25,7 @@
 #include "Utils/Utility.h"
 using namespace Core;
 
-Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
+Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManager& resourceManager,
 	WorkerThreadManager& workerThreadManager,
 	RenderScene& renderScene, SwapChain& swapChain, SyncContext& syncContext)
 	:_device(device)
@@ -48,35 +48,35 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	_frameGraph = make_unique<FrameGraph>(device, workerThreadManager);
+	_frameGraph = make_unique<FrameGraph>(device, resourceManager, workerThreadManager);
 
-	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, renderScene));
-	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));
 
-	DepthPrePasses depthPrePasses(*_frameGraph, device, renderScene, extent, depthFormat, _msaaSamples);
+	DepthPrePasses depthPrePasses(*_frameGraph, device, resourceManager, renderScene, extent, depthFormat, _msaaSamples);
 
-	_frameGraph->AddPass(make_unique<LightCullingPass>(device, renderScene, extent, tileNums, _msaaSamples));
+	_frameGraph->AddPass(make_unique<LightCullingPass>(device, resourceManager, renderScene, extent, tileNums, _msaaSamples));
 
 	// The shadow feature wires its own cull + draw passes into the graph.
-	ShadowPasses shadowPasses(*_frameGraph, device, renderScene, depthFormat);
+	ShadowPasses shadowPasses(*_frameGraph, device, resourceManager, renderScene, depthFormat);
 
 	auto fgSdfShadowPass = make_unique<SDFShadowPass>(
-		device, renderScene, extent, _msaaSamples, shadowPasses.GetShadowBuffer());
+		device, resourceManager, renderScene, extent, _msaaSamples, shadowPasses.GetShadowBuffer());
 	SDFShadowPass* fgSdfShadowPassPtr = fgSdfShadowPass.get();
 	_frameGraph->AddPass(std::move(fgSdfShadowPass));
 
 	_frameGraph->AddPass(make_unique<AmbientOcclusionPass>(
-		device, renderScene, extent, _msaaSamples,
+		device, resourceManager, renderScene, extent, _msaaSamples,
 		fgSdfShadowPassPtr->GetSDFGenerator()));
 
 	// Generates the IBL maps the geometry pass samples. Runs on the first frame
 	// only; after that it declares nothing and the graph culls it.
-	_frameGraph->AddPass(make_unique<IBLPass>(device, renderScene));
+	_frameGraph->AddPass(make_unique<IBLPass>(device, resourceManager, renderScene));
 
 	_frameGraph->AddPass(make_unique<GeometryPass>(
 		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
 
-	_frameGraph->AddPass(make_unique<TerrainPass>(device, renderScene,
+	_frameGraph->AddPass(make_unique<TerrainPass>(device, resourceManager, renderScene,
 		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
 
 	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples,

@@ -12,6 +12,7 @@ namespace Core
     class RenderScene;
     class TransferContext;
     class SyncContext;
+    class ResourceManager;
 
     struct EngineOptions
     {
@@ -32,6 +33,9 @@ namespace Core
         unique_ptr<Core::Status> _status;
         unique_ptr<Core::Timer> _timer;
         Device* _device;
+
+        ResourceManager* _resourceManager;
+
         WorkerThreadManager* _workerThreadManager;
         
         IRenderPipeline* _renderPipeline;

@@ -13,18 +13,18 @@
 
 namespace Core
 {
-	TerrainSystem::TerrainSystem(Device& device, TransferContext& transfer)
+	TerrainSystem::TerrainSystem(Device& device, ResourceManager& resourceManager, TransferContext& transfer)
 		: _store(TerrainNodeStore::Load(_config,
 			ProceduralTerrainHeightSource(TerrainNoiseParams{},
 				_config.heightMin, _config.heightMax)))
 	{
-		_quadTree = make_unique<TerrainQuadTree>(device, _config);
+		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
-		CreateGridIndexBuffer(device, transfer);
+		CreateGridIndexBuffer(device, resourceManager, transfer);
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
 		// each slot before its first GPU write has happened.
-		auto& resourceManager = device.GetResourceManager();
+		
 		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
 		{
 			_patchCountReadback[slot] = resourceManager.LoadBuffer(
@@ -37,7 +37,7 @@ namespace Core
 	}
 
 	void TerrainSystem::CreateGridIndexBuffer(Device& device,
-		TransferContext& transfer)
+		ResourceManager& resourceManager, TransferContext& transfer)
 	{
 		// One shared index buffer over a virtual 17x17 PATCH grid - the draw
 		// instance is one patch of the GPU-culled patch list; terrain.vert
@@ -61,7 +61,7 @@ namespace Core
 		_gridIndexCount = uint32_t(indices.size());
 		assert(_gridIndexCount == _config.PatchIndexCount());
 
-		_gridIndexBuffer = device.GetResourceManager().LoadBuffer(
+		_gridIndexBuffer = resourceManager.LoadBuffer(
 			{ indices.size() * sizeof(uint16_t),
 			  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			  MemoryType::DEVICE_LOCAL },

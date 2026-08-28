@@ -6,8 +6,8 @@
 
 using namespace Core;
 
-MeshBufferManager::MeshBufferManager(Device& device)
-	: _device(device)
+MeshBufferManager::MeshBufferManager(Device& device, ResourceManager& resourceManager)
+	: _device(device), _resourceManager(resourceManager)
 {
 }
 
@@ -149,7 +149,7 @@ Handle<Buffer> MeshBufferManager::InsertBufferSpace(VkIndexType indexType)
 	}
 
 	_indexType = indexType;
-	_indexBufferHandle = _device.GetResourceManager().LoadBuffer(
+	_indexBufferHandle = _resourceManager.LoadBuffer(
 		{ _maxIndices * size,
 		  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		  MemoryType::DEVICE_LOCAL },
@@ -169,7 +169,7 @@ Core::MeshBufferRegion Core::MeshBufferManager::Allocate(const std::string& name
 {
 	if (_vertexBufferHandles.find(name) == _vertexBufferHandles.end())
 	{
-		_vertexBufferHandles[name] = _device.GetResourceManager().LoadBuffer(
+		_vertexBufferHandles[name] = _resourceManager.LoadBuffer(
 			{ _maxVertices * stride,
 			  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			  MemoryType::DEVICE_LOCAL },

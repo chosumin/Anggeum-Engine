@@ -17,14 +17,14 @@
 
 using namespace Core;
 
-TerrainDepthPrePass::TerrainDepthPrePass(Device& device, RenderScene& renderScene,
+TerrainDepthPrePass::TerrainDepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples)
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
 	// terrain.vert + a normal-only fragment; positions are invariant with the
 	// color pipeline's, so the color pass can rely on this depth exactly.
-	_shader = device.GetResourceManager().LoadShader("TerrainDepth");
+	_shader = resourceManager.LoadShader("TerrainDepth");
 
 	_pipelineState = make_unique<PipelineState>();
 	_pipelineState->GetMultisampleStateCreateInfo().rasterizationSamples = msaaSamples;

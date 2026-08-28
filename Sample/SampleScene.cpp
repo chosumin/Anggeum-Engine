@@ -14,8 +14,8 @@
 #include "Graphics/RenderContext.h"
 using namespace Core;
 
-SampleScene::SampleScene(Core::Device& device)
-	:_renderContext(nullptr), _device(device)
+SampleScene::SampleScene(Core::Device& device, Core::ResourceManager& resourceManager)
+	:_renderContext(nullptr), _device(device), _resourceManager(resourceManager)
 {
 }
 
@@ -23,7 +23,7 @@ void SampleScene::Load(float width, float height, Core::RenderContext* renderCon
 {
 	_renderContext = renderContext;
 
-	_gltfLoader = make_unique<Core::GLTFLoader>(_device, *this);
+	_gltfLoader = make_unique<Core::GLTFLoader>(_device, _resourceManager, *this);
 
 	_gltfLoader->SetRenderContext(renderContext);
 

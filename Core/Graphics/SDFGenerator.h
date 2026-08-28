@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class Image;
 	class Texture;
@@ -28,7 +29,7 @@ namespace Core
 	class SDFGenerator
 	{
 	public:
-		SDFGenerator(Device& device);
+		SDFGenerator(Device& device, ResourceManager& resourceManager);
 		~SDFGenerator();
 
 		// Records the full generation (bounds reduce, triangle lookup, volume
@@ -62,6 +63,7 @@ namespace Core
 
 	private:
 		Device& _device;
+		ResourceManager& _resourceManager;
 
 		// GPU-generated volume texture. App-lifetime, so it lives in the
 		// ResourceManager texture pool; this generator just holds the handle.

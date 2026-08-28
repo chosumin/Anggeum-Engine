@@ -7,6 +7,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	/*
 	 * RenderContext acts as a frame manager
 	 * It swaps between RenderFrame objects and forwards a request for vulkan resources to the active frame.
@@ -30,7 +31,7 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device, RenderScene& renderScene, SyncContext& syncContext);
+		RenderContext(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, SyncContext& syncContext);
 		~RenderContext();
 
 		void RecreateSwapChain();
@@ -80,6 +81,7 @@ namespace Core
 		
 	private:
 		Device& _device;
+		ResourceManager& _resourceManager;
 		
 		// Swap chain
 		SwapChain* _swapChain = nullptr;

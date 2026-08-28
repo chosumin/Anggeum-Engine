@@ -17,7 +17,7 @@
 
 using namespace Core;
 
-RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer)
+RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene& scene, TransferContext& transfer)
 	: _device(&device)
 	, _scene(scene)
 {
@@ -27,13 +27,13 @@ RenderScene::RenderScene(Device& device, Scene& scene, TransferContext& transfer
 
 	// Bindless textures require descriptor indexing; the rest are always created.
 	if (device.SupportsDescriptorIndexing())
-		_bindless = make_unique<BindlessTextureManager>(device, 4096);
+		_bindless = make_unique<BindlessTextureManager>(device, resourceManager, 4096);
 
-	_meshBuffer = make_unique<MeshBufferManager>(device);
-	_material = make_unique<MaterialManager>(device);
-	_batch = make_unique<RendererBatch>(device);
+	_meshBuffer = make_unique<MeshBufferManager>(device, resourceManager);
+	_material = make_unique<MaterialManager>(device, resourceManager);
+	_batch = make_unique<RendererBatch>(device, resourceManager);
 
-	_terrainSystem = make_unique<TerrainSystem>(device, transfer);
+	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, transfer);
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.

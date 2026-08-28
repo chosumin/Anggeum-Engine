@@ -17,13 +17,15 @@
 
 using namespace Core;
 
-HiZCullPass::HiZCullPass(Device& device, RenderScene& renderScene, Phase phase,
+HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, Phase phase,
     HiZCullPass* cull1)
     : _device(device)
+    , _resourceManager(resourceManager)
     , _renderScene(renderScene)
     , _phase(phase)
 {
-    auto& resourceManager = _device.GetResourceManager();
+    
+
 
     if (_phase == Phase::Cull1)
     {
@@ -64,6 +66,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
     auto& batch = renderFrame.GetRendererBatch();
     if (batch.GetDrawCommandCount() == 0)
         return;
+
 
     if (_phase == Phase::Cull1)
     {
@@ -147,7 +150,7 @@ void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources, RendererBatch
     hiZDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     hiZDesc.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     hiZDesc.mipLevels = _state->hiZMipLevels;
-    hiZDesc.sampler = _device.GetResourceManager().LoadSampler(samplerDesc);
+    hiZDesc.sampler = _resourceManager.LoadSampler(samplerDesc);
 
     _hiZTexture = frameResources.GetOrCreateRenderTarget(RT_HIZ, hiZDesc);
 
@@ -214,6 +217,7 @@ void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
     auto& renderFrame = context.GetRenderFrame();
     auto& batch = renderFrame.GetRendererBatch();
     auto& slot = _state->slots[&renderFrame.GetResources()];
+
 
     if (_phase == Phase::Cull1)
     {

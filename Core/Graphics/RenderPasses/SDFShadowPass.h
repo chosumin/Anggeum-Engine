@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class Shader;
@@ -19,7 +20,7 @@ namespace Core
 		static constexpr const char* RT_SDF_SHADOW       = "SDFShadow";
 		static constexpr const char* RT_SDF_VOLUME_SLICE = "SDFVolumeSlice";
 
-		SDFShadowPass(Device& device, RenderScene& renderScene, VkExtent2D screenExtent,
+		SDFShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D screenExtent,
 			VkSampleCountFlagBits msaaSamples, ShadowUniform* shadowBuffer);
 		~SDFShadowPass();
 

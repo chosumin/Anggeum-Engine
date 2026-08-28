@@ -4,6 +4,8 @@
 
 namespace Core
 {
+	class ResourceManager;
+
 	struct MeshAllocation
 	{
 		uint32_t vertexOffset;
@@ -29,7 +31,7 @@ namespace Core
 	class MeshBufferManager
 	{
 	public:
-		MeshBufferManager(Device& device);
+		MeshBufferManager(Device& device, ResourceManager& resourceManager);
 		~MeshBufferManager();
 
 		// Reserve space in the global buffers for one submesh: appends the copies to
@@ -85,6 +87,7 @@ namespace Core
 			uint32_t offset, uint32_t count);
 	private:
 		Device& _device;
+		ResourceManager& _resourceManager;
 
 		//Key: Attribute name, Value: handle
 		unordered_map<string, Handle<Buffer>> _vertexBufferHandles;

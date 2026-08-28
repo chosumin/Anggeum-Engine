@@ -7,6 +7,7 @@
 namespace Core
 {
 	class Device;
+	class ResourceManager;
 	class PerspectiveCamera;
 	class TransferContext;
 	class Light;
@@ -16,7 +17,7 @@ namespace Core
 	class TerrainSystem
 	{
 	public:
-		TerrainSystem(Device& device, TransferContext& transfer);
+		TerrainSystem(Device& device, ResourceManager& resourceManager, TransferContext& transfer);
 
 		void Update(PerspectiveCamera& camera);
 
@@ -43,7 +44,7 @@ namespace Core
 		int GetDebugMode() const { return _debugMode; }
 
 	private:
-		void CreateGridIndexBuffer(Device& device, TransferContext& transfer);
+		void CreateGridIndexBuffer(Device& device, ResourceManager& resourceManager, TransferContext& transfer);
 
 		TerrainConfig _config;
 		TerrainNodeStore _store;

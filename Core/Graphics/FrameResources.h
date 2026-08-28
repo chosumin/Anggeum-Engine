@@ -6,6 +6,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class Texture;
 	class Sampler;
@@ -33,7 +34,7 @@ namespace Core
 	class FrameResources
 	{
 	public:
-		explicit FrameResources(Device& device);
+		FrameResources(Device& device, ResourceManager& resourceManager);
 		~FrameResources();
 
 		FrameResources(const FrameResources&) = delete;

@@ -9,7 +9,7 @@
 
 using namespace Core;
 
-MaterialManager::MaterialManager(Device& device)
+MaterialManager::MaterialManager(Device& device, ResourceManager& resourceManager)
 	: _device(device)
 {
 	for (auto& data : _materialData)
@@ -17,7 +17,7 @@ MaterialManager::MaterialManager(Device& device)
 		data = GPUMaterialData{};
 	}
 
-	_materialDataBuffer = _device.GetResourceManager().LoadBuffer(
+	_materialDataBuffer = resourceManager.LoadBuffer(
 		{ sizeof(MaterialTable), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM },
 		"MaterialTable");
 

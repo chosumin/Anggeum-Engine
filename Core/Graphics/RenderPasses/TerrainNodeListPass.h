@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class TerrainSystem;
@@ -24,7 +25,7 @@ namespace Core
 		static constexpr const char* SB_NODE_LIST_COUNT = "Terrain.NodeListCount";
 		static constexpr const char* SB_PATCH_DRAW_ARGS = "Terrain.PatchDrawArgs";
 
-		TerrainNodeListPass(Device& device, RenderScene& renderScene);
+		TerrainNodeListPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene);
 		~TerrainNodeListPass() override;
 
 		const char* GetName() const override { return "TerrainNodeList"; }

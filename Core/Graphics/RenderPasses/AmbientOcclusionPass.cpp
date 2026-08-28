@@ -10,13 +10,14 @@
 
 using namespace Core;
 
-AmbientOcclusionPass::AmbientOcclusionPass(Device& device, RenderScene& renderScene,
+AmbientOcclusionPass::AmbientOcclusionPass(Device& device,
+    ResourceManager& resourceManager, RenderScene& renderScene,
     VkExtent2D screenExtent, VkSampleCountFlagBits msaaSamples,
     SDFGenerator* sdfGenerator)
     : _msaaSamples(msaaSamples)
 {
     _cacaoPass = make_unique<CACAOPass>(device, renderScene.GetScene(), screenExtent, msaaSamples);
-    _dfaoPass = make_unique<DFAOPass>(device, renderScene.GetScene(), screenExtent, msaaSamples, sdfGenerator);
+    _dfaoPass = make_unique<DFAOPass>(device, resourceManager, renderScene.GetScene(), screenExtent, msaaSamples, sdfGenerator);
 }
 
 AmbientOcclusionPass::~AmbientOcclusionPass() = default;

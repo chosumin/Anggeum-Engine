@@ -17,7 +17,7 @@
 
 using namespace Core;
 
-ShadowPass::ShadowPass(Device& device, RenderScene& renderScene, VkFormat depthFormat)
+ShadowPass::ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkFormat depthFormat)
 	: _device(device)
 	, _renderScene(renderScene)
 {
@@ -30,7 +30,7 @@ ShadowPass::ShadowPass(Device& device, RenderScene& renderScene, VkFormat depthF
 
 	// The material is registered in the cache/material table; we only need its
 	// shader handle here, so it isn't kept as a member.
-	auto shadowMaterial = _device.GetResourceManager().LoadMaterial("shadow", "Shadow");
+	auto shadowMaterial = resourceManager.LoadMaterial("shadow", "Shadow");
 	_shadowShader = shadowMaterial.Get().GetShaderHandle();
 
 	// Depth-only dynamic-rendering pipeline.

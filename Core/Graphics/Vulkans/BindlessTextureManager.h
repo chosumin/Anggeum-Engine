@@ -4,6 +4,8 @@
 
 namespace Core
 {
+	class ResourceManager;
+
 	// Packed bindless slot index: low 31 bits are the array index, the MSB flags a
 	// cubemap (binding 1) vs a 2D texture (binding 0). UINT32_MAX means "none".
 	inline constexpr uint32_t InvalidBindlessIndex = UINT32_MAX;
@@ -23,7 +25,7 @@ namespace Core
 	class BindlessTextureManager
 	{
 	public:
-		BindlessTextureManager(Device& device, uint32_t maxTextures = 4096);
+		BindlessTextureManager(Device& device, ResourceManager& resourceManager, uint32_t maxTextures = 4096);
 		~BindlessTextureManager();
 
 		BindlessTextureManager(const BindlessTextureManager&) = delete;

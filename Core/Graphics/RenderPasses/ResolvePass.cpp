@@ -23,7 +23,7 @@ namespace
 	};
 }
 
-ResolvePass::ResolvePass(Device& device, VkExtent2D screenExtent,
+ResolvePass::ResolvePass(Device& device, ResourceManager& resourceManager, VkExtent2D screenExtent,
 	VkSampleCountFlagBits msaaSamples, bool resolveNormal)
 	: _device(device)
 	, _screenExtent(screenExtent)
@@ -33,7 +33,7 @@ ResolvePass::ResolvePass(Device& device, VkExtent2D screenExtent,
 	assert((!resolveNormal || msaaSamples != VK_SAMPLE_COUNT_1_BIT) &&
 		"the normal resolve is MSAA-only");
 
-	auto& resourceManager = _device.GetResourceManager();
+	
 
 	_depthResolveShader = resourceManager.LoadShader("Shaders/depthResolve.comp.spv");
 	_depthResolvePipeline = resourceManager.LoadComputePipeline("Shaders/depthResolve.comp.spv");

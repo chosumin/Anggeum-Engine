@@ -17,13 +17,13 @@
 
 using namespace Core;
 
-TerrainPass::TerrainPass(Device& device, RenderScene& renderScene,
+TerrainPass::TerrainPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 	VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples)
 	: _device(device)
 	, _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
-	_shader = device.GetResourceManager().LoadShader("Terrain");
+	_shader = resourceManager.LoadShader("Terrain");
 
 	_pipelineState = make_unique<PipelineState>();
 	_pipelineState->GetMultisampleStateCreateInfo().rasterizationSamples = msaaSamples;

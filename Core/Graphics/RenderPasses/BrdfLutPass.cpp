@@ -10,8 +10,9 @@
 
 using namespace Core;
 
-Core::BrdfLutPass::BrdfLutPass(Device& device, VkFormat lutFormat)
+Core::BrdfLutPass::BrdfLutPass(Device& device, ResourceManager& resourceManager, VkFormat lutFormat)
     : _device(device)
+    , _resourceManager(resourceManager)
     , _lutFormat(lutFormat)
     , _pipelineState(make_unique<PipelineState>())
 {
@@ -24,8 +25,8 @@ Core::BrdfLutPass::~BrdfLutPass()
 
 void Core::BrdfLutPass::Initialize()
 {
-    auto shaderHandle = _device.GetResourceManager().LoadShader("BRDF");
-    _brdfMaterial = new Material(_device, shaderHandle, "brdf lut");
+    auto shaderHandle = _resourceManager.LoadShader("BRDF");
+    _brdfMaterial = new Material(_device, _resourceManager, shaderHandle, "brdf lut");
 
     auto pipelineState = *_pipelineState;
 

@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class Shader;
@@ -17,7 +18,7 @@ namespace Core
 	public:
 		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
-		ShadowPass(Device& device, RenderScene& renderScene, VkFormat depthFormat);
+		ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkFormat depthFormat);
 		~ShadowPass();
 
 		const char* GetName() const override { return "ShadowPass"; }

@@ -15,11 +15,11 @@
 
 using namespace Core;
 
-FrameResources::FrameResources(Device& device)
+FrameResources::FrameResources(Device& device, ResourceManager& resourceManager)
 	: _device(device)
 {
 	CreateDescriptorPool();
-	_defaultSampler = device.GetResourceManager().LoadSampler(DEFAULT_SAMPLER);
+	_defaultSampler = resourceManager.LoadSampler(DEFAULT_SAMPLER);
 }
 
 TransientResourceAllocator& FrameResources::GetTransientAllocator()

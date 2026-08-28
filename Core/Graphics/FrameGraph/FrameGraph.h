@@ -8,6 +8,7 @@
 namespace Core
 {
 	class Device;
+	class ResourceManager;
 	class RenderContext;
 	class RenderFrame;
 	class Texture;
@@ -117,7 +118,7 @@ namespace Core
 	class FrameGraph : public Threadable
 	{
 	public:
-		FrameGraph(Device& device, WorkerThreadManager& workerThreadManager);
+		FrameGraph(Device& device, ResourceManager& resourceManager, WorkerThreadManager& workerThreadManager);
 		~FrameGraph();
 
 		FrameGraph(const FrameGraph&) = delete;
@@ -173,6 +174,7 @@ namespace Core
 
 	private:
 		Device& _device;
+		ResourceManager& _resourceManager;
 
 		vector<unique_ptr<FrameGraphPass>> _passes;
 

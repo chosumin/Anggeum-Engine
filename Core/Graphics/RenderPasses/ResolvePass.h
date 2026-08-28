@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class Shader;
 	class Pipeline;
@@ -16,7 +17,7 @@ namespace Core
 		static constexpr const char* RT_RESOLVED_NORMAL = "ResolvedNormal";
 
 		// resolveNormal also resolves MainNormal into ResolvedNormal (MSAA only).
-		ResolvePass(Device& device, VkExtent2D screenExtent,
+		ResolvePass(Device& device, ResourceManager& resourceManager, VkExtent2D screenExtent,
 			VkSampleCountFlagBits msaaSamples, bool resolveNormal);
 		~ResolvePass();
 

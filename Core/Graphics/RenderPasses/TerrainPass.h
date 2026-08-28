@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class TerrainSystem;
@@ -14,7 +15,7 @@ namespace Core
 	class TerrainPass : public FrameGraphPass
 	{
 	public:
-		TerrainPass(Device& device, RenderScene& renderScene,
+		TerrainPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkFormat colorFormat, VkFormat depthFormat,
 			VkSampleCountFlagBits msaaSamples);
 		~TerrainPass() override;

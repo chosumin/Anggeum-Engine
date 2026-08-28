@@ -4,10 +4,10 @@
 
 namespace Core
 {
-	BindlessTextureManager::BindlessTextureManager(Device& device, uint32_t maxTextures)
+	BindlessTextureManager::BindlessTextureManager(Device& device, ResourceManager& resourceManager, uint32_t maxTextures)
 		: _device(device), _maxTextures(maxTextures)
 	{
-		_defaultTexture = device.GetResourceManager().GetDefaultTextureHandle();
+		_defaultTexture = resourceManager.GetDefaultTextureHandle();
 		_defaultTextureBuffer.rawTexture = &_defaultTexture.Get();
 
 		_texture2DSlots.resize(maxTextures);

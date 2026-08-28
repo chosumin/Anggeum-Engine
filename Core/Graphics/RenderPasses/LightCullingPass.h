@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class RenderScene;
 	class Device;
 	class Pipeline;
@@ -15,7 +16,7 @@ namespace Core
 	class LightCullingPass : public FrameGraphPass
 	{
 	public:
-		LightCullingPass(Device& device, RenderScene& renderScene,
+		LightCullingPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkExtent2D swapChainExtents, ivec2 tileNums, VkSampleCountFlagBits msaaSamples);
 		~LightCullingPass();
 

@@ -41,7 +41,7 @@ namespace Core
 	class GLTFLoader
 	{
 	public:
-		GLTFLoader(Device& device, Scene& scene);
+		GLTFLoader(Device& device, ResourceManager& resourceManager, Scene& scene);
 		~GLTFLoader();
 
 		void LoadScene(string path);

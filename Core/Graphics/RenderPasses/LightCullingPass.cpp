@@ -14,14 +14,14 @@
 
 using namespace Core;
 
-LightCullingPass::LightCullingPass(Device& device, RenderScene& renderScene,
+LightCullingPass::LightCullingPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 	VkExtent2D swapChainExtents, ivec2 tileNums, VkSampleCountFlagBits msaaSamples)
 	: _device(device)
 	, _renderScene(renderScene)
 	, _msaaSamples(msaaSamples)
 {
-	_computeMaterial = device.GetResourceManager().LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
-	_computePipeline = device.GetResourceManager().LoadComputePipeline("shaders/lightCulling.comp.spv");
+	_computeMaterial = resourceManager.LoadMaterial("lightCulling", "shaders/lightCulling.comp.spv");
+	_computePipeline = resourceManager.LoadComputePipeline("shaders/lightCulling.comp.spv");
 
 	_tileInfo.viewportSize = ivec2(swapChainExtents.width, swapChainExtents.height);
 	_tileInfo.tileNums = tileNums;

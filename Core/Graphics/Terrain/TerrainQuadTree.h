@@ -5,6 +5,7 @@
 namespace Core
 {
 	class Device;
+	class ResourceManager;
 	class Texture;
 	class Buffer;
 
@@ -20,7 +21,7 @@ namespace Core
 		static constexpr const char* QUADTREE_INDEX = "Terrain.QuadtreeIndex";
 		static constexpr const char* NODE_DESC = "Terrain.NodeDesc";
 
-		TerrainQuadTree(Device& device, const TerrainConfig& config);
+		TerrainQuadTree(Device& device, ResourceManager& resourceManager, const TerrainConfig& config);
 
 		Handle<Texture> GetHeightAtlas() const { return _heightAtlas; }
 		Handle<Texture> GetNormalAtlas() const { return _normalAtlas; }

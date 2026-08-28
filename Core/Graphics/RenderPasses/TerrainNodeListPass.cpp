@@ -17,11 +17,11 @@ using namespace Core;
 
 TerrainNodeListPass::~TerrainNodeListPass() = default;
 
-TerrainNodeListPass::TerrainNodeListPass(Device& device, RenderScene& renderScene)
+TerrainNodeListPass::TerrainNodeListPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
-	auto& resourceManager = device.GetResourceManager();
+	
 	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainNodeList.comp.spv");
 
 	const TerrainConfig& config = _terrain.GetConfig();

@@ -5,6 +5,7 @@
 
 namespace Core
 {
+	class ResourceManager;
 	class Device;
 	class RenderScene;
 	class TerrainSystem;
@@ -21,7 +22,7 @@ namespace Core
 	public:
 		static constexpr const char* SB_PATCH_LIST = "Terrain.PatchList";
 
-		TerrainPatchCullPass(Device& device, RenderScene& renderScene,
+		TerrainPatchCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 			VkExtent2D screenExtent);
 
 		const char* GetName() const override { return "TerrainPatchCull"; }

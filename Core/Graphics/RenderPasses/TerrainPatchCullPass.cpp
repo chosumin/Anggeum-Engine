@@ -22,13 +22,13 @@
 
 using namespace Core;
 
-TerrainPatchCullPass::TerrainPatchCullPass(Device& device, RenderScene& renderScene,
+TerrainPatchCullPass::TerrainPatchCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
 	VkExtent2D screenExtent)
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 	, _screenExtent(screenExtent)
 {
-	auto& resourceManager = device.GetResourceManager();
+	
 	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainPatchCull.comp.spv");
 	_pipeline = resourceManager.LoadComputePipeline("Shaders/Terrain/terrainPatchCull.comp.spv");
 
