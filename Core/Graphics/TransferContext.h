@@ -2,6 +2,7 @@
 #include "StagingRing.h"
 #include "UploadJob.h"
 #include "ResourceHandle.h"
+#include "Foundation/Threadable.h"
 #include "Utils/timer.h"
 
 namespace Core
@@ -20,7 +21,7 @@ namespace Core
 	//
 	// Upload completion is asynchronous: Flush blocks only on worker-thread
 	// recording, while GPU consumption is ordered by the transfer-timeline gate.
-	class TransferContext
+	class TransferContext : public Threadable
 	{
 	public:
 		// One upload with everything that must follow ITS lifecycle: the
@@ -91,7 +92,6 @@ namespace Core
 		};
 
 		Device& _device;
-		WorkerThreadManager& _workerThreadManager;
 
 		unique_ptr<CommandPool> _primaryCommandPool;
 
@@ -103,10 +103,12 @@ namespace Core
 
 		SyncContext& _sync;
 
-		condition_variable _jobWait;
-		mutex _lock;
 		Core::Timer _timer;
-		unordered_map<string, PendingUpload> _pendingJobs;
+
+		// Main-thread only, like every other member here: workers touch nothing
+		// but their own job's atomic status, so the wait mutex Threadable owns
+		// is the only synchronization this class needs.
+		unordered_map<string, PendingUpload> _pendingUploads;
 		deque<InFlightJobs> _inFlightJobs;
 
 		uint32_t _promotedCount = 0;

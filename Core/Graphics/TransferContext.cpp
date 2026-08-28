@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "TransferContext.h"
 
-#include "Foundation/WorkerThread.h"
 #include "Graphics/FrameCounter.h"
 #include "Graphics/SyncContext.h"
 #include "Graphics/ResourcePool.h"
@@ -15,8 +14,8 @@ using namespace Core;
 
 TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
 	SyncContext& syncContext)
-	: _device(device)
-	, _workerThreadManager(workerThreadManager)
+	: Threadable(workerThreadManager)
+	, _device(device)
 	, _sync(syncContext)
 {
 	_primaryCommandPool = make_unique<CommandPool>(_device,
@@ -116,33 +115,30 @@ void TransferContext::SubmitJob(PendingUpload&& upload, const string& jobName)
 {
 	// Already enqueued: the pending upload covers the request; this one is
 	// destroyed on return.
-	if (_pendingJobs.find(jobName) != _pendingJobs.end())
+	if (_pendingUploads.find(jobName) != _pendingUploads.end())
 		return;
 
 	upload.job->stagingRing = _stagingRing.get();
 
-	Job* raw = upload.job.get();
-	raw->completionWait = &_jobWait;
-
-	_pendingJobs.insert({ jobName, std::move(upload) });
-	_workerThreadManager.Enqueue(raw);
+	Job& job = *upload.job;
+	_pendingUploads.insert({ jobName, std::move(upload) });
+	EnqueueUnowned(job);
 }
 
 void TransferContext::Flush(bool waitForRecordings)
 {
-	if (_pendingJobs.empty())
+	if (_pendingUploads.empty())
 		return;
 
 	_timer.tick();
 
-	unique_lock<mutex> lock(_lock);
 	if (waitForRecordings)
 	{
-		// Must-land uploads only: memcpy recordings that finish in microseconds. 
+		// Must-land uploads only: memcpy recordings that finish in microseconds.
 		// IO-bound loads keep carrying over instead of blocking the frame here.
-		_jobWait.wait(lock, [&]
+		WaitFor([this]
 		{
-			for (auto&& upload : _pendingJobs)
+			for (auto&& upload : _pendingUploads)
 			{
 				if (upload.second.mustLand
 					&& upload.second.job->status != JobStatus::COMPLETE)
@@ -158,13 +154,13 @@ void TransferContext::Flush(bool waitForRecordings)
 	// and ride a later Flush instead of stalling this frame.
 	InFlightJobs batch;
 	vector<CommandBuffer*> secondaryCommands;
-	for (auto it = _pendingJobs.begin(); it != _pendingJobs.end();)
+	for (auto it = _pendingUploads.begin(); it != _pendingUploads.end();)
 	{
 		if (it->second.job->status == JobStatus::COMPLETE)
 		{
 			secondaryCommands.push_back(it->second.job->commandBuffer);
 			batch.uploads.push_back(std::move(it->second));
-			it = _pendingJobs.erase(it);
+			it = _pendingUploads.erase(it);
 		}
 		else
 		{
@@ -191,8 +187,6 @@ void TransferContext::Flush(bool waitForRecordings)
 		if (upload.job->stagingSpanId != UINT64_MAX)
 			_stagingRing->Close(upload.job->stagingSpanId, signalValue);
 	}
-
-	lock.unlock();
 
 	// The uploads (owning any fallback staging) stay alive until BeginFrame's
 	// completion poll sees the GPU pass this value.
