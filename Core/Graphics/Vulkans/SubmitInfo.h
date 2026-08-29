@@ -1,15 +1,21 @@
 #pragma once
 #include "Graphics/SyncContext.h"
+#include "CommandBuffer.h"
 
 namespace Core
 {
     class SubmitInfo
     {
     public:
-        SubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)
-            : _queueType(queueType), _commandBuffer(commandBuffer), _syncContext(&syncContext) {}
+        SubmitInfo(QueueType queueType, CommandBuffer& commandBuffer, SyncContext& syncContext)
+            : _queueType(queueType), _recorded(&commandBuffer)
+            , _commandBuffer(commandBuffer.GetHandle()), _syncContext(&syncContext) {}
 
         QueueType GetQueueType() const { return _queueType; }
+
+        // The recorded buffer behind the handle - the submitter stamps it
+        // with its retirement value after submitting.
+        CommandBuffer& GetCommandBuffer() { return *_recorded; }
 
         // Timeline semaphore wait on given queue's timeline (uses current value)
         void AddWaitSemaphore(QueueType queueType, VkPipelineStageFlags stage)
@@ -80,6 +86,7 @@ namespace Core
 
     private:
         QueueType _queueType;
+        CommandBuffer* _recorded;
         VkCommandBuffer _commandBuffer;
         SyncContext* _syncContext;
 
@@ -105,7 +112,10 @@ namespace Core
         // submitInfos, and this keeps their lifetime obvious at the call site.
         vector<VkSubmitInfo> submitScratch;
 
+        // Per-frame-slot is correct here: reuse is guarded by the slot wait.
+        // The present-wait semaphore is NOT here - it must be per swapchain
+        // IMAGE (RenderContext owns those): presentation may still consume it
+        // after this slot has cycled.
         VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-        VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
     };
 }

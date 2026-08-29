@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "SyncContext.h"
+#include "Vulkans/CommandPool.h"
+#include "Vulkans/CommandBuffer.h"
 #include "Vulkans/Device.h"
 #include "Vulkans/SubmitInfo.h"
 
@@ -73,6 +75,23 @@ u64 SyncContext::QueryCompletedValue(QueueType queueType) const
     return value;
 }
 
+u64 SyncContext::GetCachedCompletedValue(QueueType queueType) const
+{
+    switch (queueType)
+    {
+    case QueueType::Compute:  return _computeCompletedCache;
+    case QueueType::Transfer: return _transferCompletedCache;
+    default:                  return _graphicsCompletedCache;
+    }
+}
+
+void SyncContext::RefreshCompletedCache()
+{
+    _graphicsCompletedCache = QueryCompletedValue(QueueType::Graphics);
+    _computeCompletedCache = QueryCompletedValue(QueueType::Compute);
+    _transferCompletedCache = QueryCompletedValue(QueueType::Transfer);
+}
+
 u64 SyncContext::AcquireNextValue(QueueType queueType)
 {
     return (queueType == QueueType::Compute) ? ++_computeSemaphoreValue : ++_graphicsSemaphoreValue;
@@ -85,7 +104,7 @@ void SyncContext::RecordFrameSnapshot(FrameTimelineSnapshot& snapshot)
     snapshot.valid = true;
 }
 
-void SyncContext::SubmitResourceInit(VkCommandBuffer commandBuffer)
+void SyncContext::SubmitResourceInit(CommandBuffer& commandBuffer)
 {
     u64 signalValue = ++_resourceSemaphoreValue;
 
@@ -98,7 +117,7 @@ void SyncContext::SubmitResourceInit(VkCommandBuffer commandBuffer)
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = &timelineInfo;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &_resourceSemaphore;
 
@@ -106,6 +125,8 @@ void SyncContext::SubmitResourceInit(VkCommandBuffer commandBuffer)
         throw runtime_error("failed to submit resource init commands!");
 
     _pendingResourceWait = signalValue;
+
+    _pendingInitBuffers.push_back(&commandBuffer);
 }
 
 VkResult SyncContext::Present(const VkPresentInfoKHR& presentInfo)
@@ -113,7 +134,8 @@ VkResult SyncContext::Present(const VkPresentInfoKHR& presentInfo)
     return vkQueuePresentKHR(_presentQueue, &presentInfo);
 }
 
-u64 SyncContext::SubmitTransfer(VkCommandBuffer commandBuffer)
+u64 SyncContext::SubmitTransfer(CommandBuffer& primary,
+    const vector<CommandBuffer*>& secondaries)
 {
     u64 signalValue = ++_transferSemaphoreValue;
 
@@ -126,12 +148,17 @@ u64 SyncContext::SubmitTransfer(VkCommandBuffer commandBuffer)
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = &timelineInfo;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &primary.GetHandle();
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &_transferSemaphore;
 
     if (vkQueueSubmit(_transferQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
         throw runtime_error("failed to submit transfer commands!");
+
+    // Everything this submission executes recycles when the GPU passes it.
+    primary.MarkSubmitted(signalValue);
+    for (CommandBuffer* secondary : secondaries)
+        secondary->MarkSubmitted(signalValue);
 
     // Monotonic: a later submit's value covers every earlier one.
     _pendingTransferWait = signalValue;
@@ -241,4 +268,22 @@ void SyncContext::SubmitToQueues(
 
         index = runEnd;
     }
+
+    // The submitter stamps what it submitted: each buffer retires on its
+    // queue's end-of-frame value (a queue's last signal orders after all of
+    // the frame's earlier submissions on that queue). The resource-init
+    // primaries rode the graphics queue ahead of the frame, so the same
+    // graphics value covers them.
+    const u64 graphicsValue = GetCurrentValue(QueueType::Graphics);
+    const u64 computeValue = GetCurrentValue(QueueType::Compute);
+
+    for (auto& info : submitInfos)
+    {
+        info.GetCommandBuffer().MarkSubmitted(
+            info.GetQueueType() == QueueType::Compute ? computeValue : graphicsValue);
+    }
+
+    for (CommandBuffer* initBuffer : _pendingInitBuffers)
+        initBuffer->MarkSubmitted(graphicsValue);
+    _pendingInitBuffers.clear();
 }

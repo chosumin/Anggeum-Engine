@@ -17,6 +17,13 @@ namespace Core
 		size_t GetSwapChainCount() const { return _swapChainImages.size(); }
 		VkImageView GetImageView(size_t swapChainIndex) const;
 		VkImage GetImage(size_t swapChainIndex) const { return _swapChainImages[swapChainIndex]; }
+
+		// Present-wait semaphore for image i, signaled by the frame's last
+		// graphics submit and waited by Present.
+		VkSemaphore GetRenderFinishedSemaphore(uint32_t imageIndex) const
+		{
+			return _renderFinishedPerImage[imageIndex];
+		}
 		VkFormat GetImageFormat() const 
 		{
 			return _swapChainImageFormat;
@@ -28,6 +35,7 @@ namespace Core
 		VkPresentModeKHR ChooseSwapPresentMode(const vector<VkPresentModeKHR>& availablePresentModes);
 
 		void CreateImageViews();
+		void CreateRenderFinishedSemaphores();
 		void CleanupSwapChain();
 	private:
 		Device& _device;
@@ -37,6 +45,7 @@ namespace Core
 		VkFormat _swapChainImageFormat;
 		VkExtent2D _swapChainExtent;
 		vector<VkImageView> _swapChainImageViews;
+		vector<VkSemaphore> _renderFinishedPerImage;
 	};
 }
 

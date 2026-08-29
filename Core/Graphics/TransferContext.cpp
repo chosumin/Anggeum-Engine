@@ -18,8 +18,8 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 	, _device(device)
 	, _sync(syncContext)
 {
-	_primaryCommandPool = make_unique<CommandPool>(_device,
-		_device.GetQueueFamilyIndices().TransferFamily.value());
+	_primaryCommandPool = make_unique<CommandPool>(_device, syncContext,
+		QueueType::Transfer);
 
 	// Sized for steady-state traffic (terrain tiles, table refills); the
 	// initial scene load intentionally overflows into per-job fallbacks.
@@ -176,7 +176,7 @@ void TransferContext::Flush(bool waitForRecordings)
 	primary.ExecuteCommands(secondaryCommands);
 	primary.EndCommandBuffer();
 
-	uint64_t signalValue = _sync.SubmitTransfer(primary.GetHandle());
+	uint64_t signalValue = _sync.SubmitTransfer(primary, secondaryCommands);
 	batch.value = signalValue;
 
 	// Close each submitted upload's staging span on THIS submission's value;

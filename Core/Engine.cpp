@@ -11,10 +11,13 @@
 #include "Graphics/ForwardRenderPipeline.h"
 #include "Sample/SampleScene.h"
 #include "Utils/timer.h"
+#include "Utils/CrashHandler.h"
 
 Core::Engine::Engine(const EngineOptions& options)
 {
     assert(options.window != nullptr && "Window must be valid");
+
+    Core::InstallCrashHandler();
 
     _timer = make_unique<Core::Timer>();
 
@@ -22,6 +25,7 @@ Core::Engine::Engine(const EngineOptions& options)
     _resourceManager = new Core::ResourceManager(*_device);
     _workerThreadManager = new Core::WorkerThreadManager(*_device);
     _syncContext = new Core::SyncContext(*_device);
+    _workerThreadManager = new Core::WorkerThreadManager(*_device, *_syncContext);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager,
         *_syncContext);
 
@@ -92,6 +96,8 @@ void Core::Engine::Draw()
 	{
 		ScopedCpuTimer timer(phases.transferWaitMs);
 
+		// One completed-value poll per frame; pools recycle off this cache.
+		_syncContext->RefreshCompletedCache();
 		_transferContext->BeginFrame();
 
 		// Streams, syncs the GPU mirrors and hands this frame's upload jobs

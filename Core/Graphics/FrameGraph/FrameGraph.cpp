@@ -665,7 +665,7 @@ namespace Core
 			auto& sync = _compiled.passSync[i];
 
 			SubmitInfo& submitInfo = renderFrame.AddSubmitInfo(decl.queue,
-				GetJob(jobIndex)->commandBuffer->GetHandle(), syncContext);
+				*GetJob(jobIndex)->commandBuffer, syncContext);
 
 			if (sync.waitPass >= 0)
 			{

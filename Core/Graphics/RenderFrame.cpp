@@ -27,10 +27,6 @@ RenderFrame::~RenderFrame()
 	{
 		vkDestroySemaphore(_device.GetDevice(), _submission.imageAvailableSemaphore, nullptr);
 	}
-	if (_submission.renderFinishedSemaphore != VK_NULL_HANDLE)
-	{
-		vkDestroySemaphore(_device.GetDevice(), _submission.renderFinishedSemaphore, nullptr);
-	}
 }
 
 void RenderFrame::Reset()
@@ -48,14 +44,13 @@ void RenderFrame::CreateSyncObjects()
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_submission.imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_submission.renderFinishedSemaphore) != VK_SUCCESS)
+	if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr, &_submission.imageAvailableSemaphore) != VK_SUCCESS)
 	{
 		throw std::runtime_error("failed to create semaphores for a frame!");
 	}
 }
 
-SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext)
+SubmitInfo& RenderFrame::AddSubmitInfo(QueueType queueType, CommandBuffer& commandBuffer, SyncContext& syncContext)
 {
 	_submission.submitInfos.emplace_back(queueType, commandBuffer, syncContext);
 	return _submission.submitInfos.back();

@@ -1,16 +1,16 @@
 #include "stdafx.h"
 #include "WorkerThread.h"
 #include "Graphics/Vulkans/CommandPool.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-Core::WorkerThread::WorkerThread(Device& device)
+Core::WorkerThread::WorkerThread(Device& device, SyncContext& syncContext)
 	:_device(device), _shutdown(false)
 {
-	QueueFamilyIndices indices = _device.GetQueueFamilyIndices();
 
-	_graphicsCommandPool = new CommandPool(device, indices.GraphicsFamily.value());
-	_computeCommandPool = new CommandPool(device, indices.ComputeFamily.value());
-	_transferCommandPool = new CommandPool(device, indices.TransferFamily.value());
+	_graphicsCommandPool = new CommandPool(device, syncContext, QueueType::Graphics);
+	_computeCommandPool = new CommandPool(device, syncContext, QueueType::Compute);
+	_transferCommandPool = new CommandPool(device, syncContext, QueueType::Transfer);
 
 	_thread = thread(&WorkerThread::Run, this);
     SetThreadDescription(_thread.native_handle(), L"Worker Thread");
@@ -90,6 +90,12 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 	}
 	case JobType::GRAPHICS_SECONDARY:
 	{
+		// Reserved for splitting ONE pass's recording across workers; no job
+		// uses it yet. CONTRACT when enabling: SubmitToQueues stamps only the
+		// SubmitInfo primaries, so secondaries executed into a primary must
+		// reach the submitter for stamping too (the way Flush hands transfer
+		// secondaries to SubmitTransfer) - otherwise they stay checked out
+		// forever and the pool grows unboundedly.
 		auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		job->commandBuffer = &commandBuffer;
@@ -114,14 +120,14 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 	throw runtime_error("Invalid job type");
 }
 
-Core::WorkerThreadManager::WorkerThreadManager(Device& device)
+Core::WorkerThreadManager::WorkerThreadManager(Device& device, SyncContext& syncContext)
 	:_device(device)
 {
 	_threadCount = std::thread::hardware_concurrency();
 
 	for (size_t i = 0; i < _threadCount; i++)
 	{
-		auto workerThread = make_unique<WorkerThread>(_device);
+		auto workerThread = make_unique<WorkerThread>(_device, syncContext);
 		_workerThreads.push_back(move(workerThread));
 	}
 }

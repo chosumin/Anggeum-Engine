@@ -88,8 +88,15 @@ namespace Core
 
 		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
 
-		void UpdateFrame(uint64_t frame) { _frame = frame; }
-		bool IsBusy();
+		// Recycling contract: busy from checkout until the stamped timeline
+		// value completes. 
+		void MarkCheckedOut() { _submitValue = UINT64_MAX; }
+		void MarkSubmitted(uint64_t timelineValue) { _submitValue = timelineValue; }
+		bool IsBusy(uint64_t timelineCompleted) const
+		{
+			uint64_t value = _submitValue.load();
+			return value == UINT64_MAX || timelineCompleted < value;
+		}
 
 		static void ImmediateSubmit(Device& device, Job& job);
 		static void ImmediateSubmit(Device& device, std::vector<Job*>& jobs);
@@ -115,7 +122,8 @@ namespace Core
 		// stage on a dedicated compute queue).
 		uint32_t _queueFamilyIndex;
 
-		//hack : have to be managed in resource system or something
-		uint64_t _frame;
+		// Timeline stamp; atomic because workers check out on their thread
+		// while the main thread stamps at submit. 0 = never used, recyclable.
+		std::atomic<uint64_t> _submitValue{ 0 };
 	};
 }

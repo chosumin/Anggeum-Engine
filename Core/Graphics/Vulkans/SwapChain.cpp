@@ -8,6 +8,7 @@ Core::SwapChain::SwapChain(Device& device)
 {
     CreateSwapChain();
     CreateImageViews();
+    CreateRenderFinishedSemaphores();
 }
 
 Core::SwapChain::~SwapChain()
@@ -161,6 +162,7 @@ void Core::SwapChain::RecreateSwapChain()
 
     CreateSwapChain();
     CreateImageViews();
+    CreateRenderFinishedSemaphores();
 }
 
 void Core::SwapChain::GetViewportAndScissor(VkViewport& viewport, VkRect2D& scissor)
@@ -180,10 +182,30 @@ void Core::SwapChain::CleanupSwapChain()
 {
     auto device = _device.GetDevice();
 
+    for (auto semaphore : _renderFinishedPerImage)
+        vkDestroySemaphore(device, semaphore, nullptr);
+    _renderFinishedPerImage.clear();
+
     for (auto imageView : _swapChainImageViews)
         vkDestroyImageView(device, imageView, nullptr);
 
     vkDestroySwapchainKHR(device, _swapChain, nullptr);
+}
+
+void Core::SwapChain::CreateRenderFinishedSemaphores()
+{
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    _renderFinishedPerImage.resize(_swapChainImages.size(), VK_NULL_HANDLE);
+    for (auto& semaphore : _renderFinishedPerImage)
+    {
+        if (vkCreateSemaphore(_device.GetDevice(), &semaphoreInfo, nullptr,
+            &semaphore) != VK_SUCCESS)
+        {
+            throw runtime_error("failed to create present-wait semaphore!");
+        }
+    }
 }
 
 

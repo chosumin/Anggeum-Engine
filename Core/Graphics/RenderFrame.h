@@ -27,7 +27,7 @@ namespace Core
 		void Reset();
 
 		// Submit info management
-		SubmitInfo& AddSubmitInfo(QueueType queueType, VkCommandBuffer commandBuffer, SyncContext& syncContext);
+		SubmitInfo& AddSubmitInfo(QueueType queueType, CommandBuffer& commandBuffer, SyncContext& syncContext);
 		SubmitInfo& GetCurrentSubmitInfo() { return _submission.submitInfos.back(); }
 		FrameSubmission& GetSubmission() { return _submission; }
 

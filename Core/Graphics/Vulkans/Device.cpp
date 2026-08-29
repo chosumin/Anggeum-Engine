@@ -57,8 +57,7 @@ namespace Core
 
 		_debugUtils.Initialize(_instance, _device);
 
-	    _graphicsCommandPool = new CommandPool(*this,
-	        _queueFamilyIndices.GraphicsFamily.value());
+	    _graphicsCommandPool = new CommandPool(*this, QueueType::Graphics);
 
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 	}
@@ -122,6 +121,9 @@ namespace Core
 	    vkWaitForFences(_device, 1, &fence, VK_TRUE, 100000000000);
 
 	    vkDestroyFence(_device, fence, nullptr);
+
+	    // The fence wait just retired the work: releasable immediately.
+	    commandBuffer.MarkSubmitted(0);
 	}
 
 	VkFormat Device::FindSupportedFormat(
@@ -371,14 +373,9 @@ namespace Core
 	    createInfo.ppEnabledExtensionNames = _deviceExtensions.data();
 	    createInfo.pNext = &featureChain.features2;
 
-	    const auto& validationLayers = _debugUtils.GetValidationLayers();
-	    if (_debugUtils.IsValidationLayerEnabled())
-	    {
-	        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-	        createInfo.ppEnabledLayerNames = validationLayers.data();
-	    }
-	    else
-	        createInfo.enabledLayerCount = 0;
+	    // Device layers are deprecated (VUID-VkDeviceCreateInfo-enabledLayerCount-12384):
+	    // layers are enabled per INSTANCE only, and the device inherits them.
+	    createInfo.enabledLayerCount = 0;
 
 	    if (vkCreateDevice(_physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS)
 	    {

@@ -56,10 +56,6 @@ namespace Core
 		double GetLastPresentMs() const { return _lastPresentMs; }
 		uint32_t GetImageIndex() const { return _imageIndex; }
 
-		// Command buffer allocation
-		CommandBuffer& RequestCommandBuffer();
-		CommandBuffer& RequestComputeCommandBuffer();
-		
 		// Swap chain
 		SwapChain& GetSwapChain() const;
 		VkExtent2D GetSurfaceExtent() const;
@@ -83,14 +79,12 @@ namespace Core
 		Device& _device;
 		ResourceManager& _resourceManager;
 		
-		// Swap chain
 		SwapChain* _swapChain = nullptr;
 		uint32_t _imageIndex = 0;
 		
-		// Command pools
-		CommandPool* _commandPool = nullptr;
-		CommandPool* _computeCommandPool = nullptr;
-		
+		// Serves only the per-frame resource-init primary. 
+		CommandPool* _initResourceCommandPool = nullptr;
+
 		// Per-frame resources
 		vector<unique_ptr<RenderFrame>> _frames;
 		uint32_t _currentFrame = 0;

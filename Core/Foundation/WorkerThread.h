@@ -4,6 +4,7 @@
 
 namespace Core
 {
+	class SyncContext;
 	class CommandPool;
 	class CommandBuffer;
 	class WorkerThread
@@ -11,7 +12,7 @@ namespace Core
 	private:
 		friend class WorkerThreadManager;
 	public:
-		WorkerThread(Device& device);
+		WorkerThread(Device& device, SyncContext& syncContext);
 		~WorkerThread();
 
 		void Enqueue(const Job* job);
@@ -37,7 +38,7 @@ namespace Core
 	class WorkerThreadManager
 	{
 	public:
-		WorkerThreadManager(Device& device);
+		WorkerThreadManager(Device& device, SyncContext& syncContext);
 		~WorkerThreadManager() = default;
 
 		void Enqueue(const Job* job);

@@ -8,14 +8,12 @@
 #include "Image.h"
 #include "BindlessTextureManager.h"
 #include "DescriptorPool.h"
-#include "Graphics/FrameCounter.h"
 #include "Graphics/RenderFrame.h"
 #include "Foundation/Job.h"
 
 Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkCommandBufferLevel level)
 	:_device(device), _level(level)
 {
-	_frame = Core::FrameCounter::GetFrameNumber();
 	_queueFamilyIndex = commandPool.GetQueueFamilyIndex();
 
 	VkCommandBufferAllocateInfo allocInfo{};
@@ -30,7 +28,6 @@ Core::CommandBuffer::CommandBuffer(Device& device, CommandPool& commandPool, VkC
 
 void Core::CommandBuffer::ResetCommandBuffer()
 {
-    _frame = Core::FrameCounter::GetFrameNumber();
 
     vkResetCommandBuffer(_commandBuffer, 0);
 }
@@ -397,13 +394,6 @@ void Core::CommandBuffer::EndCommandBuffer()
 {
     if (vkEndCommandBuffer(_commandBuffer) != VK_SUCCESS)
         throw std::runtime_error("failed to record command buffer!");
-}
-
-bool Core::CommandBuffer::IsBusy()
-{
-    // A buffer used at frame N may still be executing on the GPU until its frame
-    // slot has cycled through every frame in flight.
-    return Core::FrameCounter::GetFrameNumber() < _frame + MAX_FRAMES_IN_FLIGHT;
 }
 
 void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, Core::Job& job)

@@ -39,11 +39,8 @@ RenderContext::RenderContext(Device& device, ResourceManager& resourceManager,
 {
 	_swapChain = new SwapChain(device);
 
-	auto queueFamilyIndices = device.GetQueueFamilyIndices();
 
-	// Create command pools (owned by RenderContext)
-	_commandPool = new CommandPool(device, queueFamilyIndices.GraphicsFamily.value());
-	_computeCommandPool = new CommandPool(device, queueFamilyIndices.ComputeFamily.value());
+	_initResourceCommandPool = new CommandPool(device, syncContext, QueueType::Graphics);
 
 	_queueTimer = make_unique<GpuQueueTimer>(device);
 
@@ -61,8 +58,7 @@ RenderContext::~RenderContext()
 	_queueTimer.reset();
 
 	// Clean up command pools
-	delete _commandPool;
-	delete _computeCommandPool;
+	delete _initResourceCommandPool;
 
 	// Clean up swap chain
 	delete _swapChain;
@@ -137,47 +133,36 @@ void RenderContext::Submit()
 	// on the timeline value it signals.
 	if (frameResources.HasPendingInit())
 	{
-		auto& initCommandBuffer = RequestCommandBuffer();
+		auto& initCommandBuffer = _initResourceCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 		initCommandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 		frameResources.ExecutePendingInit(initCommandBuffer);
 
 		initCommandBuffer.EndCommandBuffer();
 
-		_syncContext.SubmitResourceInit(initCommandBuffer.GetHandle());
+		_syncContext.SubmitResourceInit(initCommandBuffer);
 	}
+
+	VkSemaphore renderFinished = _swapChain->GetRenderFinishedSemaphore(_imageIndex);
 
 	// Submit all queues with semaphore injection
 	_syncContext.SubmitToQueues(
 		submission.submitInfos,
 		submission.submitScratch,
 		submission.imageAvailableSemaphore,
-		submission.renderFinishedSemaphore);
+		renderFinished);
 
 	// Record this frame's final timeline values
 	_syncContext.RecordFrameSnapshot(_frameSnapshots[_currentFrame]);
 
 	auto presentStart = std::chrono::steady_clock::now();
 
-	VkSemaphore renderFinished = submission.renderFinishedSemaphore;
 	EndFrame(&renderFinished);
 
 	auto presentEnd = std::chrono::steady_clock::now();
 
 	_lastQueueSubmitMs = std::chrono::duration<double, std::milli>(presentStart - submitStart).count();
 	_lastPresentMs = std::chrono::duration<double, std::milli>(presentEnd - presentStart).count();
-}
-
-CommandBuffer& RenderContext::RequestCommandBuffer()
-{
-	auto& cmd = _commandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-	return cmd;
-}
-
-CommandBuffer& RenderContext::RequestComputeCommandBuffer()
-{
-	auto& cmd = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-	return cmd;
 }
 
 SwapChain& RenderContext::GetSwapChain() const

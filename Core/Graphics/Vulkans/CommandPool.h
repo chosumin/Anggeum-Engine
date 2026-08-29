@@ -4,10 +4,18 @@ namespace Core
 {
 	class Device;
 	class CommandBuffer;
+	class SyncContext;
+	enum class QueueType;
+
 	class CommandPool
 	{
 	public:
-		CommandPool(Device& device, uint32_t queueFamilyIndex);
+		// Timeline-recycled pool
+		CommandPool(Device& device, SyncContext& sync, QueueType queue);
+
+		// Unbound pool (blocking one-shot use)
+		CommandPool(Device& device, QueueType queue);
+
 		virtual ~CommandPool();
 
 		VkCommandPool& GetHandle() { return _commandPool; }
@@ -20,6 +28,10 @@ namespace Core
 		VkCommandPool _commandPool;
 
 		uint32_t _queueFamilyIndex;
+
+		// Fixed at construction; null = unbound (one-shot) pool.
+		SyncContext* _sync = nullptr;
+		QueueType _timelineQueue{};
 
 		vector<unique_ptr<CommandBuffer>> _primaryCommandBuffers;
 		vector<unique_ptr<CommandBuffer>> _secondaryCommandBuffers;

@@ -12,6 +12,8 @@ namespace Core
 
     class Device;
     class SubmitInfo;
+    class CommandPool;
+    class CommandBuffer;
 
     struct FrameTimelineSnapshot
     {
@@ -41,7 +43,16 @@ namespace Core
 
         // The GPU-side progress of a queue's timeline (non-blocking poll):
         // every submission whose value is <= this has fully executed.
+        // Main thread only - concurrent driver queries from workers are what
+        // the cached variant below exists to avoid.
         u64 QueryCompletedValue(QueueType queueType) const;
+
+        // Completed values cached once per frame (RefreshCompletedCache, main
+        // thread). Safe to read from any thread; a stale value is
+        // CONSERVATIVE for recycling - a resource merely stays busy a little
+        // longer - so pools poll this instead of the driver.
+        u64 GetCachedCompletedValue(QueueType queueType) const;
+        void RefreshCompletedCache();
 
         // Frame slot snapshots (for reusing a frame slot safely)
         void RecordFrameSnapshot(FrameTimelineSnapshot& snapshot);
@@ -49,11 +60,12 @@ namespace Core
         // Submits this frame's resource-init work. It signals its own timeline
         // rather than a queue timeline, so the next SubmitToQueues can gate the
         // first submit of *both* queues on it.
-        void SubmitResourceInit(VkCommandBuffer commandBuffer);
+        void SubmitResourceInit(CommandBuffer& commandBuffer);
 
         // Submits an upload batch on the transfer queue, signalling the
         // transfer timeline; returns the signalled value.
-        u64 SubmitTransfer(VkCommandBuffer commandBuffer);
+        u64 SubmitTransfer(CommandBuffer& primary,
+            const vector<CommandBuffer*>& secondaries);
 
         // Injects the frame-level semaphores and submits the frame
         void SubmitToQueues(deque<SubmitInfo>& submitInfos,
@@ -73,6 +85,10 @@ namespace Core
         // engine code submits through this class, never through the handle.
         VkQueue GetGraphicsQueueForExternalInit() const { return _graphicsQueue; }
     private:
+        // Resource-init buffers submitted since the last SubmitToQueues,
+        // awaiting their end-of-frame graphics stamp.
+        vector<CommandBuffer*> _pendingInitBuffers;
+
         Device& _device;
 
         // The queue handles live here, not on Device: submission (and its
@@ -96,5 +112,10 @@ namespace Core
         // submitted for this frame. Cleared once the wait is injected.
         u64 _pendingResourceWait = 0;
         u64 _pendingTransferWait = 0;
+
+        // Per-frame snapshot of QueryCompletedValue, readable from workers.
+        atomic<u64> _graphicsCompletedCache{ 0 };
+        atomic<u64> _computeCompletedCache{ 0 };
+        atomic<u64> _transferCompletedCache{ 0 };
     };
 }
