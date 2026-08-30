@@ -340,12 +340,18 @@ else()
     )
 endif()
 
-# Copy Assets folder (post-build) - only copy changed files
+# Copy Assets folder (post-build) - only copy changed files, then bake raw
+# png/jpg into mipmapped KTX2 siblings (output dir only; the loader prefers
+# the baked file, and the upload path has no runtime mip generation).
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Syncing Assets from ${CMAKE_SOURCE_DIR}/Assets to $<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${CMAKE_SOURCE_DIR}/Assets"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
+    COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+        -File "${CMAKE_SOURCE_DIR}/Tools/BakeTextures.ps1"
+        -AssetsDir "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
+        -Toktx "${KTX_DIR}/Release/toktx.exe"
     COMMENT "Syncing Assets folder (changed files only)..."
 )
 

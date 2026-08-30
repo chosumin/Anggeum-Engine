@@ -170,7 +170,10 @@ namespace Core
 		if (it != _textureHandles.end() && _texturePool.IsAlive(it->second))
 			return it->second;
 
-		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
+		ImageCreateDesc resolvedInfo = imageCreateInfo;
+		resolvedInfo.filePath = Image::ResolveBakedPath(resolvedInfo.filePath);
+
+		auto image = make_unique<Core::Image>(_device, resolvedInfo);
 		auto texture = make_unique<Core::Texture>(newName, std::move(image), sampler);
 		Texture* texturePtr = texture.get();
 
@@ -189,8 +192,8 @@ namespace Core
 			}
 
 			handle.SetLoading();
-			_streamer->Push({ handle, imageCreateInfo.filePath,
-				Image::QueryStagingBytes(imageCreateInfo.filePath) });
+			_streamer->Push({ handle, resolvedInfo.filePath,
+				Image::QueryStagingBytes(resolvedInfo.filePath) });
 		}
 
 		return handle;

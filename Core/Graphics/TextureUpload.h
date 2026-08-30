@@ -55,7 +55,8 @@ namespace Core
 	};
 
 	// Executes one texture upload: reads the file, stages the pixels and
-	// records the copy + mip generation, all on a worker thread.
+	// records the copies (all mips, when the file bakes them), on a worker
+	// thread.
 	// Oversized loads (and callers without one) fall back to a dedicated
 	// one-shot staging buffer that lives and dies with the job.
 	class TextureUploadJob : public UploadJob

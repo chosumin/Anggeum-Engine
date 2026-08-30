@@ -271,13 +271,28 @@ VkImageAspectFlags Core::Image::GetAspectFlags() const
     return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
-void Core::Image::LoadRawImage(vector<uint8_t>& data, const string& filePath)
+string Core::Image::ResolveBakedPath(const string& filePath)
+{
+    const size_t dot = filePath.rfind('.');
+    if (dot == string::npos)
+        return filePath;
+
+    const string extension = filePath.substr(dot + 1);
+    if (extension != "png" && extension != "jpg")
+        return filePath;
+
+    string baked = filePath.substr(0, dot) + ".ktx2";
+    return FileSystem::Exists(baked) ? baked : filePath;
+}
+
+void Core::Image::LoadRawImage(vector<uint8_t>& data,
+    vector<VkBufferImageCopy>& outCopyRegions, const string& filePath)
 {
     string extension = FileSystem::GetExtension(filePath);
 
-    if (extension == "ktx")
+    if (extension == "ktx" || extension == "ktx2")
     {
-        LoadKtxImage(data, filePath);
+        LoadKtxImage(data, outCopyRegions, filePath);
     }
     else if (extension == "hdr")
     {
@@ -303,6 +318,7 @@ void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
     _extent.width = static_cast<uint32_t>(width);
     _extent.height = static_cast<uint32_t>(height);
     _layer = 1;
+    _mipLevels = 1;
 
     _format = VK_FORMAT_R32G32B32A32_SFLOAT;
 
@@ -315,15 +331,17 @@ void Core::Image::LoadHdrImage(vector<uint8_t>& outData, const string& filePath)
 
 VkDeviceSize Core::Image::QueryStagingBytes(const string& filePath)
 {
-	if (FileSystem::GetExtension(filePath) == "ktx")
+	const string extension = FileSystem::GetExtension(filePath);
+	if (extension == "ktx" || extension == "ktx2")
 	{
-		// Header-only open: with NO_FLAGS the pixel data stays on disk, but
-		// dataSize (every mip and layer, what LoadKtxImage stages) is known.
+		// Header-only open: with NO_FLAGS the pixel data stays on disk. The
+		// UNCOMPRESSED size is what LoadKtxImage stages (supercompression is
+		// inflated at load), so that is what the budget must charge.
 		ktxTexture* texture = nullptr;
 		if (ktxTexture_CreateFromNamedFile(filePath.c_str(),
 			KTX_TEXTURE_CREATE_NO_FLAGS, &texture) == KTX_SUCCESS)
 		{
-			VkDeviceSize size = texture->dataSize;
+			VkDeviceSize size = ktxTexture_GetDataSizeUncompressed(texture);
 			ktxTexture_Destroy(texture);
 			return size;
 		}
@@ -362,41 +380,48 @@ void Core::Image::LoadStbImage(vector<uint8_t>& data, const string& filePath)
 
     _layer = 1;
 
+    _mipLevels = 1;
+
     stbi_image_free(pixels);
 }
 
-void Core::Image::LoadKtxImage(vector<uint8_t>& outData, const string& path)
+void Core::Image::LoadKtxImage(vector<uint8_t>& outData,
+    vector<VkBufferImageCopy>& outCopyRegions, const string& path)
 {
     auto data = FileSystem::Read(path);
 
     auto dataBuffer = reinterpret_cast<const ktx_uint8_t*>(data.data());
     auto dataSize = static_cast<ktx_size_t>(data.size());
 
+    // LOAD_IMAGE_DATA inflates any supercompression (the baked assets are
+    // zstd-wrapped) into pData; image offsets below index the inflated blob.
     ktxTexture* texture;
     auto ktxResult = ktxTexture_CreateFromMemory(
-        dataBuffer, dataSize, 
-        KTX_TEXTURE_CREATE_NO_FLAGS, &texture);
+        dataBuffer, dataSize,
+        KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
 
     if (ktxResult != KTX_SUCCESS)
     {
         throw runtime_error{ "Error loading KTX texture: " + path };
     }
 
-    if (texture->pData)
+    // Basis-encoded payloads (the baked UASTC assets) transcode right here on
+    // the worker thread to the desktop block format, and the image honors the
+    // transcoded format over the desc's placeholder. Same bits per texel, so
+    // the staging budget taken from the file header still matches.
+    if (texture->classId == ktxTexture2_c)
     {
-        outData = { texture->pData , texture->pData + texture->dataSize };
-    }
-    else
-    {
-        ktx_size_t dataSize = texture->dataSize;
-        outData.resize(dataSize);
-        auto loadDataResult = ktxTexture_LoadImageData(texture, outData.data(), dataSize);
-
-        if (loadDataResult != KTX_SUCCESS)
+        auto* texture2 = reinterpret_cast<ktxTexture2*>(texture);
+        if (ktxTexture2_NeedsTranscoding(texture2))
         {
-			throw runtime_error{ "Error loading KTX texture: " + path };
+            if (ktxTexture2_TranscodeBasis(texture2, KTX_TTF_BC7_RGBA, 0) != KTX_SUCCESS)
+                throw runtime_error{ "Error transcoding KTX texture: " + path };
+
+            _format = ktxTexture_GetVkFormat(texture);
         }
     }
+
+    outData = { texture->pData, texture->pData + texture->dataSize };
 
     _extent.depth = texture->baseDepth;
     _extent.width = texture->baseWidth;
@@ -405,9 +430,39 @@ void Core::Image::LoadKtxImage(vector<uint8_t>& outData, const string& path)
     _layer = texture->numLayers;
 
     // Use the faces if there are 6 (for cubemap)
-    if (texture->numLayers == 1 && texture->numFaces == 6)
+    const bool cubemap = texture->numLayers == 1 && texture->numFaces == 6;
+    if (cubemap)
     {
         _layer = texture->numFaces;
+    }
+
+    // The file's baked mip chain replaces runtime generation: keep its level
+    // count and hand back one copy region per mip/layer at the blob's own
+    // offsets. (Rows are assumed tightly packed, which holds for the 4-byte
+    // and block-compressed formats KTX assets use.)
+    _mipLevels = texture->numLevels;
+
+    outCopyRegions.clear();
+    for (uint32_t level = 0; level < texture->numLevels; ++level)
+    {
+        for (uint32_t layer = 0; layer < _layer; ++layer)
+        {
+            ktx_size_t offset = 0;
+            ktxTexture_GetImageOffset(texture, level,
+                cubemap ? 0 : layer, cubemap ? layer : 0, &offset);
+
+            VkBufferImageCopy region{};
+            region.bufferOffset = offset;
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = level;
+            region.imageSubresource.baseArrayLayer = layer;
+            region.imageSubresource.layerCount = 1;
+            region.imageExtent = {
+                std::max(1u, texture->baseWidth >> level),
+                std::max(1u, texture->baseHeight >> level),
+                std::max(1u, texture->baseDepth >> level) };
+            outCopyRegions.push_back(region);
+        }
     }
 
     ktxTexture_Destroy(texture);
@@ -436,17 +491,29 @@ void Core::Image::CreateImage(VkImageTiling tiling,
     imageInfo.initialLayout = initialLayout;
     imageInfo.usage = usage;
 
-    // CONCURRENT across graphics+compute when the families differ, 
-    // so cross-queue access needs no ownership transfers.
+    // CONCURRENT across every distinct family that touches this image, so
+    // cross-queue access needs no ownership transfers: graphics+compute
+    // always; the dedicated transfer family only when the usage says the
+    // upload lane may write it (render targets keep their g+c list).
     const auto& qfi = _device.GetQueueFamilyIndices();
-    uint32_t queueFamilies[2] = {
-        qfi.GraphicsFamily.value(),
-        qfi.ComputeFamily.value()
+    uint32_t queueFamilies[3];
+    uint32_t familyCount = 0;
+    auto addUnique = [&](uint32_t family)
+    {
+        for (uint32_t i = 0; i < familyCount; ++i)
+            if (queueFamilies[i] == family)
+                return;
+        queueFamilies[familyCount++] = family;
     };
-    if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+    addUnique(qfi.GraphicsFamily.value());
+    addUnique(qfi.ComputeFamily.value());
+    if (usage & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT))
+        addUnique(qfi.TransferFamily.value());
+
+    if (familyCount > 1)
     {
         imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        imageInfo.queueFamilyIndexCount = 2;
+        imageInfo.queueFamilyIndexCount = familyCount;
         imageInfo.pQueueFamilyIndices = queueFamilies;
     }
     else
@@ -555,14 +622,18 @@ VkImageView Core::Image::CreateSingleLayerImageView(uint32_t layerIndex, VkImage
     return imageView;
 }
 
-void Core::Image::Load(vector<uint8_t>& outImageData)
+void Core::Image::Load(vector<uint8_t>& outImageData,
+    vector<VkBufferImageCopy>& outCopyRegions)
 {
     if (_filePath.empty())
         return;
 
-    LoadRawImage(outImageData, _filePath);
+    LoadRawImage(outImageData, outCopyRegions, _filePath);
 
-    _mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(_extent.width, _extent.height)))) + 1;
+    // Block-compressed formats (transcoded BC) have no STORAGE image support;
+    // file textures are sampled-only anyway.
+    if (_format >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && _format <= VK_FORMAT_BC7_SRGB_BLOCK)
+        _usageFlags &= ~VK_IMAGE_USAGE_STORAGE_BIT;
 
     CreateImage(
         VK_IMAGE_TILING_OPTIMAL,

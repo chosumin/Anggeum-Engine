@@ -89,6 +89,4 @@ void GeometryUploadJob::Execute()
 			copy.offset, base + srcOffset, copy.data.size());
 		srcOffset += copy.data.size();
 	}
-
-	status = JobStatus::COMPLETE;
 }

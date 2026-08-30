@@ -27,13 +27,11 @@ void TextureUploadJob::Execute()
 
 	// Already uploaded (VkImage created) — nothing to do.
 	if (image.GetImage() != VK_NULL_HANDLE)
-	{
-		status = JobStatus::COMPLETE;
 		return;
-	}
 
 	vector<uint8_t> imageData;
-	image.Load(imageData);
+	vector<VkBufferImageCopy> copyRegions;
+	image.Load(imageData, copyRegions);
 
 	VkDeviceSize bufferSize = imageData.size();
 
@@ -66,13 +64,23 @@ void TextureUploadJob::Execute()
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
 		.Submit();
 
-	auto extent = image.GetExtent();
-	commandBuffer->CopyBufferToImage(*source, _dstTexture, extent.width, extent.height,
-		sourceOffset);
+	if (!copyRegions.empty())
+	{
+		// Baked mip chain: one copy per mip/layer.
+		for (VkBufferImageCopy& region : copyRegions)
+			region.bufferOffset += sourceOffset;
 
-	//hack : need to be pregenerated and stored in the texture file to improve loading speed.
-	if (image.GetMipLevel() > 1)
-		commandBuffer->GenerateMipmaps(_dstTexture, image.GetMipLevel());
+		commandBuffer->CopyBufferToImage(*source, _dstTexture, copyRegions);
+	}
+	else
+	{
+		auto extent = image.GetExtent();
+		commandBuffer->CopyBufferToImage(*source, _dstTexture, extent.width, extent.height,
+			sourceOffset);
+	}
 
-	status = JobStatus::COMPLETE;
+	commandBuffer->CreateBarrierBatch()
+		.Image(_dstTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		.Submit();
 }

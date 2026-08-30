@@ -86,7 +86,6 @@ namespace Core
 		void CopyImageToBuffer(Texture& texture, VkImageLayout layout, Buffer& buffer,
 			uint32_t width, uint32_t height);
 
-		void GenerateMipmaps(Texture& texture, uint32_t mipLevels);
 
 		// Recycling contract: busy from checkout until the stamped timeline
 		// value completes. 

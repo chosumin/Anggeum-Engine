@@ -77,16 +77,28 @@ namespace Core
 		uint32_t GetMipLevel() { return _mipLevels; }
 		VkImageAspectFlags GetAspectFlags() const;
 
-		void Load(vector<uint8_t>& outImageData);
+		// Loads the file and creates the VkImage. `outCopyRegions` is the
+		// upload's per-mip/layer copy list when the file bakes one (KTX;
+		// offsets relative to the staged blob), empty otherwise - transient
+		// upload data for the caller, never stored here.
+		void Load(vector<uint8_t>& outImageData,
+			vector<VkBufferImageCopy>& outCopyRegions);
 
 		static VkDeviceSize QueryStagingBytes(const string& filePath);
 
+		// Prefers the baked KTX2 sibling the asset pipeline writes next to raw
+		// png/jpg sources - mips come from the file and the upload stays a pure
+		// copy. Returns the input unchanged when no sibling exists.
+		static string ResolveBakedPath(const string& filePath);
+
 		string& GetFilePath() { return _filePath; }
 	private:
-		void LoadRawImage(vector<uint8_t>& outData, const string& filePath);
+		void LoadRawImage(vector<uint8_t>& outData,
+			vector<VkBufferImageCopy>& outCopyRegions, const string& filePath);
 		void LoadStbImage(vector<uint8_t>& outData, const string& filePath);
 		void LoadHdrImage(vector<uint8_t>& outData, const string& filePath);
-		void LoadKtxImage(vector<uint8_t>& outData, const string& path);
+		void LoadKtxImage(vector<uint8_t>& outData,
+			vector<VkBufferImageCopy>& outCopyRegions, const string& path);
 		void CreateImage(VkImageTiling tiling, 
 			VkImageUsageFlags usage, VkImageLayout initialLayout, VkImageCreateFlags flags);
 		void BindImageMemory(VkMemoryPropertyFlags properties);
