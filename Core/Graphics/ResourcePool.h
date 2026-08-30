@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include "Graphics/ResourceHandle.h"
+#include "Graphics/RetireQueue.h"
 
 namespace Core
 {
@@ -11,15 +12,20 @@ namespace Core
 	 * generation, so a handle kept past Remove() resolves to nullptr instead of
 	 * silently aliasing whatever later took the slot.
 	 *
-	 * Slots hold a shared_ptr so the pool can co-own with legacy shared_ptr holders
-	 * while a resource type is migrated onto handles. Once nothing else holds the
-	 * resource, the pool is its sole owner and Remove() destroys it.
+	 * The pool tracks only the LOGICAL lifetime (generations). It never destroys:
+	 * every resource displaced by Remove() or Replace() goes straight to the
+	 * RetireQueue, which holds it until the GPU has passed its last use.
 	 */
 	template<typename T>
 	class ResourcePool
 	{
 	public:
-		Handle<T> Add(shared_ptr<T> resource)
+		explicit ResourcePool(RetireQueue& retire)
+			: _retire(retire)
+		{
+		}
+
+		Handle<T> Add(unique_ptr<T> resource)
 		{
 			uint32_t index;
 
@@ -45,14 +51,16 @@ namespace Core
 			return Handle<T>{ this, index, slot.generation };
 		}
 
-		// Destroys the resource and invalidates every handle to it.
+		// Ends the LOGICAL lifetime: invalidates every handle (generation bump)
+		// and frees the slot. The resource retires - it dies once no in-flight
+		// submission can still reference it.
 		void Remove(Handle<T> handle)
 		{
 			if (Get(handle) == nullptr)
 				return;
 
 			auto& slot = _slots[handle.index];
-			slot.resource.reset();
+			_retire.Retire(std::move(slot.resource));
 			++slot.generation;
 			--_liveCount;
 
@@ -62,16 +70,14 @@ namespace Core
 		// Relocates the resource behind a live handle in place: the handle stays
 		// valid (same index/generation) and now resolves to `resource`. This is the
 		// primitive behind resize/relocation — a holder keeps its handle while the
-		// backing object is swapped for a bigger one.
-		//
-		// The previous resource is released immediately, so only call this once no
-		// in-flight frame still references it. Safe deferred destruction (retiring
-		// the old object for MAX_FRAMES_IN_FLIGHT) is future work for streaming.
-		void Replace(Handle<T> handle, shared_ptr<T> resource)
+		// backing object is swapped for a bigger one. The displaced resource
+		// retires.
+		void Replace(Handle<T> handle, unique_ptr<T> resource)
 		{
 			if (!IsAlive(handle))
 				return;
 
+			_retire.Retire(std::move(_slots[handle.index].resource));
 			_slots[handle.index].resource = std::move(resource);
 		}
 
@@ -110,11 +116,12 @@ namespace Core
 	private:
 		struct Slot
 		{
-			shared_ptr<T> resource;
+			unique_ptr<T> resource;
 			uint32_t generation = 0;
 			ResourceState state = ResourceState::Resident;
 		};
 
+		RetireQueue& _retire;
 		vector<Slot> _slots;
 		vector<uint32_t> _freeSlots;
 		uint32_t _liveCount = 0;

@@ -484,8 +484,8 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 	boundsStaging->CopyBuffer(header.rawBounds, sizeof(header.rawBounds));
 
-	if (!_sdfTexture.IsValid())
-		CreateSDFTexture(header.resolution);
+	_resourceManager.UnloadTexture(_sdfTexture);
+	CreateSDFTexture(header.resolution);
 
 	auto& texture = _sdfTexture.Get();
 

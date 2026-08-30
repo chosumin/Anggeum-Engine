@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "TerrainQuadTree.h"
 #include "Graphics/ResourceManager.h"
-#include "Graphics/FrameCounter.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/Image.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
@@ -34,8 +34,10 @@ namespace
 
 namespace Core
 {
-	TerrainQuadTree::TerrainQuadTree(Device& device, ResourceManager& resourceManager, const TerrainConfig& config)
+	TerrainQuadTree::TerrainQuadTree(Device& device, ResourceManager& resourceManager,
+		SyncContext& syncContext, const TerrainConfig& config)
 		: _config(config)
+		, _sync(syncContext)
 	{
 		uint32_t rows = config.AtlasRows();
 		_heightExtent = uvec2(config.atlasSlotsPerRow, rows) * config.HeightTexels();
@@ -70,10 +72,10 @@ namespace Core
 	{
 		if (_freeSlots.empty())
 		{
-			// Reclaim retired slots that no in-flight frame can reference.
-			while (!_retiredSlots.empty()
-				&& FrameCounter::GetFrameNumber()
-				>= _retiredSlots.front().second + MAX_FRAMES_IN_FLIGHT)
+			// Reclaim retired slots once the GPU passed their last possible
+			// reader. The per-frame cache is enough: stale merely delays.
+			const u64 completed = _sync.GetCompletedValue(QueueType::Graphics);
+			while (!_retiredSlots.empty() && completed >= _retiredSlots.front().second)
 			{
 				_freeSlots.push_back(_retiredSlots.front().first);
 				_retiredSlots.pop_front();
@@ -91,7 +93,11 @@ namespace Core
 	void TerrainQuadTree::ReleaseSlot(uint16_t slot)
 	{
 		assert(slot < _config.atlasCapacity);
-		_retiredSlots.emplace_back(slot, FrameCounter::GetFrameNumber());
+
+		// The current graphics value bounds every frame submitted so far -
+		// and this frame's draws use the updated tables (the eviction's
+		// table job lands this frame), so no later frame samples the slot.
+		_retiredSlots.emplace_back(slot, _sync.GetCurrentValue(QueueType::Graphics));
 	}
 
 	uvec2 TerrainQuadTree::HeightTexelOrigin(uint16_t slot) const

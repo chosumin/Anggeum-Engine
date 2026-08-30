@@ -8,6 +8,7 @@ namespace Core
 {
 	class ResourceManager;
 	class Device;
+	class SyncContext;
 	class Texture;
 	class Sampler;
 	class Shader;
@@ -34,7 +35,8 @@ namespace Core
 	class FrameResources
 	{
 	public:
-		FrameResources(Device& device, ResourceManager& resourceManager);
+		FrameResources(Device& device, ResourceManager& resourceManager,
+			SyncContext& syncContext);
 		~FrameResources();
 
 		FrameResources(const FrameResources&) = delete;
@@ -45,14 +47,11 @@ namespace Core
 		void Reset();
 
 		// On-Demand creation. Render targets are pool-owned per frame and referred
-		// to by handle, like cache textures.
+		// to by handle, like cache textures. A name is created exactly once; the
+		// desc only matters on the creating call.
 		Handle<Texture> GetOrCreateRenderTarget(const string& name,
 			const RenderTargetDesc& desc);
 		Handle<Texture> GetRenderTarget(const string& name) const;
-
-		// Explicit creation (for cases where you want to control the timing of resource creation)
-		Handle<Texture> CreateRenderTarget(const string& name,
-			const RenderTargetDesc& desc);
 
 		// Storage buffers that one pass produces and another consumes within the
 		// same frame. Created on first request and reused for the frame's lifetime.
@@ -131,6 +130,8 @@ namespace Core
 
 	private:
 		Device& _device;
+
+		RetireQueue _retire;
 
 		static inline atomic<bool> _recordingGuard = false;
 

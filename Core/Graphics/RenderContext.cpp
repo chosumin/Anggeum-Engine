@@ -70,7 +70,8 @@ void RenderContext::CreateRenderFrames()
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		_frames[i] = make_unique<RenderFrame>(_device, _resourceManager, _renderScene);
+		_frames[i] = make_unique<RenderFrame>(_device, _resourceManager,
+			_renderScene, _syncContext);
 	}
 }
 

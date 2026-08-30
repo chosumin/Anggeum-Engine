@@ -112,11 +112,6 @@ void Core::RendererBatch::RebuildGpuBuffers(AssetStreamer& streamer)
     // set changed either way, and Cullers have to notice.
     ++_revision;
 
-    // Replacing a live buffer frees the old one immediately, so make sure no frame is
-    // still reading it. The very first build happens before any frame is in flight.
-    if (_hasGpuBuffers)
-        vkDeviceWaitIdle(_device.GetDevice());
-
     // --- Transform buffer (indexed by entity id) ---
     uint32_t maxEntityId = 0;
     bool anyTransform = !_transforms.empty();

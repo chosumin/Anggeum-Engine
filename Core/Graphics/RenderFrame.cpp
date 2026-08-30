@@ -13,10 +13,11 @@
 
 using namespace Core;
 
-RenderFrame::RenderFrame(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
+RenderFrame::RenderFrame(Device& device, ResourceManager& resourceManager,
+	RenderScene& renderScene, SyncContext& syncContext)
 	: _device(device)
 	, _renderScene(renderScene)
-	, _resources(device, resourceManager)
+	, _resources(device, resourceManager, syncContext)
 {
 	CreateSyncObjects();
 }

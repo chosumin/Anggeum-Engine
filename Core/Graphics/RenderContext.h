@@ -31,7 +31,8 @@ namespace Core
 	private:
 		static vector<function<void(SwapChain&)>> _resizeCallbacks;
 	public:
-		RenderContext(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, SyncContext& syncContext);
+		RenderContext(Device& device, ResourceManager& resourceManager,
+			RenderScene& renderScene, SyncContext& syncContext);
 		~RenderContext();
 
 		void RecreateSwapChain();

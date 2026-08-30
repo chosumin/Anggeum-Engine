@@ -18,14 +18,18 @@ namespace Core
 	class Image;
 	class RenderContext;
 	class AssetStreamer;
+	class SyncContext;
 
 	class ResourceManager
 	{
 	public:
-		ResourceManager(Device& device);
+		ResourceManager(Device& device, SyncContext& syncContext);
 		~ResourceManager();
 
 		void Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer);
+
+		// Destroys retired resources whose timelines the GPU has passed.
+		void DestroyRetired();
 
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Material> LoadMaterial(const string materialName, const string& shaderName);
@@ -48,6 +52,8 @@ namespace Core
 		Handle<Texture> LoadTexture(const string& name,
 			unique_ptr<Image> image, Handle<Sampler> sampler);
 
+		void UnloadTexture(Handle<Texture> handle);
+
 		// Pool-owned (resolve with handle.Get()) and deduped by name. Space for the
 		// geometry is reserved right here so the SubMesh is immediately usable
 		//   LoadSubMesh           -> global mesh buffers (GPU-driven draw set)
@@ -67,12 +73,14 @@ namespace Core
 
 	private:
 		void GetShaderFiles(const uint32_t hash, string& pass, string& vert, string& frag);
-		Handle<Shader> StoreShader(const string& name, shared_ptr<Shader> shader);
+		Handle<Shader> StoreShader(const string& name, unique_ptr<Shader> shader);
 
 	private:
 		Device& _device;
 		RenderContext* _renderContext = nullptr;
 		AssetStreamer* _streamer = nullptr;
+
+		RetireQueue _retire;
 
 		Handle<Texture> _defaultTexture;
 

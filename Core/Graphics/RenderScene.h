@@ -15,6 +15,7 @@ namespace Core
 	class DescriptorSetBuilder;
 	class TerrainSystem;
 	class TransferContext;
+	class SyncContext;
 	class ResourceManager;
 	class AssetStreamer;
 
@@ -36,7 +37,8 @@ namespace Core
 	public:
 		// The CPU scene this render scene mirrors. The scene object is created
 		// first (empty) and loaded later, so it can be a constructor argument.
-		RenderScene(Device& device, ResourceManager& resourceManager, Scene& scene, TransferContext& transfer);
+		RenderScene(Device& device, ResourceManager& resourceManager, Scene& scene,
+			SyncContext& syncContext, TransferContext& transfer);
 		~RenderScene();
 
 		Scene& GetScene() const { return _scene; }

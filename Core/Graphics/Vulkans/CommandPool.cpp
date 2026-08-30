@@ -60,7 +60,7 @@ namespace Core
 		// delays recycling. Unbound pools (blocking one-shots, stamped 0
 		// after their wait) reduce to "not checked out".
 		const uint64_t completed = _sync != nullptr
-			? _sync->GetCachedCompletedValue(_timelineQueue) : 0;
+			? _sync->GetCompletedValue(_timelineQueue) : 0;
 
 		for (auto&& buffer : buffers)
 		{

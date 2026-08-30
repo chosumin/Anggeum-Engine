@@ -33,7 +33,7 @@ void TransferContext::BeginFrame()
 	// Non-blocking completion poll: everything the GPU has passed retires
 	// here - transfer-stamped ring spans and the jobs (and fallback staging)
 	// of completed batches.
-	uint64_t completed = _sync.QueryCompletedValue(QueueType::Transfer);
+	uint64_t completed = _sync.GetCompletedValue(QueueType::Transfer);
 	CollectCompletedJobs(completed);
 	_stagingRing->Reclaim(completed);
 	_stagingRing->BeginFrame();

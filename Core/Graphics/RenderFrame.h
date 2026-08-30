@@ -20,7 +20,8 @@ namespace Core
 	class RenderFrame
 	{
 	public:
-		RenderFrame(Device& device, ResourceManager& resourceManager, RenderScene& renderScene);
+		RenderFrame(Device& device, ResourceManager& resourceManager,
+			RenderScene& renderScene, SyncContext& syncContext);
 		~RenderFrame();
 		
 		// Reset frame resources

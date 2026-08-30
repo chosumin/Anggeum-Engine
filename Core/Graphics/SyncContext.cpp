@@ -68,14 +68,7 @@ u64 SyncContext::GetCurrentValue(QueueType queueType) const
     }
 }
 
-u64 SyncContext::QueryCompletedValue(QueueType queueType) const
-{
-    u64 value = 0;
-    vkGetSemaphoreCounterValue(_device.GetDevice(), GetSemaphore(queueType), &value);
-    return value;
-}
-
-u64 SyncContext::GetCachedCompletedValue(QueueType queueType) const
+u64 SyncContext::GetCompletedValue(QueueType queueType) const
 {
     switch (queueType)
     {
@@ -87,9 +80,17 @@ u64 SyncContext::GetCachedCompletedValue(QueueType queueType) const
 
 void SyncContext::RefreshCompletedCache()
 {
-    _graphicsCompletedCache = QueryCompletedValue(QueueType::Graphics);
-    _computeCompletedCache = QueryCompletedValue(QueueType::Compute);
-    _transferCompletedCache = QueryCompletedValue(QueueType::Transfer);
+    // The only driver poll: everyone else reads the snapshot.
+    auto query = [this](QueueType queueType)
+    {
+        u64 value = 0;
+        vkGetSemaphoreCounterValue(_device.GetDevice(), GetSemaphore(queueType), &value);
+        return value;
+    };
+
+    _graphicsCompletedCache = query(QueueType::Graphics);
+    _computeCompletedCache = query(QueueType::Compute);
+    _transferCompletedCache = query(QueueType::Transfer);
 }
 
 u64 SyncContext::AcquireNextValue(QueueType queueType)

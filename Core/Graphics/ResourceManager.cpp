@@ -7,11 +7,20 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/AssetStreamer.h"
+#include "Graphics/RetireQueue.h"
 
 namespace Core
 {
-	ResourceManager::ResourceManager(Device& device)
+	ResourceManager::ResourceManager(Device& device, SyncContext& syncContext)
 		: _device(device)
+		, _retire(syncContext)
+		, _materialPool(_retire)
+		, _shaderPool(_retire)
+		, _computePipelinePool(_retire)
+		, _samplerPool(_retire)
+		, _texturePool(_retire)
+		, _subMeshPool(_retire)
+		, _bufferPool(_retire)
 	{
 		ImageCreateDesc imageCreateInfo{};
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
@@ -24,6 +33,11 @@ namespace Core
 	}
 
 	ResourceManager::~ResourceManager() = default;
+
+	void ResourceManager::DestroyRetired()
+	{
+		_retire.Collect();
+	}
 
 	void ResourceManager::Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer)
 	{
@@ -46,9 +60,9 @@ namespace Core
 			return it->second;
 
 		auto material =
-			make_shared<Core::Material>(_device, *this, LoadShader(shaderName), materialName);
+			make_unique<Core::Material>(_device, *this, LoadShader(shaderName), materialName);
 
-		Handle<Material> handle = _materialPool.Add(material);
+		Handle<Material> handle = _materialPool.Add(std::move(material));
 		_materialHandles[materialName] = handle;
 
 		MaterialManager* materialManager = _renderContext->GetMaterialManager();
@@ -71,11 +85,11 @@ namespace Core
 		uint32_t hash = Utility::HashCode(shaderName.c_str());
 		GetShaderFiles(hash, pass, vertShaderPath, fragShaderPath);
 
-		shared_ptr<Core::Shader> shader;
+		unique_ptr<Core::Shader> shader;
 		if (vertShaderPath.empty() || fragShaderPath.empty())
-			shader = make_shared<Shader>(_device, pass, shaderName);
+			shader = make_unique<Shader>(_device, pass, shaderName);
 		else
-			shader = make_shared<Shader>(_device, pass, vertShaderPath, fragShaderPath);
+			shader = make_unique<Shader>(_device, pass, vertShaderPath, fragShaderPath);
 
 		return StoreShader(shaderName, std::move(shader));
 	}
@@ -92,7 +106,7 @@ namespace Core
 			return it->second;
 
 		Handle<Pipeline> handle = _computePipelinePool.Add(
-			make_shared<Pipeline>(_device, shader.Get()));
+			make_unique<Pipeline>(_device, shader.Get()));
 		_computePipelineHandles[shaderName] = handle;
 
 		return handle;
@@ -108,12 +122,12 @@ namespace Core
 		if (it != _shaderHandles.end() && _shaderPool.IsAlive(it->second))
 			return it->second;
 
-		auto shader = make_shared<Shader>(_device, "Geometry", vertPath, fragPath);
+		auto shader = make_unique<Shader>(_device, "Geometry", vertPath, fragPath);
 
 		return StoreShader(name, std::move(shader));
 	}
 
-	Handle<Shader> ResourceManager::StoreShader(const string& name, shared_ptr<Shader> shader)
+	Handle<Shader> ResourceManager::StoreShader(const string& name, unique_ptr<Shader> shader)
 	{
 		// Set bindless descriptor set layout BEFORE CreatePipelineLayout
 		if (_renderContext && _renderContext->HasBindlessSupport() && shader->UsesBindlessTextures())
@@ -139,7 +153,7 @@ namespace Core
 		if (it != _samplerHandles.end() && _samplerPool.IsAlive(it->second))
 			return it->second;
 
-		Handle<Sampler> handle = _samplerPool.Add(make_shared<Core::Sampler>(_device, info));
+		Handle<Sampler> handle = _samplerPool.Add(make_unique<Core::Sampler>(_device, info));
 		_samplerHandles[info] = handle;
 		return handle;
 	}
@@ -157,12 +171,13 @@ namespace Core
 			return it->second;
 
 		auto image = make_unique<Core::Image>(_device, imageCreateInfo);
-		auto texture = make_shared<Core::Texture>(newName, std::move(image), sampler);
+		auto texture = make_unique<Core::Texture>(newName, std::move(image), sampler);
+		Texture* texturePtr = texture.get();
 
-		Handle<Texture> handle = _texturePool.Add(texture);
+		Handle<Texture> handle = _texturePool.Add(std::move(texture));
 		_textureHandles[newName] = handle;
 
-		// Only the ctor's default texture takes that path. 
+		// Only the ctor's default texture takes that path.
 		// The ctor needs neither the queue nor the Loading state.
 		if (_renderContext != nullptr)
 		{
@@ -170,7 +185,7 @@ namespace Core
 			{
 				auto* bindlessManager = _renderContext->GetBindlessTextureManager();
 				uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
-				texture->SetBindlessIndex(bindlessIndex);
+				texturePtr->SetBindlessIndex(bindlessIndex);
 			}
 
 			handle.SetLoading();
@@ -186,13 +201,30 @@ namespace Core
 	{
 		lock_guard<mutex> guard(_textureMutex);
 
-		auto texture = make_shared<Core::Texture>(name, std::move(image), sampler);
+		auto it = _textureHandles.find(name);
+		if (it != _textureHandles.end() && _texturePool.IsAlive(it->second))
+			return it->second;
 
-		// Re-creation (e.g. SDF regenerate) orphans the previous slot rather than
-		// freeing it, since an in-flight frame may still reference the old texture.
-		Handle<Texture> handle = _texturePool.Add(texture);
+		auto texture = make_unique<Core::Texture>(name, std::move(image), sampler);
+
+		Handle<Texture> handle = _texturePool.Add(std::move(texture));
 		_textureHandles[name] = handle;
 		return handle;
+	}
+
+	void ResourceManager::UnloadTexture(Handle<Texture> handle)
+	{
+		lock_guard<mutex> guard(_textureMutex);
+
+		Texture* texture = handle.TryGet();
+		if (texture == nullptr)
+			return;
+
+		// NOTE: bindless-registered textures also need their descriptor reset to
+		// the default texture; today's callers only unload unregistered ones
+		// (SDF volume). Revisit when the streaming policy starts evicting assets.
+		_textureHandles.erase(texture->GetName());
+		_texturePool.Remove(handle);
 	}
 
 	// Index count is implied by the data, so callers don't have to pass it separately.
@@ -214,10 +246,11 @@ namespace Core
 		if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
 			return it->second;
 
-		auto subMesh = make_shared<Core::SubMesh>(_device, name);
+		auto subMesh = make_unique<Core::SubMesh>(_device, name);
 		subMesh->SetIndexCount(IndexCountOf(geometry));
+		SubMesh* subMeshPtr = subMesh.get();
 
-		Handle<SubMesh> handle = _subMeshPool.Add(subMesh);
+		Handle<SubMesh> handle = _subMeshPool.Add(std::move(subMesh));
 		_subMeshHandles[name] = handle;
 
 		GeometryCopyBatch batch;
@@ -226,10 +259,10 @@ namespace Core
 
 		// Scanning every vertex for bounds is the expensive part, so the upload job
 		// does it on a worker thread and reports back here.
-		batch.boundsTarget = subMesh.get();
+		batch.boundsTarget = subMeshPtr;
 
 		auto* meshBufferManager = _renderContext->GetMeshBufferManager();
-		subMesh->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
+		subMeshPtr->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
 
 		if (!batch.copies.empty())
 		{
@@ -251,11 +284,11 @@ namespace Core
 			if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
 				return it->second;
 
-			auto created = make_shared<Core::SubMesh>(_device, name);
+			auto created = make_unique<Core::SubMesh>(_device, name);
 			created->SetIndexCount(IndexCountOf(geometry));
 
 			subMesh = created.get();
-			handle = _subMeshPool.Add(created);
+			handle = _subMeshPool.Add(std::move(created));
 			_subMeshHandles[name] = handle;
 		}
 
@@ -300,7 +333,7 @@ namespace Core
 	{
 		lock_guard<mutex> guard(_bufferMutex);
 
-		auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+		auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 		if (!debugName.empty())
 		{
@@ -308,14 +341,14 @@ namespace Core
 				(uint64_t)buffer->GetBuffer(), debugName.c_str());
 		}
 
-		return _bufferPool.Add(buffer);
+		return _bufferPool.Add(std::move(buffer));
 	}
 
 	void ResourceManager::ResizeBuffer(Handle<Buffer> handle, const BufferDesc& desc, const string& debugName)
 	{
 		lock_guard<mutex> guard(_bufferMutex);
 
-		auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+		auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 		if (!debugName.empty())
 		{
@@ -323,7 +356,7 @@ namespace Core
 				(uint64_t)buffer->GetBuffer(), debugName.c_str());
 		}
 
-		_bufferPool.Replace(handle, buffer);
+		_bufferPool.Replace(handle, std::move(buffer));
 	}
 
 	void Core::ResourceManager::GetShaderFiles(const uint32_t hash,

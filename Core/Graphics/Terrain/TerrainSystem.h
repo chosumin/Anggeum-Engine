@@ -10,6 +10,7 @@ namespace Core
 	class ResourceManager;
 	class PerspectiveCamera;
 	class TransferContext;
+	class SyncContext;
 	class Light;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
@@ -17,7 +18,8 @@ namespace Core
 	class TerrainSystem
 	{
 	public:
-		TerrainSystem(Device& device, ResourceManager& resourceManager, TransferContext& transfer);
+		TerrainSystem(Device& device, ResourceManager& resourceManager,
+			SyncContext& syncContext, TransferContext& transfer);
 
 		void Update(PerspectiveCamera& camera);
 

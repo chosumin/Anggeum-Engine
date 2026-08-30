@@ -41,17 +41,9 @@ namespace Core
         u64 GetCurrentValue(QueueType queueType) const;
         u64 AcquireNextValue(QueueType queueType);
 
-        // The GPU-side progress of a queue's timeline (non-blocking poll):
-        // every submission whose value is <= this has fully executed.
-        // Main thread only - concurrent driver queries from workers are what
-        // the cached variant below exists to avoid.
-        u64 QueryCompletedValue(QueueType queueType) const;
-
-        // Completed values cached once per frame (RefreshCompletedCache, main
-        // thread). Safe to read from any thread; a stale value is
-        // CONSERVATIVE for recycling - a resource merely stays busy a little
-        // longer - so pools poll this instead of the driver.
-        u64 GetCachedCompletedValue(QueueType queueType) const;
+        // The GPU-side progress of a queue's timeline: every submission whose
+        // value is <= this has fully executed.
+        u64 GetCompletedValue(QueueType queueType) const;
         void RefreshCompletedCache();
 
         // Frame slot snapshots (for reusing a frame slot safely)
@@ -113,7 +105,7 @@ namespace Core
         u64 _pendingResourceWait = 0;
         u64 _pendingTransferWait = 0;
 
-        // Per-frame snapshot of QueryCompletedValue, readable from workers.
+        // Per-frame snapshot of the driver completed values, readable anywhere.
         atomic<u64> _graphicsCompletedCache{ 0 };
         atomic<u64> _computeCompletedCache{ 0 };
         atomic<u64> _transferCompletedCache{ 0 };

@@ -22,16 +22,18 @@ Core::Engine::Engine(const EngineOptions& options)
     _timer = make_unique<Core::Timer>();
 
     _device = new Core::Device(*options.window);
-    _resourceManager = new Core::ResourceManager(*_device);
-    _workerThreadManager = new Core::WorkerThreadManager(*_device);
+    
     _syncContext = new Core::SyncContext(*_device);
+
+    _resourceManager = new Core::ResourceManager(*_device, *_syncContext);
     _workerThreadManager = new Core::WorkerThreadManager(*_device, *_syncContext);
     _transferContext = new Core::TransferContext(*_device, *_workerThreadManager,
         *_syncContext);
 
     auto* sampleScene = new SampleScene(*_device, *_resourceManager);
     _scene = sampleScene;
-    _renderScene = new Core::RenderScene(*_device, *_resourceManager, *_scene, *_transferContext);
+    _renderScene = new Core::RenderScene(*_device, *_resourceManager, *_scene,
+        *_syncContext, *_transferContext);
     _renderContext = new Core::RenderContext(*_device, *_resourceManager, *_renderScene, *_syncContext);
     _status = make_unique<Core::Status>(*_renderContext);
 
@@ -55,9 +57,9 @@ Core::Engine::~Engine()
     delete(_renderScene);
     delete(_scene);
     delete(_transferContext);
-    delete(_syncContext);
     delete(_workerThreadManager);
     delete(_resourceManager);
+    delete(_syncContext);
     delete(_device);
 
     Core::Window::Instance().Delete();
@@ -98,6 +100,10 @@ void Core::Engine::Draw()
 
 		// One completed-value poll per frame; pools recycle off this cache.
 		_syncContext->RefreshCompletedCache();
+
+		// Destroy retired resources whose timelines the GPU has passed.
+		_resourceManager->DestroyRetired();
+
 		_transferContext->BeginFrame();
 
 		// Streams, syncs the GPU mirrors and hands this frame's upload jobs

@@ -6,6 +6,7 @@ namespace Core
 {
 	class Device;
 	class ResourceManager;
+	class SyncContext;
 	class Texture;
 	class Buffer;
 
@@ -21,7 +22,8 @@ namespace Core
 		static constexpr const char* QUADTREE_INDEX = "Terrain.QuadtreeIndex";
 		static constexpr const char* NODE_DESC = "Terrain.NodeDesc";
 
-		TerrainQuadTree(Device& device, ResourceManager& resourceManager, const TerrainConfig& config);
+		TerrainQuadTree(Device& device, ResourceManager& resourceManager,
+			SyncContext& syncContext, const TerrainConfig& config);
 
 		Handle<Texture> GetHeightAtlas() const { return _heightAtlas; }
 		Handle<Texture> GetNormalAtlas() const { return _normalAtlas; }
@@ -60,7 +62,11 @@ namespace Core
 		Handle<Texture> _indexTexture;
 		Handle<Buffer> _nodeDescBuffer;
 
+		SyncContext& _sync;
+
 		vector<uint16_t> _freeSlots;
-		deque<pair<uint16_t, uint64_t>> _retiredSlots; // slot, release frame
+
+		// slot + the graphics value covering its last possible reader.
+		deque<pair<uint16_t, u64>> _retiredSlots;
 	};
 }

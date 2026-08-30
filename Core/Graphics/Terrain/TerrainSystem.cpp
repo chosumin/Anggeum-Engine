@@ -13,12 +13,13 @@
 
 namespace Core
 {
-	TerrainSystem::TerrainSystem(Device& device, ResourceManager& resourceManager, TransferContext& transfer)
+	TerrainSystem::TerrainSystem(Device& device, ResourceManager& resourceManager,
+		SyncContext& syncContext, TransferContext& transfer)
 		: _store(TerrainNodeStore::Load(_config,
 			ProceduralTerrainHeightSource(TerrainNoiseParams{},
 				_config.heightMin, _config.heightMax)))
 	{
-		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, _config);
+		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
 		CreateGridIndexBuffer(device, resourceManager, transfer);
 

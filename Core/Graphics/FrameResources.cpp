@@ -15,8 +15,12 @@
 
 using namespace Core;
 
-FrameResources::FrameResources(Device& device, ResourceManager& resourceManager)
+FrameResources::FrameResources(Device& device, ResourceManager& resourceManager,
+	SyncContext& syncContext)
 	: _device(device)
+	, _retire(syncContext)
+	, _renderTargetPool(_retire)
+	, _bufferPool(_retire)
 {
 	CreateDescriptorPool();
 	_defaultSampler = resourceManager.LoadSampler(DEFAULT_SAMPLER);
@@ -40,6 +44,9 @@ FrameResources::~FrameResources()
 
 void FrameResources::Reset()
 {
+	// Destroy retired resources whose timelines the GPU has passed.
+	_retire.Collect();
+
 	if (_descriptorPool)
 		_descriptorPool->Reset();
 
@@ -130,12 +137,6 @@ Handle<Texture> FrameResources::GetOrCreateRenderTarget(const string& name,
 	if (it != _renderTargets.end())
 		return it->second;
 
-	return CreateRenderTarget(name, desc);
-}
-
-Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
-	const RenderTargetDesc& desc)
-{
 	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
 
 	VkFormat format = desc.format;
@@ -158,7 +159,7 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	auto* imagePtr = image.get();
 
 	Handle<Sampler> sampler = desc.sampler.IsValid() ? desc.sampler : _defaultSampler;
-	auto texture = make_shared<Texture>(name, std::move(image), sampler);
+	auto texture = make_unique<Texture>(name, std::move(image), sampler);
 
 	// Render targets are what validation errors point at most of the time, so give
 	// the layer a name to print instead of a bare handle.
@@ -168,7 +169,7 @@ Handle<Texture> FrameResources::CreateRenderTarget(const string& name,
 	debugUtils.SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW,
 		(uint64_t)imagePtr->GetOrCreateImageView(0), (name + " View").c_str());
 
-	Handle<Texture> handle = _renderTargetPool.Add(texture);
+	Handle<Texture> handle = _renderTargetPool.Add(std::move(texture));
 	_renderTargets[name] = handle;
 
 	// Move the target from UNDEFINED into its requested starting layout. Deferred
@@ -191,12 +192,12 @@ Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 
 	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
 
-	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+	auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
 		(uint64_t)buffer->GetBuffer(), name.c_str());
 
-	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	Handle<Buffer> handle = _bufferPool.Add(std::move(buffer));
 	_storageBufferHandles[name] = handle;
 	return handle;
 }
@@ -206,7 +207,7 @@ Handle<Buffer> FrameResources::CreateOrReplaceStorageBuffer(const string& name,
 {
 	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
 
-	auto buffer = make_shared<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
+	auto buffer = make_unique<Buffer>(_device, desc.size, desc.usage, desc.memoryType);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
 		(uint64_t)buffer->GetBuffer(), name.c_str());
@@ -214,11 +215,11 @@ Handle<Buffer> FrameResources::CreateOrReplaceStorageBuffer(const string& name,
 	auto it = _storageBufferHandles.find(name);
 	if (it != _storageBufferHandles.end())
 	{
-		_bufferPool.Replace(it->second, buffer);
+		_bufferPool.Replace(it->second, std::move(buffer));
 		return it->second;
 	}
 
-	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	Handle<Buffer> handle = _bufferPool.Add(std::move(buffer));
 	_storageBufferHandles[name] = handle;
 	return handle;
 }
@@ -250,13 +251,13 @@ Handle<Buffer> FrameResources::GetOrCreateUniformBuffer(const string& name, VkDe
 
 	assert(!IsRecordingGuardActive() && "resource pool mutation during the recording window");
 
-	auto buffer = make_shared<Buffer>(_device, size,
+	auto buffer = make_unique<Buffer>(_device, size,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, MemoryType::UNIFORM);
 
 	_device.GetDebugUtils().SetObjectName(VK_OBJECT_TYPE_BUFFER,
 		(uint64_t)buffer->GetBuffer(), name.c_str());
 
-	Handle<Buffer> handle = _bufferPool.Add(buffer);
+	Handle<Buffer> handle = _bufferPool.Add(std::move(buffer));
 	_uniformBufferHandles[name] = handle;
 	return handle;
 }

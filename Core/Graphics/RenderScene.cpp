@@ -17,7 +17,8 @@
 
 using namespace Core;
 
-RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene& scene, TransferContext& transfer)
+RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene& scene,
+	SyncContext& syncContext, TransferContext& transfer)
 	: _device(&device)
 	, _scene(scene)
 {
@@ -33,7 +34,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 	_material = make_unique<MaterialManager>(device, resourceManager);
 	_batch = make_unique<RendererBatch>(device, resourceManager);
 
-	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, transfer);
+	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, syncContext, transfer);
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.
