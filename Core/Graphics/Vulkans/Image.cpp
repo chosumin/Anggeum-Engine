@@ -405,10 +405,9 @@ void Core::Image::LoadKtxImage(vector<uint8_t>& outData,
         throw runtime_error{ "Error loading KTX texture: " + path };
     }
 
-    // Basis-encoded payloads (the baked UASTC assets) transcode right here on
-    // the worker thread to the desktop block format, and the image honors the
-    // transcoded format over the desc's placeholder. Same bits per texel, so
-    // the staging budget taken from the file header still matches.
+    // Basis-encoded payloads (the baked UASTC assets) transcode right here 
+    // to the desktop block format, and the image honors the
+    // transcoded format over the desc's placeholder.
     if (texture->classId == ktxTexture2_c)
     {
         auto* texture2 = reinterpret_cast<ktxTexture2*>(texture);
