@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/SyncContext.h"
 
 namespace Core
 {
@@ -7,7 +8,7 @@ namespace Core
 
 	// The engine's staging arena: a persistently-mapped, self-owned allocation
 	// (no pool involved). Spans are handed out circularly, closed with the
-	// transfer-timeline value of the submission that consumed them, and
+	// timeline value (and lane) of the submission that consumed them, and
 	// reclaimed FIFO once the GPU passes that value - steady-state traffic
 	// reuses the same memory instead of allocating per upload.
 	//
@@ -33,13 +34,13 @@ namespace Core
 		// Thread-safe: jobs acquire on worker threads while they record.
 		Span Acquire(VkDeviceSize size);
 
-		// Every acquired span must be closed exactly once, with the transfer
-		// timeline value that retires it: a slow job's span must ride ITS OWN
-		// submission's value, not whatever submission happened to go out first.
-		void Close(uint64_t spanId, uint64_t transferValue);
+		// Every acquired span must be closed exactly once, with the timeline
+		// value (on `lane`'s timeline) that retires it: a slow job's span must
+		// ride ITS OWN submission's value, not whatever submission happened to
+		// go out first.
+		void Close(uint64_t spanId, uint64_t value, QueueType lane);
 
-		// Free the closed-and-completed PREFIX.
-		void Reclaim(uint64_t transferCompleted);
+		void Reclaim(uint64_t transferCompleted, uint64_t graphicsLaneCompleted);
 
 		// Starts a budget window: resets the requested-bytes tally the shared
 		// upload budget is measured against.
@@ -73,6 +74,7 @@ namespace Core
 			VkDeviceSize used;   // span bytes + any wrap padding it caused
 			bool closed = false;
 			uint64_t value = 0;
+			QueueType lane = QueueType::Transfer;
 		};
 		deque<SpanRecord> _records;
 		uint64_t _baseId = 0;

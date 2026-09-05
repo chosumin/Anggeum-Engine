@@ -46,6 +46,7 @@ namespace Core
 		static void GetAccessAndStageMask(VkImageLayout imageLayout,
 			VkAccessFlags2& outAccess, VkPipelineStageFlags2& outStage);
 		VkPipelineStageFlags2 SanitizeStageMask(VkPipelineStageFlags2 stageMask) const;
+		VkAccessFlags2 SanitizeAccessMask(VkAccessFlags2 accessMask) const;
 
 	private:
 		CommandBuffer& _commandBuffer;

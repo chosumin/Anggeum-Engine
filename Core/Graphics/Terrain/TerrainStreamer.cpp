@@ -175,9 +175,7 @@ namespace Core
 			vector<TerrainNodeDescGPU>(_descMirror),
 			vector<vector<uint16_t>>(_indexMirror),
 			_firstUpload, span);
-		// Must-land: the recording is a memcpy, and the tables it publishes
-		// back this frame's bookkeeping.
-		upload.mustLand = true;
+		upload.lane = QueueType::Graphics;
 
 		_transfer.SubmitJob(std::move(upload),
 			"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber()));

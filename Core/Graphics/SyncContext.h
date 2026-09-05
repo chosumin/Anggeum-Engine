@@ -44,6 +44,11 @@ namespace Core
         // The GPU-side progress of a queue's timeline: every submission whose
         // value is <= this has fully executed.
         u64 GetCompletedValue(QueueType queueType) const;
+
+        // Same, for the resource timeline (resource init + graphics-lane
+        // uploads - pre-frame graphics work signals it).
+        u64 GetCompletedResourceValue() const { return _resourceCompletedCache; }
+
         void RefreshCompletedCache();
 
         // Frame slot snapshots (for reusing a frame slot safely)
@@ -57,6 +62,13 @@ namespace Core
         // Submits an upload batch on the transfer queue, signalling the
         // transfer timeline; returns the signalled value.
         u64 SubmitTransfer(CommandBuffer& primary,
+            const vector<CommandBuffer*>& secondaries);
+
+        // Submits a graphics-lane upload batch (in-place mutations) on the
+        // graphics queue ahead of the frame, signalling the resource timeline
+        // like resource init; returns the signalled value. Same-queue
+        // submission order protects the previous in-flight frame's reads.
+        u64 SubmitGraphicsUpload(CommandBuffer& primary,
             const vector<CommandBuffer*>& secondaries);
 
         // Injects the frame-level semaphores and submits the frame
@@ -109,5 +121,6 @@ namespace Core
         atomic<u64> _graphicsCompletedCache{ 0 };
         atomic<u64> _computeCompletedCache{ 0 };
         atomic<u64> _transferCompletedCache{ 0 };
+        atomic<u64> _resourceCompletedCache{ 0 };
     };
 }

@@ -32,11 +32,8 @@ namespace Core
 			Handle<Texture> texture;
 			Handle<SubMesh> subMesh;
 
-			// Must be submitted the frame it was enqueued (table fills back a
-			// draw set that already changed CPU-side; terrain tiles publish with
-			// their tables). Always memcpy recordings - Flush's wait never
-			// blocks on file IO.
-			bool mustLand = false;
+			// Which queue this upload's batch submits on.
+			QueueType lane = QueueType::Transfer;
 		};
 
 		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
@@ -71,9 +68,10 @@ namespace Core
 		// A pending job with the same name absorbs the call.
 		void SubmitJob(PendingUpload&& upload, const string& jobName);
 
-		// Submit the jobs whose worker RECORDING has finished, as one batch.
-		// `waitForRecordings` first waits for the must-land jobs' recordings;
-		// IO-bound loads keep cooking and ride a later Flush.
+		// Submit the jobs whose worker RECORDING has finished, one batch per
+		// lane. `waitForRecordings` first waits for the graphics-lane
+		// (frame-coherent) recordings; IO-bound loads keep cooking and ride a
+		// later Flush.
 		void Flush(bool waitForRecordings = false);
 
 		// How many resources the promotion pump flipped Resident since the last call.
@@ -81,19 +79,23 @@ namespace Core
 
 	private:
 		// Promotes + destroys in-flight batches the GPU has passed.
-		void CollectCompletedJobs(uint64_t completedValue);
+		void CollectCompletedJobs();
 
-		// Uploads submitted at `value`, awaiting GPU completion before their
-		// resources promote and their jobs (fallback staging included) die.
+		// Uploads submitted at `value` on `lane`'s timeline.
 		struct InFlightJobs
 		{
-			uint64_t value;
+			uint64_t value = 0;
+			QueueType lane = QueueType::Transfer;
 			vector<PendingUpload> uploads;
 		};
+
+		void SubmitBatch(InFlightJobs&& batch,
+			vector<CommandBuffer*>& secondaries, QueueType lane);
 
 		Device& _device;
 
 		unique_ptr<CommandPool> _primaryCommandPool;
+		unique_ptr<CommandPool> _graphicsPrimaryCommandPool;
 
 		// Steady-state staging memory, recycled by timeline value. Jobs whose
 		// data does not fit (initial load spike) fall back to their own

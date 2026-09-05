@@ -6,8 +6,9 @@
 #include "Components/Light.h"
 #include "Components/Transform.h"
 #include "Graphics/ResourceManager.h"
-#include "Graphics/GeometryUpload.h"
+#include "Graphics/BufferUpload.h"
 #include "Graphics/FrameCounter.h"
+#include "Graphics/FrameResources.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/Vulkans/Buffer.h"
 
@@ -21,7 +22,7 @@ namespace Core
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
-		CreateGridIndexBuffer(device, resourceManager, transfer);
+		CreateGridIndexBuffer(resourceManager);
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
 		// each slot before its first GPU write has happened.
@@ -37,8 +38,7 @@ namespace Core
 		}
 	}
 
-	void TerrainSystem::CreateGridIndexBuffer(Device& device,
-		ResourceManager& resourceManager, TransferContext& transfer)
+	void TerrainSystem::CreateGridIndexBuffer(ResourceManager& resourceManager)
 	{
 		// One shared index buffer over a virtual 17x17 PATCH grid - the draw
 		// instance is one patch of the GPU-culled patch list; terrain.vert
@@ -68,16 +68,17 @@ namespace Core
 			  MemoryType::DEVICE_LOCAL },
 			"Terrain.GridIndices");
 
-		GeometryCopyBatch batch;
-		batch.debugName = "Terrain.GridIndices";
-		const auto* bytes = reinterpret_cast<const uint8_t*>(indices.data());
-		batch.copies.push_back({ _gridIndexBuffer,
-			vector<uint8_t>(bytes, bytes + indices.size() * sizeof(uint16_t)), 0 });
+		_pendingGridIndices = std::move(indices);
+	}
 
-		TransferContext::PendingUpload upload;
-		upload.job = make_unique<GeometryUploadJob>(device, move(batch));
-		upload.mustLand = true;
-		transfer.SubmitJob(std::move(upload), "Terrain.GridIndices");
+	void TerrainSystem::QueueGridIndexInit(Device& device, FrameResources& frameResources)
+	{
+		if (_pendingGridIndices.empty())
+			return;
+
+		frameResources.AddInitJob(make_unique<BufferUploadJob<uint16_t>>(
+			device, _gridIndexBuffer.Get(), std::move(_pendingGridIndices), 0));
+		_pendingGridIndices.clear();
 	}
 
 	TerrainParams TerrainSystem::BuildRenderParams(Light* mainLight) const

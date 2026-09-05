@@ -110,11 +110,15 @@ void Core::BarrierBatch::Submit()
 	{
 		barrier.srcStageMask = SanitizeStageMask(barrier.srcStageMask);
 		barrier.dstStageMask = SanitizeStageMask(barrier.dstStageMask);
+		barrier.srcAccessMask = SanitizeAccessMask(barrier.srcAccessMask);
+		barrier.dstAccessMask = SanitizeAccessMask(barrier.dstAccessMask);
 	}
 	for (auto& barrier : _imageBarriers)
 	{
 		barrier.srcStageMask = SanitizeStageMask(barrier.srcStageMask);
 		barrier.dstStageMask = SanitizeStageMask(barrier.dstStageMask);
+		barrier.srcAccessMask = SanitizeAccessMask(barrier.srcAccessMask);
+		barrier.dstAccessMask = SanitizeAccessMask(barrier.dstAccessMask);
 	}
 
 	VkDependencyInfo dependencyInfo{};
@@ -174,8 +178,33 @@ VkPipelineStageFlags2 Core::BarrierBatch::SanitizeStageMask(VkPipelineStageFlags
 {
 	const auto& qfi = _device.GetQueueFamilyIndices();
 
-	// Only the dedicated compute queue needs stage sanitizing. Graphics queue
-	// supports all of the stages used here.
+	// Dedicated transfer family: shader/raster stages don't exist on this
+	// queue, so any mask naming them collapses to ALL_COMMANDS (queue-scoped,
+	// always valid). SanitizeAccessMask drops the matching access bits -
+	// cross-queue visibility is the consumer's timeline gate, not this
+	// barrier.
+	if (qfi.TransferFamily.has_value() &&
+		_queueFamilyIndex == qfi.TransferFamily.value() &&
+		qfi.TransferFamily.value() != qfi.GraphicsFamily.value())
+	{
+		const VkPipelineStageFlags2 transferLegal =
+			VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT |
+			VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT |
+			VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT |
+			VK_PIPELINE_STAGE_2_COPY_BIT |
+			VK_PIPELINE_STAGE_2_RESOLVE_BIT |
+			VK_PIPELINE_STAGE_2_BLIT_BIT |
+			VK_PIPELINE_STAGE_2_CLEAR_BIT |
+			VK_PIPELINE_STAGE_2_HOST_BIT |
+			VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+		if (stageMask & ~transferLegal)
+			return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		return stageMask;
+	}
+
+	// Only the dedicated compute queue needs stage sanitizing beyond that.
+	// Graphics queue supports all of the stages used here.
 	if (!qfi.ComputeFamily.has_value() ||
 		_queueFamilyIndex != qfi.ComputeFamily.value())
 		return stageMask;
@@ -205,4 +234,23 @@ VkPipelineStageFlags2 Core::BarrierBatch::SanitizeStageMask(VkPipelineStageFlags
 		stageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
 
 	return stageMask;
+}
+
+VkAccessFlags2 Core::BarrierBatch::SanitizeAccessMask(VkAccessFlags2 accessMask) const
+{
+	const auto& qfi = _device.GetQueueFamilyIndices();
+	if (!qfi.TransferFamily.has_value() ||
+		_queueFamilyIndex != qfi.TransferFamily.value() ||
+		qfi.TransferFamily.value() == qfi.GraphicsFamily.value())
+		return accessMask;
+
+	// A transfer-only queue has no stage that supports shader or attachment
+	// access, so those bits are illegal even under ALL_COMMANDS (its expansion
+	// is queue-scoped). Dropping them is correct: cross-queue visibility is
+	// established by the consumer's semaphore wait, not this barrier.
+	const VkAccessFlags2 transferLegal =
+		VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT |
+		VK_ACCESS_2_HOST_READ_BIT | VK_ACCESS_2_HOST_WRITE_BIT |
+		VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+	return accessMask & transferLegal;
 }

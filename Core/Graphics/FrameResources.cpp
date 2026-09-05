@@ -58,6 +58,11 @@ void FrameResources::Reset()
 	_pendingInitJobs.clear();
 }
 
+void FrameResources::AddInitJob(unique_ptr<Job> job)
+{
+	_pendingInitJobs.push_back(std::move(job));
+}
+
 bool FrameResources::HasPendingInit() const
 {
 	// Reset() empties the job list at the top of the frame, so anything in it here

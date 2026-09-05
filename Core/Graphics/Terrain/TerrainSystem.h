@@ -12,6 +12,7 @@ namespace Core
 	class TransferContext;
 	class SyncContext;
 	class Light;
+	class FrameResources;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
 	// startup and owns the quadtree GPU face and the streamer.
@@ -33,6 +34,8 @@ namespace Core
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }
 		uint32_t GetGridIndexCount() const { return _gridIndexCount; }
 
+		void QueueGridIndexInit(Device& device, FrameResources& frameResources);
+
 		// Stats feed for the visible patch count: the patch cull pass copies
 		// the GPU-culled instanceCount into the frame's slot; OnGUI reads the
 		// slot whose submission Begin's wait already retired (2-frame delay).
@@ -46,7 +49,7 @@ namespace Core
 		int GetDebugMode() const { return _debugMode; }
 
 	private:
-		void CreateGridIndexBuffer(Device& device, ResourceManager& resourceManager, TransferContext& transfer);
+		void CreateGridIndexBuffer(ResourceManager& resourceManager);
 
 		TerrainConfig _config;
 		TerrainNodeStore _store;
@@ -55,6 +58,8 @@ namespace Core
 
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;
+
+		vector<uint16_t> _pendingGridIndices;
 
 		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _patchCountReadback;
 

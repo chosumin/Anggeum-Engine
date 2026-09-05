@@ -66,9 +66,10 @@ void AssetStreamer::SubmitQueued()
 
 		TransferContext::PendingUpload upload;
 		upload.subMesh = batch.subMesh;
-		// Table-class = must-land (see the budget bypass above); its recording
-		// is a memcpy of CPU-built tables.
-		upload.mustLand = !batch.subMesh.IsValid();
+		// Table-class = frame-coherent (see the budget bypass above): its
+		// memcpy recording rides the graphics lane and lands this frame.
+		upload.lane = batch.subMesh.IsValid()
+			? QueueType::Transfer : QueueType::Graphics;
 
 		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
 		upload.job = make_unique<GeometryUploadJob>(_device, move(batch));

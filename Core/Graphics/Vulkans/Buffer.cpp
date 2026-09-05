@@ -29,14 +29,23 @@ void Core::Buffer::CreateVkBuffer(VkDeviceSize size, VkBufferUsageFlags usage)
 	bufferInfo.usage = usage;
 
 	const auto& qfi = _device.GetQueueFamilyIndices();
-	uint32_t queueFamilies[2] = {
-		qfi.GraphicsFamily.value(),
-		qfi.ComputeFamily.value()
+	uint32_t queueFamilies[3];
+	uint32_t familyCount = 0;
+	auto addUnique = [&](uint32_t family)
+	{
+		for (uint32_t i = 0; i < familyCount; ++i)
+			if (queueFamilies[i] == family)
+				return;
+		queueFamilies[familyCount++] = family;
 	};
-	if (qfi.GraphicsFamily.value() != qfi.ComputeFamily.value())
+	addUnique(qfi.GraphicsFamily.value());
+	addUnique(qfi.ComputeFamily.value());
+	addUnique(qfi.TransferFamily.value());
+
+	if (familyCount > 1)
 	{
 		bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-		bufferInfo.queueFamilyIndexCount = 2;
+		bufferInfo.queueFamilyIndexCount = familyCount;
 		bufferInfo.pQueueFamilyIndices = queueFamilies;
 	}
 	else

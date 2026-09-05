@@ -90,12 +90,6 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 	}
 	case JobType::GRAPHICS_SECONDARY:
 	{
-		// Reserved for splitting ONE pass's recording across workers; no job
-		// uses it yet. CONTRACT when enabling: SubmitToQueues stamps only the
-		// SubmitInfo primaries, so secondaries executed into a primary must
-		// reach the submitter for stamping too (the way Flush hands transfer
-		// secondaries to SubmitTransfer) - otherwise they stay checked out
-		// forever and the pool grows unboundedly.
 		auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		job->commandBuffer = &commandBuffer;

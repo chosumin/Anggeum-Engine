@@ -254,25 +254,40 @@ namespace Core
 	    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
 		int i = 0;
-		for (const auto& queueFamily : queueFamilies) 
-		{
-			if (indices.IsComplete())
-				break;
+		bool dedicatedTransfer = false;
 
-			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		// Full scan, no early break: the dedicated transfer family can sit
+		// after the point where graphics/compute/present are all found (AMD
+		// lists DMA behind compute).
+		for (const auto& queueFamily : queueFamilies)
+		{
+			if (!indices.GraphicsFamily.has_value() &&
+				(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			{
 				indices.GraphicsFamily = i;
-				indices.TransferFamily = i;
+
+				// Fallback: without a dedicated transfer family the upload
+				// lanes both ride the graphics queue, like before.
+				if (!dedicatedTransfer)
+					indices.TransferFamily = i;
 			}
 
-			if ((queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+			if (!indices.ComputeFamily.has_value() &&
+				(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
 				!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 				indices.ComputeFamily = i;
 
-			//if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-			//	!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
-			//	!(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
-			//	indices.TransferFamily = i;
+			// Dedicated transfer family (the DMA engines): the streaming lane
+			// submits here so big asset copies overlap rendering. First match
+			// wins - later transfer-capable families (video decode) are not it.
+			if (!dedicatedTransfer &&
+				(queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+				!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+				!(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+			{
+				indices.TransferFamily = i;
+				dedicatedTransfer = true;
+			}
 
 	        VkBool32 presentSupport = false;
 	        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, _surface, &presentSupport);

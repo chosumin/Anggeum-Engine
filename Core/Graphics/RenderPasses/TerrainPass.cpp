@@ -50,6 +50,8 @@ TerrainPass::~TerrainPass() = default;
 void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
+	_terrain.QueueGridIndexInit(_device, frameResources);
+
 	_active = false;
 
 	// Needs the GPU patch list and the main targets; either missing (no

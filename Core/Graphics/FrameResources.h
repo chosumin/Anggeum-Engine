@@ -106,6 +106,12 @@ namespace Core
 		bool HasPendingInit() const;
 		void ExecutePendingInit(CommandBuffer& commandBuffer);
 
+		// Queues init work from pass Setup: recorded into this frame's
+		// resource-init submission, which runs on the graphics queue ahead of
+		// every pass (app-lifetime resources; per-frame buffers use the
+		// CreateOrReplace* fills).
+		void AddInitJob(unique_ptr<Job> job);
+
 		// Recording-window guard: while frame graph passes record on worker
 		// threads the resource pools are frozen (the main thread only waits).
 		static void SetRecordingGuard(bool recording) { _recordingGuard = recording; }
