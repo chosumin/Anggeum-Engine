@@ -65,8 +65,7 @@ Toy 3D rendering engine for learning modern rendering and Vulkan API.
      - BRDF lookup table (LUT)
 
 **Image System**
-   - KTX texture format support
-   - Runtime mipmap generation
+   - Offline KTX2 bake: prebaked mip chains, UASTC supercompression transcoded to BC7 at load
    - Cubemap loading and processing
 
 ### Resource Management
@@ -81,8 +80,9 @@ Toy 3D rendering engine for learning modern rendering and Vulkan API.
    - Stale handles resolve to null instead of aliasing recycled slots
    - In-place buffer replacement keeps held handles valid across resizes/rebuilds
 
-**Asynchronous Uploads**
-   - Buffer and image uploads staged on worker threads and submitted as a single batch through a transfer context
+**Asynchronous Uploads (Dedicated Transfer Queue)**
+   - New content streams on the dedicated transfer queue (DMA engines), overlapping uploads with rendering
+   - Upload jobs recorded on worker threads, budgeted per frame, and submitted as one batch over a staging ring recycled by timeline value
 
 ### Shader System
 
