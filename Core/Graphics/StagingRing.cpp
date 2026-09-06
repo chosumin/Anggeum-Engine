@@ -56,7 +56,7 @@ StagingRing::Span StagingRing::Acquire(VkDeviceSize size)
 	return span;
 }
 
-void StagingRing::Close(uint64_t spanId, uint64_t value, QueueType lane)
+void StagingRing::Close(uint64_t spanId, uint64_t timelineValue)
 {
 	lock_guard<mutex> lock(_mutex);
 
@@ -65,11 +65,10 @@ void StagingRing::Close(uint64_t spanId, uint64_t value, QueueType lane)
 
 	SpanRecord& record = _records[size_t(spanId - _baseId)];
 	record.closed = true;
-	record.value = value;
-	record.lane = lane;
+	record.value = timelineValue;
 }
 
-void StagingRing::Reclaim(uint64_t transferCompleted, uint64_t graphicsLaneCompleted)
+void StagingRing::Reclaim(uint64_t completedTimelineValue)
 {
 	lock_guard<mutex> lock(_mutex);
 
@@ -78,9 +77,7 @@ void StagingRing::Reclaim(uint64_t transferCompleted, uint64_t graphicsLaneCompl
 	while (!_records.empty())
 	{
 		const SpanRecord& front = _records.front();
-		const uint64_t completed = (front.lane == QueueType::Graphics)
-			? graphicsLaneCompleted : transferCompleted;
-		if (!front.closed || completed < front.value)
+		if (!front.closed || completedTimelineValue < front.value)
 			break;
 
 		_used -= front.used;

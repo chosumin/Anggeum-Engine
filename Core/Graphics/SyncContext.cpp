@@ -91,10 +91,6 @@ void SyncContext::RefreshCompletedCache()
     _graphicsCompletedCache = query(QueueType::Graphics);
     _computeCompletedCache = query(QueueType::Compute);
     _transferCompletedCache = query(QueueType::Transfer);
-
-    u64 resourceValue = 0;
-    vkGetSemaphoreCounterValue(_device.GetDevice(), _resourceSemaphore, &resourceValue);
-    _resourceCompletedCache = resourceValue;
 }
 
 u64 SyncContext::AcquireNextValue(QueueType queueType)
@@ -132,40 +128,6 @@ void SyncContext::SubmitResourceInit(CommandBuffer& commandBuffer)
     _pendingResourceWait = signalValue;
 
     _pendingInitBuffers.push_back(&commandBuffer);
-}
-
-u64 SyncContext::SubmitGraphicsUpload(CommandBuffer& primary,
-    const vector<CommandBuffer*>& secondaries)
-{
-    u64 signalValue = ++_resourceSemaphoreValue;
-
-    VkTimelineSemaphoreSubmitInfo timelineInfo{};
-    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-    timelineInfo.signalSemaphoreValueCount = 1;
-    timelineInfo.pSignalSemaphoreValues = &signalValue;
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.pNext = &timelineInfo;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &primary.GetHandle();
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &_resourceSemaphore;
-
-    if (vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-        throw runtime_error("failed to submit graphics upload commands!");
-
-    // Gates this frame's first submits (monotonic: coexists with the same
-    // frame's resource-init value).
-    _pendingResourceWait = signalValue;
-
-    // Graphics-family buffers park like init primaries and get the
-    // end-of-frame graphics stamp in SubmitToQueues.
-    _pendingInitBuffers.push_back(&primary);
-    for (CommandBuffer* secondary : secondaries)
-        _pendingInitBuffers.push_back(secondary);
-
-    return signalValue;
 }
 
 VkResult SyncContext::Present(const VkPresentInfoKHR& presentInfo)

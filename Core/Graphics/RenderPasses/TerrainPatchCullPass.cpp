@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TerrainPatchCullPass.h"
 #include "TerrainNodeListPass.h"
 #include "TerrainLodMapPass.h"
@@ -108,6 +108,8 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 		_terrain.GetPatchCountReadback(slot));
 	builder.Write(_readback, BufferAccess::TransferDst);
 
+	_nodeDescBuffer = frameResources.GetStorageBuffer(TerrainQuadTree::NODE_DESC);
+
 	_active = true;
 }
 
@@ -120,16 +122,18 @@ void TerrainPatchCullPass::Execute(FrameGraphPassContext& context,
 	Shader& shader = _shader.Get();
 	commandBuffer.BindPipeline(&_pipeline.Get());
 
-	// Node descs and the dummy atlas are externally maintained (upload jobs) -
-	// not graph resources; see TerrainPass::Execute.
 	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
 
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetStorageBuffer(0, context.GetBuffer(_nodeList));
-	builder.SetStorageBuffer(1, quadTree.GetNodeDescBuffer().Get());
+	builder.SetStorageBuffer(1, _nodeDescBuffer.Get());
 	builder.SetTextureBuffer(2, context.GetTexture(_lodMap));
-	builder.SetTextureBuffer(3, _hiZBound
-		? context.GetTexture(_hiZ) : quadTree.GetHeightAtlas().Get());
+	// The dummy fallback is the height atlas, which lives in GENERAL layout.
+	if (_hiZBound)
+		builder.SetTextureBuffer(3, context.GetTexture(_hiZ));
+	else
+		builder.SetTextureBuffer(3, quadTree.GetHeightAtlas().Get(),
+			0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetStorageBuffer(4, context.GetBuffer(_patchList));
 	builder.SetStorageBuffer(5, context.GetBuffer(_patchDrawArgs));
 	builder.SetUniformBuffer(6, context.GetBuffer(_cullData));

@@ -34,7 +34,7 @@ namespace Core
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }
 		uint32_t GetGridIndexCount() const { return _gridIndexCount; }
 
-		void QueueGridIndexInit(Device& device, FrameResources& frameResources);
+		void QueuePendingInit(Device& device, FrameResources& frameResources);
 
 		// Stats feed for the visible patch count: the patch cull pass copies
 		// the GPU-culled instanceCount into the frame's slot; OnGUI reads the

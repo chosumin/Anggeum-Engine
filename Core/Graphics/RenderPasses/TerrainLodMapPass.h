@@ -13,6 +13,7 @@ namespace Core
 	class Pipeline;
 	class Buffer;
 	class Sampler;
+	class Texture;
 
 	class TerrainLodMapPass : public FrameGraphPass
 	{
@@ -36,6 +37,8 @@ namespace Core
 		Handle<Pipeline> _pipeline;
 
 		Handle<Sampler> _nearestSampler;
+
+		Handle<Texture> _indexTexture;
 
 		FGTexture _lodMap;
 		TerrainTraversalPush _push{};

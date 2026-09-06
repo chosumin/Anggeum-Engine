@@ -12,8 +12,8 @@ namespace Core
 	class Transform;
 	class Buffer;
 	class Scene;
-	class AssetStreamer;
 	class ResourceManager;
+	class FrameResources;
 
 	struct TransformBatch
 	{
@@ -53,11 +53,10 @@ namespace Core
 		// against the batch (the culling passes) compare this to notice they went stale
 		uint64_t GetRevision() const { return _revision; }
 
-		// Rebuild the whole draw set from the current scene membership. Self-gated;
-		// no-op when clean. The buffer fills are pushed as copy REQUESTS - the
-		// upload scheduler turns them into transfer work, so the caller has to
-		// submit + flush it before the frame reads the draw set.
-		void Sync(Scene& scene, AssetStreamer& streamer, VkExtent2D extents);
+		// Rebuild the whole draw set from the current scene membership.
+		void Sync(Scene& scene, VkExtent2D extents);
+
+		void QueuePendingInit(FrameResources& frameResources);
 
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
@@ -72,7 +71,7 @@ namespace Core
 	private:
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
 		void InitializeFromScene(Scene& scene);
-		void RebuildGpuBuffers(AssetStreamer& streamer);
+		void RebuildGpuBuffers();
 
 		// Create the buffer on first use, resize it in place afterwards so the handle
 		// stays valid. Callers must ensure no frame is in flight when resizing.
@@ -85,6 +84,8 @@ namespace Core
 
 		TransformBatch _transformBatch;
 		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix
+
+		vector<pair<Handle<Buffer>, vector<uint8_t>>> _pendingTableFills;
 
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;

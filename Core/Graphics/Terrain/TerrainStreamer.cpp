@@ -3,16 +3,25 @@
 #include "TerrainNodeStore.h"
 #include "TerrainQuadTree.h"
 #include "TerrainUpload.h"
+#include "Graphics/BufferUpload.h"
 #include "Graphics/FrameCounter.h"
+#include "Graphics/ResourceManager.h"
+#include "Graphics/FrameResources.h"
 #include "Graphics/TransferContext.h"
 
 namespace Core
 {
 	TerrainStreamer::TerrainStreamer(const TerrainConfig& config,
 		const TerrainNodeStore& store, TerrainQuadTree& quadTree,
-		TransferContext& transfer)
+		TransferContext& transfer, ResourceManager& resourceManager)
 		: _config(config), _store(store), _quadTree(quadTree), _transfer(transfer)
 	{
+		_indexSampler = resourceManager.LoadSampler(
+			{ VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+			  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			  VK_SAMPLER_MIPMAP_MODE_NEAREST });
+
 		_runtime.resize(config.TotalNodeCount());
 
 		_indexMirror.resize(config.lodCount);
@@ -53,7 +62,6 @@ namespace Core
 			uint32_t(payload.minHeight) | (uint32_t(payload.maxHeight) << 16);
 		_descMirror[slot].slotLod = (slot % _config.atlasSlotsPerRow)
 			| ((slot / _config.atlasSlotsPerRow) << 8) | (uint32_t(id.lod) << 16);
-		_tablesDirty = true;
 	}
 
 	void TerrainStreamer::Update(vec2 cameraXZ)
@@ -83,7 +91,6 @@ namespace Core
 						_quadTree.ReleaseSlot(runtime.atlasSlot);
 						runtime = {};
 						_indexMirror[lod][uint32_t(y) * side + x] = TERRAIN_NODE_EMPTY;
-						_tablesDirty = true;
 						++_stats.evictedThisFrame;
 					}
 				}
@@ -106,9 +113,6 @@ namespace Core
 			VkDeviceSize(_config.HeightTexels()) * _config.HeightTexels() * 2
 			+ VkDeviceSize(_config.ColorTexels()) * _config.ColorTexels() * 4 * 2
 			+ 64; // per-tile alignment slack
-		VkDeviceSize tableBytes = _config.atlasCapacity * sizeof(TerrainNodeDescGPU)
-			+ _config.TotalNodeCount() * sizeof(uint16_t)
-			+ 16 * (_config.lodCount + 1);
 
 		uint32_t budgetTiles = std::min<uint32_t>(_config.uploadBudgetPerFrame,
 			uint32_t(toLoad.size()));
@@ -118,72 +122,90 @@ namespace Core
 			budgetTiles = uint32_t(granted / tileBytes);
 		}
 
-		if (budgetTiles == 0 && !_tablesDirty)
-		{
-			// Nothing to upload this frame.
-			_stats.pending += uint32_t(toLoad.size());
-			CountResident();
-			return;
-		}
+		StagingRing::Span span;
+		if (budgetTiles > 0)
+			span = _transfer.AcquireStagingSpan(budgetTiles * tileBytes);
 
-		// The span is acquired BEFORE any bookkeeping commits: a full ring
-		// (load spike) skips the whole frame, so the tables never point at
-		// tiles that were not uploaded. Everything retries next frame.
-		StagingRing::Span span = _transfer.AcquireStagingSpan(
-			budgetTiles * tileBytes + tableBytes);
-		if (!span.IsValid())
+		if (span.IsValid())
 		{
-			_stats.pending += uint32_t(toLoad.size());
-			CountResident();
-			return;
-		}
+			// Pass 2b: commit the admitted tiles (bookkeeping only - the
+			// payload memcpys and copy recording happen in the upload job on a
+			// worker).
+			vector<TerrainTileUpload> tiles;
+			tiles.reserve(budgetTiles);
 
-		// Pass 2b: commit the admitted tiles (bookkeeping only - the payload
-		// memcpys and copy recording happen in the upload job on a worker).
-		vector<TerrainTileUpload> tiles;
-		tiles.reserve(budgetTiles);
-
-		for (const TerrainNodeId& id : toLoad)
-		{
-			if (_stats.uploadedThisFrame >= budgetTiles)
+			for (const TerrainNodeId& id : toLoad)
 			{
-				++_stats.pending;
-				continue;
+				if (_stats.uploadedThisFrame >= budgetTiles)
+				{
+					++_stats.pending;
+					continue;
+				}
+
+				TerrainNodeRuntime& runtime = _runtime[ToLinearIndex(id, _config)];
+				uint16_t slot = _quadTree.AllocateSlot();
+				if (slot == TERRAIN_NODE_EMPTY)
+				{
+					++_stats.starved;
+					continue;
+				}
+
+				runtime.atlasSlot = slot;
+				RegisterNode(id, slot);
+				tiles.push_back({ id, slot });
+				++_stats.uploadedThisFrame;
 			}
 
-			TerrainNodeRuntime& runtime = _runtime[ToLinearIndex(id, _config)];
-			uint16_t slot = _quadTree.AllocateSlot();
-			if (slot == TERRAIN_NODE_EMPTY)
-			{
-				++_stats.starved;
-				continue;
-			}
+			// Pass 3: submit the tile pixels to the transfer queue and BLOCK
+			// on the recording (a memcpy): the tables published below declare
+			// these slots resident this frame, so the job must not slide past
+			// this frame's Flush.
+			string jobName =
+				"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber());
 
-			runtime.atlasSlot = slot;
-			RegisterNode(id, slot);
-			tiles.push_back({ id, slot });
-			++_stats.uploadedThisFrame;
+			TransferContext::PendingUpload upload;
+			upload.job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
+				std::move(tiles), span, _atlasLayoutPending);
+			_transfer.SubmitJob(std::move(upload), jobName);
+			_transfer.WaitForRecording(jobName);
+			_atlasLayoutPending = false;
 		}
-
-		// Pass 3: one job carries the tiles and (when dirty) the republished
-		// lookup tables, so GPU-visible residency changes atomically. The
-		// table snapshots are copies - this frame's mirrors, immutable to the
-		// job while the streamer moves on.
-		TransferContext::PendingUpload upload;
-		upload.job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
-			std::move(tiles), _tablesDirty,
-			vector<TerrainNodeDescGPU>(_descMirror),
-			vector<vector<uint16_t>>(_indexMirror),
-			_firstUpload, span);
-		upload.lane = QueueType::Graphics;
-
-		_transfer.SubmitJob(std::move(upload),
-			"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber()));
-
-		_tablesDirty = false;
-		_firstUpload = false;
+		else
+		{
+			_stats.pending += uint32_t(toLoad.size());
+		}
 
 		CountResident();
+	}
+
+	void TerrainStreamer::QueueTableInit(Device& device, FrameResources& frameResources)
+	{
+		// This frame slot's own table copies: created on first use, then
+		// overwritten wholesale every frame from the live mirrors (stable
+		// between Updates). Publishing every frame keeps each slot's copy
+		// current - including evictions the same frame their release was
+		// stamped, ring pressure notwithstanding.
+		BufferDesc descDesc{
+			_config.atlasCapacity * sizeof(TerrainNodeDescGPU),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			MemoryType::DEVICE_LOCAL };
+		Handle<Buffer> descBuffer = frameResources.GetOrCreateStorageBuffer(
+			TerrainQuadTree::NODE_DESC, descDesc);
+		frameResources.AddInitJob(make_unique<BufferUploadJob<TerrainNodeDescGPU>>(
+			device, descBuffer.Get(),
+			vector<TerrainNodeDescGPU>(_descMirror), 0));
+
+		RenderTargetDesc indexDesc{};
+		indexDesc.extent = { _config.NodesPerSide(0), _config.NodesPerSide(0) };
+		indexDesc.format = VK_FORMAT_R16_UINT;
+		indexDesc.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		indexDesc.mipLevels = _config.lodCount;
+		indexDesc.sampler = _indexSampler;
+		Handle<Texture> indexTexture = frameResources.GetOrCreateRenderTarget(
+			TerrainQuadTree::QUADTREE_INDEX, indexDesc);
+		frameResources.AddInitJob(make_unique<TerrainIndexUploadJob>(
+			device, indexTexture.Get(), _config,
+			vector<vector<uint16_t>>(_indexMirror)));
 	}
 
 	void TerrainStreamer::CountResident()

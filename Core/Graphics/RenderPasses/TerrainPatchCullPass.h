@@ -39,6 +39,8 @@ namespace Core
 		Handle<Shader> _shader;
 		Handle<Pipeline> _pipeline;
 
+		Handle<Buffer> _nodeDescBuffer;
+
 		FGTexture _lodMap, _hiZ;
 		FGBuffer _nodeList, _nodeListCount, _patchList,
 			_patchDrawArgs, _cullData, _readback;

@@ -6,6 +6,7 @@
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/Vulkans/MemoryAllocator.h"
 
 namespace
 {
@@ -32,25 +33,18 @@ namespace Core
 {
 	TerrainUploadJob::TerrainUploadJob(TerrainQuadTree& quadTree,
 		const TerrainNodeStore& store, const TerrainConfig& config,
-		vector<TerrainTileUpload>&& tiles, bool tablesDirty,
-		vector<TerrainNodeDescGPU>&& descSnapshot,
-		vector<vector<uint16_t>>&& indexSnapshot, bool firstUpload,
-		StagingRing::Span span)
+		vector<TerrainTileUpload>&& tiles, StagingRing::Span span,
+		bool initializeAtlases)
 		: UploadJob()
 		, _store(store)
 		, _config(config)
 		, _heightAtlas(quadTree.GetHeightAtlas().Get())
 		, _normalAtlas(quadTree.GetNormalAtlas().Get())
 		, _albedoAtlas(quadTree.GetAlbedoAtlas().Get())
-		, _indexTexture(quadTree.GetIndexTexture().Get())
-		, _nodeDescBuffer(quadTree.GetNodeDescBuffer().Get())
 		, _quadTree(quadTree)
 		, _tiles(std::move(tiles))
-		, _tablesDirty(tablesDirty)
-		, _descSnapshot(std::move(descSnapshot))
-		, _indexSnapshot(std::move(indexSnapshot))
-		, _firstUpload(firstUpload)
 		, _span(span)
+		, _initializeAtlases(initializeAtlases)
 	{
 		stagingSpanId = span.id;
 	}
@@ -68,7 +62,6 @@ namespace Core
 		Buffer* source = _span.buffer;
 		VkDeviceSize offset = _span.offset;
 
-		// --- Stage tile payloads + build copy regions ---
 		vector<VkBufferImageCopy> heightRegions, normalRegions, albedoRegions;
 		heightRegions.reserve(_tiles.size());
 		normalRegions.reserve(_tiles.size());
@@ -94,77 +87,81 @@ namespace Core
 				albedoRegions, _quadTree.ColorTexelOrigin(tile.slot), colorTexels);
 		}
 
-		// --- Stage lookup tables ---
+		// First upload ever: the atlases leave UNDEFINED for their permanent
+		// GENERAL layout here, ahead of the first copies in this very
+		// recording. (Legal on the transfer family - the sanitizers collapse
+		// GENERAL's shader stages/accesses; visibility for consumers is the
+		// timeline gate.)
+		if (_initializeAtlases)
+		{
+			commandBuffer->CreateBarrierBatch()
+				.Image(_heightAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+				.Image(_normalAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+				.Image(_albedoAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
+				.Submit();
+		}
+
+		commandBuffer->CopyBufferToImage(*source, _heightAtlas, heightRegions,
+			VK_IMAGE_LAYOUT_GENERAL);
+		commandBuffer->CopyBufferToImage(*source, _normalAtlas, normalRegions,
+			VK_IMAGE_LAYOUT_GENERAL);
+		commandBuffer->CopyBufferToImage(*source, _albedoAtlas, albedoRegions,
+			VK_IMAGE_LAYOUT_GENERAL);
+	}
+
+	TerrainIndexUploadJob::TerrainIndexUploadJob(Device& device,
+		Texture& indexTexture, const TerrainConfig& config,
+		vector<vector<uint16_t>>&& indexMips)
+		: Job(JobType::TRANSFER)
+		, _device(device)
+		, _config(config)
+		, _indexTexture(indexTexture)
+		, _indexMips(std::move(indexMips))
+	{
+	}
+
+	TerrainIndexUploadJob::~TerrainIndexUploadJob() = default;
+
+	void TerrainIndexUploadJob::Execute()
+	{
+		// One-shot staging owned by the job (inline init work never touches
+		// the transfer-timeline staging ring).
+		VkDeviceSize stagingBytes = 0;
+		for (const auto& mip : _indexMips)
+			stagingBytes = Align(stagingBytes, 16) + mip.size() * sizeof(uint16_t);
+
+		_stagingBuffer = make_unique<Buffer>(_device, stagingBytes,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
+		void* mappedRaw = nullptr;
+		_stagingBuffer->GetMappedPtr(&mappedRaw);
+		uint8_t* mapped = static_cast<uint8_t*>(mappedRaw);
+
+		VkDeviceSize offset = 0;
 		vector<VkBufferImageCopy> indexRegions;
-		VkDeviceSize descOffset = 0;
-		if (_tablesDirty)
+		for (uint32_t lod = 0; lod < _config.lodCount; ++lod)
 		{
 			offset = Align(offset, 16);
-			descOffset = offset;
-			VkDeviceSize descBytes = _descSnapshot.size() * sizeof(TerrainNodeDescGPU);
-			memcpy(stagingBase + offset, _descSnapshot.data(), size_t(descBytes));
-			offset += descBytes;
-
-			for (uint32_t lod = 0; lod < _config.lodCount; ++lod)
-			{
-				offset = Align(offset, 16);
-				VkDeviceSize mipBytes = _indexSnapshot[lod].size() * sizeof(uint16_t);
-				memcpy(stagingBase + offset, _indexSnapshot[lod].data(), size_t(mipBytes));
-				indexRegions.push_back(MakeRegion(offset, uvec2(0),
-					_config.NodesPerSide(lod), lod));
-				offset += mipBytes;
-			}
+			VkDeviceSize mipBytes = _indexMips[lod].size() * sizeof(uint16_t);
+			memcpy(mapped + offset, _indexMips[lod].data(), size_t(mipBytes));
+			indexRegions.push_back(MakeRegion(offset, uvec2(0),
+				_config.NodesPerSide(lod), lod));
+			offset += mipBytes;
 		}
 
-		// --- Record: transition, copy, transition back (net-zero for the
-		// frame graph, which believes these images stay SHADER_READ_ONLY) ---
-		bool touchAtlases = _firstUpload || !heightRegions.empty();
-		bool touchIndex = _firstUpload || !indexRegions.empty();
-		VkImageLayout oldLayout = _firstUpload
-			? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		// Every mip is rewritten and this frame slot's copy is idle, so the
+		// old contents can be discarded (UNDEFINED) instead of preserved.
+		commandBuffer->CreateBarrierBatch()
+			.Image(_indexTexture, VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+			.Submit();
 
-		{
-			auto barrier = commandBuffer->CreateBarrierBatch();
-			if (touchAtlases)
-			{
-				barrier.Image(_heightAtlas, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-				barrier.Image(_normalAtlas, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-				barrier.Image(_albedoAtlas, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-			}
-			if (touchIndex)
-				barrier.Image(_indexTexture, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-			barrier.Submit();
-		}
+		commandBuffer->CopyBufferToImage(*_stagingBuffer, _indexTexture, indexRegions);
 
-		if (!heightRegions.empty())
-		{
-			commandBuffer->CopyBufferToImage(*source, _heightAtlas, heightRegions);
-			commandBuffer->CopyBufferToImage(*source, _normalAtlas, normalRegions);
-			commandBuffer->CopyBufferToImage(*source, _albedoAtlas, albedoRegions);
-		}
+		commandBuffer->CreateBarrierBatch()
+			.Image(_indexTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			.Submit();
 
-		if (!indexRegions.empty())
-			commandBuffer->CopyBufferToImage(*source, _indexTexture, indexRegions);
-
-		if (_tablesDirty)
-			commandBuffer->CopyBuffer(*source, _nodeDescBuffer,
-				0, descOffset, _nodeDescBuffer.GetSize());
-
-		{
-			auto barrier = commandBuffer->CreateBarrierBatch();
-			if (touchAtlases)
-			{
-				barrier.Image(_heightAtlas, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				barrier.Image(_normalAtlas, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				barrier.Image(_albedoAtlas, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			}
-			if (touchIndex)
-				barrier.Image(_indexTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			barrier.Submit();
-		}
+		status = JobStatus::COMPLETE;
 	}
 }

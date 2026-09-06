@@ -107,6 +107,11 @@ void GeometryPass::PrepareSkybox()
 void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
+    // Rebuilt draw-set tables ride this frame's resource-init submission,
+    // so they land this frame and same-queue order protects the
+    // previous in-flight frame's reads of the old tables.
+    renderFrame.GetRendererBatch().QueuePendingInit(frameResources);
+
     _pass1Indirect = FGBuffer{};
     _pass2Indirect = FGBuffer{};
 

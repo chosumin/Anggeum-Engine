@@ -39,37 +39,26 @@ void AssetStreamer::SubmitQueued()
 
 	// One upload job per batch (i.e. per submesh); the job consumes the
 	// request whole and resolves its destination handles itself.
-	//
-	// table-class batches (no submesh handle - draw-set tables,
-	// the terrain grid) bypass the budget and MUST drain the frame they were
-	// pushed. A table batch carried across a rebuild would record into the
-	// very buffers the rebuild replaces.
 	vector<GeometryCopyBatch> deferred;
 	size_t batchIndex = 0;
 	while (!_geometryCopies.Empty())
 	{
 		GeometryCopyBatch batch = _geometryCopies.PopFront();
+		assert(batch.subMesh.IsValid() && "geometry streaming is submesh-only");
 
-		if (batch.subMesh.IsValid())
+		VkDeviceSize bytes = 0;
+		for (const auto& copy : batch.copies)
+			bytes += copy.data.size();
+
+		// Unaffordable batches are SKIPPED (kept in order for next frame)
+		if (!_transfer.TryAdmit(bytes))
 		{
-			VkDeviceSize bytes = 0;
-			for (const auto& copy : batch.copies)
-				bytes += copy.data.size();
-
-			// Unaffordable batches are SKIPPED (kept in order for next frame)
-			if (!_transfer.TryAdmit(bytes))
-			{
-				deferred.push_back(std::move(batch));
-				continue;
-			}
+			deferred.push_back(std::move(batch));
+			continue;
 		}
 
 		TransferContext::PendingUpload upload;
 		upload.subMesh = batch.subMesh;
-		// Table-class = frame-coherent (see the budget bypass above): its
-		// memcpy recording rides the graphics lane and lands this frame.
-		upload.lane = batch.subMesh.IsValid()
-			? QueueType::Transfer : QueueType::Graphics;
 
 		string jobName = batch.debugName + "_" + std::to_string(batchIndex);
 		upload.job = make_unique<GeometryUploadJob>(_device, move(batch));

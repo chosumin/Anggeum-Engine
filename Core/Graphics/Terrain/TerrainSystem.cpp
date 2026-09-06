@@ -21,7 +21,8 @@ namespace Core
 				_config.heightMin, _config.heightMax)))
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
-		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree, transfer);
+		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree,
+			transfer, resourceManager);
 		CreateGridIndexBuffer(resourceManager);
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
@@ -71,14 +72,16 @@ namespace Core
 		_pendingGridIndices = std::move(indices);
 	}
 
-	void TerrainSystem::QueueGridIndexInit(Device& device, FrameResources& frameResources)
+	void TerrainSystem::QueuePendingInit(Device& device, FrameResources& frameResources)
 	{
-		if (_pendingGridIndices.empty())
-			return;
+		if (!_pendingGridIndices.empty())
+		{
+			frameResources.AddInitJob(make_unique<BufferUploadJob<uint16_t>>(
+				device, _gridIndexBuffer.Get(), std::move(_pendingGridIndices), 0));
+			_pendingGridIndices.clear();
+		}
 
-		frameResources.AddInitJob(make_unique<BufferUploadJob<uint16_t>>(
-			device, _gridIndexBuffer.Get(), std::move(_pendingGridIndices), 0));
-		_pendingGridIndices.clear();
+		_streamer->QueueTableInit(device, frameResources);
 	}
 
 	TerrainParams TerrainSystem::BuildRenderParams(Light* mainLight) const

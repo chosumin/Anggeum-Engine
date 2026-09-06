@@ -57,6 +57,7 @@ namespace Core
 		// same frame. Created on first request and reused for the frame's lifetime.
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Buffer> GetOrCreateStorageBuffer(const string& name, const BufferDesc& desc);
+		Handle<Buffer> GetStorageBuffer(const string& name) const;
 
 		// Creates the buffer, or swaps a fresh one under an existing name. The handle
 		// survives the swap (ResourcePool::Replace keeps index and generation), so

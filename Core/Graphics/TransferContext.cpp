@@ -20,8 +20,6 @@ TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThre
 {
 	_primaryCommandPool = make_unique<CommandPool>(_device, syncContext,
 		QueueType::Transfer);
-	_graphicsPrimaryCommandPool = make_unique<CommandPool>(_device, syncContext,
-		QueueType::Graphics);
 
 	// Sized for steady-state traffic (terrain tiles, table refills); the
 	// initial scene load intentionally overflows into per-job fallbacks.
@@ -34,8 +32,7 @@ void TransferContext::BeginFrame()
 {
 	CollectCompletedJobs();
 
-	_stagingRing->Reclaim(_sync.GetCompletedValue(QueueType::Transfer),
-		_sync.GetCompletedResourceValue());
+	_stagingRing->Reclaim(_sync.GetCompletedValue(QueueType::Transfer));
 	_stagingRing->BeginFrame();
 
 	_frameAdmittedBytes = 0;
@@ -60,15 +57,11 @@ bool TransferContext::TryAdmit(VkDeviceSize bytes)
 
 void TransferContext::CollectCompletedJobs()
 {
-	const uint64_t transferCompleted = _sync.GetCompletedValue(QueueType::Transfer);
-	const uint64_t graphicsLaneCompleted = _sync.GetCompletedResourceValue();
+	const uint64_t completed = _sync.GetCompletedValue(QueueType::Transfer);
 
 	while (!_inFlightJobs.empty())
 	{
-		const InFlightJobs& front = _inFlightJobs.front();
-		const uint64_t completed = (front.lane == QueueType::Graphics)
-			? graphicsLaneCompleted : transferCompleted;
-		if (completed < front.value)
+		if (completed < _inFlightJobs.front().value)
 			break;
 
 		// Activate-on-completion, per upload: residency flips and bounds
@@ -128,9 +121,6 @@ void TransferContext::SubmitJob(PendingUpload&& upload, const string& jobName)
 	if (_pendingUploads.find(jobName) != _pendingUploads.end())
 		return;
 
-	upload.job->type = (upload.lane == QueueType::Graphics)
-		? JobType::GRAPHICS_SECONDARY : JobType::TRANSFER;
-
 	upload.job->stagingRing = _stagingRing.get();
 
 	Job& job = *upload.job;
@@ -138,45 +128,33 @@ void TransferContext::SubmitJob(PendingUpload&& upload, const string& jobName)
 	EnqueueUnowned(job);
 }
 
-void TransferContext::Flush(bool waitForRecordings)
+void TransferContext::WaitForRecording(const string& jobName)
+{
+	auto it = _pendingUploads.find(jobName);
+	if (it == _pendingUploads.end())
+		return;
+
+	Job& job = *it->second.job;
+	WaitFor([&job] { return job.status == JobStatus::COMPLETE; });
+}
+
+void TransferContext::Flush()
 {
 	if (_pendingUploads.empty())
 		return;
 
 	_timer.tick();
 
-	if (waitForRecordings)
-	{
-		// Graphics-lane (frame-coherent) uploads only: memcpy recordings that
-		// finish in microseconds. IO-bound loads keep carrying over instead of
-		// blocking the frame here.
-		WaitFor([this]
-		{
-			for (auto&& upload : _pendingUploads)
-			{
-				if (upload.second.lane == QueueType::Graphics
-					&& upload.second.job->status != JobStatus::COMPLETE)
-				{
-					return false;
-				}
-			}
-			return true;
-		});
-	}
-
-	// Submit what finished recording, one batch per lane; the rest (slow file
-	// reads) stay pending and ride a later Flush instead of stalling this frame.
-	InFlightJobs transferBatch, graphicsBatch;
-	vector<CommandBuffer*> transferSecondaries, graphicsSecondaries;
+	// Submit what finished recording; the rest (slow file reads) stay pending
+	// and ride a later Flush instead of stalling this frame.
+	InFlightJobs batch;
+	vector<CommandBuffer*> secondaries;
 	for (auto it = _pendingUploads.begin(); it != _pendingUploads.end();)
 	{
 		if (it->second.job->status == JobStatus::COMPLETE)
 		{
-			const bool graphicsLane = it->second.lane == QueueType::Graphics;
-			(graphicsLane ? graphicsSecondaries : transferSecondaries)
-				.push_back(it->second.job->commandBuffer);
-			(graphicsLane ? graphicsBatch : transferBatch)
-				.uploads.push_back(std::move(it->second));
+			secondaries.push_back(it->second.job->commandBuffer);
+			batch.uploads.push_back(std::move(it->second));
 			it = _pendingUploads.erase(it);
 		}
 		else
@@ -185,32 +163,16 @@ void TransferContext::Flush(bool waitForRecordings)
 		}
 	}
 
-	SubmitBatch(std::move(transferBatch), transferSecondaries, QueueType::Transfer);
-	SubmitBatch(std::move(graphicsBatch), graphicsSecondaries, QueueType::Graphics);
-
-	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
-	cout << "Transfer Time : " << deltaTime << endl;
-}
-
-void TransferContext::SubmitBatch(InFlightJobs&& batch,
-	vector<CommandBuffer*>& secondaries, QueueType lane)
-{
 	if (batch.uploads.empty())
 		return;
 
-	CommandPool& pool = (lane == QueueType::Graphics)
-		? *_graphicsPrimaryCommandPool : *_primaryCommandPool;
-
-	auto& primary = pool.RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	auto& primary = _primaryCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	primary.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	primary.ExecuteCommands(secondaries);
 	primary.EndCommandBuffer();
 
-	uint64_t signalValue = (lane == QueueType::Graphics)
-		? _sync.SubmitGraphicsUpload(primary, secondaries)
-		: _sync.SubmitTransfer(primary, secondaries);
+	uint64_t signalValue = _sync.SubmitTransfer(primary, secondaries);
 	batch.value = signalValue;
-	batch.lane = lane;
 
 	// Close each submitted upload's staging span on THIS submission's value;
 	// spans of still-recording jobs stay open and block ring reclamation
@@ -218,12 +180,15 @@ void TransferContext::SubmitBatch(InFlightJobs&& batch,
 	for (PendingUpload& upload : batch.uploads)
 	{
 		if (upload.job->stagingSpanId != UINT64_MAX)
-			_stagingRing->Close(upload.job->stagingSpanId, signalValue, lane);
+			_stagingRing->Close(upload.job->stagingSpanId, signalValue);
 	}
 
 	// The uploads (owning any fallback staging) stay alive until BeginFrame's
 	// completion poll sees the GPU pass this value.
 	_inFlightJobs.push_back(std::move(batch));
+
+	auto deltaTime = static_cast<float>(_timer.tick<Core::Timer::Seconds>());
+	cout << "Transfer Time : " << deltaTime << endl;
 }
 
 

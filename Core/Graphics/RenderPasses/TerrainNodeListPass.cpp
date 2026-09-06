@@ -1,5 +1,6 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TerrainNodeListPass.h"
+#include "Graphics/FrameResources.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderContext.h"
@@ -18,7 +19,8 @@ using namespace Core;
 TerrainNodeListPass::~TerrainNodeListPass() = default;
 
 TerrainNodeListPass::TerrainNodeListPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
-	: _renderScene(renderScene)
+	: _device(device)
+	, _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
 	
@@ -42,6 +44,9 @@ TerrainNodeListPass::TerrainNodeListPass(Device& device, ResourceManager& resour
 void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	FrameResources& frameResources, RenderFrame& renderFrame)
 {
+	_terrain.QueuePendingInit(_device, frameResources);
+	_indexTexture = frameResources.GetRenderTarget(TerrainQuadTree::QUADTREE_INDEX);
+
 	_active = false;
 
 	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
@@ -88,9 +93,7 @@ void TerrainNodeListPass::Execute(FrameGraphPassContext& context,
 	commandBuffer.BindPipeline(_pipeline.get());
 
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-	// Externally maintained (upload jobs, SHADER_READ_ONLY) - not a graph
-	// resource; see TerrainPass::Execute.
-	builder.SetTextureBuffer(0, _terrain.GetQuadTree().GetIndexTexture().Get());
+	builder.SetTextureBuffer(0, _indexTexture.Get());
 	builder.SetStorageBuffer(1, context.GetBuffer(_nodeList));
 	builder.SetStorageBuffer(2, context.GetBuffer(_nodeListCount));
 	builder.SetStorageBuffer(3, context.GetBuffer(_patchDrawArgs));

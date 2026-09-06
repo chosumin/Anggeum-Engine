@@ -10,6 +10,7 @@ namespace
 {
 	using namespace Core;
 
+
 	Handle<Texture> CreateAtlasTexture(Device& device,
 		ResourceManager& resourceManager, const char* name,
 		uvec2 extent, VkFormat format, uint32_t mipLevels = 1,
@@ -50,18 +51,7 @@ namespace Core
 		_albedoAtlas = CreateAtlasTexture(device, resourceManager, ALBEDO_ATLAS,
 			_colorExtent, config.albedoFormat);
 
-		// One texel per quadtree node: mip m holds LOD m. The finest LOD side
-		// must be divisible so every LOD maps to an exact mip extent.
 		assert(config.NodesPerSide(0) >= (1u << (config.lodCount - 1)));
-		_indexTexture = CreateAtlasTexture(device, resourceManager, QUADTREE_INDEX,
-			uvec2(config.NodesPerSide(0)), VK_FORMAT_R16_UINT, config.lodCount,
-			VK_FILTER_NEAREST);
-
-		_nodeDescBuffer = resourceManager.LoadBuffer(
-			{ config.atlasCapacity * sizeof(TerrainNodeDescGPU),
-			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			  MemoryType::DEVICE_LOCAL },
-			NODE_DESC);
 
 		_freeSlots.reserve(config.atlasCapacity);
 		for (uint32_t slot = config.atlasCapacity; slot > 0; --slot)

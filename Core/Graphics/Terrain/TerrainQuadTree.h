@@ -10,9 +10,6 @@ namespace Core
 	class Texture;
 	class Buffer;
 
-	// Owns the GPU face of the terrain world structure: the three payload
-	// atlases (synchronized slots - one slot index addresses all of them),
-	// the mip-mapped quadtree index texture, and the node description buffer.
 	class TerrainQuadTree
 	{
 	public:
@@ -28,8 +25,6 @@ namespace Core
 		Handle<Texture> GetHeightAtlas() const { return _heightAtlas; }
 		Handle<Texture> GetNormalAtlas() const { return _normalAtlas; }
 		Handle<Texture> GetAlbedoAtlas() const { return _albedoAtlas; }
-		Handle<Texture> GetIndexTexture() const { return _indexTexture; }
-		Handle<Buffer> GetNodeDescBuffer() const { return _nodeDescBuffer; }
 
 		uvec2 GetHeightAtlasExtent() const { return _heightExtent; }
 		uvec2 GetColorAtlasExtent() const { return _colorExtent; }
@@ -59,8 +54,6 @@ namespace Core
 		Handle<Texture> _heightAtlas;
 		Handle<Texture> _normalAtlas;
 		Handle<Texture> _albedoAtlas;
-		Handle<Texture> _indexTexture;
-		Handle<Buffer> _nodeDescBuffer;
 
 		SyncContext& _sync;
 

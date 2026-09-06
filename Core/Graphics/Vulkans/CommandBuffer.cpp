@@ -263,7 +263,7 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture, ui
 }
 
 void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture,
-    const vector<VkBufferImageCopy>& regions)
+    const vector<VkBufferImageCopy>& regions, VkImageLayout dstLayout)
 {
     assert(!regions.empty());
 
@@ -271,7 +271,7 @@ void Core::CommandBuffer::CopyBufferToImage(Buffer& buffer, Texture& texture,
         _commandBuffer,
         buffer.GetBuffer(),
         texture.GetImage().GetImage(),
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        dstLayout,
         static_cast<uint32_t>(regions.size()),
         regions.data()
     );

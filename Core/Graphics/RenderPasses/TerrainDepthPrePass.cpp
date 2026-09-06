@@ -96,16 +96,16 @@ void TerrainDepthPrePass::Execute(FrameGraphPassContext& context,
 
 	commandBuffer.BindPipeline(_pipeline.get());
 
-	// Atlases are externally maintained (upload jobs, SHADER_READ_ONLY) -
-	// not graph resources; see TerrainPass::Execute.
+	// Atlases are externally maintained in GENERAL layout (transfer-queue tile
+	// streaming) - not graph resources; see TerrainPass::Execute.
 	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
 
 	Shader& shader = _shader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
-	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get());
-	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get());
+	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
 	auto& resources = builder.Build();
 

@@ -188,6 +188,14 @@ Handle<Texture> FrameResources::GetOrCreateRenderTarget(const string& name,
 	return handle;
 }
 
+Handle<Buffer> FrameResources::GetStorageBuffer(const string& name) const
+{
+	auto it = _storageBufferHandles.find(name);
+	if (it != _storageBufferHandles.end())
+		return it->second;
+	return Handle<Buffer>{};
+}
+
 Handle<Buffer> FrameResources::GetOrCreateStorageBuffer(const string& name,
 	const BufferDesc& desc)
 {

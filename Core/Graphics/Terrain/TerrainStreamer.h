@@ -6,9 +6,12 @@ namespace Core
 {
 	class Device;
 	class Buffer;
+	class Sampler;
 	class TerrainNodeStore;
 	class TerrainQuadTree;
 	class TransferContext;
+	class FrameResources;
+	class ResourceManager;
 
 	struct TerrainStreamingStats
 	{
@@ -27,11 +30,14 @@ namespace Core
 	{
 	public:
 		TerrainStreamer(const TerrainConfig& config, const TerrainNodeStore& store,
-			TerrainQuadTree& quadTree, TransferContext& transfer);
+			TerrainQuadTree& quadTree, TransferContext& transfer,
+			ResourceManager& resourceManager);
 		~TerrainStreamer();
 
 		// Main thread, once per frame, before frame-graph Setup.
 		void Update(vec2 cameraXZ);
+
+		void QueueTableInit(Device& device, FrameResources& frameResources);
 
 		bool IsResident(const TerrainNodeId& id) const
 		{
@@ -67,11 +73,10 @@ namespace Core
 		vector<TerrainNodeRuntime> _runtime;             // by global linear index
 		vector<vector<uint16_t>> _indexMirror;           // CPU copy, per LOD
 		vector<TerrainNodeDescGPU> _descMirror;          // by atlas slot
-		bool _tablesDirty = true;                        // desc + index textures
 
-		// The first job must move every atlas out of UNDEFINED (the sampling
-		// passes bind SHADER_READ_ONLY from frame 0).
-		bool _firstUpload = true;
+		bool _atlasLayoutPending = true;
+
+		Handle<Sampler> _indexSampler;
 
 		TerrainStreamingStats _stats;
 	};

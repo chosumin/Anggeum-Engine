@@ -111,9 +111,7 @@ void Core::Engine::Draw()
 		_renderScene->SyncManagers(*_scene, extents,
 			_transferContext->TakePromotedCount());
 
-		// Waits only for the must-land recordings (memcpys); IO-bound loads
-		// keep cooking.
-		_transferContext->Flush(/*waitForRecordings*/ true);
+		_transferContext->Flush();
 	}
 
 	{

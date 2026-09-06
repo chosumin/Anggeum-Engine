@@ -50,8 +50,6 @@ TerrainPass::~TerrainPass() = default;
 void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 	RenderFrame& renderFrame)
 {
-	_terrain.QueueGridIndexInit(_device, frameResources);
-
 	_active = false;
 
 	// Needs the GPU patch list and the main targets; either missing (no
@@ -106,18 +104,19 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 		? _wireframePipeline.get() : _pipeline.get();
 	commandBuffer.BindPipeline(pipeline);
 
-	// The atlases are not graph resources: written outside the graph by the
-	// terrain upload jobs (which keep them SHADER_READ_ONLY and order against
-	// the frame via the transfer-timeline gate), read-only in here.
+	// The atlases are not graph resources: they live in GENERAL layout forever
+	// (the transfer queue streams tiles into them while other slots are
+	// sampled), read-only in here and ordered against the frame via the
+	// transfer-timeline gate.
 	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
 
 	Shader& shader = _shader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
-	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get());
-	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get());
-	builder.SetTextureBuffer(4, quadTree.GetAlbedoAtlas().Get());
+	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetTextureBuffer(4, quadTree.GetAlbedoAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
 	auto& resources = builder.Build();
 

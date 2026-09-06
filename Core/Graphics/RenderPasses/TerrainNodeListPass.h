@@ -12,6 +12,7 @@ namespace Core
 	class Shader;
 	class Pipeline;
 	class Buffer;
+	class Texture;
 
 	// Phase-2 GPU pipeline, stage 1: builds the Terrain Node List on the GPU
 	// (FC5's covering-set traversal) from the quadtree index texture. Runs
@@ -35,6 +36,7 @@ namespace Core
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
+		Device& _device;
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
 
@@ -42,6 +44,8 @@ namespace Core
 		// Owned directly (not the pooled LoadComputePipeline) because it is
 		// specialized with this config's constants.
 		unique_ptr<Pipeline> _pipeline;
+
+		Handle<Texture> _indexTexture;
 
 		FGBuffer _nodeList, _nodeListCount, _patchDrawArgs;
 		TerrainTraversalPush _push{};

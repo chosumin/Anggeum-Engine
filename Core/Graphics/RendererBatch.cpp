@@ -11,7 +11,8 @@
 #include "Components/Mesh.h"
 #include "Components/Transform.h"
 
-#include "Graphics/AssetStreamer.h"
+#include "Graphics/BufferUpload.h"
+#include "Graphics/FrameResources.h"
 
 using namespace Core;
 
@@ -106,7 +107,7 @@ static vector<uint8_t> ToBytes(const vector<T>& data)
 	return bytes;
 }
 
-void Core::RendererBatch::RebuildGpuBuffers(AssetStreamer& streamer)
+void Core::RendererBatch::RebuildGpuBuffers()
 {
     // Bumped before the early-out below so an empty rebuild still counts: the draw
     // set changed either way, and Cullers have to notice.
@@ -230,26 +231,29 @@ void Core::RendererBatch::RebuildGpuBuffers(AssetStreamer& streamer)
     _instanceBuffer = AcquirePersistentBuffer(
         _instanceBuffer, instanceDesc, "RendererBatch.Instance");
 
-    // Copy REQUESTS, not jobs: like every loader, the batch only describes its
-    // table fills; the upload scheduler stages them on a worker thread and they
-    // go out as one submit when the caller flushes it.
-    GeometryCopyBatch batch;
-    batch.debugName = "RendererBatch.Tables";
-    batch.copies.push_back({ _indirectCommandBuffer, ToBytes(drawCommands), 0 });
-    batch.copies.push_back({ _materialIndexBuffer, ToBytes(materialIndices), 0 });
-    batch.copies.push_back({ _objectDataBuffer, ToBytes(objectData), 0 });
-    batch.copies.push_back({ _instanceBuffer, ToBytes(instanceData), 0 });
+    _pendingTableFills.clear();
+    _pendingTableFills.emplace_back(_indirectCommandBuffer, ToBytes(drawCommands));
+    _pendingTableFills.emplace_back(_materialIndexBuffer, ToBytes(materialIndices));
+    _pendingTableFills.emplace_back(_objectDataBuffer, ToBytes(objectData));
+    _pendingTableFills.emplace_back(_instanceBuffer, ToBytes(instanceData));
 
     // A transform copy only exists when there were transforms to upload.
     if (anyTransform)
-        batch.copies.push_back({ _transformBatch.TransformBuffer, ToBytes(transforms), 0 });
-
-    streamer.Push(move(batch));
+        _pendingTableFills.emplace_back(_transformBatch.TransformBuffer, ToBytes(transforms));
 
     _hasGpuBuffers = true;
 }
 
-void Core::RendererBatch::Sync(Scene& scene, AssetStreamer& streamer, VkExtent2D extents)
+void Core::RendererBatch::QueuePendingInit(FrameResources& frameResources)
+{
+    for (auto& [buffer, bytes] : _pendingTableFills)
+        frameResources.AddInitJob(make_unique<BufferUploadJob<uint8_t>>(
+            _device, buffer.Get(), std::move(bytes), 0));
+
+    _pendingTableFills.clear();
+}
+
+void Core::RendererBatch::Sync(Scene& scene, VkExtent2D extents)
 {
     if (!_dirty)
         return;
@@ -263,5 +267,5 @@ void Core::RendererBatch::Sync(Scene& scene, AssetStreamer& streamer, VkExtent2D
     _transforms.clear();
 
     InitializeFromScene(scene);
-    RebuildGpuBuffers(streamer);
+    RebuildGpuBuffers();
 }

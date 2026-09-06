@@ -58,7 +58,7 @@ void RenderScene::SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promot
 
 	_material->Sync();
 
-	_batch->Sync(scene, *_assetStreamer, extents);
+	_batch->Sync(scene, extents);
 
 	// Everything this frame produced - loader requests, the rebuild's table fills
 	_assetStreamer->SubmitQueued();
