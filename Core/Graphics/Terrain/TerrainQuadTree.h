@@ -10,6 +10,8 @@ namespace Core
 	class Texture;
 	class Buffer;
 
+	// The three terrain payload atlases (one slot index addresses all) and
+	// the slot lifetime: free list + frame-stamped retire.
 	class TerrainQuadTree
 	{
 	public:

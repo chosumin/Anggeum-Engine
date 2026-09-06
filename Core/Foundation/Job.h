@@ -4,7 +4,7 @@ namespace Core
 {
 	enum class JobType
 	{
-		GRAPHICS_PRIMARY, GRAPHICS_SECONDARY, COMPUTE, TRANSFER
+		GRAPHICS_PRIMARY, COMPUTE, TRANSFER
 	};
 
 	enum class JobStatus

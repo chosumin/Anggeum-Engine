@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "TerrainNodeListPass.h"
 #include "Graphics/FrameResources.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"

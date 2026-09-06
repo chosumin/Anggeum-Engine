@@ -88,13 +88,6 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}
-	case JobType::GRAPHICS_SECONDARY:
-	{
-		auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-		commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		job->commandBuffer = &commandBuffer;
-		return &commandBuffer;
-	}
 	case JobType::COMPUTE:
 	{
 		auto& commandBuffer = _computeCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);

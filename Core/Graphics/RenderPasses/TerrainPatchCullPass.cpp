@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "TerrainPatchCullPass.h"
 #include "TerrainNodeListPass.h"
 #include "TerrainLodMapPass.h"

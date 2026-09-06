@@ -10,7 +10,6 @@ namespace
 {
 	using namespace Core;
 
-
 	Handle<Texture> CreateAtlasTexture(Device& device,
 		ResourceManager& resourceManager, const char* name,
 		uvec2 extent, VkFormat format, uint32_t mipLevels = 1,
@@ -51,6 +50,7 @@ namespace Core
 		_albedoAtlas = CreateAtlasTexture(device, resourceManager, ALBEDO_ATLAS,
 			_colorExtent, config.albedoFormat);
 
+		// Every LOD must map to an exact mip extent of the index texture.
 		assert(config.NodesPerSide(0) >= (1u << (config.lodCount - 1)));
 
 		_freeSlots.reserve(config.atlasCapacity);
