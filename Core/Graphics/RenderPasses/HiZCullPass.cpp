@@ -17,20 +17,18 @@
 
 using namespace Core;
 
-HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, Phase phase,
-    HiZCullPass* cull1)
+HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+    VkExtent2D screenExtent, Phase phase, HiZCullPass* cull1)
     : _device(device)
     , _resourceManager(resourceManager)
     , _renderScene(renderScene)
     , _phase(phase)
 {
-    
-
-
     if (_phase == Phase::Cull1)
     {
         assert(cull1 == nullptr && "Cull1 owns the shared state");
         _state = make_shared<SharedState>();
+        _state->extent = screenExtent;
 
         _cullShader = resourceManager.LoadShader("Shaders/gpuCulling.comp.spv");
         _cullPipeline = resourceManager.LoadComputePipeline("Shaders/gpuCulling.comp.spv");
@@ -74,7 +72,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 
         auto& slot = _state->slots[&frameResources];
 
-        EnsureHiZTexture(frameResources, batch);
+        EnsureHiZTexture(frameResources);
 
         Handle<Buffer> pass1, pass2, rejectedIndices, rejectedCount;
         EnsureBatchBuffers(frameResources, batch, slot,
@@ -130,10 +128,8 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
     _active = true;
 }
 
-void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources, RendererBatch& batch)
+void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources)
 {
-    _state->extent = batch.GetExtents();
-
     uint32_t maxDim = std::max(_state->extent.width, _state->extent.height);
     _state->hiZMipLevels = static_cast<uint32_t>(std::floor(std::log2(maxDim))) + 1;
 
@@ -331,7 +327,7 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     auto builder = context.CreateDescriptorSetBuilder(cullShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
     builder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
-    builder.SetStorageBuffer(2, batch.GetTransformBatch().TransformBuffer.Get());
+    builder.SetStorageBuffer(2, batch.GetTransformBuffer());
     builder.SetStorageBuffer(3, batch.GetInstanceBuffer());
     builder.SetStorageBuffer(4, context.GetBuffer(_indirect));
     builder.SetTextureBuffer(5, _hiZTexture.Get());

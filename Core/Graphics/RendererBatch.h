@@ -15,12 +15,6 @@ namespace Core
 	class ResourceManager;
 	class FrameResources;
 
-	struct TransformBatch
-	{
-		// Persistent (handle pattern), owned via ResourceManager; resolve with .Get().
-		Handle<Buffer> TransformBuffer;
-	};
-
 	struct SubMeshBatch
 	{
 		Handle<SubMesh> SubMesh;
@@ -33,28 +27,24 @@ namespace Core
 		unordered_map<string, SubMeshBatch> SubMeshBatches;
 	};
 
-	// RendererBatch: the application-wide GPU-driven draw set. Part of RenderScene
-	// (owned by Engine), a single instance shared by every frame-in-flight. Its buffers
-	// are read-only inputs to the culling passes, so one shared copy is safe (the
-	// mutable culling outputs are per-frame-slot graph buffers). Rebuilt from the scene by
-	// Prepare(), which RenderScene::Sync calls only when the scene structure changed.
+	// RendererBatch: the application-wide GPU-driven draw set, shared by every
+	// frame-in-flight (culling reads it; mutable outputs are per-frame graph
+	// buffers). Tables are sized for the whole scene membership; resident
+	// geometry fills a dense prefix in promotion order, and each promotion
+	// appends its own entries via offset copies instead of a rebuild.
 	class RendererBatch
 	{
 	public:
 		RendererBatch(Device& device, ResourceManager& resourceManager);
 		~RendererBatch();
 
-		// Marks the draw set stale — call after adding/removing scene meshes. Kept here
-		// rather than on Scene: which membership changes matter is a rendering concern,
-		// and it keeps every manager owning its own dirty state.
 		void MarkDirty() { _dirty = true; }
 
-		// Bumped every time the draw set is rebuilt. Holders that sized themselves
-		// against the batch (the culling passes) compare this to notice they went stale
+		// Bumped on every table change so holders sized against the notice they went stale.
 		uint64_t GetRevision() const { return _revision; }
 
-		// Rebuild the whole draw set from the current scene membership.
-		void Sync(Scene& scene, VkExtent2D extents);
+		// Membership rebuild when dirty, then appends newly-resident geometry.
+		void Sync(Scene& scene);
 
 		void QueuePendingInit(FrameResources& frameResources);
 
@@ -65,16 +55,34 @@ namespace Core
 		uint32_t GetInstanceCount() const { return _instanceCount; }
 		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
-		TransformBatch& GetTransformBatch() { return _transformBatch; }
-		VkExtent2D GetExtents() const { return _extents; }
+		Buffer& GetTransformBuffer() const { return _transformBuffer.Get(); }
 
 	private:
+		// A submesh waiting for residency; appended once its upload lands.
+		struct PendingDraw
+		{
+			Handle<Material> Material;
+			Handle<SubMesh> SubMesh;
+			vector<uint> Transforms;
+		};
+
+		struct TableFill
+		{
+			Handle<Buffer> Buffer;
+			vector<uint8_t> Bytes;
+			VkDeviceSize Offset = 0;
+		};
+
 		void AddMesh(uint entityId, Handle<Material> material, Handle<SubMesh> subMesh);
 		void InitializeFromScene(Scene& scene);
 		void RebuildGpuBuffers();
 
-		// Create the buffer on first use, resize it in place afterwards so the handle
-		// stays valid. Callers must ensure no frame is in flight when resizing.
+		// Appends one submesh to the mirror prefix; returns its command slot.
+		uint32_t AppendDraw(Handle<Material> material, Handle<SubMesh> subMesh,
+			const vector<uint>& transforms);
+		void AppendPendingResident();
+
+		// Create the buffer on first use; replace only when the size changed.
 		Handle<Buffer> AcquirePersistentBuffer(Handle<Buffer> current,
 			const struct BufferDesc& desc, const string& name);
 
@@ -82,17 +90,21 @@ namespace Core
 		Device& _device;
 		ResourceManager& _resourceManager;
 
-		TransformBatch _transformBatch;
-		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix
+		vector<TableFill> _pendingTableFills;
 
-		vector<pair<Handle<Buffer>, vector<uint8_t>>> _pendingTableFills;
+		// Not yet resident at the last rebuild, keyed by submesh name.
+		unordered_map<string, PendingDraw> _pendingDraws;
+
+		Handle<Buffer> _transformBuffer;
+		unordered_map<uint, glm::mat4> _transforms;   // entity id -> world matrix
 
 		// Material batches (keyed by material name)
 		unordered_map<string, MaterialBatch> _materialBatches;
 
-		// Persistent GPU buffers (handle pattern), owned via ResourceManager.
 		Handle<Buffer> _instanceBuffer;
-		uint _instanceCount = 0;
+		uint _instanceCount = 0;          // resident instances (live prefix)
+		uint32_t _instanceCapacity = 0;   // total membership instances
+		uint32_t _commandCapacity = 0;    // total membership submeshes
 
 		IndirectDrawBuffer _indirectDrawBuffer;
 		Handle<Buffer> _indirectCommandBuffer;
@@ -100,12 +112,10 @@ namespace Core
 
 		// Object data buffer for GPU Culling (bounding spheres, transform indices)
 		Handle<Buffer> _objectDataBuffer;
+		vector<GPUObjectData> _objectData;
 
 		bool _hasGpuBuffers = false; // GPU buffers created at least once
 		bool _dirty = false;         // scene membership changed since the last rebuild
-		uint64_t _revision = 0;      // incremented on every rebuild
-
-		// Screen extents for the Hi-Z pyramid sizing
-		VkExtent2D _extents = {};
+		uint64_t _revision = 0;
 	};
 }

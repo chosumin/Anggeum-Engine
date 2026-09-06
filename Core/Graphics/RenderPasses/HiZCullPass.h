@@ -34,8 +34,8 @@ namespace Core
         static constexpr const char* RT_HIZ = "OcclusionCull.HiZ";
 
         // Cull2 takes the Cull1 instance to share its CPU state.
-        HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, Phase phase,
-            HiZCullPass* cull1 = nullptr);
+        HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+            VkExtent2D screenExtent, Phase phase, HiZCullPass* cull1 = nullptr);
         ~HiZCullPass();
 
         const char* GetName() const override
@@ -73,7 +73,7 @@ namespace Core
         void EnsureBatchBuffers(FrameResources& frameResources, RendererBatch& batch,
             SlotState& slot, Handle<Buffer>& outPass1, Handle<Buffer>& outPass2,
             Handle<Buffer>& outRejectedIndices, Handle<Buffer>& outRejectedCount);
-        void EnsureHiZTexture(FrameResources& frameResources, RendererBatch& batch);
+        void EnsureHiZTexture(FrameResources& frameResources);
 
         void ResetDrawCommands(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
             RendererBatch& batch);

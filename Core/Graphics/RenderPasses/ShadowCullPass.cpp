@@ -153,7 +153,7 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 		auto cullBuilder = context.CreateDescriptorSetBuilder(cullShader, 0);
 		cullBuilder.SetUniformBuffer(0, cullDataBuffer);
 		cullBuilder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
-		cullBuilder.SetStorageBuffer(2, batch.GetTransformBatch().TransformBuffer.Get());
+		cullBuilder.SetStorageBuffer(2, batch.GetTransformBuffer());
 		cullBuilder.SetStorageBuffer(3, batch.GetInstanceBuffer());
 		cullBuilder.SetStorageBuffer(4, context.GetBuffer(_indirect[i]));
 		auto& cullResources = cullBuilder.Build();

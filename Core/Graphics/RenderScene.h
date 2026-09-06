@@ -48,7 +48,7 @@ namespace Core
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
 		// The frame's world-model update
-		void SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promotedCount);
+		void SyncManagers(Scene& scene);
 
 		AssetStreamer& GetAssetStreamer() { return *_assetStreamer; }
 

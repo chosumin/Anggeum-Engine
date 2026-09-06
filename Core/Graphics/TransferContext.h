@@ -73,9 +73,6 @@ namespace Core
 		// Submit the jobs whose worker RECORDING has finished, as one batch.
 		void Flush();
 
-		// How many resources the promotion pump flipped Resident since the last call.
-		uint32_t TakePromotedCount();
-
 	private:
 		// Promotes + destroys in-flight batches the GPU has passed.
 		void CollectCompletedJobs();
@@ -107,7 +104,6 @@ namespace Core
 		unordered_map<string, PendingUpload> _pendingUploads;
 		deque<InFlightJobs> _inFlightJobs;
 
-		uint32_t _promotedCount = 0;
 		VkDeviceSize _frameAdmittedBytes = 0;
 	};
 }

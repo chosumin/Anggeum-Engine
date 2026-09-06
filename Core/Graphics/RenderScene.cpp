@@ -40,7 +40,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 // Out of line for the unique_ptr members forward-declared in the header.
 RenderScene::~RenderScene() = default;
 
-void RenderScene::SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promotedCount)
+void RenderScene::SyncManagers(Scene& scene)
 {
 	// Streaming producer: decides this frame's uploads, and submits them.
 	if (auto* camera = scene.GetMainCamera())
@@ -49,16 +49,12 @@ void RenderScene::SyncManagers(Scene& scene, VkExtent2D extents, uint32_t promot
 	// The managers below are consumers of COMPLETED uploads: they fold
 	// promoted resources into the GPU mirrors.
 
-	// Newly-Resident geometry can only join the draw set through a rebuild.
-	if (promotedCount > 0)
-		_batch->MarkDirty();
-
 	if (_bindless)
 		_bindless->Sync();
 
 	_material->Sync();
 
-	_batch->Sync(scene, extents);
+	_batch->Sync(scene);
 
 	// Everything this frame produced - loader requests, the rebuild's table fills
 	_assetStreamer->SubmitQueued();
@@ -83,7 +79,7 @@ void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 
 	commandBuffer.BindPipeline(&pipeline);
 
-	builder.SetStorageBuffer(1, _batch->GetTransformBatch().TransformBuffer.Get());
+	builder.SetStorageBuffer(1, _batch->GetTransformBuffer());
 	builder.SetStorageBuffer(2, _batch->GetInstanceBuffer());
 	builder.SetUniformBuffer(8, _material->GetMaterialBuffer());
 	builder.SetStorageBuffer(9, _batch->GetMaterialIndexBuffer());

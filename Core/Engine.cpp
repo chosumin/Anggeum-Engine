@@ -108,8 +108,7 @@ void Core::Engine::Draw()
 
 		// Streams, syncs the GPU mirrors and hands this frame's upload jobs
 		// to the transfer context.
-		_renderScene->SyncManagers(*_scene, extents,
-			_transferContext->TakePromotedCount());
+		_renderScene->SyncManagers(*_scene);
 
 		_transferContext->Flush();
 	}

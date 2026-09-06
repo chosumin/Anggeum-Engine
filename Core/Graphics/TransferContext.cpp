@@ -69,26 +69,13 @@ void TransferContext::CollectCompletedJobs()
 		for (PendingUpload& upload : _inFlightJobs.front().uploads)
 		{
 			if (upload.texture.IsValid())
-			{
 				upload.texture.SetResident();
-				++_promotedCount;
-			}
 			if (upload.subMesh.IsValid())
-			{
 				upload.subMesh.SetResident();
-				++_promotedCount;
-			}
 		}
 
 		_inFlightJobs.pop_front();
 	}
-}
-
-uint32_t TransferContext::TakePromotedCount()
-{
-	uint32_t count = _promotedCount;
-	_promotedCount = 0;
-	return count;
 }
 
 VkDeviceSize TransferContext::GrantUploadBudget(VkDeviceSize requested)

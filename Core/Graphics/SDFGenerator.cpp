@@ -327,7 +327,7 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderF
 	auto& indirectCommandBuffer = batch.GetIndirectCommandBuffer();
 	auto drawCommandCount = batch.GetDrawCommandCount();
 	auto instanceCount = batch.GetInstanceCount();
-	auto& transformBuffer = batch.GetTransformBatch().TransformBuffer.Get();
+	auto& transformBuffer = batch.GetTransformBuffer();
 
 	uint32_t totalTriangles = meshBufferManager.GetTotalIndexCount() / 3;
 

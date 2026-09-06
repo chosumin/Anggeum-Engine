@@ -15,7 +15,7 @@ DepthPrePasses::DepthPrePasses(FrameGraph& graph, Device& device, ResourceManage
 	using CullPhase = HiZCullPass::Phase;
 	using DepthPhase = DepthPrePass::Phase;
 
-	auto hiZCull1 = make_unique<HiZCullPass>(device, resourceManager, renderScene, CullPhase::Cull1);
+	auto hiZCull1 = make_unique<HiZCullPass>(device, resourceManager, renderScene, extent, CullPhase::Cull1);
 	HiZCullPass* hiZCull1Ptr = hiZCull1.get();
 
 	graph.AddPass(std::move(hiZCull1));
@@ -31,7 +31,7 @@ DepthPrePasses::DepthPrePasses(FrameGraph& graph, Device& device, ResourceManage
 	graph.AddPass(make_unique<TerrainDepthPrePass>(device, resourceManager, renderScene, depthFormat,
 		msaaSamples));
 	graph.AddPass(make_unique<ResolvePass>(device, resourceManager, extent, msaaSamples, /*resolveNormal*/ false));
-	graph.AddPass(make_unique<HiZCullPass>(device, resourceManager, renderScene, CullPhase::Cull2, hiZCull1Ptr));
+	graph.AddPass(make_unique<HiZCullPass>(device, resourceManager, renderScene, extent, CullPhase::Cull2, hiZCull1Ptr));
 	graph.AddPass(make_unique<DepthPrePass>(device, resourceManager, renderScene, extent, depthFormat,
 		msaaSamples, DepthPhase::Second));
 
