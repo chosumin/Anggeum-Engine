@@ -153,7 +153,7 @@ else()
     # Directory for shader dependency files
     set(SHADER_DEP_DIR "${CMAKE_BINARY_DIR}/shader_deps")
     file(MAKE_DIRECTORY "${SHADER_DEP_DIR}")
-    
+
     # Create compilation rules for each shader file
     set(COMPILED_SHADERS)
     foreach(SHADER ${SHADER_SOURCES})
@@ -165,37 +165,15 @@ else()
         string(REPLACE "/" "_" SHADER_DEP_NAME "${SHADER_REL}")
         set(SHADER_DEP_FILE "${SHADER_DEP_DIR}/${SHADER_DEP_NAME}.d")
 
-        # Generate dependency file using glslc -M
-        # This produces a Makefile-style .d file listing actual #include dependencies
-        execute_process(
-            COMMAND ${GLSLC} ${GLSLC_FLAGS} -M ${SHADER}
-            OUTPUT_FILE "${SHADER_DEP_FILE}"
-            RESULT_VARIABLE DEP_RESULT
-            ERROR_QUIET
-        )
-
-        # Parse dependency file to extract actual header dependencies
-        set(SHADER_ACTUAL_DEPS ${SHADER})
-        if(DEP_RESULT EQUAL 0 AND EXISTS "${SHADER_DEP_FILE}")
-            file(READ "${SHADER_DEP_FILE}" DEP_CONTENT)
-            # Remove the target part (everything before ':')
-            string(REGEX REPLACE "^[^:]*:" "" DEP_CONTENT "${DEP_CONTENT}")
-            # Remove backslash-newline continuations
-            string(REPLACE "\\\n" " " DEP_CONTENT "${DEP_CONTENT}")
-            # Remove extra whitespace and split into list
-            string(REGEX REPLACE "[ \t\r\n]+" ";" DEP_CONTENT "${DEP_CONTENT}")
-            foreach(DEP ${DEP_CONTENT})
-                if(EXISTS "${DEP}" AND NOT "${DEP}" STREQUAL "${SHADER}")
-                    list(APPEND SHADER_ACTUAL_DEPS "${DEP}")
-                endif()
-            endforeach()
-        endif()
-
-        # Shader compilation command with per-shader dependencies
+        # -MD writes the #include list at build time; DEPFILE keeps it
+        # current without reconfiguring.
         add_custom_command(
             OUTPUT ${SHADER_OUTPUT}
-            COMMAND ${GLSLC} ${GLSLC_FLAGS} -o ${SHADER_OUTPUT} ${SHADER}
-            DEPENDS ${SHADER_ACTUAL_DEPS}
+            COMMAND ${GLSLC} ${GLSLC_FLAGS}
+                -MD -MF ${SHADER_DEP_FILE} -MT ${SHADER_OUTPUT}
+                -o ${SHADER_OUTPUT} ${SHADER}
+            DEPENDS ${SHADER}
+            DEPFILE ${SHADER_DEP_FILE}
             COMMENT "Compiling shader: ${SHADER_NAME}"
             VERBATIM
         )
