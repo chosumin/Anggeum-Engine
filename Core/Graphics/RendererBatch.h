@@ -35,13 +35,11 @@ namespace Core
 	class RendererBatch
 	{
 	public:
+		static constexpr const char* SB_INSTANCE_IDS = "RendererBatch.Instance";
 		RendererBatch(Device& device, ResourceManager& resourceManager);
 		~RendererBatch();
 
 		void MarkDirty() { _dirty = true; }
-
-		// Bumped on every table change so holders sized against the notice they went stale.
-		uint64_t GetRevision() const { return _revision; }
 
 		// Membership rebuild when dirty, then appends newly-resident geometry.
 		void Sync(Scene& scene);
@@ -54,6 +52,7 @@ namespace Core
 		uint32_t GetDrawCommandCount() const { return _indirectDrawBuffer.GetDrawCount(); }
 		uint32_t GetInstanceCount() const { return _instanceCount; }
 		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
+		Handle<Buffer> GetInstanceBufferHandle() const { return _instanceBuffer; }
 		const IndirectDrawBuffer& GetIndirectDrawBuffer() const { return _indirectDrawBuffer; }
 		Buffer& GetTransformBuffer() const { return _transformBuffer.Get(); }
 
@@ -116,6 +115,5 @@ namespace Core
 
 		bool _hasGpuBuffers = false; // GPU buffers created at least once
 		bool _dirty = false;         // scene membership changed since the last rebuild
-		uint64_t _revision = 0;
 	};
 }

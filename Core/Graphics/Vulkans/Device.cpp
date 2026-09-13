@@ -10,6 +10,7 @@ namespace Core
 	{
 		VkPhysicalDeviceVulkan13Features features13{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
 		VkPhysicalDeviceVulkan12Features features12{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		VkPhysicalDeviceVulkan11Features features11{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
 		VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
 
 		DeviceFeatureChain() = default;
@@ -20,13 +21,16 @@ namespace Core
 		void Query(VkPhysicalDevice device)
 		{
 			features12.pNext = &features13;
-			features2.pNext = &features12;
+			features11.pNext = &features12;
+			features2.pNext = &features11;
 			vkGetPhysicalDeviceFeatures2(device, &features2);
 		}
 
 		bool HasRequiredFeatures() const
 		{
 			return features2.features.samplerAnisotropy &&
+				// gl_DrawID: the compacted material tables are draw-indexed.
+				features11.shaderDrawParameters &&
 				features12.timelineSemaphore &&
 				features13.dynamicRendering &&
 				features13.synchronization2;

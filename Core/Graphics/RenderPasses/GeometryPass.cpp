@@ -213,9 +213,20 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
     {
         _pass1Indirect = builder.GetBuffer(HiZCullPass::SB_PASS1_INDIRECT);
         builder.Read(_pass1Indirect, BufferAccess::IndirectRead);
+        _pass1Count = builder.GetBuffer(HiZCullPass::SB_PASS1_DRAW_COUNT);
+        builder.Read(_pass1Count, BufferAccess::IndirectRead);
+        _pass1Materials = builder.GetBuffer(HiZCullPass::SB_PASS1_MATERIALS);
+        builder.Read(_pass1Materials, BufferAccess::StorageFragmentRead);
 
         _pass2Indirect = builder.GetBuffer(HiZCullPass::SB_PASS2_INDIRECT);
         builder.Read(_pass2Indirect, BufferAccess::IndirectRead);
+        _pass2Count = builder.GetBuffer(HiZCullPass::SB_PASS2_DRAW_COUNT);
+        builder.Read(_pass2Count, BufferAccess::IndirectRead);
+        _pass2Materials = builder.GetBuffer(HiZCullPass::SB_PASS2_MATERIALS);
+        builder.Read(_pass2Materials, BufferAccess::StorageFragmentRead);
+
+        FGBuffer instanceIDs = builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS);
+        builder.Read(instanceIDs, BufferAccess::StorageVertexRead);
     }
 }
 
@@ -249,11 +260,13 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
     commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
 
-    // Replay both culled draw lists, then the skybox, all in one scope.
+    // Replay both compacted draw lists, then the skybox, all in one scope.
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass1Indirect), builder);
+        context.GetBuffer(_pass1Indirect), context.GetBuffer(_pass1Count),
+        context.GetBuffer(_pass1Materials), builder);
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass2Indirect), builder);
+        context.GetBuffer(_pass2Indirect), context.GetBuffer(_pass2Count),
+        context.GetBuffer(_pass2Materials), builder);
 
     RecordSkybox(context, commandBuffer);
 

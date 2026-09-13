@@ -27,9 +27,9 @@ layout(set = 0, binding = 2) buffer readonly InstanceBuffer
     uint IDs[];
 } instanceBuffer;
 
-void main() 
+void main()
 {
-    outDrawID = gl_InstanceIndex;
+    outDrawID = gl_DrawIDARB;
 
     uint id = instanceBuffer.IDs[gl_InstanceIndex];
     mat4 world = transformBuffer.transforms[id];

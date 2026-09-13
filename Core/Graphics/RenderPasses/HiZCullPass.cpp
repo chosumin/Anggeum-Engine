@@ -32,9 +32,6 @@ HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, Rende
 
         _cullShader = resourceManager.LoadShader("Shaders/gpuCulling.comp.spv");
         _cullPipeline = resourceManager.LoadComputePipeline("Shaders/gpuCulling.comp.spv");
-
-        _resetShader = resourceManager.LoadShader("Shaders/resetDrawCommands.comp.spv");
-        _resetPipeline = resourceManager.LoadComputePipeline("Shaders/resetDrawCommands.comp.spv");
     }
     else
     {
@@ -48,6 +45,9 @@ HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, Rende
 
     _hiZShader = resourceManager.LoadShader("Shaders/hiZGenerate.comp.spv");
     _hiZPipeline = resourceManager.LoadComputePipeline("Shaders/hiZGenerate.comp.spv");
+
+    _compactShader = resourceManager.LoadShader("Shaders/compactDrawCommands.comp.spv");
+    _compactPipeline = resourceManager.LoadComputePipeline("Shaders/compactDrawCommands.comp.spv");
 }
 
 HiZCullPass::~HiZCullPass() = default;
@@ -66,28 +66,52 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         return;
 
 
+    const uint32_t drawCount = batch.GetDrawCommandCount();
+    const uint32_t instanceCount = batch.GetInstanceCount();
+
+    // The cull dispatch scatters instance IDs into the batch-owned buffer;
+    // declared so the graph orders it against every ID read and rewrite.
+    FGBuffer instanceIDs = builder.HasBuffer(RendererBatch::SB_INSTANCE_IDS)
+        ? builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS)
+        : builder.ImportBuffer(RendererBatch::SB_INSTANCE_IDS,
+            batch.GetInstanceBufferHandle());
+    builder.Write(instanceIDs, BufferAccess::StorageComputeWrite);
+
+    FGBufferDesc countsDesc{ drawCount * sizeof(uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
+    FGBufferDesc visibleDesc{ drawCount * sizeof(DrawIndexedIndirectCommand),
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
+    FGBufferDesc materialsDesc{ drawCount * sizeof(uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
+    FGBufferDesc drawCountDesc{ sizeof(uint32_t),
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+        | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
+
     if (_phase == Phase::Cull1)
     {
         _state->camera = camera->Matrices;
 
-        auto& slot = _state->slots[&frameResources];
-
         EnsureHiZTexture(frameResources);
 
-        Handle<Buffer> pass1, pass2, rejectedIndices, rejectedCount;
-        EnsureBatchBuffers(frameResources, batch, slot,
-            pass1, pass2, rejectedIndices, rejectedCount);
+        _counts = builder.CreateBuffer(SB_PASS1_COUNTS, countsDesc);
+        builder.Write(_counts, BufferAccess::StorageComputeWrite);
 
-        _indirect = builder.ImportBuffer(SB_PASS1_INDIRECT, pass1);
-        builder.Write(_indirect, BufferAccess::StorageComputeWrite);
+        _visibleCommands = builder.CreateBuffer(SB_PASS1_INDIRECT, visibleDesc);
+        builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
 
-        _pass2Indirect = builder.ImportBuffer(SB_PASS2_INDIRECT, pass2);
-        builder.Write(_pass2Indirect, BufferAccess::StorageComputeWrite);
+        _visibleMaterials = builder.CreateBuffer(SB_PASS1_MATERIALS, materialsDesc);
+        builder.Write(_visibleMaterials, BufferAccess::StorageComputeWrite);
 
-        _rejectedIndices = builder.ImportBuffer(SB_REJECTED_INDICES, rejectedIndices);
+        _visibleDrawCount = builder.CreateBuffer(SB_PASS1_DRAW_COUNT, drawCountDesc);
+        builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
+
+        _rejectedIndices = builder.CreateBuffer(SB_REJECTED_INDICES,
+            { instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
         builder.Write(_rejectedIndices, BufferAccess::StorageComputeWrite);
 
-        _rejectedCount = builder.ImportBuffer(SB_REJECTED_COUNT, rejectedCount);
+        _rejectedCount = builder.CreateBuffer(SB_REJECTED_COUNT,
+            { sizeof(uint32_t),
+              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
         builder.Write(_rejectedCount, BufferAccess::StorageComputeWrite);
 
         // Pass-1 Hi-Z reprojects the previous frame's resolved depth (another
@@ -97,7 +121,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
     else
     {
         // Cull1 declared nothing this frame (it runs first): nothing to recover.
-        if (!builder.HasBuffer(SB_PASS2_INDIRECT))
+        if (!builder.HasBuffer(SB_PASS1_INDIRECT))
             return;
 
         _rejectedIndices = builder.GetBuffer(SB_REJECTED_INDICES);
@@ -106,8 +130,21 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         _rejectedCount = builder.GetBuffer(SB_REJECTED_COUNT);
         builder.Read(_rejectedCount, BufferAccess::StorageComputeRead);
 
-        _indirect = builder.GetBuffer(SB_PASS2_INDIRECT);
-        builder.Write(_indirect, BufferAccess::StorageComputeWrite);
+        // Recovered instances scatter after pass 1's in the shared ID ranges.
+        _baseCounts = builder.GetBuffer(SB_PASS1_COUNTS);
+        builder.Read(_baseCounts, BufferAccess::StorageComputeRead);
+
+        _counts = builder.CreateBuffer(SB_PASS2_COUNTS, countsDesc);
+        builder.Write(_counts, BufferAccess::StorageComputeWrite);
+
+        _visibleCommands = builder.CreateBuffer(SB_PASS2_INDIRECT, visibleDesc);
+        builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
+
+        _visibleMaterials = builder.CreateBuffer(SB_PASS2_MATERIALS, materialsDesc);
+        builder.Write(_visibleMaterials, BufferAccess::StorageComputeWrite);
+
+        _visibleDrawCount = builder.CreateBuffer(SB_PASS2_DRAW_COUNT, drawCountDesc);
+        builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
 
         _resolvedDepth = builder.GetTexture(ResolvePass::RT_RESOLVED_DEPTH);
         builder.Read(_resolvedDepth, TextureAccess::SampledCompute);
@@ -158,53 +195,6 @@ void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources)
         hiZTexture.GetImage().GetOrCreateImageView(mip);
 }
 
-void HiZCullPass::EnsureBatchBuffers(FrameResources& frameResources, RendererBatch& batch,
-    SlotState& slot, Handle<Buffer>& outPass1, Handle<Buffer>& outPass2,
-    Handle<Buffer>& outRejectedIndices, Handle<Buffer>& outRejectedCount)
-{
-    const auto& drawCommands = batch.GetIndirectDrawBuffer().GetDrawCommands();
-
-    BufferDesc indirectDesc{};
-    indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
-    indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-        | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    indirectDesc.memoryType = MemoryType::DEVICE_LOCAL;
-
-    BufferDesc rejectedIndicesDesc{};
-    rejectedIndicesDesc.size = batch.GetInstanceCount() * sizeof(uint32_t);
-    rejectedIndicesDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    rejectedIndicesDesc.memoryType = MemoryType::DEVICE_LOCAL;
-
-    const uint64_t revision = batch.GetRevision();
-    if (!slot.buffersCreated || slot.batchRevision != revision)
-    {
-        // The culling shaders only rewrite instance counts; the rest of each
-        // indirect command comes from this fill, so a rebuilt draw set has to
-        // refresh both lists.
-        outPass1 = frameResources.CreateOrReplaceStorageBuffer(
-            SB_PASS1_INDIRECT, indirectDesc, drawCommands);
-        outPass2 = frameResources.CreateOrReplaceStorageBuffer(
-            SB_PASS2_INDIRECT, indirectDesc, drawCommands);
-        outRejectedIndices = frameResources.CreateOrReplaceStorageBuffer(
-            SB_REJECTED_INDICES, rejectedIndicesDesc);
-
-        slot.batchRevision = revision;
-        slot.buffersCreated = true;
-    }
-    else
-    {
-        outPass1 = frameResources.GetOrCreateStorageBuffer(SB_PASS1_INDIRECT, indirectDesc);
-        outPass2 = frameResources.GetOrCreateStorageBuffer(SB_PASS2_INDIRECT, indirectDesc);
-        outRejectedIndices = frameResources.GetOrCreateStorageBuffer(SB_REJECTED_INDICES, rejectedIndicesDesc);
-    }
-
-    BufferDesc rejectedCountDesc{};
-    rejectedCountDesc.size = sizeof(uint32_t);
-    rejectedCountDesc.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    rejectedCountDesc.memoryType = MemoryType::DEVICE_LOCAL;
-    outRejectedCount = frameResources.GetOrCreateStorageBuffer(SB_REJECTED_COUNT, rejectedCountDesc);
-}
-
 void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     if (!_active)
@@ -217,10 +207,6 @@ void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 
     if (_phase == Phase::Cull1)
     {
-        commandBuffer.BeginDebugMarker("Reset Draw Commands");
-        ResetDrawCommands(context, commandBuffer, batch);
-        commandBuffer.EndDebugMarker();
-
         commandBuffer.BeginDebugMarker("Pass 1 Culling");
         // Null on the frames before any depth has been produced.
         DispatchCulling(context, commandBuffer, batch, slot, _prevDepth.TryGet());
@@ -233,48 +219,10 @@ void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
             &context.GetTexture(_resolvedDepth));
         commandBuffer.EndDebugMarker();
     }
-}
 
-void HiZCullPass::ResetDrawCommands(FrameGraphPassContext& context,
-    CommandBuffer& commandBuffer, RendererBatch& batch)
-{
-    const uint32_t drawCount = batch.GetDrawCommandCount();
-
-    commandBuffer.BindPipeline(&_resetPipeline.Get());
-
-    auto& resetShader = _resetShader.Get();
-    auto builder = context.CreateDescriptorSetBuilder(resetShader, 0);
-    builder.SetStorageBuffer(0, context.GetBuffer(_indirect));
-    builder.SetStorageBuffer(1, context.GetBuffer(_pass2Indirect));
-    builder.SetStorageBuffer(2, context.GetBuffer(_rejectedCount));
-    auto& resources = builder.Build();
-
-    commandBuffer.PushConstants(resetShader, 0, drawCount);
-    commandBuffer.BindDescriptorSet(_resetPipeline.Get().GetPipelineBindPoint(),
-        resetShader, resources);
-
-    uint32_t groupCount = (drawCount + 63) / 64;
-    commandBuffer.Dispatch(std::max(1u, groupCount), 1, 1);
-
-    // Same-pass hazard (reset -> pass-1 cull dispatch), so it cannot come from
-    // the graph; cross-pass hazards on these buffers do.
-    commandBuffer.CreateBarrierBatch()
-        .Buffer(context.GetBuffer(_indirect),
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
-        .Buffer(context.GetBuffer(_pass2Indirect),
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
-        .Buffer(context.GetBuffer(_rejectedCount),
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
-        .Submit();
+    commandBuffer.BeginDebugMarker("Compact Draw Commands");
+    CompactDrawCommands(context, commandBuffer, batch);
+    commandBuffer.EndDebugMarker();
 }
 
 void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
@@ -303,6 +251,30 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     }
     slot.hiZImage = _hiZTexture;
 
+    // Zero this phase's counters ahead of the dispatches.
+    {
+        commandBuffer.FillBuffer(context.GetBuffer(_counts), 0, VK_WHOLE_SIZE, 0);
+        commandBuffer.FillBuffer(context.GetBuffer(_visibleDrawCount), 0, VK_WHOLE_SIZE, 0);
+        if (_phase == Phase::Cull1)
+            commandBuffer.FillBuffer(context.GetBuffer(_rejectedCount), 0, VK_WHOLE_SIZE, 0);
+
+        auto barriers = commandBuffer.CreateBarrierBatch();
+        barriers.Buffer(context.GetBuffer(_counts),
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        barriers.Buffer(context.GetBuffer(_visibleDrawCount),
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        if (_phase == Phase::Cull1)
+            barriers.Buffer(context.GetBuffer(_rejectedCount),
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        barriers.Submit();
+    }
+
     // Culling parameters. Built CPU-side and assigned once: the mapping is
     // uncached, so field-by-field writes into it would be slow.
     const CameraBuffer& camera = _state->camera;
@@ -329,8 +301,11 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     builder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
     builder.SetStorageBuffer(2, batch.GetTransformBuffer());
     builder.SetStorageBuffer(3, batch.GetInstanceBuffer());
-    builder.SetStorageBuffer(4, context.GetBuffer(_indirect));
+    builder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
     builder.SetTextureBuffer(5, _hiZTexture.Get());
+    builder.SetStorageBuffer(6, context.GetBuffer(_counts));
+    if (_phase == Phase::Cull2)
+        builder.SetStorageBuffer(7, context.GetBuffer(_baseCounts));
     builder.SetStorageBuffer(10, context.GetBuffer(_rejectedIndices));
     builder.SetStorageBuffer(11, context.GetBuffer(_rejectedCount));
     auto& resources = builder.Build();
@@ -340,17 +315,49 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
 
     uint32_t groupCount = (batch.GetInstanceCount() + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);
+}
 
-    // The graph emits the barriers for the indirect/rejected buffers (their
-    // readers declare IndirectRead / compute reads). The instance buffer stays
-    // manual: it belongs to the RendererBatch, outside the graph.
+void HiZCullPass::CompactDrawCommands(FrameGraphPassContext& context,
+    CommandBuffer& commandBuffer, RendererBatch& batch)
+{
+    // Same-pass hazard: the cull dispatch above wrote this phase's counts.
     commandBuffer.CreateBarrierBatch()
-        .Buffer(batch.GetInstanceBuffer(),
+        .Buffer(context.GetBuffer(_counts),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT)
         .Submit();
+
+    struct CompactPush
+    {
+        uint32_t drawCount;
+        uint32_t applyBaseCounts;
+    };
+    CompactPush push{ batch.GetDrawCommandCount(),
+        _phase == Phase::Cull2 ? 1u : 0u };
+
+    commandBuffer.BindPipeline(&_compactPipeline.Get());
+
+    auto& compactShader = _compactShader.Get();
+    auto builder = context.CreateDescriptorSetBuilder(compactShader, 0);
+    builder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
+    builder.SetStorageBuffer(1, batch.GetMaterialIndexBuffer());
+    builder.SetStorageBuffer(2, context.GetBuffer(_counts));
+    // Pass 1 has no base counts; the shader ignores the binding when the
+    // flag is off, but the descriptor still has to be valid.
+    builder.SetStorageBuffer(3, _phase == Phase::Cull2
+        ? context.GetBuffer(_baseCounts) : context.GetBuffer(_counts));
+    builder.SetStorageBuffer(4, context.GetBuffer(_visibleCommands));
+    builder.SetStorageBuffer(5, context.GetBuffer(_visibleMaterials));
+    builder.SetStorageBuffer(6, context.GetBuffer(_visibleDrawCount));
+    auto& resources = builder.Build();
+
+    commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),
+        compactShader, resources);
+    commandBuffer.PushConstants(compactShader, 0, push);
+
+    commandBuffer.Dispatch(std::max(1u, (push.drawCount + 63) / 64), 1, 1);
 }
 
 void HiZCullPass::BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,

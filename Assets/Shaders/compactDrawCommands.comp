@@ -1,0 +1,59 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct DrawIndexedIndirectCommand
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+};
+
+// Appends the commands that survived culling (count > 0), densely and in
+// order, for DrawIndexedIndirectCount - empty commands never reach the draw.
+layout(push_constant) uniform Push
+{
+    uint drawCount;
+    // Pass-2: recovered instances were scattered after pass 1's, so the
+    // emitted firstInstance shifts by the pass-1 count.
+    uint applyBaseCounts;
+} push;
+
+layout(set = 0, binding = 0) readonly buffer TemplateCommands
+{
+    DrawIndexedIndirectCommand templateCommands[];
+};
+layout(set = 0, binding = 1) readonly buffer TemplateMaterials { uint templateMaterials[]; };
+layout(set = 0, binding = 2) readonly buffer InstanceCounts { uint counts[]; };
+layout(set = 0, binding = 3) readonly buffer BaseCounts { uint baseCounts[]; };
+
+layout(set = 0, binding = 4) writeonly buffer OutCommands
+{
+    DrawIndexedIndirectCommand outCommands[];
+};
+layout(set = 0, binding = 5) writeonly buffer OutMaterials { uint outMaterials[]; };
+layout(set = 0, binding = 6) buffer OutDrawCount { uint outDrawCount; };
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= push.drawCount)
+        return;
+
+    uint instanceCount = counts[index];
+    if (instanceCount == 0)
+        return;
+
+    uint slot = atomicAdd(outDrawCount, 1);
+
+    DrawIndexedIndirectCommand cmd = templateCommands[index];
+    cmd.instanceCount = instanceCount;
+    
+    if (push.applyBaseCounts != 0)
+        cmd.firstInstance += baseCounts[index];
+
+    outCommands[slot] = cmd;
+    outMaterials[slot] = templateMaterials[index];
+}

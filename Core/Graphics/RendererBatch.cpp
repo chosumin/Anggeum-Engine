@@ -141,7 +141,6 @@ void Core::RendererBatch::AppendPendingResident()
     if (_pendingDraws.empty())
         return;
 
-    bool appended = false;
     for (auto it = _pendingDraws.begin(); it != _pendingDraws.end();)
     {
         PendingDraw& pending = it->second;
@@ -175,20 +174,12 @@ void Core::RendererBatch::AppendPendingResident()
             ToBytes(&_objectData[firstInstance], pending.Transforms.size()),
             firstInstance * sizeof(GPUObjectData) });
 
-        appended = true;
         it = _pendingDraws.erase(it);
     }
-
-    if (appended)
-        ++_revision;
 }
 
 void Core::RendererBatch::RebuildGpuBuffers()
 {
-    // Bumped before the early-out below so an empty rebuild still counts: the draw
-    // set changed either way, and Cullers have to notice.
-    ++_revision;
-
     _indirectDrawBuffer.Clear();
     _objectData.clear();
     _pendingDraws.clear();

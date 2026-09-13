@@ -30,7 +30,8 @@ layout(set = 0, binding = 0) uniform CullData
 layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer { ObjectData objects[]; };
 layout(set = 0, binding = 2) readonly buffer TransformBuffer { mat4 transforms[]; };
 layout(set = 0, binding = 3) writeonly buffer InstanceBuffer { uint IDs[]; };
-layout(set = 0, binding = 4) buffer DrawCommands { DrawIndexedIndirectCommand commands[]; };
+layout(set = 0, binding = 4) readonly buffer DrawCommands { DrawIndexedIndirectCommand commands[]; };
+layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
 
 bool IsVisibleFrustum(vec3 center, float radius)
 {
@@ -65,7 +66,7 @@ void main()
 
     if (IsVisibleFrustum(worldCenter, worldRadius))
     {
-        uint localIdx = atomicAdd(commands[cmdIndex].instanceCount, 1);
+        uint localIdx = atomicAdd(counts[cmdIndex], 1);
         IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
     }
 }

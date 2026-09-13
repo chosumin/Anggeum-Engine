@@ -2,6 +2,7 @@
 #include "DepthPrePass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
+#include "Graphics/RendererBatch.h"
 #include "HiZCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -91,13 +92,23 @@ void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 	builder.Read(_camera, BufferAccess::UniformVertex);
 
 	_indirect = FGBuffer{};
-	const char* indirectName = _phase == Phase::First
-		? HiZCullPass::SB_PASS1_INDIRECT
-		: HiZCullPass::SB_PASS2_INDIRECT;
+	const char* indirectName = first
+		? HiZCullPass::SB_PASS1_INDIRECT : HiZCullPass::SB_PASS2_INDIRECT;
 	if (builder.HasBuffer(indirectName))
 	{
 		_indirect = builder.GetBuffer(indirectName);
 		builder.Read(_indirect, BufferAccess::IndirectRead);
+
+		_indirectCount = builder.GetBuffer(first
+			? HiZCullPass::SB_PASS1_DRAW_COUNT : HiZCullPass::SB_PASS2_DRAW_COUNT);
+		builder.Read(_indirectCount, BufferAccess::IndirectRead);
+
+		_visibleMaterials = builder.GetBuffer(first
+			? HiZCullPass::SB_PASS1_MATERIALS : HiZCullPass::SB_PASS2_MATERIALS);
+		builder.Read(_visibleMaterials, BufferAccess::StorageFragmentRead);
+
+		FGBuffer instanceIDs = builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS);
+		builder.Read(instanceIDs, BufferAccess::StorageVertexRead);
 	}
 }
 
@@ -116,7 +127,8 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 		builder.SetUniformBuffer(0, context.GetBuffer(_camera));
 
 		_renderScene.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
-			context.GetBuffer(_indirect), builder);
+			context.GetBuffer(_indirect), context.GetBuffer(_indirectCount),
+			context.GetBuffer(_visibleMaterials), builder);
 	}
 
 	context.EndRendering(commandBuffer);
