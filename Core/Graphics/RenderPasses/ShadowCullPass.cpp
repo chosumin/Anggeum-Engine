@@ -151,14 +151,14 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	}
 
 	// The culls wrote the counts the compaction below reads.
-	auto barriers = commandBuffer.CreateBarrierBatch();
+	auto barrier = commandBuffer.CreateBarrierBatch();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
 	{
-		barriers.Buffer(context.GetBuffer(_instanceCounts[i]),
+		barrier.Buffer(context.GetBuffer(_instanceCounts[i]),
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
 	}
-	barriers.Submit();
+	barrier.Submit();
 
 	struct CompactPush
 	{
