@@ -272,13 +272,10 @@ void ShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResource
 
 			_cascadeMaterials[i] = builder.GetBuffer(ShadowCullPass::MaterialsName(i));
 			builder.Read(_cascadeMaterials[i], BufferAccess::StorageFragmentRead);
-		}
-	}
 
-	if (builder.HasBuffer(RendererBatch::SB_INSTANCE_IDS))
-	{
-		FGBuffer instanceIDs = builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS);
-		builder.Read(instanceIDs, BufferAccess::StorageVertexRead);
+			_cascadeInstanceIDs[i] = builder.GetBuffer(ShadowCullPass::InstanceIdsName(i));
+			builder.Read(_cascadeInstanceIDs[i], BufferAccess::StorageVertexRead);
+		}
 	}
 }
 
@@ -327,6 +324,7 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 		_renderScene.DrawIndirect(commandBuffer, shader, *_pipeline,
 			context.GetBuffer(_cascadeIndirect[cascadeIndex]),
 			context.GetBuffer(_cascadeDrawCount[cascadeIndex]),
+			context.GetBuffer(_cascadeInstanceIDs[cascadeIndex]),
 			context.GetBuffer(_cascadeMaterials[cascadeIndex]), builder);
 		commandBuffer.EndRendering();
 

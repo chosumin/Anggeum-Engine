@@ -52,13 +52,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 
 	const uint32_t drawCount = batch.GetDrawCommandCount();
 
-	// The cascade culls scatter instance IDs into the batch-owned buffer;
-	// declared so the graph orders it against every ID read and rewrite.
-	FGBuffer instanceIDs = builder.HasBuffer(RendererBatch::SB_INSTANCE_IDS)
-		? builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS)
-		: builder.ImportBuffer(RendererBatch::SB_INSTANCE_IDS,
-			batch.GetInstanceBufferHandle());
-	builder.Write(instanceIDs, BufferAccess::StorageComputeWrite);
+	const uint32_t instanceCount = batch.GetInstanceCount();
 
 	// Only the active cascades are declared, so the shadow pass sees exactly
 	// the lists that were culled this frame (HasBuffer fails for the rest).
@@ -70,6 +64,12 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 			{ drawCount * sizeof(uint32_t),
 			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
 		builder.Write(_instanceCounts[i], BufferAccess::StorageComputeWrite);
+
+		// Each cascade scatters into its own ID buffer, so its draw never
+		// reads another cascade's IDs.
+		_instanceIDs[i] = builder.CreateBuffer(InstanceIdsName(i),
+			{ instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+		builder.Write(_instanceIDs[i], BufferAccess::StorageComputeWrite);
 
 		_indirect[i] = builder.CreateBuffer(IndirectName(i),
 			{ drawCount * sizeof(DrawIndexedIndirectCommand),
@@ -140,7 +140,7 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 		cullBuilder.SetUniformBuffer(0, cullDataBuffer);
 		cullBuilder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
 		cullBuilder.SetStorageBuffer(2, batch.GetTransformBuffer());
-		cullBuilder.SetStorageBuffer(3, batch.GetInstanceBuffer());
+		cullBuilder.SetStorageBuffer(3, context.GetBuffer(_instanceIDs[i]));
 		cullBuilder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
 		cullBuilder.SetStorageBuffer(6, context.GetBuffer(_instanceCounts[i]));
 		auto& cullResources = cullBuilder.Build();
@@ -160,13 +160,6 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	}
 	barrier.Submit();
 
-	struct CompactPush
-	{
-		uint32_t drawCount;
-		uint32_t applyBaseCounts;
-	};
-	CompactPush push{ drawCount, 0 };
-
 	commandBuffer.BindPipeline(&_compactPipeline.Get());
 	auto& compactShader = _compactShader.Get();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
@@ -175,15 +168,14 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 		compactBuilder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
 		compactBuilder.SetStorageBuffer(1, batch.GetMaterialIndexBuffer());
 		compactBuilder.SetStorageBuffer(2, context.GetBuffer(_instanceCounts[i]));
-		compactBuilder.SetStorageBuffer(3, context.GetBuffer(_instanceCounts[i]));
-		compactBuilder.SetStorageBuffer(4, context.GetBuffer(_indirect[i]));
-		compactBuilder.SetStorageBuffer(5, context.GetBuffer(_visibleMaterials[i]));
-		compactBuilder.SetStorageBuffer(6, context.GetBuffer(_drawCounts[i]));
+		compactBuilder.SetStorageBuffer(3, context.GetBuffer(_indirect[i]));
+		compactBuilder.SetStorageBuffer(4, context.GetBuffer(_visibleMaterials[i]));
+		compactBuilder.SetStorageBuffer(5, context.GetBuffer(_drawCounts[i]));
 		auto& compactResources = compactBuilder.Build();
 
 		commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),
 			compactShader, compactResources);
-		commandBuffer.PushConstants(compactShader, 0, push);
+		commandBuffer.PushConstants(compactShader, 0, drawCount);
 		commandBuffer.Dispatch(std::max(1u, (drawCount + 63) / 64), 1, 1);
 	}
 

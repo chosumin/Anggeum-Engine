@@ -50,6 +50,7 @@ namespace Core
 		// This phase's culled draw list, produced by the HiZCull passes.
 		FGBuffer _indirect;
 		FGBuffer _indirectCount;
+		FGBuffer _instanceIDs;
 		FGBuffer _visibleMaterials;
 	};
 }

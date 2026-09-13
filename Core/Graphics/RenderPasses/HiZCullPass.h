@@ -27,11 +27,13 @@ namespace Core
         enum class Phase { Cull1, Cull2 };
 
         static constexpr const char* SB_PASS1_COUNTS = "OcclusionCull.Pass1Counts";
+        static constexpr const char* SB_PASS1_INSTANCE_IDS = "OcclusionCull.Pass1InstanceIDs";
         static constexpr const char* SB_PASS1_INDIRECT = "OcclusionCull.Pass1Indirect";
         static constexpr const char* SB_PASS1_MATERIALS = "OcclusionCull.Pass1Materials";
         static constexpr const char* SB_PASS1_DRAW_COUNT = "OcclusionCull.Pass1DrawCount";
 
         static constexpr const char* SB_PASS2_COUNTS = "OcclusionCull.Pass2Counts";
+        static constexpr const char* SB_PASS2_INSTANCE_IDS = "OcclusionCull.Pass2InstanceIDs";
         static constexpr const char* SB_PASS2_INDIRECT = "OcclusionCull.Pass2Indirect";
         static constexpr const char* SB_PASS2_MATERIALS = "OcclusionCull.Pass2Materials";
         static constexpr const char* SB_PASS2_DRAW_COUNT = "OcclusionCull.Pass2DrawCount";
@@ -111,7 +113,7 @@ namespace Core
         Handle<Texture> _prevDepth;   // Cull1: previous frame's resolved depth
         FGTexture _resolvedDepth;     // Cull2: this frame's depth, from ResolvePass
         FGBuffer _counts;             // this phase's per-command instance counts
-        FGBuffer _baseCounts;         // Cull2: pass 1's counts (ID scatter offset)
+        FGBuffer _instanceIDs;        // this phase's ID scatter target
         FGBuffer _visibleCommands;    // this phase's compacted draw list
         FGBuffer _visibleMaterials;
         FGBuffer _visibleDrawCount;

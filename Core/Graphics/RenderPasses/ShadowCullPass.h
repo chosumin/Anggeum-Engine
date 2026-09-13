@@ -33,6 +33,10 @@ namespace Core
 		{
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Counts";
 		}
+		static string InstanceIdsName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".InstanceIDs";
+		}
 
 		ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass);
 		~ShadowCullPass();
@@ -57,6 +61,7 @@ namespace Core
 		uint32_t _cascadeCount = 0;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _views{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceCounts{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceIDs{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _indirect{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _visibleMaterials{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _drawCounts{};

@@ -22,10 +22,6 @@ namespace Core
 	class RendererBatch
 	{
 	public:
-		static constexpr const char* SB_INSTANCE_IDS = "RendererBatch.Instance";
-
-		static constexpr uint32_t DEAD_DRAW = 0xFFFFFFFFu;
-
 		RendererBatch(Device& device, ResourceManager& resourceManager,
 			SyncContext& syncContext);
 		~RendererBatch();
@@ -40,8 +36,6 @@ namespace Core
 		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
 		Buffer& GetMaterialIndexBuffer() const { return _materialIndexBuffer.Get(); }
-		Buffer& GetInstanceBuffer() const { return _instanceBuffer.Get(); }
-		Handle<Buffer> GetInstanceBufferHandle() const { return _instanceBuffer; }
 		Buffer& GetTransformBuffer() const { return _transformBuffer.Get(); }
 
 		// One past the last slot ever handed out: the culls dispatch over
@@ -50,6 +44,11 @@ namespace Core
 		uint32_t GetInstanceCount() const { return _instanceSlotEnd; }
 
 	private:
+		// objectData.drawCommandIndex of a freed entry; the culls skip it.
+		static constexpr uint32_t DEAD_DRAW = 0xFFFFFFFFu;
+		// DrawRecord::CmdSlot of a record not (yet) placed in the tables.
+		static constexpr uint32_t NO_SLOT = 0xFFFFFFFFu;
+
 		// One (material, submesh) draw: its membership and, once resident,
 		// the slot and instance range it owns.
 		struct DrawRecord
@@ -57,7 +56,7 @@ namespace Core
 			Handle<Material> Material;
 			Handle<SubMesh> SubMesh;
 			vector<uint> Entities;
-			uint32_t CmdSlot = DEAD_DRAW;
+			uint32_t CmdSlot = NO_SLOT;
 			uint32_t FirstInstance = 0;
 		};
 
@@ -118,7 +117,6 @@ namespace Core
 		Handle<Buffer> _indirectCommandBuffer;
 		Handle<Buffer> _materialIndexBuffer;
 		Handle<Buffer> _objectDataBuffer;
-		Handle<Buffer> _instanceBuffer;   // GPU-written scatter target
 		Handle<Buffer> _transformBuffer;
 
 		uint32_t _commandCapacity = 0;

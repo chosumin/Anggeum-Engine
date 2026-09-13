@@ -41,9 +41,6 @@ layout(set = 0, binding = 4) readonly buffer DrawCommands
 layout(set = 0, binding = 5) uniform sampler2D hiZBuffer;
 
 layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
-// Pass-1 counts: recovered instances scatter AFTER pass 1's, so the pass-1
-// draw list keeps its IDs intact.
-layout(set = 0, binding = 7) readonly buffer BaseCounts { uint baseCounts[]; };
 
 // Buffers to use the pass 2
 layout(set = 0, binding = 10) buffer RejectedIndicesBuffer { uint rejectedIndices[]; };
@@ -141,6 +138,5 @@ void main()
         return;
 
     uint localIdx = atomicAdd(counts[cmdIndex], 1);
-    IDs[commands[cmdIndex].firstInstance + baseCounts[cmdIndex] + localIdx]
-        = obj.transformIndex;
+    IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
 }

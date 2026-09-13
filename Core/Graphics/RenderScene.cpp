@@ -62,8 +62,8 @@ void RenderScene::SyncManagers(Scene& scene)
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 	Pipeline& pipeline, Buffer& indirectCommandBuffer,
-	Buffer& drawCountBuffer, Buffer& materialIndexBuffer,
-	DescriptorSetBuilder& builder)
+	Buffer& drawCountBuffer, Buffer& instanceIDBuffer,
+	Buffer& materialIndexBuffer, DescriptorSetBuilder& builder)
 {
 	if (_batch->GetDrawCommandCount() == 0)
 		return;
@@ -82,7 +82,7 @@ void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 	commandBuffer.BindPipeline(&pipeline);
 
 	builder.SetStorageBuffer(1, _batch->GetTransformBuffer());
-	builder.SetStorageBuffer(2, _batch->GetInstanceBuffer());
+	builder.SetStorageBuffer(2, instanceIDBuffer);
 	builder.SetUniformBuffer(8, _material->GetMaterialBuffer());
 	// Compacted alongside the draw list.
 	builder.SetStorageBuffer(9, materialIndexBuffer);

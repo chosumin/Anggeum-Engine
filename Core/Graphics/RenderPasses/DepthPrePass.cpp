@@ -107,8 +107,9 @@ void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 			? HiZCullPass::SB_PASS1_MATERIALS : HiZCullPass::SB_PASS2_MATERIALS);
 		builder.Read(_visibleMaterials, BufferAccess::StorageFragmentRead);
 
-		FGBuffer instanceIDs = builder.GetBuffer(RendererBatch::SB_INSTANCE_IDS);
-		builder.Read(instanceIDs, BufferAccess::StorageVertexRead);
+		_instanceIDs = builder.GetBuffer(first
+			? HiZCullPass::SB_PASS1_INSTANCE_IDS : HiZCullPass::SB_PASS2_INSTANCE_IDS);
+		builder.Read(_instanceIDs, BufferAccess::StorageVertexRead);
 	}
 }
 
@@ -128,7 +129,7 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
 		_renderScene.DrawIndirect(commandBuffer, depthNormalShader, *_pipeline,
 			context.GetBuffer(_indirect), context.GetBuffer(_indirectCount),
-			context.GetBuffer(_visibleMaterials), builder);
+			context.GetBuffer(_instanceIDs), context.GetBuffer(_visibleMaterials), builder);
 	}
 
 	context.EndRendering(commandBuffer);

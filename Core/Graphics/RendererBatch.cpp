@@ -146,7 +146,7 @@ void Core::RendererBatch::PlacePendingDrawRecords()
 {
     for (auto& [key, record] : _drawRecords)
     {
-        if (record.CmdSlot != DEAD_DRAW)
+        if (record.CmdSlot != NO_SLOT)
             continue;
 
         auto* subMesh = record.SubMesh.TryGet();
@@ -226,7 +226,7 @@ void Core::RendererBatch::QueueDrawRecordFills(const DrawRecord& record)
 
 void Core::RendererBatch::ReleaseDrawRecord(DrawRecord& record)
 {
-    if (record.CmdSlot == DEAD_DRAW)
+    if (record.CmdSlot == NO_SLOT)
         return;
 
     const uint32_t count = static_cast<uint32_t>(record.Entities.size());
@@ -246,7 +246,7 @@ void Core::RendererBatch::ReleaseDrawRecord(DrawRecord& record)
     _retiredCommandSlots.emplace_back(record.CmdSlot, stamp);
     _retiredInstanceRanges.emplace_back(InstanceRange{ record.FirstInstance, count }, stamp);
 
-    record.CmdSlot = DEAD_DRAW;
+    record.CmdSlot = NO_SLOT;
 }
 
 void Core::RendererBatch::ReclaimRetired()
@@ -373,11 +373,6 @@ void Core::RendererBatch::GrowAndRepack()
     _objectDataBuffer = AcquirePersistentBuffer(
         _objectDataBuffer, objectDesc, "RendererBatch.ObjectData");
 
-    BufferDesc instanceDesc{ _instanceCapacity * sizeof(uint),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
-    _instanceBuffer = AcquirePersistentBuffer(
-        _instanceBuffer, instanceDesc, "RendererBatch.Instance");
-
     _commands.assign(_commandCapacity, DrawIndexedIndirectCommand{});
     _materialIndices.assign(_commandCapacity, 0);
     GPUObjectData dead{};
@@ -395,7 +390,7 @@ void Core::RendererBatch::GrowAndRepack()
     // Re-place every resident draw densely, then fill the prefix in bulk.
     for (auto& [key, record] : _drawRecords)
     {
-        if (record.CmdSlot == DEAD_DRAW)
+        if (record.CmdSlot == NO_SLOT)
             continue;
 
         bool slotted = TryAllocateCommandSlot(record.CmdSlot);

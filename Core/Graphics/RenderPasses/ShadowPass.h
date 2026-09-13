@@ -60,6 +60,7 @@ namespace Core
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeIndirect{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeDrawCount{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeMaterials{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeInstanceIDs{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;

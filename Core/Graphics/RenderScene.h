@@ -62,8 +62,8 @@ namespace Core
 
 		void DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 			Pipeline& pipeline, Buffer& indirectCommandBuffer,
-			Buffer& drawCountBuffer, Buffer& materialIndexBuffer,
-			DescriptorSetBuilder& builder);
+			Buffer& drawCountBuffer, Buffer& instanceIDBuffer,
+			Buffer& materialIndexBuffer, DescriptorSetBuilder& builder);
 
 	private:
 		Scene& _scene;
