@@ -53,6 +53,8 @@ void main()
             globalIndexOffset < cmdFirstIndex + cmdIndexCount)
         {
             uint firstInstance = drawCommands[d].firstInstance;
+            if (objectData[firstInstance].drawCommandIndex == 0xFFFFFFFFu)
+                continue; // freed slot: its command is stale
 
             triLookups[triIdx].vertexOffset = drawCommands[d].vertexOffset;
             triLookups[triIdx].transformIndex = objectData[firstInstance].transformIndex;

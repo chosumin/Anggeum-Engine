@@ -186,6 +186,16 @@ struct alignas(16) GPUMaterialData
 	glm::vec3 padding;  // 16-byte alignment
 };
 
+// Same layout as VkDrawIndexedIndirectCommand.
+struct DrawIndexedIndirectCommand
+{
+	uint32_t indexCount;
+	uint32_t instanceCount;
+	uint32_t firstIndex;
+	int32_t vertexOffset;
+	uint32_t firstInstance;
+};
+
 struct alignas(16) GPUObjectData
 {
 	glm::vec4 boundingSphere;  // xyz: center, w: radius

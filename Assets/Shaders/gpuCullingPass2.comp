@@ -116,6 +116,8 @@ void main()
 
     uint objectIndex = rejectedIndices[index];
     ObjectData obj = objects[objectIndex];
+    if (obj.drawCommandIndex == 0xFFFFFFFFu)
+        return; // freed slot
     uint cmdIndex = obj.drawCommandIndex;
 
     // Get world transform matrix

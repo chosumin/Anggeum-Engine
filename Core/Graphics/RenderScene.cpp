@@ -32,7 +32,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 
 	_meshBuffer = make_unique<MeshBufferManager>(device, resourceManager);
 	_material = make_unique<MaterialManager>(device, resourceManager);
-	_batch = make_unique<RendererBatch>(device, resourceManager);
+	_batch = make_unique<RendererBatch>(device, resourceManager, syncContext);
 
 	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, syncContext, transfer);
 }
@@ -106,6 +106,6 @@ void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 		indirectCommandBuffer, 0,
 		drawCountBuffer, 0,
 		_batch->GetDrawCommandCount(),
-		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+		static_cast<uint32_t>(sizeof(DrawIndexedIndirectCommand))
 	);
 }

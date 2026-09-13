@@ -45,6 +45,8 @@ void main()
         return;
 
     GPUObjectData obj = objects[gid];
+    if (obj.drawCommandIndex == 0xFFFFFFFFu)
+        return; // freed slot
     mat4 worldMatrix = transforms[obj.transformIndex];
 
     vec3 worldCenter = (worldMatrix * vec4(obj.boundingSphere.xyz, 1.0)).xyz;

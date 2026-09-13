@@ -114,6 +114,8 @@ void main()
         return;
 
     ObjectData obj = objects[index];
+    if (obj.drawCommandIndex == 0xFFFFFFFFu)
+        return; // freed slot
     uint cmdIndex = obj.drawCommandIndex;
 
     // Get world transform matrix
