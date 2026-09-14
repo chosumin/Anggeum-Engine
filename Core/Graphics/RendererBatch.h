@@ -89,8 +89,9 @@ namespace Core
 		bool TryPlaceDrawBatch(DrawBatch& batch);
 		void ReleaseDrawBatch(DrawBatch& batch);
 
-		// Mirrors only; the GPU patch for one batch is queued separately.
-		void WriteDrawBatch(const DrawBatch& batch);
+		// Table entries are derived from the batch on demand; nothing is mirrored.
+		DrawIndexedIndirectCommand BuildCommand(const DrawBatch& batch) const;
+		vector<GPUInstanceData> BuildInstances(const DrawBatch& batch) const;
 		void QueueDrawBatchFills(const DrawBatch& batch);
 
 		void ReclaimRetired();
@@ -115,10 +116,6 @@ namespace Core
 
 		unordered_map<string, DrawBatch> _drawBatches;
 		unordered_map<uint, glm::mat4> _entityTransforms;
-
-		// CPU mirrors, capacity-sized; the GPU tables are patched from them.
-		vector<DrawIndexedIndirectCommand> _commands;
-		vector<GPUInstanceData> _instanceData;
 
 		Handle<Buffer> _indirectCommandBuffer;
 		Handle<Buffer> _instanceDataBuffer;

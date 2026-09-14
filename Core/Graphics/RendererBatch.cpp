@@ -183,45 +183,51 @@ bool Core::RendererBatch::TryPlaceDrawBatch(DrawBatch& batch)
 
     batch.CmdSlot = slot;
     batch.FirstInstance = firstInstance;
-    WriteDrawBatch(batch);
     QueueDrawBatchFills(batch);
 
     return true;
 }
 
-void Core::RendererBatch::WriteDrawBatch(const DrawBatch& batch)
+DrawIndexedIndirectCommand Core::RendererBatch::BuildCommand(const DrawBatch& batch) const
 {
     const auto& allocation = batch.SubMesh.Get().GetAllocation();
-    const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
 
-    DrawIndexedIndirectCommand& cmd = _commands[batch.CmdSlot];
+    DrawIndexedIndirectCommand cmd{};
     cmd.indexCount = allocation.indexCount;
     cmd.instanceCount = 0;
     cmd.firstIndex = allocation.indexOffset;
     cmd.vertexOffset = static_cast<int32_t>(allocation.vertexOffset);
     cmd.firstInstance = batch.FirstInstance;
+    return cmd;
+}
 
-    for (uint32_t i = 0; i < count; ++i)
+vector<GPUInstanceData> Core::RendererBatch::BuildInstances(const DrawBatch& batch) const
+{
+    const auto& allocation = batch.SubMesh.Get().GetAllocation();
+
+    vector<GPUInstanceData> instances(batch.Instances.size());
+    for (size_t i = 0; i < instances.size(); ++i)
     {
         const DrawInstance& instance = batch.Instances[i];
-        GPUInstanceData& data = _instanceData[batch.FirstInstance + i];
+        GPUInstanceData& data = instances[i];
         data.boundingSphere = glm::vec4(
             allocation.boundingSphereCenter, allocation.boundingSphereRadius);
         data.transformIndex = instance.EntityId;
         data.drawCommandIndex = batch.CmdSlot;
         data.materialIndex = instance.Material.Get().GetMaterialIndex();
     }
+    return instances;
 }
 
 void Core::RendererBatch::QueueDrawBatchFills(const DrawBatch& batch)
 {
-    const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
-
+    const DrawIndexedIndirectCommand cmd = BuildCommand(batch);
     _pendingTableFills.push_back({ _indirectCommandBuffer,
-        ToBytes(&_commands[batch.CmdSlot], 1),
-        batch.CmdSlot * sizeof(DrawIndexedIndirectCommand) });
+        ToBytes(&cmd, 1), batch.CmdSlot * sizeof(DrawIndexedIndirectCommand) });
+
+    const vector<GPUInstanceData> instances = BuildInstances(batch);
     _pendingTableFills.push_back({ _instanceDataBuffer,
-        ToBytes(&_instanceData[batch.FirstInstance], count),
+        ToBytes(instances.data(), instances.size()),
         batch.FirstInstance * sizeof(GPUInstanceData) });
 }
 
@@ -232,15 +238,15 @@ void Core::RendererBatch::ReleaseDrawBatch(DrawBatch& batch)
 
     const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
 
-    // Dead-marked in place (one dword per entry, so an in-flight reader sees
-    // the old entry or the dead one, never a torn mix); every consumer keys
-    // off this field. The slot and range are handed out again only after
-    // those readers retire.
-    for (uint32_t i = 0; i < count; ++i)
-        _instanceData[batch.FirstInstance + i].drawCommandIndex = DEAD_DRAW;
+    // Rebuilt byte-identical with only the dead dword changed, so an in-flight
+    // reader sees the old entry or the dead one; every consumer keys off it.
+    // The slot and range are handed out again only after those readers retire.
+    vector<GPUInstanceData> instances = BuildInstances(batch);
+    for (GPUInstanceData& data : instances)
+        data.drawCommandIndex = DEAD_DRAW;
 
     _pendingTableFills.push_back({ _instanceDataBuffer,
-        ToBytes(&_instanceData[batch.FirstInstance], count),
+        ToBytes(instances.data(), instances.size()),
         batch.FirstInstance * sizeof(GPUInstanceData) });
 
     const u64 stamp = _sync.GetCurrentValue(QueueType::Graphics);
@@ -368,11 +374,6 @@ void Core::RendererBatch::GrowAndRepack()
     _instanceDataBuffer = AcquirePersistentBuffer(
         _instanceDataBuffer, objectDesc, "RendererBatch.InstanceData");
 
-    _commands.assign(_commandCapacity, DrawIndexedIndirectCommand{});
-    GPUInstanceData dead{};
-    dead.drawCommandIndex = DEAD_DRAW;
-    _instanceData.assign(_instanceCapacity, dead);
-
     // The old tables retire whole with their buffers: nothing to hand back.
     _freeCommandSlots.clear();
     _retiredCommandSlots.clear();
@@ -381,7 +382,7 @@ void Core::RendererBatch::GrowAndRepack()
     _commandSlotEnd = 0;
     _instanceSlotEnd = 0;
 
-    // Re-place every resident draw densely, then fill the prefix in bulk.
+    // Re-place every resident draw densely.
     for (auto& [key, batch] : _drawBatches)
     {
         if (batch.CmdSlot == NO_SLOT)
@@ -391,16 +392,29 @@ void Core::RendererBatch::GrowAndRepack()
         bool ranged = TryAllocateInstanceRange(
             static_cast<uint32_t>(batch.Instances.size()), batch.FirstInstance);
         assert(slotted && ranged);
-        WriteDrawBatch(batch);
     }
 
-    if (_commandSlotEnd > 0)
+    if (_commandSlotEnd == 0)
+        return;
+
+    // Fill the prefix in bulk.
+    vector<DrawIndexedIndirectCommand> commands(_commandSlotEnd);
+    vector<GPUInstanceData> instances(_instanceSlotEnd);
+    for (const auto& [key, batch] : _drawBatches)
     {
-        _pendingTableFills.push_back({ _indirectCommandBuffer,
-            ToBytes(_commands.data(), _commandSlotEnd), 0 });
-        _pendingTableFills.push_back({ _instanceDataBuffer,
-            ToBytes(_instanceData.data(), _instanceSlotEnd), 0 });
+        if (batch.CmdSlot == NO_SLOT)
+            continue;
+
+        commands[batch.CmdSlot] = BuildCommand(batch);
+        const vector<GPUInstanceData> batchInstances = BuildInstances(batch);
+        std::copy(batchInstances.begin(), batchInstances.end(),
+            instances.begin() + batch.FirstInstance);
     }
+
+    _pendingTableFills.push_back({ _indirectCommandBuffer,
+        ToBytes(commands.data(), commands.size()), 0 });
+    _pendingTableFills.push_back({ _instanceDataBuffer,
+        ToBytes(instances.data(), instances.size()), 0 });
 }
 
 Handle<Buffer> Core::RendererBatch::AcquirePersistentBuffer(Handle<Buffer> current,
