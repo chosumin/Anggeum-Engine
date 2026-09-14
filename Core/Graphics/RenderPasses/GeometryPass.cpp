@@ -215,8 +215,6 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
         builder.Read(_pass1Indirect, BufferAccess::IndirectRead);
         _pass1Count = builder.GetBuffer(HiZCullPass::SB_PASS1_DRAW_COUNT);
         builder.Read(_pass1Count, BufferAccess::IndirectRead);
-        _pass1Materials = builder.GetBuffer(HiZCullPass::SB_PASS1_MATERIALS);
-        builder.Read(_pass1Materials, BufferAccess::StorageFragmentRead);
         _pass1InstanceIDs = builder.GetBuffer(HiZCullPass::SB_PASS1_INSTANCE_IDS);
         builder.Read(_pass1InstanceIDs, BufferAccess::StorageVertexRead);
 
@@ -224,8 +222,6 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
         builder.Read(_pass2Indirect, BufferAccess::IndirectRead);
         _pass2Count = builder.GetBuffer(HiZCullPass::SB_PASS2_DRAW_COUNT);
         builder.Read(_pass2Count, BufferAccess::IndirectRead);
-        _pass2Materials = builder.GetBuffer(HiZCullPass::SB_PASS2_MATERIALS);
-        builder.Read(_pass2Materials, BufferAccess::StorageFragmentRead);
         _pass2InstanceIDs = builder.GetBuffer(HiZCullPass::SB_PASS2_INSTANCE_IDS);
         builder.Read(_pass2InstanceIDs, BufferAccess::StorageVertexRead);
     }
@@ -264,10 +260,10 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
     // Replay both compacted draw lists, then the skybox, all in one scope.
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
         context.GetBuffer(_pass1Indirect), context.GetBuffer(_pass1Count),
-        context.GetBuffer(_pass1InstanceIDs), context.GetBuffer(_pass1Materials), builder);
+        context.GetBuffer(_pass1InstanceIDs), builder);
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
         context.GetBuffer(_pass2Indirect), context.GetBuffer(_pass2Count),
-        context.GetBuffer(_pass2InstanceIDs), context.GetBuffer(_pass2Materials), builder);
+        context.GetBuffer(_pass2InstanceIDs), builder);
 
     RecordSkybox(context, commandBuffer);
 

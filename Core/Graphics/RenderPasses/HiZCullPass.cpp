@@ -75,8 +75,6 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
     FGBufferDesc visibleDesc{ drawCount * sizeof(DrawIndexedIndirectCommand),
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
-    FGBufferDesc materialsDesc{ drawCount * sizeof(uint32_t),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
     FGBufferDesc drawCountDesc{ sizeof(uint32_t),
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
@@ -95,9 +93,6 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 
         _visibleCommands = builder.CreateBuffer(SB_PASS1_INDIRECT, visibleDesc);
         builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
-
-        _visibleMaterials = builder.CreateBuffer(SB_PASS1_MATERIALS, materialsDesc);
-        builder.Write(_visibleMaterials, BufferAccess::StorageComputeWrite);
 
         _visibleDrawCount = builder.CreateBuffer(SB_PASS1_DRAW_COUNT, drawCountDesc);
         builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
@@ -135,9 +130,6 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 
         _visibleCommands = builder.CreateBuffer(SB_PASS2_INDIRECT, visibleDesc);
         builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
-
-        _visibleMaterials = builder.CreateBuffer(SB_PASS2_MATERIALS, materialsDesc);
-        builder.Write(_visibleMaterials, BufferAccess::StorageComputeWrite);
 
         _visibleDrawCount = builder.CreateBuffer(SB_PASS2_DRAW_COUNT, drawCountDesc);
         builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
@@ -294,7 +286,7 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
     auto& cullShader = _cullShader.Get();
     auto builder = context.CreateDescriptorSetBuilder(cullShader, 0);
     builder.SetUniformBuffer(0, cullDataBuffer);
-    builder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
+    builder.SetStorageBuffer(1, batch.GetInstanceDataBuffer());
     builder.SetStorageBuffer(2, batch.GetTransformBuffer());
     builder.SetStorageBuffer(3, context.GetBuffer(_instanceIDs));
     builder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
@@ -330,11 +322,9 @@ void HiZCullPass::CompactDrawCommands(FrameGraphPassContext& context,
     auto& compactShader = _compactShader.Get();
     auto builder = context.CreateDescriptorSetBuilder(compactShader, 0);
     builder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
-    builder.SetStorageBuffer(1, batch.GetMaterialIndexBuffer());
-    builder.SetStorageBuffer(2, context.GetBuffer(_counts));
-    builder.SetStorageBuffer(3, context.GetBuffer(_visibleCommands));
-    builder.SetStorageBuffer(4, context.GetBuffer(_visibleMaterials));
-    builder.SetStorageBuffer(5, context.GetBuffer(_visibleDrawCount));
+    builder.SetStorageBuffer(1, context.GetBuffer(_counts));
+    builder.SetStorageBuffer(2, context.GetBuffer(_visibleCommands));
+    builder.SetStorageBuffer(3, context.GetBuffer(_visibleDrawCount));
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),

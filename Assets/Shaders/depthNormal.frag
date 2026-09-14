@@ -8,7 +8,7 @@
 layout(location = 0) in vec4 inWorldPos;
 layout(location = 1) in vec3 inWorldNormal;
 layout(location = 2) in vec2 inUV;
-layout(location = 3) flat in uint inDrawID;
+layout(location = 3) flat in uint inMaterialIndex;
 
 // layout(location = 0) -> color attachment [0] (RT_MAIN_NORMAL)
 layout(location = 0) out vec4 outNormal;
@@ -39,9 +39,6 @@ layout(set = 0, binding = 8) uniform PBRBuffer
     PBR materials[256];
 } pbrBuffer;
 
-layout(set = 0, binding = 9) readonly buffer MaterialIndexBuffer {
-    uint materialIndices[];
-} materialIndices;
 
 // Set 2: Bindless texture arrays (shared with lit.frag)
 layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
@@ -68,7 +65,7 @@ vec3 ApplyNormalMap(uint normalmapIndex)
 
 void main()
 {
-    uint materialIndex = materialIndices.materialIndices[inDrawID];
+    uint materialIndex = inMaterialIndex;
     PBR pbr = pbrBuffer.materials[materialIndex];
 
     // Start from the interpolated geometric normal, then apply the normal map

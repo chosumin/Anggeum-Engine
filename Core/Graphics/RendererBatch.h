@@ -33,9 +33,8 @@ namespace Core
 
 		void QueuePendingInit(FrameResources& frameResources);
 
-		Buffer& GetObjectDataBuffer() const { return _objectDataBuffer.Get(); }
+		Buffer& GetInstanceDataBuffer() const { return _instanceDataBuffer.Get(); }
 		Buffer& GetIndirectCommandBuffer() const { return _indirectCommandBuffer.Get(); }
-		Buffer& GetMaterialIndexBuffer() const { return _materialIndexBuffer.Get(); }
 		Buffer& GetTransformBuffer() const { return _transformBuffer.Get(); }
 
 		// One past the last slot ever handed out: the culls dispatch over
@@ -44,18 +43,26 @@ namespace Core
 		uint32_t GetInstanceCount() const { return _instanceSlotEnd; }
 
 	private:
-		// objectData.drawCommandIndex of a freed entry; the culls skip it.
 		static constexpr uint32_t DEAD_DRAW = 0xFFFFFFFFu;
-		// DrawRecord::CmdSlot of a record not (yet) placed in the tables.
 		static constexpr uint32_t NO_SLOT = 0xFFFFFFFFu;
 
-		// One (material, submesh) draw: its membership and, once resident,
-		// the slot and instance range it owns.
-		struct DrawRecord
+		struct DrawInstance
 		{
+			uint EntityId;
 			Handle<Material> Material;
+
+			bool operator==(const DrawInstance& other) const
+			{
+				return EntityId == other.EntityId && Material == other.Material;
+			}
+		};
+
+		// One submesh and every instance of it (material per instance): its
+		// membership and, once resident, the slot and instance range it owns.
+		struct DrawBatch
+		{
 			Handle<SubMesh> SubMesh;
-			vector<uint> Entities;
+			vector<DrawInstance> Instances;
 			uint32_t CmdSlot = NO_SLOT;
 			uint32_t FirstInstance = 0;
 		};
@@ -73,18 +80,18 @@ namespace Core
 			VkDeviceSize Offset = 0;
 		};
 
-		void CollectDrawRecords(Scene& scene, unordered_map<string, DrawRecord>& drawRecords,
+		void CollectDrawBatches(Scene& scene, unordered_map<string, DrawBatch>& drawBatches,
 			unordered_map<uint, glm::mat4>& entityTransforms) const;
-		void SyncDrawRecords(Scene& scene);
+		void SyncDrawBatches(Scene& scene);
 		void SyncTransforms(unordered_map<uint, glm::mat4>&& entityTransforms);
 
-		void PlacePendingDrawRecords();
-		bool TryPlaceDrawRecord(DrawRecord& record);
-		void ReleaseDrawRecord(DrawRecord& record);
-		// Mirrors only; the GPU patch for one record is queued separately
-		// (GrowAndRepack refills the whole prefix instead).
-		void WriteDrawRecord(const DrawRecord& record);
-		void QueueDrawRecordFills(const DrawRecord& record);
+		void PlacePendingDrawBatches();
+		bool TryPlaceDrawBatch(DrawBatch& batch);
+		void ReleaseDrawBatch(DrawBatch& batch);
+
+		// Mirrors only; the GPU patch for one batch is queued separately.
+		void WriteDrawBatch(const DrawBatch& batch);
+		void QueueDrawBatchFills(const DrawBatch& batch);
 
 		void ReclaimRetired();
 		bool TryAllocateCommandSlot(uint32_t& outSlot);
@@ -106,17 +113,15 @@ namespace Core
 
 		vector<TableFill> _pendingTableFills;
 
-		unordered_map<string, DrawRecord> _drawRecords;
+		unordered_map<string, DrawBatch> _drawBatches;
 		unordered_map<uint, glm::mat4> _entityTransforms;
 
 		// CPU mirrors, capacity-sized; the GPU tables are patched from them.
 		vector<DrawIndexedIndirectCommand> _commands;
-		vector<uint32_t> _materialIndices;
-		vector<GPUObjectData> _objectData;
+		vector<GPUInstanceData> _instanceData;
 
 		Handle<Buffer> _indirectCommandBuffer;
-		Handle<Buffer> _materialIndexBuffer;
-		Handle<Buffer> _objectDataBuffer;
+		Handle<Buffer> _instanceDataBuffer;
 		Handle<Buffer> _transformBuffer;
 
 		uint32_t _commandCapacity = 0;

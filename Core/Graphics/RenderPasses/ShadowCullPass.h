@@ -25,10 +25,6 @@ namespace Core
 		{
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".DrawCount";
 		}
-		static string MaterialsName(uint32_t cascade)
-		{
-			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Materials";
-		}
 		static string CountsName(uint32_t cascade)
 		{
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Counts";
@@ -63,7 +59,6 @@ namespace Core
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceCounts{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceIDs{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _indirect{};
-		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _visibleMaterials{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _drawCounts{};
 		array<Handle<Buffer>, SHADOW_MAP_CASCADE_COUNT> _cullData{};
 	};

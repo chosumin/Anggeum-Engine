@@ -51,6 +51,5 @@ namespace Core
 		FGBuffer _indirect;
 		FGBuffer _indirectCount;
 		FGBuffer _instanceIDs;
-		FGBuffer _visibleMaterials;
 	};
 }

@@ -2,14 +2,7 @@
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-struct DrawIndexedIndirectCommand
-{
-    uint indexCount;
-    uint instanceCount;
-    uint firstIndex;
-    int vertexOffset;
-    uint firstInstance;
-};
+#include "gpuDriven.glsl"
 
 // Appends the commands that survived culling (count > 0), densely and in
 // order, for DrawIndexedIndirectCount - empty commands never reach the draw.
@@ -22,15 +15,13 @@ layout(set = 0, binding = 0) readonly buffer TemplateCommands
 {
     DrawIndexedIndirectCommand templateCommands[];
 };
-layout(set = 0, binding = 1) readonly buffer TemplateMaterials { uint templateMaterials[]; };
-layout(set = 0, binding = 2) readonly buffer InstanceCounts { uint counts[]; };
+layout(set = 0, binding = 1) readonly buffer InstanceCounts { uint counts[]; };
 
-layout(set = 0, binding = 3) writeonly buffer OutCommands
+layout(set = 0, binding = 2) writeonly buffer OutCommands
 {
     DrawIndexedIndirectCommand outCommands[];
 };
-layout(set = 0, binding = 4) writeonly buffer OutMaterials { uint outMaterials[]; };
-layout(set = 0, binding = 5) buffer OutDrawCount { uint outDrawCount; };
+layout(set = 0, binding = 3) buffer OutDrawCount { uint outDrawCount; };
 
 void main()
 {
@@ -48,5 +39,4 @@ void main()
     cmd.instanceCount = instanceCount;
 
     outCommands[slot] = cmd;
-    outMaterials[slot] = templateMaterials[index];
 }

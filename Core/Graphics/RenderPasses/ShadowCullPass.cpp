@@ -76,17 +76,13 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 		builder.Write(_indirect[i], BufferAccess::StorageComputeWrite);
 
-		_visibleMaterials[i] = builder.CreateBuffer(MaterialsName(i),
-			{ drawCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
-		builder.Write(_visibleMaterials[i], BufferAccess::StorageComputeWrite);
-
 		_drawCounts[i] = builder.CreateBuffer(DrawCountName(i),
 			{ sizeof(uint32_t),
 			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 			  | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
 		builder.Write(_drawCounts[i], BufferAccess::StorageComputeWrite);
 
-		_cullData[i] = frameResources.GetOrCreateUniformBuffer<GPUFrustumCullData>(
+		_cullData[i] = frameResources.GetOrCreateUniformBuffer<GPUCullData>(
 			"ShadowCull.Cascade" + std::to_string(i) + ".CullData");
 	}
 
@@ -125,7 +121,8 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	auto& cullShader = _cullShader.Get();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
 	{
-		GPUFrustumCullData cullData{};
+		// Shared cull block; the Hi-Z fields stay zero (frustum only).
+		GPUCullData cullData{};
 		cullData.view = _views[i].View;
 		cullData.proj = _views[i].Projection;
 		cullData.drawCount = instanceCount;
@@ -138,7 +135,7 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
 		auto cullBuilder = context.CreateDescriptorSetBuilder(cullShader, 0);
 		cullBuilder.SetUniformBuffer(0, cullDataBuffer);
-		cullBuilder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
+		cullBuilder.SetStorageBuffer(1, batch.GetInstanceDataBuffer());
 		cullBuilder.SetStorageBuffer(2, batch.GetTransformBuffer());
 		cullBuilder.SetStorageBuffer(3, context.GetBuffer(_instanceIDs[i]));
 		cullBuilder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
@@ -166,11 +163,9 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	{
 		auto compactBuilder = context.CreateDescriptorSetBuilder(compactShader, 0);
 		compactBuilder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
-		compactBuilder.SetStorageBuffer(1, batch.GetMaterialIndexBuffer());
-		compactBuilder.SetStorageBuffer(2, context.GetBuffer(_instanceCounts[i]));
-		compactBuilder.SetStorageBuffer(3, context.GetBuffer(_indirect[i]));
-		compactBuilder.SetStorageBuffer(4, context.GetBuffer(_visibleMaterials[i]));
-		compactBuilder.SetStorageBuffer(5, context.GetBuffer(_drawCounts[i]));
+		compactBuilder.SetStorageBuffer(1, context.GetBuffer(_instanceCounts[i]));
+		compactBuilder.SetStorageBuffer(2, context.GetBuffer(_indirect[i]));
+		compactBuilder.SetStorageBuffer(3, context.GetBuffer(_drawCounts[i]));
 		auto& compactResources = compactBuilder.Build();
 
 		commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),

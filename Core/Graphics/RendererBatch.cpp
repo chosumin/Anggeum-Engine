@@ -26,9 +26,11 @@ namespace
         return bytes;
     }
 
-    string DrawRecordKey(const Material& material, const SubMesh& subMesh)
+    // Instance readiness: the tables carry material indices per instance.
+    bool HasMaterialIndex(const Handle<Material>& material)
     {
-        return material.GetName() + "|" + subMesh.GetName();
+        auto* ptr = material.TryGet();
+        return ptr && ptr->HasMaterialIndex();
     }
 }
 
@@ -40,8 +42,8 @@ Core::RendererBatch::RendererBatch(Device& device, ResourceManager& resourceMana
 
 Core::RendererBatch::~RendererBatch() = default;
 
-void Core::RendererBatch::CollectDrawRecords(Scene& scene,
-    unordered_map<string, DrawRecord>& drawRecords,
+void Core::RendererBatch::CollectDrawBatches(Scene& scene,
+    unordered_map<string, DrawBatch>& drawBatches,
     unordered_map<uint, glm::mat4>& entityTransforms) const
 {
     for (auto* mesh : scene.GetComponents<Mesh>())
@@ -66,24 +68,23 @@ void Core::RendererBatch::CollectDrawRecords(Scene& scene,
 
             entityTransforms[entityId] = world;
 
-            DrawRecord& record = drawRecords[DrawRecordKey(*material, *subMesh)];
-            record.Material = materials[i];
-            record.SubMesh = subMeshes[i];
-            record.Entities.push_back(entityId);
+            DrawBatch& batch = drawBatches[subMesh->GetName()];
+            batch.SubMesh = subMeshes[i];
+            batch.Instances.push_back({ entityId, materials[i] });
         }
     }
 }
 
-void Core::RendererBatch::SyncDrawRecords(Scene& scene)
+void Core::RendererBatch::SyncDrawBatches(Scene& scene)
 {
-    unordered_map<string, DrawRecord> incoming;
+    unordered_map<string, DrawBatch> incoming;
     unordered_map<uint, glm::mat4> entityTransforms;
-    CollectDrawRecords(scene, incoming, entityTransforms);
+    CollectDrawBatches(scene, incoming, entityTransforms);
 
-    for (auto it = _drawRecords.begin(); it != _drawRecords.end();)
+    for (auto it = _drawBatches.begin(); it != _drawBatches.end();)
     {
         auto match = incoming.find(it->first);
-        if (match != incoming.end() && match->second.Entities == it->second.Entities)
+        if (match != incoming.end() && match->second.Instances == it->second.Instances)
         {
 			// Didn't change: keep the slot and range.
             incoming.erase(match);
@@ -91,14 +92,14 @@ void Core::RendererBatch::SyncDrawRecords(Scene& scene)
             continue;
         }
 
-		// Left or changed: free the slot and range, then remove the record.
-        ReleaseDrawRecord(it->second);
-        it = _drawRecords.erase(it);
+		// Left or changed: free the slot and range, then remove the batch.
+        ReleaseDrawBatch(it->second);
+        it = _drawBatches.erase(it);
     }
 
 	// New or changed draws: add them to the table and place them if resident.
-    for (auto& [key, record] : incoming)
-        _drawRecords.emplace(key, std::move(record));
+    for (auto& [key, batch] : incoming)
+        _drawBatches.emplace(key, std::move(batch));
 
     SyncTransforms(std::move(entityTransforms));
 }
@@ -142,29 +143,30 @@ void Core::RendererBatch::SyncTransforms(unordered_map<uint, glm::mat4>&& entity
     _entityTransforms = std::move(entityTransforms);
 }
 
-void Core::RendererBatch::PlacePendingDrawRecords()
+void Core::RendererBatch::PlacePendingDrawBatches()
 {
-    for (auto& [key, record] : _drawRecords)
+    for (auto& [key, batch] : _drawBatches)
     {
-        if (record.CmdSlot != NO_SLOT)
+        if (batch.CmdSlot != NO_SLOT)
             continue;
 
-        auto* subMesh = record.SubMesh.TryGet();
-        auto* material = record.Material.TryGet();
-        if (!subMesh || !material || !material->HasMaterialIndex()
-            || !subMesh->HasAllocation() || !record.SubMesh.IsResident())
+        auto* subMesh = batch.SubMesh.TryGet();
+        if (!subMesh || !subMesh->HasAllocation() || !batch.SubMesh.IsResident())
+            continue;
+        if (!std::all_of(batch.Instances.begin(), batch.Instances.end(),
+            [](const DrawInstance& instance) { return HasMaterialIndex(instance.Material); }))
             continue;
 
-        if (!TryPlaceDrawRecord(record))
+        if (!TryPlaceDrawBatch(batch))
         {
             GrowAndRepack();
-            bool placed = TryPlaceDrawRecord(record);
+            bool placed = TryPlaceDrawBatch(batch);
             assert(placed && "capacity grew to fit every draw");
         }
     }
 }
 
-bool Core::RendererBatch::TryPlaceDrawRecord(DrawRecord& record)
+bool Core::RendererBatch::TryPlaceDrawBatch(DrawBatch& batch)
 {
     ReclaimRetired();
 
@@ -173,80 +175,79 @@ bool Core::RendererBatch::TryPlaceDrawRecord(DrawRecord& record)
         return false;
 
     uint32_t firstInstance = 0;
-    if (!TryAllocateInstanceRange(static_cast<uint32_t>(record.Entities.size()), firstInstance))
+    if (!TryAllocateInstanceRange(static_cast<uint32_t>(batch.Instances.size()), firstInstance))
     {
         _freeCommandSlots.push_back(slot);
         return false;
     }
 
-    record.CmdSlot = slot;
-    record.FirstInstance = firstInstance;
-    WriteDrawRecord(record);
-    QueueDrawRecordFills(record);
+    batch.CmdSlot = slot;
+    batch.FirstInstance = firstInstance;
+    WriteDrawBatch(batch);
+    QueueDrawBatchFills(batch);
+
     return true;
 }
 
-void Core::RendererBatch::WriteDrawRecord(const DrawRecord& record)
+void Core::RendererBatch::WriteDrawBatch(const DrawBatch& batch)
 {
-    const auto& allocation = record.SubMesh.Get().GetAllocation();
-    const uint32_t count = static_cast<uint32_t>(record.Entities.size());
+    const auto& allocation = batch.SubMesh.Get().GetAllocation();
+    const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
 
-    DrawIndexedIndirectCommand& cmd = _commands[record.CmdSlot];
+    DrawIndexedIndirectCommand& cmd = _commands[batch.CmdSlot];
     cmd.indexCount = allocation.indexCount;
     cmd.instanceCount = 0;
     cmd.firstIndex = allocation.indexOffset;
     cmd.vertexOffset = static_cast<int32_t>(allocation.vertexOffset);
-    cmd.firstInstance = record.FirstInstance;
-
-    _materialIndices[record.CmdSlot] = record.Material.Get().GetMaterialIndex();
+    cmd.firstInstance = batch.FirstInstance;
 
     for (uint32_t i = 0; i < count; ++i)
     {
-        GPUObjectData& data = _objectData[record.FirstInstance + i];
+        const DrawInstance& instance = batch.Instances[i];
+        GPUInstanceData& data = _instanceData[batch.FirstInstance + i];
         data.boundingSphere = glm::vec4(
             allocation.boundingSphereCenter, allocation.boundingSphereRadius);
-        data.transformIndex = record.Entities[i];
-        data.drawCommandIndex = record.CmdSlot;
+        data.transformIndex = instance.EntityId;
+        data.drawCommandIndex = batch.CmdSlot;
+        data.materialIndex = instance.Material.Get().GetMaterialIndex();
     }
 }
 
-void Core::RendererBatch::QueueDrawRecordFills(const DrawRecord& record)
+void Core::RendererBatch::QueueDrawBatchFills(const DrawBatch& batch)
 {
-    const uint32_t count = static_cast<uint32_t>(record.Entities.size());
+    const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
 
     _pendingTableFills.push_back({ _indirectCommandBuffer,
-        ToBytes(&_commands[record.CmdSlot], 1),
-        record.CmdSlot * sizeof(DrawIndexedIndirectCommand) });
-    _pendingTableFills.push_back({ _materialIndexBuffer,
-        ToBytes(&_materialIndices[record.CmdSlot], 1), record.CmdSlot * sizeof(uint32_t) });
-    _pendingTableFills.push_back({ _objectDataBuffer,
-        ToBytes(&_objectData[record.FirstInstance], count),
-        record.FirstInstance * sizeof(GPUObjectData) });
+        ToBytes(&_commands[batch.CmdSlot], 1),
+        batch.CmdSlot * sizeof(DrawIndexedIndirectCommand) });
+    _pendingTableFills.push_back({ _instanceDataBuffer,
+        ToBytes(&_instanceData[batch.FirstInstance], count),
+        batch.FirstInstance * sizeof(GPUInstanceData) });
 }
 
-void Core::RendererBatch::ReleaseDrawRecord(DrawRecord& record)
+void Core::RendererBatch::ReleaseDrawBatch(DrawBatch& batch)
 {
-    if (record.CmdSlot == NO_SLOT)
+    if (batch.CmdSlot == NO_SLOT)
         return;
 
-    const uint32_t count = static_cast<uint32_t>(record.Entities.size());
+    const uint32_t count = static_cast<uint32_t>(batch.Instances.size());
 
     // Dead-marked in place (one dword per entry, so an in-flight reader sees
     // the old entry or the dead one, never a torn mix); every consumer keys
     // off this field. The slot and range are handed out again only after
     // those readers retire.
     for (uint32_t i = 0; i < count; ++i)
-        _objectData[record.FirstInstance + i].drawCommandIndex = DEAD_DRAW;
+        _instanceData[batch.FirstInstance + i].drawCommandIndex = DEAD_DRAW;
 
-    _pendingTableFills.push_back({ _objectDataBuffer,
-        ToBytes(&_objectData[record.FirstInstance], count),
-        record.FirstInstance * sizeof(GPUObjectData) });
+    _pendingTableFills.push_back({ _instanceDataBuffer,
+        ToBytes(&_instanceData[batch.FirstInstance], count),
+        batch.FirstInstance * sizeof(GPUInstanceData) });
 
     const u64 stamp = _sync.GetCurrentValue(QueueType::Graphics);
-    _retiredCommandSlots.emplace_back(record.CmdSlot, stamp);
-    _retiredInstanceRanges.emplace_back(InstanceRange{ record.FirstInstance, count }, stamp);
+    _retiredCommandSlots.emplace_back(batch.CmdSlot, stamp);
+    _retiredInstanceRanges.emplace_back(InstanceRange{ batch.FirstInstance, count }, stamp);
 
-    record.CmdSlot = NO_SLOT;
+    batch.CmdSlot = NO_SLOT;
 }
 
 void Core::RendererBatch::ReclaimRetired()
@@ -340,10 +341,10 @@ void Core::RendererBatch::GrowAndRepack()
 {
     uint32_t commandsNeeded = 0;
     uint32_t instancesNeeded = 0;
-    for (const auto& [key, record] : _drawRecords)
+    for (const auto& [key, batch] : _drawBatches)
     {
         ++commandsNeeded;
-        instancesNeeded += static_cast<uint32_t>(record.Entities.size());
+        instancesNeeded += static_cast<uint32_t>(batch.Instances.size());
     }
 
     _commandCapacity = std::max(commandsNeeded, _commandCapacity * 2);
@@ -353,8 +354,7 @@ void Core::RendererBatch::GrowAndRepack()
     _pendingTableFills.erase(std::remove_if(_pendingTableFills.begin(), _pendingTableFills.end(),
         [this](const TableFill& fill)
         {
-            return fill.Buffer == _indirectCommandBuffer || fill.Buffer == _materialIndexBuffer
-                || fill.Buffer == _objectDataBuffer;
+            return fill.Buffer == _indirectCommandBuffer || fill.Buffer == _instanceDataBuffer;
         }), _pendingTableFills.end());
 
     BufferDesc indirectDesc{ _commandCapacity * sizeof(DrawIndexedIndirectCommand),
@@ -363,21 +363,15 @@ void Core::RendererBatch::GrowAndRepack()
     _indirectCommandBuffer = AcquirePersistentBuffer(
         _indirectCommandBuffer, indirectDesc, "RendererBatch.IndirectCommand");
 
-    BufferDesc materialDesc{ _commandCapacity * sizeof(uint32_t),
+    BufferDesc objectDesc{ _instanceCapacity * sizeof(GPUInstanceData),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
-    _materialIndexBuffer = AcquirePersistentBuffer(
-        _materialIndexBuffer, materialDesc, "RendererBatch.MaterialIndex");
-
-    BufferDesc objectDesc{ _instanceCapacity * sizeof(GPUObjectData),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
-    _objectDataBuffer = AcquirePersistentBuffer(
-        _objectDataBuffer, objectDesc, "RendererBatch.ObjectData");
+    _instanceDataBuffer = AcquirePersistentBuffer(
+        _instanceDataBuffer, objectDesc, "RendererBatch.InstanceData");
 
     _commands.assign(_commandCapacity, DrawIndexedIndirectCommand{});
-    _materialIndices.assign(_commandCapacity, 0);
-    GPUObjectData dead{};
+    GPUInstanceData dead{};
     dead.drawCommandIndex = DEAD_DRAW;
-    _objectData.assign(_instanceCapacity, dead);
+    _instanceData.assign(_instanceCapacity, dead);
 
     // The old tables retire whole with their buffers: nothing to hand back.
     _freeCommandSlots.clear();
@@ -388,26 +382,24 @@ void Core::RendererBatch::GrowAndRepack()
     _instanceSlotEnd = 0;
 
     // Re-place every resident draw densely, then fill the prefix in bulk.
-    for (auto& [key, record] : _drawRecords)
+    for (auto& [key, batch] : _drawBatches)
     {
-        if (record.CmdSlot == NO_SLOT)
+        if (batch.CmdSlot == NO_SLOT)
             continue;
 
-        bool slotted = TryAllocateCommandSlot(record.CmdSlot);
+        bool slotted = TryAllocateCommandSlot(batch.CmdSlot);
         bool ranged = TryAllocateInstanceRange(
-            static_cast<uint32_t>(record.Entities.size()), record.FirstInstance);
+            static_cast<uint32_t>(batch.Instances.size()), batch.FirstInstance);
         assert(slotted && ranged);
-        WriteDrawRecord(record);
+        WriteDrawBatch(batch);
     }
 
     if (_commandSlotEnd > 0)
     {
         _pendingTableFills.push_back({ _indirectCommandBuffer,
             ToBytes(_commands.data(), _commandSlotEnd), 0 });
-        _pendingTableFills.push_back({ _materialIndexBuffer,
-            ToBytes(_materialIndices.data(), _commandSlotEnd), 0 });
-        _pendingTableFills.push_back({ _objectDataBuffer,
-            ToBytes(_objectData.data(), _instanceSlotEnd), 0 });
+        _pendingTableFills.push_back({ _instanceDataBuffer,
+            ToBytes(_instanceData.data(), _instanceSlotEnd), 0 });
     }
 }
 
@@ -440,8 +432,8 @@ void Core::RendererBatch::Sync(Scene& scene)
     if (_dirty)
     {
         _dirty = false;
-        SyncDrawRecords(scene);
+        SyncDrawBatches(scene);
     }
 
-    PlacePendingDrawRecords();
+    PlacePendingDrawBatches();
 }

@@ -214,13 +214,13 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 }
 
 void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
-	Buffer& objectDataBuffer, Buffer& transformBuffer,
+	Buffer& instanceDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
 	// Make the transfer-uploaded inputs (and the initialized bounds buffer) visible
 	// to the reduce kernel. Scoped to the buffers it reads rather than all memory.
 	commandBuffer.CreateBarrierBatch()
-		.Buffer(objectDataBuffer,
+		.Buffer(instanceDataBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -239,7 +239,7 @@ void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuf
 
 	auto& boundsReduceShader = _boundsReduceShader.Get();
 	auto builder = frameResources.CreateDescriptorSetBuilder(boundsReduceShader, 0);
-	builder.SetStorageBuffer(0, objectDataBuffer);
+	builder.SetStorageBuffer(0, instanceDataBuffer);
 	builder.SetStorageBuffer(1, transformBuffer);
 	builder.SetStorageBuffer(2, _boundsBuffer.Get());
 	auto& resources = builder.Build();
@@ -264,7 +264,7 @@ void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuf
 }
 
 void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBuffer& commandBuffer,
-	Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
+	Buffer& instanceDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
 	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex).
@@ -286,7 +286,7 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 	auto& triLookupShader = _triLookupShader.Get();
 	auto builder = frameResources.CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
-	builder.SetStorageBuffer(1, objectDataBuffer);
+	builder.SetStorageBuffer(1, instanceDataBuffer);
 	builder.SetStorageBuffer(2, _triLookupBuffer.Get());
 	auto& resources = builder.Build();
 
@@ -323,7 +323,7 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderF
 
 	auto& meshBufferManager = renderFrame.GetMeshBufferManager();
 	auto& batch = renderFrame.GetRendererBatch();
-	auto& objectDataBuffer = batch.GetObjectDataBuffer();
+	auto& instanceDataBuffer = batch.GetInstanceDataBuffer();
 	auto& indirectCommandBuffer = batch.GetIndirectCommandBuffer();
 	auto drawCommandCount = batch.GetDrawCommandCount();
 	auto instanceCount = batch.GetInstanceCount();
@@ -333,11 +333,11 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderF
 
 	// Step 1: Compute world-space bounds
 	ComputeWorldBounds(frameResources, commandBuffer,
-		objectDataBuffer, transformBuffer, instanceCount);
+		instanceDataBuffer, transformBuffer, instanceCount);
 
 	// Step 2: Build per-triangle lookup (vertexOffset + transformIndex)
 	BuildTriangleLookup(frameResources, commandBuffer,
-		objectDataBuffer, indirectCommandBuffer,
+		instanceDataBuffer, indirectCommandBuffer,
 		drawCommandCount, totalTriangles);
 
 	// Step 3: Generate SDF volume

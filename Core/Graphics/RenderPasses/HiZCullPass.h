@@ -29,13 +29,11 @@ namespace Core
         static constexpr const char* SB_PASS1_COUNTS = "OcclusionCull.Pass1Counts";
         static constexpr const char* SB_PASS1_INSTANCE_IDS = "OcclusionCull.Pass1InstanceIDs";
         static constexpr const char* SB_PASS1_INDIRECT = "OcclusionCull.Pass1Indirect";
-        static constexpr const char* SB_PASS1_MATERIALS = "OcclusionCull.Pass1Materials";
         static constexpr const char* SB_PASS1_DRAW_COUNT = "OcclusionCull.Pass1DrawCount";
 
         static constexpr const char* SB_PASS2_COUNTS = "OcclusionCull.Pass2Counts";
         static constexpr const char* SB_PASS2_INSTANCE_IDS = "OcclusionCull.Pass2InstanceIDs";
         static constexpr const char* SB_PASS2_INDIRECT = "OcclusionCull.Pass2Indirect";
-        static constexpr const char* SB_PASS2_MATERIALS = "OcclusionCull.Pass2Materials";
         static constexpr const char* SB_PASS2_DRAW_COUNT = "OcclusionCull.Pass2DrawCount";
         
         static constexpr const char* SB_REJECTED_INDICES = "OcclusionCull.RejectedIndices";
@@ -115,7 +113,6 @@ namespace Core
         FGBuffer _counts;             // this phase's per-command instance counts
         FGBuffer _instanceIDs;        // this phase's ID scatter target
         FGBuffer _visibleCommands;    // this phase's compacted draw list
-        FGBuffer _visibleMaterials;
         FGBuffer _visibleDrawCount;
         FGBuffer _rejectedIndices;
         FGBuffer _rejectedCount;

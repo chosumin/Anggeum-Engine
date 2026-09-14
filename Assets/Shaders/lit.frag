@@ -15,7 +15,7 @@ layout(location = 1) in vec3 worldNormal;
 layout(location = 2) in vec2 uv;
 
 #ifdef GPU_DRIVEN_RENDERING
-layout(location = 3) flat in uint drawID;
+layout(location = 3) flat in uint inMaterialIndex;
 #endif
 
 layout(location = 0) out vec4 outColor;
@@ -82,9 +82,6 @@ layout(set = 0, binding = 8) uniform PBRBuffer
     PBR materials[256];
 } pbrBuffer;
 
-layout(set = 0, binding = 9) readonly buffer MaterialIndexBuffer {
-    uint materialIndices[];
-} materialIndices;
 #else
 // Set 1: Material properties with texture indices
 layout(set = 1, binding = 1) uniform PBR
@@ -119,7 +116,7 @@ layout(std140, push_constant) uniform TileInfo
 void main()
 {
 #ifdef GPU_DRIVEN_RENDERING
-	uint materialIndex = materialIndices.materialIndices[drawID];
+	uint materialIndex = inMaterialIndex;
     PBR pbr = pbrBuffer.materials[materialIndex];
 #endif
 

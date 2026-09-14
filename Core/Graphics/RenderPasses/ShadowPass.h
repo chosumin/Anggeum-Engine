@@ -59,7 +59,6 @@ namespace Core
 		// entries mean the cascade was inactive this frame (clear-only).
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeIndirect{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeDrawCount{};
-		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeMaterials{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeInstanceIDs{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */

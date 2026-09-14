@@ -196,11 +196,12 @@ struct DrawIndexedIndirectCommand
 	uint32_t firstInstance;
 };
 
-struct alignas(16) GPUObjectData
+struct alignas(16) GPUInstanceData
 {
 	glm::vec4 boundingSphere;  // xyz: center, w: radius
 	uint32_t transformIndex;
 	uint32_t drawCommandIndex;
+	uint32_t materialIndex;
 };
 
 struct alignas(16) GPUCullData
@@ -214,10 +215,3 @@ struct alignas(16) GPUCullData
 	uint32_t enableOcclusionCulling;
 };
 
-struct alignas(16) GPUFrustumCullData
-{
-	glm::mat4 view;
-	glm::mat4 proj;
-	glm::vec4 frustumPlanes[6];
-	uint32_t drawCount;
-};
