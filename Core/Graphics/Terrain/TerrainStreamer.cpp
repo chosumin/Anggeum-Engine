@@ -64,6 +64,15 @@ namespace Core
 			| ((slot / _config.atlasSlotsPerRow) << 8) | (uint32_t(id.lod) << 16);
 	}
 
+	void TerrainStreamer::PromoteNode(const TerrainNodeId& id, uint16_t slot)
+	{
+		const TerrainNodeRuntime& runtime = _runtime[ToLinearIndex(id, _config)];
+		if (runtime.state != TerrainNodeState::PendingUpload || runtime.atlasSlot != slot)
+			return;
+
+		RegisterNode(id, slot);
+	}
+
 	void TerrainStreamer::Update(vec2 cameraXZ)
 	{
 		_stats = {};
@@ -85,7 +94,7 @@ namespace Core
 						if (runtime.state == TerrainNodeState::Unloaded)
 							toLoad.push_back(id);
 					}
-					else if (runtime.state != TerrainNodeState::Unloaded
+					else if (runtime.state == TerrainNodeState::Resident
 						&& !IsRequested(cameraXZ, id, _config.evictHysteresis))
 					{
 						_quadTree.ReleaseSlot(runtime.atlasSlot);
@@ -151,23 +160,25 @@ namespace Core
 				}
 
 				runtime.atlasSlot = slot;
-				RegisterNode(id, slot);
+				runtime.state = TerrainNodeState::PendingUpload;
 				tiles.push_back({ id, slot });
 				++_stats.uploadedThisFrame;
 			}
 
-			// Pass 3: submit the tile pixels to the transfer queue and BLOCK
-			// on the recording (a memcpy): the tables published below declare
-			// these slots resident this frame, so the job must not slide past
-			// this frame's Flush.
+			// Pass 3: submit the tile pixels. The tables list these slots only
+			// once the upload landed, so a late job just delays the node.
 			string jobName =
 				"Terrain.Upload_" + std::to_string(FrameCounter::GetFrameNumber());
 
 			TransferContext::PendingUpload upload;
+			upload.onLanded = [this, tiles]()
+			{
+				for (const TerrainTileUpload& tile : tiles)
+					PromoteNode(tile.id, tile.slot);
+			};
 			upload.job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
 				std::move(tiles), span, _atlasLayoutPending);
 			_transfer.SubmitJob(std::move(upload), jobName);
-			_transfer.WaitForRecording(jobName);
 			_atlasLayoutPending = false;
 		}
 		else

@@ -72,6 +72,8 @@ void TransferContext::CollectCompletedJobs()
 				upload.texture.SetResident();
 			if (upload.subMesh.IsValid())
 				upload.subMesh.SetResident();
+			if (upload.onLanded)
+				upload.onLanded();
 		}
 
 		_inFlightJobs.pop_front();
@@ -113,16 +115,6 @@ void TransferContext::SubmitJob(PendingUpload&& upload, const string& jobName)
 	Job& job = *upload.job;
 	_pendingUploads.insert({ jobName, std::move(upload) });
 	EnqueueUnowned(job);
-}
-
-void TransferContext::WaitForRecording(const string& jobName)
-{
-	auto it = _pendingUploads.find(jobName);
-	if (it == _pendingUploads.end())
-		return;
-
-	Job& job = *it->second.job;
-	WaitFor([&job] { return job.status == JobStatus::COMPLETE; });
 }
 
 void TransferContext::Flush()

@@ -21,9 +21,8 @@ namespace Core
 	// images and spans nothing in flight can read).
 	//
 	// Upload completion is asynchronous: a job whose recording missed a Flush
-	// rides a later one (producers needing same-frame landing block on
-	// WaitForRecording), and GPU consumption is ordered by the
-	// transfer-timeline gate.
+	// rides a later one, residency flips when its submission completes, and
+	// GPU consumption is ordered by the transfer-timeline gate.
 	class TransferContext : public Threadable
 	{
 	public:
@@ -34,6 +33,7 @@ namespace Core
 			unique_ptr<UploadJob> job;
 			Handle<Texture> texture;
 			Handle<SubMesh> subMesh;
+			function<void()> onLanded;
 		};
 
 		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
@@ -67,8 +67,6 @@ namespace Core
 		// Hands one upload to the worker pool and the pending set.
 		// A pending job with the same name absorbs the call.
 		void SubmitJob(PendingUpload&& upload, const string& jobName);
-
-		void WaitForRecording(const string& jobName);
 
 		// Submit the jobs whose worker RECORDING has finished, as one batch.
 		void Flush();

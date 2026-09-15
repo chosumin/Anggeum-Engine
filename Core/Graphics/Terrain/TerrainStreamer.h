@@ -64,6 +64,8 @@ namespace Core
 		bool IsRequested(vec2 cameraXZ, const TerrainNodeId& id, float radiusScale) const;
 		// The bookkeeping half of a tile load: runtime state, table mirrors.
 		void RegisterNode(const TerrainNodeId& id, uint16_t slot);
+		// Called when the tile's upload landed; the node may have been evicted since.
+		void PromoteNode(const TerrainNodeId& id, uint16_t slot);
 
 		const TerrainConfig& _config;
 		const TerrainNodeStore& _store;
