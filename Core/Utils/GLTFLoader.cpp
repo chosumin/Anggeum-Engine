@@ -80,18 +80,6 @@ inline VkSamplerAddressMode FindWrapMode(int wrap)
 	}
 };
 
-inline bool NeedSRGB(const std::string& name)
-{
-	// The gltf spec states that the base and emissive textures MUST be encoded with the sRGB
-	// transfer function. All other texture types are linear.
-	if (name == "baseColorTexture" || name == "emissiveTexture")
-		return true;
-
-	// metallicRoughnessTexture, normalTexture & occlusionTexture must be linear
-	assert(name == "metallicRoughnessTexture" || name == "normalTexture" || name == "occlusionTexture");
-	
-	return false;
-}
 
 inline vector<uint8_t> GetAttributeData(const tinygltf::Model* model, uint32_t accessorId)
 {
@@ -510,6 +498,14 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 {
 	size_t size = _model->textures.size();
 
+	// glTF: baseColor and emissive are sRGB, every other texture is linear data.
+	unordered_set<int> srgbTextures;
+	for (const auto& material : _model->materials)
+	{
+		srgbTextures.insert(material.pbrMetallicRoughness.baseColorTexture.index);
+		srgbTextures.insert(material.emissiveTexture.index);
+	}
+
 	vector<Handle<Core::Texture>> textures(size);
 
 	for (size_t i = 0; i < size; ++i)
@@ -517,9 +513,13 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		int imageIndex = _model->textures[i].source;
 		int samplerIndex = _model->textures[i].sampler;
 
-		// Texture owns its Image 1:1; build it from the glTF image URI.
+		// Texture owns its Image 1:1; build it from the glTF image URI. The
+		// format only matters for the raw png/jpg fallback: a baked KTX2
+		// carries its own transfer function.
 		ImageCreateDesc imageCreateInfo{};
 		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
+		if (srgbTextures.count(static_cast<int>(i)))
+			imageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
 
 		auto texture =
 			_resourceManager.LoadTexture(_model->textures[i].name,

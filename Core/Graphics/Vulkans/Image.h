@@ -69,7 +69,6 @@ namespace Core
 		VkImageView& GetOrCreateImageView(uint mipLevel);
 		VkImageView& GetOrCreateLayerImageView(uint32_t layerIndex);
 		const VkExtent3D& GetExtent() { return _extent; }
-		void SetSRGBFormat();
 
 		VkSampleCountFlagBits GetSampleCount() { return _sampleCount; }
 

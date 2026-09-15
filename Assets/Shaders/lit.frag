@@ -126,7 +126,7 @@ void main()
 
 	if (pbr.albedoTextureSet == 1)
 	{
-		albedo = SRGBtoLINEAR(texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], uv));
+		albedo = texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], uv);
 	}
 	else
 		albedo = pbr.albedo;
