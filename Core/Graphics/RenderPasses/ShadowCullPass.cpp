@@ -63,7 +63,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 		_instanceCounts[i] = builder.CreateBuffer(CountsName(i),
 			{ drawCount * sizeof(uint32_t),
 			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
-		builder.Write(_instanceCounts[i], BufferAccess::StorageComputeWrite);
+		builder.Write(_instanceCounts[i], BufferAccess::FillComputeWrite);
 
 		// Each cascade scatters into its own ID buffer, so its draw never
 		// reads another cascade's IDs.
@@ -80,7 +80,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 			{ sizeof(uint32_t),
 			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 			  | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
-		builder.Write(_drawCounts[i], BufferAccess::StorageComputeWrite);
+		builder.Write(_drawCounts[i], BufferAccess::FillComputeWrite);
 
 		_cullData[i] = frameResources.GetOrCreateUniformBuffer<GPUCullData>(
 			"ShadowCull.Cascade" + std::to_string(i) + ".CullData");

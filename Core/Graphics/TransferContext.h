@@ -21,8 +21,7 @@ namespace Core
 	// images and spans nothing in flight can read).
 	//
 	// Upload completion is asynchronous: a job whose recording missed a Flush
-	// rides a later one, residency flips when its submission completes, and
-	// GPU consumption is ordered by the transfer-timeline gate.
+	// rides a later one, and residency flips only once its submission complete.
 	class TransferContext : public Threadable
 	{
 	public:

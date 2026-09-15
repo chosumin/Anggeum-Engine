@@ -108,10 +108,9 @@ namespace Core
         u64 _resourceSemaphoreValue = 0;
         u64 _transferSemaphoreValue = 0;
 
-        // Values the next SubmitToQueues must wait on, or 0 when nothing was
+        // Value the next SubmitToQueues must wait on, or 0 when nothing was
         // submitted for this frame. Cleared once the wait is injected.
         u64 _pendingResourceWait = 0;
-        u64 _pendingTransferWait = 0;
 
         // Per-frame snapshot of the driver completed values, readable anywhere.
         atomic<u64> _graphicsCompletedCache{ 0 };

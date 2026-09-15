@@ -44,6 +44,7 @@ namespace Core
 		IndirectRead,
 		TransferSrc,
 		TransferDst,
+		FillComputeWrite,
 	};
 
 	// The sync2 facts a declared access boils down to.

@@ -86,7 +86,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         EnsureHiZTexture(frameResources);
 
         _counts = builder.CreateBuffer(SB_PASS1_COUNTS, countsDesc);
-        builder.Write(_counts, BufferAccess::StorageComputeWrite);
+        builder.Write(_counts, BufferAccess::FillComputeWrite);
 
         _instanceIDs = builder.CreateBuffer(SB_PASS1_INSTANCE_IDS, instanceIDsDesc);
         builder.Write(_instanceIDs, BufferAccess::StorageComputeWrite);
@@ -95,7 +95,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
 
         _visibleDrawCount = builder.CreateBuffer(SB_PASS1_DRAW_COUNT, drawCountDesc);
-        builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
+        builder.Write(_visibleDrawCount, BufferAccess::FillComputeWrite);
 
         _rejectedIndices = builder.CreateBuffer(SB_REJECTED_INDICES,
             { instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
@@ -104,7 +104,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         _rejectedCount = builder.CreateBuffer(SB_REJECTED_COUNT,
             { sizeof(uint32_t),
               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
-        builder.Write(_rejectedCount, BufferAccess::StorageComputeWrite);
+        builder.Write(_rejectedCount, BufferAccess::FillComputeWrite);
 
         // Pass-1 Hi-Z reprojects the previous frame's resolved depth (another
         // slot's image, outside this frame's graph); barriers are manual.
@@ -123,7 +123,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         builder.Read(_rejectedCount, BufferAccess::StorageComputeRead);
 
         _counts = builder.CreateBuffer(SB_PASS2_COUNTS, countsDesc);
-        builder.Write(_counts, BufferAccess::StorageComputeWrite);
+        builder.Write(_counts, BufferAccess::FillComputeWrite);
 
         _instanceIDs = builder.CreateBuffer(SB_PASS2_INSTANCE_IDS, instanceIDsDesc);
         builder.Write(_instanceIDs, BufferAccess::StorageComputeWrite);
@@ -132,7 +132,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         builder.Write(_visibleCommands, BufferAccess::StorageComputeWrite);
 
         _visibleDrawCount = builder.CreateBuffer(SB_PASS2_DRAW_COUNT, drawCountDesc);
-        builder.Write(_visibleDrawCount, BufferAccess::StorageComputeWrite);
+        builder.Write(_visibleDrawCount, BufferAccess::FillComputeWrite);
 
         _resolvedDepth = builder.GetTexture(ResolvePass::RT_RESOLVED_DEPTH);
         builder.Read(_resolvedDepth, TextureAccess::SampledCompute);

@@ -192,8 +192,6 @@ u64 SyncContext::SubmitTransfer(CommandBuffer& primary,
     for (CommandBuffer* secondary : secondaries)
         secondary->MarkSubmitted(signalValue);
 
-    // Monotonic: a later submit's value covers every earlier one.
-    _pendingTransferWait = signalValue;
     return signalValue;
 }
 
@@ -220,15 +218,11 @@ void SyncContext::SubmitToQueues(
         }
     }
 
-    // Work that went out ahead of this frame (resource init on graphics,
-    // uploads on transfer) gates the first submit of each queue: a pass may
-    // sample a target it transitioned or read a buffer it filled, and the
-    // compute queue has no implicit ordering against the other queues at all.
-    auto gateBothQueues = [&](VkSemaphore semaphore, u64& pendingWait)
+    // This frame's resource init gates the first submit of each queue: a pass
+    // may sample a target it transitioned or read a buffer it filled, and the
+    // compute queue has no implicit ordering against graphics at all.
+    if (_pendingResourceWait != 0)
     {
-        if (pendingWait == 0)
-            return;
-
         bool graphicsGated = false;
         bool computeGated = false;
 
@@ -240,7 +234,7 @@ void SyncContext::SubmitToQueues(
             if (gated)
                 continue;
 
-            info.AddTimelineWaitSemaphore(semaphore, pendingWait,
+            info.AddTimelineWaitSemaphore(_resourceSemaphore, _pendingResourceWait,
                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
             gated = true;
 
@@ -248,11 +242,8 @@ void SyncContext::SubmitToQueues(
                 break;
         }
 
-        pendingWait = 0;
-    };
-
-    gateBothQueues(_resourceSemaphore, _pendingResourceWait);
-    gateBothQueues(_transferSemaphore, _pendingTransferWait);
+        _pendingResourceWait = 0;
+    }
 
     // renderFinished binary + graphics timeline signal -> last graphics submit
     for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
