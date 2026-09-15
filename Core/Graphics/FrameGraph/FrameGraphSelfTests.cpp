@@ -160,14 +160,17 @@ namespace Core
 		}
 
 		// P1's read of A transitions COLOR_ATTACHMENT -> SHADER_READ_ONLY with a
-		// cross-queue source (NONE src stage: the timeline wait orders execution).
+		// cross-queue source: srcStage repeats the consumer stage so the
+		// transition chains with the timeline wait's stage mask, and srcAccess
+		// stays NONE (the semaphore already made the producer's writes visible).
 		{
 			bool found = false;
 			for (const auto& plan : out.preBarriers[1])
 				if (plan.resource == 0 &&
 					plan.oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
 					plan.newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
-					plan.srcStage == VK_PIPELINE_STAGE_2_NONE)
+					plan.srcStage == VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT &&
+					plan.srcAccess == VK_ACCESS_2_NONE)
 					found = true;
 			assert(found);
 		}

@@ -89,16 +89,20 @@ namespace Core
 
 		// First upload ever: the atlases leave UNDEFINED for their permanent
 		// GENERAL layout here, ahead of the first copies in this very
-		// recording. (Legal on the transfer family - the sanitizers collapse
-		// GENERAL's shader stages/accesses; visibility for consumers is the
-		// timeline gate.)
+		// recording. Explicit masks: the transition must be visible to the
+		// copies below (GENERAL's inferred shader dst scope would sanitize to
+		// nothing on the transfer family); visibility for shader consumers is
+		// the timeline gate.
 		if (_initializeAtlases)
 		{
-			commandBuffer->CreateBarrierBatch()
-				.Image(_heightAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
-				.Image(_normalAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
-				.Image(_albedoAtlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL)
-				.Submit();
+			auto batch = commandBuffer->CreateBarrierBatch();
+			for (Texture* atlas : { &_heightAtlas, &_normalAtlas, &_albedoAtlas })
+			{
+				batch.Image(*atlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+					VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
+			}
+			batch.Submit();
 		}
 
 		commandBuffer->CopyBufferToImage(*source, _heightAtlas, heightRegions,

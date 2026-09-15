@@ -233,10 +233,12 @@ namespace Core
 					plan.isImage = isImage;
 					if (crossQueue)
 					{
-						// Execution order comes from the timeline wait; the
-						// semaphore also makes prior writes available, so the
-						// barrier only performs the layout transition.
-						plan.srcStage = VK_PIPELINE_STAGE_2_NONE;
+						// The timeline wait orders us after the producer and
+						// makes its writes available, so no srcAccess — but the
+						// transition must chain with the wait's stage mask:
+						// srcStage NONE would leave the transition write
+						// unordered against the producer queue.
+						plan.srcStage = accessInfo.stage;
 						plan.srcAccess = VK_ACCESS_2_NONE;
 					}
 					else
