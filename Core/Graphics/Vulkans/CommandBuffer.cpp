@@ -302,29 +302,6 @@ void Core::CommandBuffer::EndCommandBuffer()
         throw std::runtime_error("failed to record command buffer!");
 }
 
-void Core::CommandBuffer::ImmediateSubmit(Core::Device& device, Core::Job& job)
-{
-	auto& commandBuffer = device.BeginSingleTimeCommands();
-
-    job.commandBuffer = &commandBuffer;
-    job.Execute();
-    
-    device.EndSingleTimeCommands(commandBuffer);
-}
-
-void Core::CommandBuffer::ImmediateSubmit(Device& device, vector<Job*>& jobs)
-{
-    auto& commandBuffer = device.BeginSingleTimeCommands();
-
-	for (auto& job : jobs)
-	{
-		job->commandBuffer = &commandBuffer;
-		job->Execute();
-	}
-
-    device.EndSingleTimeCommands(commandBuffer);
-}
-
 void Core::CommandBuffer::DrawIndexedIndirect(Buffer& indirectBuffer, uint32_t drawCount, uint32_t stride)
 {
 	if (drawCount == 0)

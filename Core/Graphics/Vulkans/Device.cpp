@@ -1,7 +1,5 @@
 #include "stdafx.h"
 #include "Device.h"
-#include "CommandPool.h"
-#include "CommandBuffer.h"
 #include "MemoryAllocator.h"
 
 namespace Core
@@ -38,7 +36,7 @@ namespace Core
 	};
 
 	Device::Device(Window& window)
-		:_device(), _graphicsQueue(), _instance(), _surface(),
+		:_device(), _instance(), _surface(),
 		_deviceExtensions{
 			// Timeline semaphores and descriptor indexing are core since 1.2
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -61,15 +59,12 @@ namespace Core
 
 		_debugUtils.Initialize(_instance, _device);
 
-	    _graphicsCommandPool = new CommandPool(*this, QueueType::Graphics);
-
 	    _memoryAllocatorManager = new MemoryAllocatorManager(*this);
 	}
 
 	Device::~Device()
 	{
 	    delete(_memoryAllocatorManager);
-	    delete(_graphicsCommandPool);
 
 	    vkDestroyDevice(_device, nullptr);
 
@@ -94,40 +89,6 @@ namespace Core
 	    }
 
 	    throw runtime_error("failed to find suitable memory type!");
-	}
-
-	CommandBuffer& Device::BeginSingleTimeCommands() const
-	{
-	    auto& commandBuffer = _graphicsCommandPool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-
-	    commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-	    return commandBuffer;
-	}
-
-	void Device::EndSingleTimeCommands(CommandBuffer& commandBuffer) const
-	{
-	    commandBuffer.EndCommandBuffer();
-	    
-	    VkSubmitInfo submitInfo{};
-	    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	    submitInfo.commandBufferCount = 1;
-	    submitInfo.pCommandBuffers = &commandBuffer.GetHandle();
-
-	    VkFenceCreateInfo fence_info{};
-	    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	    fence_info.flags = 0;
-
-	    VkFence fence;
-	    vkCreateFence(_device, &fence_info, nullptr, &fence);
-
-	    VkResult result = vkQueueSubmit(_graphicsQueue, 1, &submitInfo, fence);
-	    vkWaitForFences(_device, 1, &fence, VK_TRUE, 100000000000);
-
-	    vkDestroyFence(_device, fence, nullptr);
-
-	    // The fence wait just retired the work: releasable immediately.
-	    commandBuffer.MarkSubmitted(0);
 	}
 
 	VkFormat Device::FindSupportedFormat(
@@ -401,7 +362,6 @@ namespace Core
 	        throw runtime_error("failed to create logical device!");
 	    }
 
-	    vkGetDeviceQueue(_device, _queueFamilyIndices.GraphicsFamily.value(), 0, &_graphicsQueue);
 	}
 
 	SwapChainSupportDetails Device::QuerySwapChainSupport(VkPhysicalDevice device)

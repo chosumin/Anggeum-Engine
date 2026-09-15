@@ -4,7 +4,7 @@
 #include "Graphics/TextureUpload.h"
 #include "Graphics/GeometryUpload.h"
 #include "Graphics/TextureUpload.h"
-#include "Graphics/Vulkans/CommandBuffer.h"
+#include "Graphics/SyncContext.h"
 #include "Graphics/RenderContext.h"
 #include "Graphics/AssetStreamer.h"
 #include "Graphics/RetireQueue.h"
@@ -26,10 +26,11 @@ namespace Core
 		imageCreateInfo.filePath = DEFAULT_IMAGE;
 		_defaultTexture = LoadTexture(DEFAULT_TEXTURE, imageCreateInfo, LoadSampler(DEFAULT_SAMPLER));
 
+		// Blocking on purpose: every material falls back to this texture, so
+		// it must be sampleable before the first frame.
 		auto& defaultTex = _defaultTexture.Get();
 		TextureUploadJob job(_device, defaultTex, defaultTex.GetName());
-
-		Core::CommandBuffer::ImmediateSubmit(_device, job);
+		syncContext.SubmitImmediate(job);
 	}
 
 	ResourceManager::~ResourceManager() = default;

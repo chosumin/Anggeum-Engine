@@ -91,6 +91,7 @@ void FrameResources::ExecutePendingInit(CommandBuffer& commandBuffer)
 	{
 		job->commandBuffer = &commandBuffer;
 		job->Execute();
+		job->status = JobStatus::COMPLETE;
 	}
 }
 

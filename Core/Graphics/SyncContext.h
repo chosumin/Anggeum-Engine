@@ -14,6 +14,7 @@ namespace Core
     class SubmitInfo;
     class CommandPool;
     class CommandBuffer;
+    class Job;
 
     struct FrameTimelineSnapshot
     {
@@ -55,6 +56,8 @@ namespace Core
         // first submit of *both* queues on it.
         void SubmitResourceInit(CommandBuffer& commandBuffer);
 
+        void SubmitImmediate(Job& job);
+
         // Submits an upload batch on the transfer queue, signalling the
         // transfer timeline; returns the signalled value.
         u64 SubmitTransfer(CommandBuffer& primary,
@@ -78,11 +81,15 @@ namespace Core
         // engine code submits through this class, never through the handle.
         VkQueue GetGraphicsQueueForExternalInit() const { return _graphicsQueue; }
     private:
+        u64 SignalResourceTimeline(CommandBuffer& commandBuffer);
+
         // Resource-init buffers submitted since the last SubmitToQueues,
         // awaiting their end-of-frame graphics stamp.
         vector<CommandBuffer*> _pendingInitBuffers;
 
         Device& _device;
+
+        unique_ptr<CommandPool> _immediatePool;
 
         // The queue handles live here, not on Device: submission (and its
         // timeline bookkeeping) has exactly one owner.

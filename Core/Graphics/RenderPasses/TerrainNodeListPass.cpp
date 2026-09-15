@@ -19,8 +19,7 @@ using namespace Core;
 TerrainNodeListPass::~TerrainNodeListPass() = default;
 
 TerrainNodeListPass::TerrainNodeListPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene)
-	: _device(device)
-	, _renderScene(renderScene)
+	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 {
 	
@@ -44,7 +43,6 @@ TerrainNodeListPass::TerrainNodeListPass(Device& device, ResourceManager& resour
 void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	FrameResources& frameResources, RenderFrame& renderFrame)
 {
-	_terrain.QueuePendingInit(_device, frameResources);
 	_indexTexture = frameResources.GetRenderTarget(TerrainQuadTree::QUADTREE_INDEX);
 
 	_active = false;

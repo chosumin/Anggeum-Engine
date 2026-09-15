@@ -51,7 +51,6 @@ namespace Core
 			float paddingFactor;
 		};
 
-		Device& _device;
 		RenderScene& _renderScene;
 		VkExtent2D _screenExtent;
 		VkSampleCountFlagBits _msaaSamples;

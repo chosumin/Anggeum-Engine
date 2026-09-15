@@ -40,7 +40,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 // Out of line for the unique_ptr members forward-declared in the header.
 RenderScene::~RenderScene() = default;
 
-void RenderScene::SyncManagers(Scene& scene)
+void RenderScene::SyncManagers(Scene& scene, FrameResources& frameResources)
 {
 	// Streaming producer: decides this frame's uploads, and submits them.
 	if (auto* camera = scene.GetMainCamera())
@@ -58,6 +58,9 @@ void RenderScene::SyncManagers(Scene& scene)
 
 	// Everything this frame produced - loader requests, the rebuild's table fills
 	_assetStreamer->SubmitQueued();
+
+	_batch->QueuePendingInit(frameResources);
+	_terrainSystem->QueuePendingInit(*_device, frameResources);
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,

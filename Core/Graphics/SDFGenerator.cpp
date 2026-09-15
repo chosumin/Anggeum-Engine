@@ -33,30 +33,22 @@ namespace
 	};
 	static_assert(sizeof(SDFFileHeader) == 64, "SDFFileHeader must be 64 bytes");
 
-	// Job: download SDF image + bounds buffer to host-visible staging buffers.
+	// Job: copy the SDF image + bounds buffer into host-visible staging the
+	// caller owns.
 	class SDFDownloadJob : public Job
 	{
 	public:
-		SDFDownloadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
-			uint32_t resolution, Buffer** outImageStaging, Buffer** outBoundsStaging)
+		SDFDownloadJob(Texture& texture, Buffer& boundsBuffer, uint32_t resolution,
+			Buffer& imageStaging, Buffer& boundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
+			, _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
-			, _outImageStaging(outImageStaging)
-			, _outBoundsStaging(outBoundsStaging)
+			, _imageStaging(imageStaging), _boundsStaging(boundsStaging)
 		{
 		}
 
 		void Execute() override
 		{
-			VkDeviceSize voxelBytes = VkDeviceSize(_resolution) * _resolution * _resolution * sizeof(float);
-
-			auto* imageStaging = new Buffer(_device, voxelBytes,
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
-			auto* boundsStaging = new Buffer(_device, _boundsBuffer.GetSize(),
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
-
-			// Image: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
 			commandBuffer->CreateBarrierBatch()
 				.Image(_texture,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -71,7 +63,7 @@ namespace
 			vkCmdCopyImageToBuffer(commandBuffer->GetHandle(),
 				_texture.GetImage().GetImage(),
 				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				imageStaging->GetBuffer(), 1, &region);
+				_imageStaging.GetBuffer(), 1, &region);
 
 			commandBuffer->CreateBarrierBatch()
 				.Image(_texture,
@@ -79,38 +71,31 @@ namespace
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 				.Submit();
 
-			// Bounds buffer: storage -> staging
 			VkBufferCopy bcopy{};
 			bcopy.size = _boundsBuffer.GetSize();
 			vkCmdCopyBuffer(commandBuffer->GetHandle(),
-				_boundsBuffer.GetBuffer(), boundsStaging->GetBuffer(),
+				_boundsBuffer.GetBuffer(), _boundsStaging.GetBuffer(),
 				1, &bcopy);
-
-			*_outImageStaging = imageStaging;
-			*_outBoundsStaging = boundsStaging;
-			status = JobStatus::COMPLETE;
 		}
 
 	private:
-		Device& _device;
 		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
-		Buffer** _outImageStaging;
-		Buffer** _outBoundsStaging;
+		Buffer& _imageStaging;
+		Buffer& _boundsStaging;
 	};
 
-	// Job: upload host data to SDF image + bounds buffer.
+	// Job: upload host data to SDF image + bounds buffer; owns its staging.
 	class SDFUploadJob : public Job
 	{
 	public:
-		SDFUploadJob(Device& device, Texture& texture, Buffer& boundsBuffer,
-			uint32_t resolution,
-			Buffer* imageStaging, Buffer* boundsStaging)
+		SDFUploadJob(Texture& texture, Buffer& boundsBuffer, uint32_t resolution,
+			unique_ptr<Buffer> imageStaging, unique_ptr<Buffer> boundsStaging)
 			: Job(JobType::TRANSFER)
-			, _device(device), _texture(texture), _boundsBuffer(boundsBuffer)
+			, _texture(texture), _boundsBuffer(boundsBuffer)
 			, _resolution(resolution)
-			, _imageStaging(imageStaging), _boundsStaging(boundsStaging)
+			, _imageStaging(std::move(imageStaging)), _boundsStaging(std::move(boundsStaging))
 		{
 		}
 
@@ -144,27 +129,58 @@ namespace
 			vkCmdCopyBuffer(commandBuffer->GetHandle(),
 				_boundsStaging->GetBuffer(), _boundsBuffer.GetBuffer(),
 				1, &bcopy);
-
-			status = JobStatus::COMPLETE;
 		}
 
 	private:
-		Device& _device;
 		Texture& _texture;
 		Buffer& _boundsBuffer;
 		uint32_t _resolution;
-		Buffer* _imageStaging;
-		Buffer* _boundsStaging;
+		unique_ptr<Buffer> _imageStaging;
+		unique_ptr<Buffer> _boundsStaging;
 	};
+
+	uint32_t FloatToSortableUint(float f)
+	{
+		uint32_t bits;
+		memcpy(&bits, &f, sizeof(bits));
+		uint32_t mask = (bits & 0x80000000u) ? 0xFFFFFFFFu : 0x80000000u;
+		return bits ^ mask;
+	}
+
+	// Min = +inf, max = -inf: what the reduce kernel's atomics start from.
+	vector<uint32_t> BoundsResetData()
+	{
+		uint32_t posInf = FloatToSortableUint(1e20f);
+		uint32_t negInf = FloatToSortableUint(-1e20f);
+		return { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
+	}
 }
 
-static uint32_t FloatToSortableUint(float f)
+// Job: records the bake into the frame's resource-init command buffer.
+class SDFGenerator::GenerateJob : public Job
 {
-	uint32_t bits;
-	memcpy(&bits, &f, sizeof(bits));
-	uint32_t mask = (bits & 0x80000000u) ? 0xFFFFFFFFu : 0x80000000u;
-	return bits ^ mask;
-}
+public:
+	GenerateJob(SDFGenerator& generator, FrameResources& frameResources,
+		RenderFrame& renderFrame, uint32_t resolution)
+		: Job(JobType::GRAPHICS_PRIMARY)
+		, _generator(generator), _frameResources(frameResources)
+		, _renderFrame(renderFrame), _resolution(resolution)
+	{
+	}
+
+	void Execute() override
+	{
+		commandBuffer->BeginDebugMarker("SDF Volume Generation (GPU)");
+		_generator.RecordGenerate(_frameResources, _renderFrame, *commandBuffer, _resolution);
+		commandBuffer->EndDebugMarker();
+	}
+
+private:
+	SDFGenerator& _generator;
+	FrameResources& _frameResources;
+	RenderFrame& _renderFrame;
+	uint32_t _resolution;
+};
 
 SDFGenerator::SDFGenerator(Device& device, ResourceManager& resourceManager)
 	: _device(device)
@@ -179,20 +195,13 @@ SDFGenerator::SDFGenerator(Device& device, ResourceManager& resourceManager)
 	_triLookupShader = _resourceManager.LoadShader("Shaders/sdfTriLookup.comp.spv");
 	_triLookupPipeline = _resourceManager.LoadComputePipeline("Shaders/sdfTriLookup.comp.spv");
 
-	// Initialize bounds buffer (pool-owned; allocate then fill via a copy job).
-	uint32_t posInf = FloatToSortableUint(1e20f);
-	uint32_t negInf = FloatToSortableUint(-1e20f);
-	vector<uint32_t> initData = { posInf, posInf, posInf, 0, negInf, negInf, negInf, 0 };
-
+	// Filled by the bake's reset or the cache upload before anything reads it.
 	_boundsBuffer = _resourceManager.LoadBuffer(
-		{ initData.size() * sizeof(uint32_t),
+		{ BoundsResetData().size() * sizeof(uint32_t),
 		  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
 		  | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		  MemoryType::DEVICE_LOCAL },
 		"SDF.Bounds");
-
-	BufferUploadJob<uint32_t> boundsJob(_device, _boundsBuffer.Get(), move(initData), 0);
-	CommandBuffer::ImmediateSubmit(_device, boundsJob);
 }
 
 SDFGenerator::~SDFGenerator() = default;
@@ -213,11 +222,24 @@ void SDFGenerator::CreateSDFTexture(uint32_t resolution)
 	_sdfTexture = _resourceManager.LoadTexture("SDFVolume", std::move(image), sampler);
 }
 
+void SDFGenerator::EnsureTriangleLookup(uint32_t totalTriangles)
+{
+	// 2 uints per triangle: vertexOffset + transformIndex. A grow swaps the
+	// backing buffer in place so the handle stays valid.
+	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
+
+	BufferDesc triLookupDesc{ requiredSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL };
+	if (!_triLookupBuffer.IsValid())
+		_triLookupBuffer = _resourceManager.LoadBuffer(triLookupDesc, "SDF.TriLookup");
+	else if (_triLookupBuffer.Get().GetSize() < requiredSize)
+		_resourceManager.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
+}
+
 void SDFGenerator::ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
 	Buffer& instanceDataBuffer, Buffer& transformBuffer,
 	uint32_t instanceCount)
 {
-	// Make the transfer-uploaded inputs (and the initialized bounds buffer) visible
+	// Make the transfer-uploaded inputs (and the reset bounds buffer) visible
 	// to the reduce kernel. Scoped to the buffers it reads rather than all memory.
 	commandBuffer.CreateBarrierBatch()
 		.Buffer(instanceDataBuffer,
@@ -267,22 +289,6 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 	Buffer& instanceDataBuffer, Buffer& drawCommandBuffer,
 	uint32_t drawCommandCount, uint32_t totalTriangles)
 {
-	// Allocate lookup buffer if needed (2 uints per triangle: vertexOffset + transformIndex).
-	// It grows with triangle count: first allocation adds a slot, a later grow swaps
-	// the backing buffer in place (Replace) so the handle stays valid.
-	VkDeviceSize requiredSize = totalTriangles * sizeof(uint32_t) * 2;
-
-	auto& resourceManager = _resourceManager;
-	BufferDesc triLookupDesc{ requiredSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::DEVICE_LOCAL };
-	if (!_triLookupBuffer.IsValid())
-	{
-		_triLookupBuffer = resourceManager.LoadBuffer(triLookupDesc, "SDF.TriLookup");
-	}
-	else if (_triLookupBuffer.Get().GetSize() < requiredSize)
-	{
-		resourceManager.ResizeBuffer(_triLookupBuffer, triLookupDesc, "SDF.TriLookup");
-	}
-
 	auto& triLookupShader = _triLookupShader.Get();
 	auto builder = frameResources.CreateDescriptorSetBuilder(triLookupShader, 0);
 	builder.SetStorageBuffer(0, drawCommandBuffer);
@@ -315,12 +321,26 @@ void SDFGenerator::BuildTriangleLookup(FrameResources& frameResources, CommandBu
 }
 
 void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderFrame,
-	CommandBuffer& commandBuffer,
 	uint32_t resolution)
 {
 	if (!_sdfTexture.IsValid())
 		CreateSDFTexture(resolution);
 
+	uint32_t totalTriangles = renderFrame.GetMeshBufferManager().GetTotalIndexCount() / 3;
+	EnsureTriangleLookup(totalTriangles);
+
+	// Reset first, then bake, in the same init submission.
+	frameResources.AddInitJob(make_unique<BufferUploadJob<uint32_t>>(
+		_device, _boundsBuffer.Get(), BoundsResetData(), 0));
+	frameResources.AddInitJob(make_unique<GenerateJob>(
+		*this, frameResources, renderFrame, resolution));
+
+	_generated = true;
+}
+
+void SDFGenerator::RecordGenerate(FrameResources& frameResources, RenderFrame& renderFrame,
+	CommandBuffer& commandBuffer, uint32_t resolution)
+{
 	auto& meshBufferManager = renderFrame.GetMeshBufferManager();
 	auto& batch = renderFrame.GetRendererBatch();
 	auto& instanceDataBuffer = batch.GetInstanceDataBuffer();
@@ -377,57 +397,60 @@ void SDFGenerator::Generate(FrameResources& frameResources, RenderFrame& renderF
 			VK_IMAGE_LAYOUT_GENERAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 		.Submit();
-
-	_generated = true;
 }
 
-bool SDFGenerator::SaveToFile(uint32_t resolution)
+void SDFGenerator::RequestSave(FrameResources& frameResources, uint32_t resolution)
 {
 	if (!_sdfTexture.IsValid() || !_boundsBuffer.IsValid())
-		return false;
+		return;
 
-	auto& texture = _sdfTexture.Get();
-
-	// The SDF generation commands were recorded into a frame command buffer that
-	// may still be executing (or not yet started) on the GPU. The download job
-	// below reads the SDF image, so all prior GPU work must complete first.
-	// SaveToFile is an infrequent (button / first-gen) operation, so a full
-	// device wait is acceptable here.
+	// In-flight frames may still sample the volume the readback transitions.
+	// Rare (button / first bake), so a full device wait is acceptable.
 	vkDeviceWaitIdle(_device.GetDevice());
 
-	Buffer* imageStaging = nullptr;
-	Buffer* boundsStaging = nullptr;
+	VkDeviceSize voxelBytes = VkDeviceSize(resolution) * resolution * resolution * sizeof(float);
+	_saveImageStaging = make_unique<Buffer>(_device, voxelBytes,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
+	_saveBoundsStaging = make_unique<Buffer>(_device, _boundsBuffer.Get().GetSize(),
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::DEDICATED_HOST);
+	_saveResolution = resolution;
+	_saveFrame = &frameResources;
 
-	SDFDownloadJob job(_device, texture, _boundsBuffer.Get(), resolution,
-		&imageStaging, &boundsStaging);
-	CommandBuffer::ImmediateSubmit(_device, job);
+	frameResources.AddInitJob(make_unique<SDFDownloadJob>(
+		_sdfTexture.Get(), _boundsBuffer.Get(), resolution,
+		*_saveImageStaging, *_saveBoundsStaging));
+}
 
-	if (!imageStaging || !boundsStaging)
-		return false;
+void SDFGenerator::FinishSave(FrameResources& frameResources)
+{
+	// The slot that carried the readback is back: its GPU work has completed.
+	if (_saveFrame != &frameResources)
+		return;
+	_saveFrame = nullptr;
 
-	// Build header (bounds stored so loaded volume's coordinate system matches)
 	SDFFileHeader header{};
 	header.magic = kSDFFileMagic;
 	header.version = kSDFFileVersion;
-	header.resolution = resolution;
+	header.resolution = _saveResolution;
 	header.format = VK_FORMAT_R32_SFLOAT;
 
 	void* boundsMapped = nullptr;
-	boundsStaging->GetMappedPtr(&boundsMapped);
+	_saveBoundsStaging->GetMappedPtr(&boundsMapped);
 	memcpy(header.rawBounds, boundsMapped, sizeof(header.rawBounds));
 
-	VkDeviceSize voxelBytes = VkDeviceSize(resolution) * resolution * resolution * sizeof(float);
+	VkDeviceSize voxelBytes = VkDeviceSize(_saveResolution) * _saveResolution
+		* _saveResolution * sizeof(float);
 
-	// Concatenate header + voxel data into one contiguous blob for a single write
+	// Header + voxels in one contiguous blob for a single write.
 	vector<uint8_t> fileData(sizeof(SDFFileHeader) + static_cast<size_t>(voxelBytes));
 	memcpy(fileData.data(), &header, sizeof(SDFFileHeader));
 
 	void* imageMapped = nullptr;
-	imageStaging->GetMappedPtr(&imageMapped);
+	_saveImageStaging->GetMappedPtr(&imageMapped);
 	memcpy(fileData.data() + sizeof(SDFFileHeader), imageMapped, static_cast<size_t>(voxelBytes));
 
-	delete imageStaging;
-	delete boundsStaging;
+	_saveImageStaging.reset();
+	_saveBoundsStaging.reset();
 
 	try
 	{
@@ -435,12 +458,11 @@ bool SDFGenerator::SaveToFile(uint32_t resolution)
 	}
 	catch (const std::exception&)
 	{
-		return false;
+		cout << "SDFGenerator: failed to write " << _sdfCachePath << endl;
 	}
-	return true;
 }
 
-bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
+bool SDFGenerator::TryLoadFromFile(FrameResources& frameResources, uint32_t expectedResolution)
 {
 	if (!FileSystem::Exists(_sdfCachePath))
 		return false;
@@ -474,27 +496,20 @@ bool SDFGenerator::TryLoadFromFile(uint32_t expectedResolution)
 	if (fileData.size() < sizeof(SDFFileHeader) + voxelBytes)
 		return false;
 
-	// Voxel staging
-	auto* imageStaging = new Buffer(_device, voxelBytes,
+	auto imageStaging = make_unique<Buffer>(_device, voxelBytes,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 	imageStaging->CopyBuffer(fileData.data() + sizeof(SDFFileHeader), voxelBytes);
 
-	// Bounds staging
-	auto* boundsStaging = new Buffer(_device, _boundsBuffer.Get().GetSize(),
+	auto boundsStaging = make_unique<Buffer>(_device, _boundsBuffer.Get().GetSize(),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
 	boundsStaging->CopyBuffer(header.rawBounds, sizeof(header.rawBounds));
 
 	_resourceManager.UnloadTexture(_sdfTexture);
 	CreateSDFTexture(header.resolution);
 
-	auto& texture = _sdfTexture.Get();
-
-	SDFUploadJob job(_device, texture, _boundsBuffer.Get(), header.resolution,
-		imageStaging, boundsStaging);
-	CommandBuffer::ImmediateSubmit(_device, job);
-
-	delete imageStaging;
-	delete boundsStaging;
+	frameResources.AddInitJob(make_unique<SDFUploadJob>(
+		_sdfTexture.Get(), _boundsBuffer.Get(), header.resolution,
+		std::move(imageStaging), std::move(boundsStaging)));
 
 	_generated = true;
 	return true;

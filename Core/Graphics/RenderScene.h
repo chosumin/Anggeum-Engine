@@ -47,8 +47,7 @@ namespace Core
 		// with the other managers; Engine drives its per-frame update.
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
-		// The frame's world-model update
-		void SyncManagers(Scene& scene);
+		void SyncManagers(Scene& scene, FrameResources& frameResources);
 
 		AssetStreamer& GetAssetStreamer() { return *_assetStreamer; }
 
