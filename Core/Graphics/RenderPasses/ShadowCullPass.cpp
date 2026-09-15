@@ -21,13 +21,11 @@ ShadowCullPass::ShadowCullPass(Device& device, ResourceManager& resourceManager,
 	, _renderScene(renderScene)
 	, _shadowPass(shadowPass)
 {
-	
-
 	_cullShader = resourceManager.LoadShader("Shaders/frustumCulling.comp.spv");
 	_cullPipeline = resourceManager.LoadComputePipeline("Shaders/frustumCulling.comp.spv");
 
-	_resetShader = resourceManager.LoadShader("Shaders/resetDrawCommandsSimple.comp.spv");
-	_resetPipeline = resourceManager.LoadComputePipeline("Shaders/resetDrawCommandsSimple.comp.spv");
+	_compactShader = resourceManager.LoadShader("Shaders/compactDrawCommands.comp.spv");
+	_compactPipeline = resourceManager.LoadComputePipeline("Shaders/compactDrawCommands.comp.spv");
 }
 
 ShadowCullPass::~ShadowCullPass() = default;
@@ -52,32 +50,9 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	if (_cascadeCount == 0)
 		return;
 
-	// (Re)create the per-cascade draw lists when the draw set changed. All
-	// cascades are refreshed together, even inactive ones: the culling shader
-	// only rewrites instance counts, so a cascade that activates later must
-	// already hold the fill from the current draw set.
-	auto& slot = _slots[&frameResources];
+	const uint32_t drawCount = batch.GetDrawCommandCount();
 
-	const auto& drawCommands = batch.GetIndirectDrawBuffer().GetDrawCommands();
-
-	BufferDesc indirectDesc{};
-	indirectDesc.size = drawCommands.size() * sizeof(DrawIndexedIndirectCommand);
-	indirectDesc.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-		| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	indirectDesc.memoryType = MemoryType::DEVICE_LOCAL;
-
-	const uint64_t revision = batch.GetRevision();
-	const bool rebuild = !slot.buffersCreated || slot.batchRevision != revision;
-
-	array<Handle<Buffer>, SHADOW_MAP_CASCADE_COUNT> handles;
-	for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; ++i)
-	{
-		handles[i] = rebuild
-			? frameResources.CreateOrReplaceStorageBuffer(IndirectName(i), indirectDesc, drawCommands)
-			: frameResources.GetOrCreateStorageBuffer(IndirectName(i), indirectDesc);
-	}
-	slot.batchRevision = revision;
-	slot.buffersCreated = true;
+	const uint32_t instanceCount = batch.GetInstanceCount();
 
 	// Only the active cascades are declared, so the shadow pass sees exactly
 	// the lists that were culled this frame (HasBuffer fails for the rest).
@@ -85,10 +60,29 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	{
 		_views[i] = _shadowPass.GetCascadeView(i);
 
-		_indirect[i] = builder.ImportBuffer(IndirectName(i), handles[i]);
+		_instanceCounts[i] = builder.CreateBuffer(CountsName(i),
+			{ drawCount * sizeof(uint32_t),
+			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
+		builder.Write(_instanceCounts[i], BufferAccess::StorageComputeWrite);
+
+		// Each cascade scatters into its own ID buffer, so its draw never
+		// reads another cascade's IDs.
+		_instanceIDs[i] = builder.CreateBuffer(InstanceIdsName(i),
+			{ instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+		builder.Write(_instanceIDs[i], BufferAccess::StorageComputeWrite);
+
+		_indirect[i] = builder.CreateBuffer(IndirectName(i),
+			{ drawCount * sizeof(DrawIndexedIndirectCommand),
+			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 		builder.Write(_indirect[i], BufferAccess::StorageComputeWrite);
 
-		_cullData[i] = frameResources.GetOrCreateUniformBuffer<GPUFrustumCullData>(
+		_drawCounts[i] = builder.CreateBuffer(DrawCountName(i),
+			{ sizeof(uint32_t),
+			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+			  | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
+		builder.Write(_drawCounts[i], BufferAccess::StorageComputeWrite);
+
+		_cullData[i] = frameResources.GetOrCreateUniformBuffer<GPUCullData>(
 			"ShadowCull.Cascade" + std::to_string(i) + ".CullData");
 	}
 
@@ -106,40 +100,29 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
 	commandBuffer.BeginDebugMarker("Shadow Cascade Culling");
 
-	// Reset every active cascade's instance counts first...
-	commandBuffer.BindPipeline(&_resetPipeline.Get());
-	auto& resetShader = _resetShader.Get();
+	auto barriers = commandBuffer.CreateBarrierBatch();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
 	{
-		auto resetBuilder = context.CreateDescriptorSetBuilder(resetShader, 0);
-		resetBuilder.SetStorageBuffer(0, context.GetBuffer(_indirect[i]));
-		auto& resetResources = resetBuilder.Build();
+		commandBuffer.FillBuffer(context.GetBuffer(_instanceCounts[i]), 0, VK_WHOLE_SIZE, 0);
+		commandBuffer.FillBuffer(context.GetBuffer(_drawCounts[i]), 0, VK_WHOLE_SIZE, 0);
 
-		commandBuffer.PushConstants(resetShader, 0, drawCount);
-		commandBuffer.BindDescriptorSet(_resetPipeline.Get().GetPipelineBindPoint(),
-			resetShader, resetResources);
-		commandBuffer.Dispatch(std::max(1u, (drawCount + 63) / 64), 1, 1);
+		barriers.Buffer(context.GetBuffer(_instanceCounts[i]),
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		barriers.Buffer(context.GetBuffer(_drawCounts[i]),
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 	}
-
-	// ...then one same-pass barrier before the culling dispatches read them.
-	{
-		auto barriers = commandBuffer.CreateBarrierBatch();
-		for (uint32_t i = 0; i < _cascadeCount; ++i)
-		{
-			barriers.Buffer(context.GetBuffer(_indirect[i]),
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_WRITE_BIT,
-				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-		}
-		barriers.Submit();
-	}
+	barriers.Submit();
 
 	commandBuffer.BindPipeline(&_cullPipeline.Get());
 	auto& cullShader = _cullShader.Get();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
 	{
-		GPUFrustumCullData cullData{};
+		// Shared cull block; the Hi-Z fields stay zero (frustum only).
+		GPUCullData cullData{};
 		cullData.view = _views[i].View;
 		cullData.proj = _views[i].Projection;
 		cullData.drawCount = instanceCount;
@@ -152,15 +135,43 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 
 		auto cullBuilder = context.CreateDescriptorSetBuilder(cullShader, 0);
 		cullBuilder.SetUniformBuffer(0, cullDataBuffer);
-		cullBuilder.SetStorageBuffer(1, batch.GetObjectDataBuffer());
+		cullBuilder.SetStorageBuffer(1, batch.GetInstanceDataBuffer());
 		cullBuilder.SetStorageBuffer(2, batch.GetTransformBuffer());
-		cullBuilder.SetStorageBuffer(3, batch.GetInstanceBuffer());
-		cullBuilder.SetStorageBuffer(4, context.GetBuffer(_indirect[i]));
+		cullBuilder.SetStorageBuffer(3, context.GetBuffer(_instanceIDs[i]));
+		cullBuilder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
+		cullBuilder.SetStorageBuffer(6, context.GetBuffer(_instanceCounts[i]));
 		auto& cullResources = cullBuilder.Build();
 
 		commandBuffer.BindDescriptorSet(_cullPipeline.Get().GetPipelineBindPoint(),
 			cullShader, cullResources);
 		commandBuffer.Dispatch(std::max(1u, (instanceCount + 63) / 64), 1, 1);
+	}
+
+	// The culls wrote the counts the compaction below reads.
+	auto barrier = commandBuffer.CreateBarrierBatch();
+	for (uint32_t i = 0; i < _cascadeCount; ++i)
+	{
+		barrier.Buffer(context.GetBuffer(_instanceCounts[i]),
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+	}
+	barrier.Submit();
+
+	commandBuffer.BindPipeline(&_compactPipeline.Get());
+	auto& compactShader = _compactShader.Get();
+	for (uint32_t i = 0; i < _cascadeCount; ++i)
+	{
+		auto compactBuilder = context.CreateDescriptorSetBuilder(compactShader, 0);
+		compactBuilder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
+		compactBuilder.SetStorageBuffer(1, context.GetBuffer(_instanceCounts[i]));
+		compactBuilder.SetStorageBuffer(2, context.GetBuffer(_indirect[i]));
+		compactBuilder.SetStorageBuffer(3, context.GetBuffer(_drawCounts[i]));
+		auto& compactResources = compactBuilder.Build();
+
+		commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),
+			compactShader, compactResources);
+		commandBuffer.PushConstants(compactShader, 0, drawCount);
+		commandBuffer.Dispatch(std::max(1u, (drawCount + 63) / 64), 1, 1);
 	}
 
 	commandBuffer.EndDebugMarker();

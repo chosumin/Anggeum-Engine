@@ -16,10 +16,22 @@ namespace Core
 	class ShadowCullPass : public FrameGraphPass
 	{
 	public:
-		// Frame-graph name of cascade i's culled draw list.
+		// Frame-graph names of cascade i's compacted draw list.
 		static string IndirectName(uint32_t cascade)
 		{
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Indirect";
+		}
+		static string DrawCountName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".DrawCount";
+		}
+		static string CountsName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".Counts";
+		}
+		static string InstanceIdsName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".InstanceIDs";
 		}
 
 		ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass);
@@ -32,30 +44,22 @@ namespace Core
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
-		// Cross-frame state, per frame slot (each slot owns its own buffers).
-		struct SlotState
-		{
-			uint64_t batchRevision = 0;
-			bool buffersCreated = false;
-		};
-
 		Device& _device;
 		RenderScene& _renderScene;
 		ShadowPass& _shadowPass;
 
 		Handle<Shader> _cullShader;
 		Handle<Pipeline> _cullPipeline;
-		Handle<Shader> _resetShader;
-		Handle<Pipeline> _resetPipeline;
+		Handle<Shader> _compactShader;
+		Handle<Pipeline> _compactPipeline;
 
-		unordered_map<FrameResources*, SlotState> _slots;
-
-		// Per-frame scratch, set in Setup and consumed by the same frame's
-		// Execute. _active gates Execute entirely.
 		bool _active = false;
 		uint32_t _cascadeCount = 0;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _views{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceCounts{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceIDs{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _indirect{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _drawCounts{};
 		array<Handle<Buffer>, SHADOW_MAP_CASCADE_COUNT> _cullData{};
 	};
 }

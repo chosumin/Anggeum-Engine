@@ -65,9 +65,9 @@ namespace Core
         Shader* _geometryShader = nullptr;
         Pipeline* _geometryPipeline = nullptr;
 
-        // Both culled draw lists, produced by the HiZCull passes.
-        FGBuffer _pass1Indirect;
-        FGBuffer _pass2Indirect;
+        // Both compacted draw lists, produced by the HiZCull passes.
+        FGBuffer _pass1Indirect, _pass1Count, _pass1InstanceIDs;
+        FGBuffer _pass2Indirect, _pass2Count, _pass2InstanceIDs;
 
         Shader* _skyboxShader = nullptr;
         Material* _skyboxMaterial = nullptr;

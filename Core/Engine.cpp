@@ -3,6 +3,7 @@
 #include "Foundation/WorkerThread.h"
 #include "Graphics/Vulkans/SwapChain.h"
 #include "Graphics/RenderContext.h"
+#include "Graphics/RenderFrame.h"
 #include "Graphics/SyncContext.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/RenderScene.h"
@@ -108,7 +109,8 @@ void Core::Engine::Draw()
 
 		// Streams, syncs the GPU mirrors and hands this frame's upload jobs
 		// to the transfer context.
-		_renderScene->SyncManagers(*_scene);
+		_renderScene->SyncManagers(*_scene,
+			_renderContext->GetCurrentFrame().GetResources());
 
 		_transferContext->Flush();
 	}

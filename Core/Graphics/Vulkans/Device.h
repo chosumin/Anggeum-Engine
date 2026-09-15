@@ -48,9 +48,6 @@ namespace Core
 		VkPhysicalDevice GetPhysicalDevice() { return _physicalDevice; }
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-		CommandBuffer& BeginSingleTimeCommands() const;
-		void EndSingleTimeCommands(CommandBuffer& commandBuffer) const;
-
 		VkFormat FindSupportedFormat(
 			const vector<VkFormat>& candidates,
 			VkImageTiling tiling,
@@ -89,17 +86,10 @@ namespace Core
 		DebugUtils _debugUtils;
 		VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 		VkDevice _device;
-		
-		// HACK: only EndSingleTimeCommands submits here, bypassing the
-		// SyncContext timelines. Delete once the SDF bake paths migrate to
-		// transfer jobs; every other queue handle lives on SyncContext.
-		VkQueue _graphicsQueue;
-
 
 		VkSurfaceKHR _surface;
 
 		QueueFamilyIndices _queueFamilyIndices;
-		CommandPool* _graphicsCommandPool;
 
 		MemoryAllocatorManager* _memoryAllocatorManager;
 

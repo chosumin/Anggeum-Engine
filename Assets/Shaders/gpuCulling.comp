@@ -1,109 +1,21 @@
 #version 450
 
+#define GPU_DRIVEN_CULL
+#include "gpuDriven.glsl"
+
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-struct DrawIndexedIndirectCommand
-{
-    uint indexCount;
-    uint instanceCount;
-    uint firstIndex;
-    int vertexOffset;
-    uint firstInstance;
-};
-
-struct ObjectData
-{
-    vec4 boundingSphere;  // xyz: center, w: radius
-    uint transformIndex;
-    uint drawCommandIndex;
-    uint padding[2];
-};
-
-layout(set = 0, binding = 0) uniform CullData
-{
-    mat4 view;
-    mat4 proj;
-    vec4 frustumPlanes[6];
-    vec2 screenSize;
-    uint drawCount;
-    uint hiZMipLevels;
-    uint enableOcclusionCulling;
-    uint padding[2];
-} cullData;
-
-layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer { ObjectData objects[]; };
+layout(set = 0, binding = 1) readonly buffer InstanceDataBuffer { InstanceData instances[]; };
 layout(set = 0, binding = 2) readonly buffer TransformBuffer { mat4 transforms[]; };
-layout(set = 0, binding = 3) writeonly buffer InstanceBuffer { uint IDs[]; };
-layout(set = 0, binding = 4) buffer DrawCommands 
-{ 
-    DrawIndexedIndirectCommand commands[];
-};
+layout(set = 0, binding = 3) writeonly buffer InstanceIDBuffer { uint instanceIDs[]; };
+// The shared command template: read-only, per-command counts go to binding 6.
+layout(set = 0, binding = 4) readonly buffer DrawCommands { DrawIndexedIndirectCommand commands[]; };
 layout(set = 0, binding = 5) uniform sampler2D hiZBuffer;
+layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
 
-// Buffers to use the pass 2
+// Pass 2 re-tests these against this frame's depth.
 layout(set = 0, binding = 10) buffer RejectedIndicesBuffer { uint rejectedIndices[]; };
 layout(set = 0, binding = 11) buffer RejectedCountBuffer { uint rejectedCount; };
-
-bool IsVisibleFrustum(vec3 center, float radius)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        float distance = dot(cullData.frustumPlanes[i].xyz, center) + cullData.frustumPlanes[i].w;
-        if (distance < -radius)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool IsOccluded(vec3 worldCenter, float worldRadius)
-{
-    // Transform to view space, then clip space
-    vec4 viewCenter = cullData.view * vec4(worldCenter, 1.0);
-    vec4 clipCenter = cullData.proj * viewCenter;
-
-    // Behind camera - let frustum culling handle it
-    if (clipCenter.w <= 0.0)
-        return false;
-    
-    // NDC coordinates
-    vec3 ndc = clipCenter.xyz / clipCenter.w;
-    
-    // Screen UV [0, 1]
-    vec2 screenUV = ndc.xy * 0.5 + 0.5;
-    
-    // Outside screen - let frustum culling handle it
-    if (any(lessThan(screenUV, vec2(0.0))) || any(greaterThan(screenUV, vec2(1.0))))
-        return false;
-    
-    // Calculate screen space radius
-    // Use abs() on proj[1][1] because Vulkan flips the Y axis (proj[1][1] is negative),
-    // which would otherwise make the radius negative and force mip level 0.
-    float projRadius = worldRadius * abs(cullData.proj[1][1]) / clipCenter.w;
-    float screenPixelRadius = projRadius * cullData.screenSize.y * 0.5;
-    
-    // Select appropriate mip level based on screen size
-    int mipLevel = int(ceil(log2(max(screenPixelRadius * 2.0, 1.0))));
-    mipLevel = clamp(mipLevel, 0, int(cullData.hiZMipLevels) - 1);
-    
-    // Sample Hi-Z buffer
-    float occluderDepth = textureLod(hiZBuffer, screenUV, float(mipLevel)).r;
-    
-    // Nearest point of the sphere toward the camera (view space, camera looks down -Z)
-    float viewNearZ = viewCenter.z + worldRadius;
-
-    // Nearest point crosses the near plane - let frustum culling handle it
-    if (viewNearZ >= 0.0)
-        return false;
-
-    // Project the nearest point to get its NDC depth (already [0, 1] on Vulkan)
-    vec4 clipNear = cullData.proj * vec4(0.0, 0.0, viewNearZ, 1.0);
-    float objectNearDepth = clipNear.z / clipNear.w;
-
-    // Object is occluded if its nearest point is behind the occluder
-    return objectNearDepth > occluderDepth;
-}
 
 void main()
 {
@@ -111,38 +23,23 @@ void main()
     if (index >= cullData.drawCount)
         return;
 
-    ObjectData obj = objects[index];
-    uint cmdIndex = obj.drawCommandIndex;
+    InstanceData inst = instances[index];
+    if (inst.drawCommandIndex == DEAD_DRAW)
+        return;
 
-    // Get world transform matrix
-    mat4 worldMatrix = transforms[obj.transformIndex];
+    vec3 worldCenter;
+    float worldRadius;
+    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
 
-    // Transform bounding sphere center to world space
-    vec3 worldCenter = (worldMatrix * vec4(obj.boundingSphere.xyz, 1.0)).xyz;
+    bool visible = IsVisibleFrustum(cullData.frustumPlanes, worldCenter, worldRadius);
+    if (visible && cullData.enableOcclusionCulling == 1)
+        visible = !IsOccluded(hiZBuffer, worldCenter, worldRadius);
 
-    // Scale radius by maximum scale factor
-    vec3 scale = vec3(
-        length(worldMatrix[0].xyz),
-        length(worldMatrix[1].xyz),
-        length(worldMatrix[2].xyz)
-    );
-    float maxScale = max(max(scale.x, scale.y), scale.z);
-    float worldRadius = obj.boundingSphere.w * maxScale;
-
-    bool visible = true;
-
-    // Frustum culling
-    visible = IsVisibleFrustum(worldCenter, worldRadius);
-
-    // Occlusion culling (only if passed frustum test)
-    if (cullData.enableOcclusionCulling == 1 && visible)
-        visible = !IsOccluded(worldCenter, worldRadius);
-
+    uint cmdIndex = inst.drawCommandIndex;
     if (visible)
     {
-        // Add it to Pass1 draw command
-        uint localIdx = atomicAdd(commands[cmdIndex].instanceCount, 1);
-        IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
+        uint localIdx = atomicAdd(counts[cmdIndex], 1);
+        instanceIDs[commands[cmdIndex].firstInstance + localIdx] = index;
     }
     else
     {

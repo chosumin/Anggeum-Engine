@@ -1,47 +1,16 @@
 #version 450
 
+#define GPU_DRIVEN_CULL
+#include "gpuDriven.glsl"
+
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-struct DrawIndexedIndirectCommand
-{
-    uint indexCount;
-    uint instanceCount;
-    uint firstIndex;
-    int vertexOffset;
-    uint firstInstance;
-};
-
-struct ObjectData
-{
-    vec4 boundingSphere;  // xyz: center, w: radius
-    uint transformIndex;
-    uint drawCommandIndex;
-    uint padding[2];
-};
-
-layout(set = 0, binding = 0) uniform CullData
-{
-    mat4 view;
-    mat4 proj;
-    vec4 frustumPlanes[6];
-    uint drawCount;
-} cullData;
-
-layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer { ObjectData objects[]; };
+layout(set = 0, binding = 1) readonly buffer InstanceDataBuffer { InstanceData instances[]; };
 layout(set = 0, binding = 2) readonly buffer TransformBuffer { mat4 transforms[]; };
-layout(set = 0, binding = 3) writeonly buffer InstanceBuffer { uint IDs[]; };
-layout(set = 0, binding = 4) buffer DrawCommands { DrawIndexedIndirectCommand commands[]; };
-
-bool IsVisibleFrustum(vec3 center, float radius)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        float distance = dot(cullData.frustumPlanes[i].xyz, center) + cullData.frustumPlanes[i].w;
-        if (distance < -radius)
-            return false;
-    }
-    return true;
-}
+layout(set = 0, binding = 3) writeonly buffer InstanceIDBuffer { uint instanceIDs[]; };
+// The shared command template: read-only, per-command counts go to binding 6.
+layout(set = 0, binding = 4) readonly buffer DrawCommands { DrawIndexedIndirectCommand commands[]; };
+layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
 
 void main()
 {
@@ -49,23 +18,18 @@ void main()
     if (index >= cullData.drawCount)
         return;
 
-    ObjectData obj = objects[index];
-    uint cmdIndex = obj.drawCommandIndex;
+    InstanceData inst = instances[index];
+    if (inst.drawCommandIndex == DEAD_DRAW)
+        return;
 
-    mat4 worldMatrix = transforms[obj.transformIndex];
-    vec3 worldCenter = (worldMatrix * vec4(obj.boundingSphere.xyz, 1.0)).xyz;
+    vec3 worldCenter;
+    float worldRadius;
+    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
 
-    vec3 scale = vec3(
-        length(worldMatrix[0].xyz),
-        length(worldMatrix[1].xyz),
-        length(worldMatrix[2].xyz)
-    );
-    float maxScale = max(max(scale.x, scale.y), scale.z);
-    float worldRadius = obj.boundingSphere.w * maxScale;
+    if (!IsVisibleFrustum(cullData.frustumPlanes, worldCenter, worldRadius))
+        return;
 
-    if (IsVisibleFrustum(worldCenter, worldRadius))
-    {
-        uint localIdx = atomicAdd(commands[cmdIndex].instanceCount, 1);
-        IDs[commands[cmdIndex].firstInstance + localIdx] = obj.transformIndex;
-    }
+    uint cmdIndex = inst.drawCommandIndex;
+    uint localIdx = atomicAdd(counts[cmdIndex], 1);
+    instanceIDs[commands[cmdIndex].firstInstance + localIdx] = index;
 }

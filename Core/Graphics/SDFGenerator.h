@@ -26,24 +26,21 @@ namespace Core
 		uint32_t useUint16Indices;
 	};
 
+	// Scene SDF volume + bounds.
 	class SDFGenerator
 	{
 	public:
 		SDFGenerator(Device& device, ResourceManager& resourceManager);
 		~SDFGenerator();
 
-		// Records the full generation (bounds reduce, triangle lookup, volume
-		// dispatch) into the given command buffer. Creates/resizes pool-owned
-		// resources, so it must run on the main thread (e.g. a single-time
-		// command buffer submitted outside the frame graph's recording window).
 		void Generate(FrameResources& frameResources, RenderFrame& renderFrame,
-			CommandBuffer& commandBuffer,
 			uint32_t resolution = SDF_VOLUME_DIM);
 
-		// Persistent storage. File format includes the bounds buffer so the
-		// loaded volume's coordinate system matches generation time.
-		bool TryLoadFromFile(uint32_t expectedResolution = SDF_VOLUME_DIM);
-		bool SaveToFile(uint32_t resolution = SDF_VOLUME_DIM);
+		bool TryLoadFromFile(FrameResources& frameResources,
+			uint32_t expectedResolution = SDF_VOLUME_DIM);
+
+		void RequestSave(FrameResources& frameResources, uint32_t resolution = SDF_VOLUME_DIM);
+		void FinishSave(FrameResources& frameResources);
 
 		void SetCachePath(const std::string& path) { _sdfCachePath = path; }
 		const std::string& GetCachePath() const { return _sdfCachePath; }
@@ -53,12 +50,17 @@ namespace Core
 		bool IsGenerated() const { return _generated; }
 
 	private:
+		class GenerateJob;
+
 		void CreateSDFTexture(uint32_t resolution);
+		void EnsureTriangleLookup(uint32_t totalTriangles);
+		void RecordGenerate(FrameResources& frameResources, RenderFrame& renderFrame,
+			CommandBuffer& commandBuffer, uint32_t resolution);
 		void ComputeWorldBounds(FrameResources& frameResources, CommandBuffer& commandBuffer,
-			Buffer& objectDataBuffer, Buffer& transformBuffer,
+			Buffer& instanceDataBuffer, Buffer& transformBuffer,
 			uint32_t instanceCount);
 		void BuildTriangleLookup(FrameResources& frameResources, CommandBuffer& commandBuffer,
-			Buffer& objectDataBuffer, Buffer& drawCommandBuffer,
+			Buffer& instanceDataBuffer, Buffer& drawCommandBuffer,
 			uint32_t drawCommandCount, uint32_t totalTriangles);
 
 	private:
@@ -81,6 +83,12 @@ namespace Core
 		Handle<Shader> _triLookupShader;
 		Handle<Pipeline> _triLookupPipeline;
 		Handle<Buffer> _triLookupBuffer;
+
+		// Pending save: the readback queued on _saveFrame fills these.
+		FrameResources* _saveFrame = nullptr;
+		unique_ptr<Buffer> _saveImageStaging;
+		unique_ptr<Buffer> _saveBoundsStaging;
+		uint32_t _saveResolution = 0;
 
 		std::string _sdfCachePath = "Assets/Cache/sdf_volume.sdfvol";
 		float _paddingFactor = 0.1f;

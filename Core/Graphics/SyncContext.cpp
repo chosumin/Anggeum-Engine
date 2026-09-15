@@ -4,6 +4,7 @@
 #include "Vulkans/CommandBuffer.h"
 #include "Vulkans/Device.h"
 #include "Vulkans/SubmitInfo.h"
+#include "Foundation/Job.h"
 
 using namespace Core;
 
@@ -33,6 +34,8 @@ SyncContext::SyncContext(Device& device)
     {
         throw runtime_error("Failed to create timeline semaphores!");
     }
+
+    _immediatePool = make_unique<CommandPool>(_device, QueueType::Graphics);
 }
 
 SyncContext::~SyncContext()
@@ -105,7 +108,7 @@ void SyncContext::RecordFrameSnapshot(FrameTimelineSnapshot& snapshot)
     snapshot.valid = true;
 }
 
-void SyncContext::SubmitResourceInit(CommandBuffer& commandBuffer)
+u64 SyncContext::SignalResourceTimeline(CommandBuffer& commandBuffer)
 {
     u64 signalValue = ++_resourceSemaphoreValue;
 
@@ -125,9 +128,37 @@ void SyncContext::SubmitResourceInit(CommandBuffer& commandBuffer)
     if (vkQueueSubmit(_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
         throw runtime_error("failed to submit resource init commands!");
 
-    _pendingResourceWait = signalValue;
+    return signalValue;
+}
+
+void SyncContext::SubmitResourceInit(CommandBuffer& commandBuffer)
+{
+    _pendingResourceWait = SignalResourceTimeline(commandBuffer);
 
     _pendingInitBuffers.push_back(&commandBuffer);
+}
+
+void SyncContext::SubmitImmediate(Job& job)
+{
+    auto& commandBuffer = _immediatePool->RequestCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    commandBuffer.BeginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    job.commandBuffer = &commandBuffer;
+    job.Execute();
+
+    commandBuffer.EndCommandBuffer();
+
+    const u64 signalValue = SignalResourceTimeline(commandBuffer);
+
+    VkSemaphoreWaitInfo waitInfo{};
+    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    waitInfo.semaphoreCount = 1;
+    waitInfo.pSemaphores = &_resourceSemaphore;
+    waitInfo.pValues = &signalValue;
+    vkWaitSemaphores(_device.GetDevice(), &waitInfo, UINT64_MAX);
+
+    // The wait retired the work: releasable immediately.
+    commandBuffer.MarkSubmitted(0);
 }
 
 VkResult SyncContext::Present(const VkPresentInfoKHR& presentInfo)

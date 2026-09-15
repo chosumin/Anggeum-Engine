@@ -55,9 +55,11 @@ namespace Core
 		FGTexture _shadowDepth;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeBuffers{};
 
-		// Per-cascade culled draw lists, produced by ShadowCullPass. Invalid
+		// Per-cascade compacted draw lists, produced by ShadowCullPass. Invalid
 		// entries mean the cascade was inactive this frame (clear-only).
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeIndirect{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeDrawCount{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _cascadeInstanceIDs{};
 
 		/** Cascade split lambda (0 = uniform, 1 = logarithmic) */
 		float _cascadeSplitLambda = 0.95f;

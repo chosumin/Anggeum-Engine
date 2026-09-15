@@ -6,13 +6,7 @@
 
 namespace Core
 {
-	// Generic typed buffer fill, for uploads OUTSIDE the transfer pipeline:
-	// frame-resource init (recorded into the frame's resource-init submission
-	// during pass Setup - after the frame's transfer Flush) and legacy
-	// immediate submits. Hence plain Job, not UploadJob, and dedicated
-	// one-shot staging instead of a StagingRing span: the ring reclaims by
-	// TRANSFER-timeline values, which these submissions never produce - an
-	// unclosed span would block all reclamation behind it.
+	// Generic typed buffer fill.
 	template<typename T>
 	class BufferUploadJob : public Job
 	{

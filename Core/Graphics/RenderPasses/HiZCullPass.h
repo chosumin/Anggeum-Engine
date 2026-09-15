@@ -16,17 +16,26 @@ namespace Core
     class RendererBatch;
 
     // Two-pass GPU occlusion culling:
-    // 
-    // Cull1: reset counts + cull against the previous frame's Hi-Z.
-    // Cull2: cull the objects pass 1 rejected against this frame's Hi-Z,
-    //  built from the depth DepthPre1 drew (ResolvePass output).
+    //
+    // Cull1: cull against the previous frame's Hi-Z, then compact the
+    //  surviving commands for DrawIndexedIndirectCount.
+    // Cull2: cull the objects pass 1 rejected against this frame's Hi-Z
+    //  and compact its own list.
     class HiZCullPass : public FrameGraphPass
     {
     public:
         enum class Phase { Cull1, Cull2 };
 
+        static constexpr const char* SB_PASS1_COUNTS = "OcclusionCull.Pass1Counts";
+        static constexpr const char* SB_PASS1_INSTANCE_IDS = "OcclusionCull.Pass1InstanceIDs";
         static constexpr const char* SB_PASS1_INDIRECT = "OcclusionCull.Pass1Indirect";
+        static constexpr const char* SB_PASS1_DRAW_COUNT = "OcclusionCull.Pass1DrawCount";
+
+        static constexpr const char* SB_PASS2_COUNTS = "OcclusionCull.Pass2Counts";
+        static constexpr const char* SB_PASS2_INSTANCE_IDS = "OcclusionCull.Pass2InstanceIDs";
         static constexpr const char* SB_PASS2_INDIRECT = "OcclusionCull.Pass2Indirect";
+        static constexpr const char* SB_PASS2_DRAW_COUNT = "OcclusionCull.Pass2DrawCount";
+        
         static constexpr const char* SB_REJECTED_INDICES = "OcclusionCull.RejectedIndices";
         static constexpr const char* SB_REJECTED_COUNT = "OcclusionCull.RejectedCount";
 
@@ -48,13 +57,9 @@ namespace Core
         void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
     private:
-        // Cross-frame CPU state, per frame slot (each slot owns its own Hi-Z
-        // image and batch-sized buffers).
+        // Cross-frame CPU state, per frame slot (each slot owns its own Hi-Z image).
         struct SlotState
         {
-            uint64_t batchRevision = 0;
-            bool buffersCreated = false;
-
             Handle<Texture> hiZImage;
             bool hiZBuilt = false;
         };
@@ -68,17 +73,12 @@ namespace Core
             unordered_map<FrameResources*, SlotState> slots;
         };
 
-        // (Re)creates the batch-sized buffers for this slot when the draw set
-        // changed; hands back the handles for this frame's imports.
-        void EnsureBatchBuffers(FrameResources& frameResources, RendererBatch& batch,
-            SlotState& slot, Handle<Buffer>& outPass1, Handle<Buffer>& outPass2,
-            Handle<Buffer>& outRejectedIndices, Handle<Buffer>& outRejectedCount);
         void EnsureHiZTexture(FrameResources& frameResources);
 
-        void ResetDrawCommands(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            RendererBatch& batch);
         void DispatchCulling(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
             RendererBatch& batch, SlotState& slot, Texture* depth);
+        void CompactDrawCommands(FrameGraphPassContext& context,
+            CommandBuffer& commandBuffer, RendererBatch& batch);
         void BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
             Texture& depth);
 
@@ -95,9 +95,9 @@ namespace Core
         Handle<Shader> _cullShader;
         Handle<Pipeline> _cullPipeline;
 
-        // Cull1 only.
-        Handle<Shader> _resetShader;
-        Handle<Pipeline> _resetPipeline;
+        // Appends surviving commands for DrawIndexedIndirectCount.
+        Handle<Shader> _compactShader;
+        Handle<Pipeline> _compactPipeline;
 
         // Hi-Z mip chain build (both phases).
         Handle<Shader> _hiZShader;
@@ -110,8 +110,10 @@ namespace Core
         Handle<Texture> _hiZTexture;
         Handle<Texture> _prevDepth;   // Cull1: previous frame's resolved depth
         FGTexture _resolvedDepth;     // Cull2: this frame's depth, from ResolvePass
-        FGBuffer _indirect;           // the indirect buffer this phase's dispatch fills
-        FGBuffer _pass2Indirect;      // Cull1: reset also clears the pass-2 buffer
+        FGBuffer _counts;             // this phase's per-command instance counts
+        FGBuffer _instanceIDs;        // this phase's ID scatter target
+        FGBuffer _visibleCommands;    // this phase's compacted draw list
+        FGBuffer _visibleDrawCount;
         FGBuffer _rejectedIndices;
         FGBuffer _rejectedCount;
     };

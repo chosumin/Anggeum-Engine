@@ -47,8 +47,7 @@ namespace Core
 		// with the other managers; Engine drives its per-frame update.
 		TerrainSystem& GetTerrainSystem() const { return *_terrainSystem; }
 
-		// The frame's world-model update
-		void SyncManagers(Scene& scene);
+		void SyncManagers(Scene& scene, FrameResources& frameResources);
 
 		AssetStreamer& GetAssetStreamer() { return *_assetStreamer; }
 
@@ -60,12 +59,9 @@ namespace Core
 		MaterialManager* GetMaterialManager() const { return _material.get(); }
 		RendererBatch* GetRendererBatch() const { return _batch.get(); }
 
-		// Records one indirect draw of the scene batch: binds the global mesh
-		// buffers, the batch's transform/instance/material tables and (when the
-		// shader wants it) the bindless set. Lives here because every one of
-		// those inputs is owned by this class.
 		void DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 			Pipeline& pipeline, Buffer& indirectCommandBuffer,
+			Buffer& drawCountBuffer, Buffer& instanceIDBuffer,
 			DescriptorSetBuilder& builder);
 
 	private:

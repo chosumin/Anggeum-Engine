@@ -2,6 +2,7 @@
 #include "ShadowPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
+#include "Graphics/RendererBatch.h"
 #include "ShadowCullPass.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
@@ -265,6 +266,12 @@ void ShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResource
 		{
 			_cascadeIndirect[i] = builder.GetBuffer(indirectName);
 			builder.Read(_cascadeIndirect[i], BufferAccess::IndirectRead);
+
+			_cascadeDrawCount[i] = builder.GetBuffer(ShadowCullPass::DrawCountName(i));
+			builder.Read(_cascadeDrawCount[i], BufferAccess::IndirectRead);
+
+			_cascadeInstanceIDs[i] = builder.GetBuffer(ShadowCullPass::InstanceIdsName(i));
+			builder.Read(_cascadeInstanceIDs[i], BufferAccess::StorageVertexRead);
 		}
 	}
 }
@@ -312,7 +319,9 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 
 		commandBuffer.BeginRendering(setup);
 		_renderScene.DrawIndirect(commandBuffer, shader, *_pipeline,
-			context.GetBuffer(_cascadeIndirect[cascadeIndex]), builder);
+			context.GetBuffer(_cascadeIndirect[cascadeIndex]),
+			context.GetBuffer(_cascadeDrawCount[cascadeIndex]),
+			context.GetBuffer(_cascadeInstanceIDs[cascadeIndex]), builder);
 		commandBuffer.EndRendering();
 
 		commandBuffer.EndDebugMarker();

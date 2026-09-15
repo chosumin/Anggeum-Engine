@@ -36,7 +36,6 @@ namespace Core
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
 	private:
-		Device& _device;
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
 

@@ -107,11 +107,6 @@ void GeometryPass::PrepareSkybox()
 void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
-    // Rebuilt draw-set tables ride this frame's resource-init submission,
-    // so they land this frame and same-queue order protects the
-    // previous in-flight frame's reads of the old tables.
-    renderFrame.GetRendererBatch().QueuePendingInit(frameResources);
-
     _pass1Indirect = FGBuffer{};
     _pass2Indirect = FGBuffer{};
 
@@ -213,9 +208,17 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
     {
         _pass1Indirect = builder.GetBuffer(HiZCullPass::SB_PASS1_INDIRECT);
         builder.Read(_pass1Indirect, BufferAccess::IndirectRead);
+        _pass1Count = builder.GetBuffer(HiZCullPass::SB_PASS1_DRAW_COUNT);
+        builder.Read(_pass1Count, BufferAccess::IndirectRead);
+        _pass1InstanceIDs = builder.GetBuffer(HiZCullPass::SB_PASS1_INSTANCE_IDS);
+        builder.Read(_pass1InstanceIDs, BufferAccess::StorageVertexRead);
 
         _pass2Indirect = builder.GetBuffer(HiZCullPass::SB_PASS2_INDIRECT);
         builder.Read(_pass2Indirect, BufferAccess::IndirectRead);
+        _pass2Count = builder.GetBuffer(HiZCullPass::SB_PASS2_DRAW_COUNT);
+        builder.Read(_pass2Count, BufferAccess::IndirectRead);
+        _pass2InstanceIDs = builder.GetBuffer(HiZCullPass::SB_PASS2_INSTANCE_IDS);
+        builder.Read(_pass2InstanceIDs, BufferAccess::StorageVertexRead);
     }
 }
 
@@ -249,11 +252,13 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 
     commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
 
-    // Replay both culled draw lists, then the skybox, all in one scope.
+    // Replay both compacted draw lists, then the skybox, all in one scope.
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass1Indirect), builder);
+        context.GetBuffer(_pass1Indirect), context.GetBuffer(_pass1Count),
+        context.GetBuffer(_pass1InstanceIDs), builder);
     _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass2Indirect), builder);
+        context.GetBuffer(_pass2Indirect), context.GetBuffer(_pass2Count),
+        context.GetBuffer(_pass2InstanceIDs), builder);
 
     RecordSkybox(context, commandBuffer);
 

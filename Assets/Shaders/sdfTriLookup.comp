@@ -2,21 +2,7 @@
 
 layout(local_size_x = 64) in;
 
-struct DrawCommand
-{
-    uint indexCount;
-    uint instanceCount;
-    uint firstIndex;
-    int  vertexOffset;
-    uint firstInstance;
-};
-
-struct GPUObjectData
-{
-    vec4 boundingSphere;
-    uint transformIndex;
-    uint drawCommandIndex;
-};
+#include "gpuDriven.glsl"
 
 struct TriLookup
 {
@@ -24,8 +10,8 @@ struct TriLookup
     uint transformIndex;
 };
 
-layout(set = 0, binding = 0) readonly buffer DrawCommandBuffer { DrawCommand drawCommands[]; };
-layout(set = 0, binding = 1) readonly buffer ObjectDataBuffer { GPUObjectData objectData[]; };
+layout(set = 0, binding = 0) readonly buffer DrawCommandBuffer { DrawIndexedIndirectCommand drawCommands[]; };
+layout(set = 0, binding = 1) readonly buffer InstanceDataBuffer { InstanceData instances[]; };
 layout(set = 0, binding = 2) writeonly buffer TriLookupBuffer { TriLookup triLookups[]; };
 
 layout(push_constant) uniform PushConstants
@@ -53,9 +39,11 @@ void main()
             globalIndexOffset < cmdFirstIndex + cmdIndexCount)
         {
             uint firstInstance = drawCommands[d].firstInstance;
+            if (instances[firstInstance].drawCommandIndex == DEAD_DRAW)
+                continue; // freed slot: its command is stale
 
             triLookups[triIdx].vertexOffset = drawCommands[d].vertexOffset;
-            triLookups[triIdx].transformIndex = objectData[firstInstance].transformIndex;
+            triLookups[triIdx].transformIndex = instances[firstInstance].transformIndex;
             return;
         }
     }

@@ -23,8 +23,7 @@ static constexpr uint32_t DEBUG_SLICE_HEIGHT = 256;
 
 SDFShadowPass::SDFShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D screenExtent,
 	VkSampleCountFlagBits msaaSamples, ShadowUniform* shadowBuffer)
-	: _device(device)
-	, _renderScene(renderScene)
+	: _renderScene(renderScene)
 	, _screenExtent(screenExtent)
 	, _msaaSamples(msaaSamples)
 	, _shadowBuffer(shadowBuffer)
@@ -80,12 +79,13 @@ void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 {
 	_sliceReady = false;
 
-	// Deferred save: the SDF generated on a previous frame is now complete, so
-	// it's safe to read back the image/bounds and write to disk.
+	_sdfGenerator->FinishSave(frameResources);
+
+	// Deferred save: the bake queued last frame has landed by now.
 	if (_savePending)
 	{
 		_savePending = false;
-		_sdfGenerator->SaveToFile(SDF_VOLUME_DIM);
+		_sdfGenerator->RequestSave(frameResources, SDF_VOLUME_DIM);
 	}
 
 	if (_regenerateRequested || !_sdfGenerator->IsGenerated())
@@ -93,21 +93,14 @@ void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 		bool tryLoad = !_regenerateRequested;
 		_regenerateRequested = false;
 
-		if (!tryLoad || !_sdfGenerator->TryLoadFromFile(SDF_VOLUME_DIM))
+		if (!tryLoad || !_sdfGenerator->TryLoadFromFile(frameResources, SDF_VOLUME_DIM))
 		{
-			// Rare event: generation creates/resizes pool-owned resources, so it
-			// runs here on the main thread with its own synchronous submit
-			// instead of inside the graph's recording window.
+			// The bake reads the draw-set tables; their fills precede it in
+			// this frame's resource init.
 			auto& batch = renderFrame.GetRendererBatch();
 			if (batch.GetDrawCommandCount() > 0)
 			{
-				auto& commandBuffer = _device.BeginSingleTimeCommands();
-				commandBuffer.BeginDebugMarker("SDF Volume Generation (GPU)");
-				_sdfGenerator->Generate(frameResources, renderFrame,
-					commandBuffer, SDF_VOLUME_DIM);
-				commandBuffer.EndDebugMarker();
-				_device.EndSingleTimeCommands(commandBuffer);
-
+				_sdfGenerator->Generate(frameResources, renderFrame, SDF_VOLUME_DIM);
 				_savePending = true;
 			}
 			// else: the batch isn't built yet (startup); retried next frame

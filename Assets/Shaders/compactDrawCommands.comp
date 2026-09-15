@@ -1,0 +1,42 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+#include "gpuDriven.glsl"
+
+// Appends the commands that survived culling (count > 0), densely and in
+// order, for DrawIndexedIndirectCount - empty commands never reach the draw.
+layout(push_constant) uniform Push
+{
+    uint drawCount;
+} push;
+
+layout(set = 0, binding = 0) readonly buffer TemplateCommands
+{
+    DrawIndexedIndirectCommand templateCommands[];
+};
+layout(set = 0, binding = 1) readonly buffer InstanceCounts { uint counts[]; };
+
+layout(set = 0, binding = 2) writeonly buffer OutCommands
+{
+    DrawIndexedIndirectCommand outCommands[];
+};
+layout(set = 0, binding = 3) buffer OutDrawCount { uint outDrawCount; };
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= push.drawCount)
+        return;
+
+    uint instanceCount = counts[index];
+    if (instanceCount == 0)
+        return;
+
+    uint slot = atomicAdd(outDrawCount, 1);
+
+    DrawIndexedIndirectCommand cmd = templateCommands[index];
+    cmd.instanceCount = instanceCount;
+
+    outCommands[slot] = cmd;
+}

@@ -2,16 +2,11 @@
 
 layout(local_size_x = 64) in;
 
-struct GPUObjectData
-{
-    vec4 boundingSphere;   // xyz: center (local), w: radius
-    uint transformIndex;
-    uint drawCommandIndex;
-};
+#include "gpuDriven.glsl"
 
-layout(set = 0, binding = 0) readonly buffer ObjectDataBuffer
+layout(set = 0, binding = 0) readonly buffer InstanceDataBuffer
 {
-    GPUObjectData objects[];
+    InstanceData instances[];
 };
 
 layout(set = 0, binding = 1) readonly buffer TransformBuffer
@@ -27,7 +22,7 @@ layout(set = 0, binding = 2) buffer SDFBoundsBuffer
 
 layout(push_constant) uniform PushConstants
 {
-    uint objectCount;
+    uint instanceCount;
 } pc;
 
 uint floatToSortableUint(float f)
@@ -41,17 +36,15 @@ void main()
 {
     uint gid = gl_GlobalInvocationID.x;
 
-    if (gid >= pc.objectCount)
+    if (gid >= pc.instanceCount)
         return;
 
-    GPUObjectData obj = objects[gid];
-    mat4 worldMatrix = transforms[obj.transformIndex];
-
-    vec3 worldCenter = (worldMatrix * vec4(obj.boundingSphere.xyz, 1.0)).xyz;
-    float maxScale = max(
-        length(worldMatrix[0].xyz),
-        max(length(worldMatrix[1].xyz), length(worldMatrix[2].xyz)));
-    float worldRadius = obj.boundingSphere.w * maxScale;
+    InstanceData inst = instances[gid];
+    if (inst.drawCommandIndex == DEAD_DRAW)
+        return; // freed slot
+    vec3 worldCenter;
+    float worldRadius;
+    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
 
     vec3 wMin = worldCenter - vec3(worldRadius);
     vec3 wMax = worldCenter + vec3(worldRadius);

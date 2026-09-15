@@ -246,11 +246,19 @@ VkAccessFlags2 Core::BarrierBatch::SanitizeAccessMask(VkAccessFlags2 accessMask)
 
 	// A transfer-only queue has no stage that supports shader or attachment
 	// access, so those bits are illegal even under ALL_COMMANDS (its expansion
-	// is queue-scoped). Dropping them is correct: cross-queue visibility is
-	// established by the consumer's semaphore wait, not this barrier.
+	// is queue-scoped). Cross-queue visibility is the consumer's semaphore
+	// wait, not this barrier.
 	const VkAccessFlags2 transferLegal =
 		VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT |
 		VK_ACCESS_2_HOST_READ_BIT | VK_ACCESS_2_HOST_WRITE_BIT |
 		VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-	return accessMask & transferLegal;
+	VkAccessFlags2 masked = accessMask & transferLegal;
+
+	// Masked to nothing (e.g. GENERAL's shader accesses): substitute the
+	// queue-wide catch-all - within-recording chains (layout transition ->
+	// copy) still need a memory dependency, not an empty scope.
+	if (masked == 0 && accessMask != 0)
+		masked = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+	return masked;
 }

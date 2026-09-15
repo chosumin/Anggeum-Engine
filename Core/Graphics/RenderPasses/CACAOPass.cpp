@@ -26,13 +26,13 @@ CACAOPass::CACAOPass(Device& device, Scene& scene, VkExtent2D screenExtent,
 CACAOPass::~CACAOPass()
 {
     // Destroy every per-frame CACAO context
-    for (auto& [index, ctx] : m_cacaoContexts)
+    for (auto& [index, slot] : m_cacaoContexts)
     {
-        if (ctx)
+        if (slot.context)
         {
-            FFX_CACAO_VkDestroyScreenSizeDependentResources(ctx);
-            FFX_CACAO_VkDestroyContext(ctx);
-            free(ctx);
+            FFX_CACAO_VkDestroyScreenSizeDependentResources(slot.context);
+            FFX_CACAO_VkDestroyContext(slot.context);
+            free(slot.context);
         }
     }
     m_cacaoContexts.clear();
@@ -50,7 +50,20 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 {
     auto it = m_cacaoContexts.find(frameKey);
     if (it != m_cacaoContexts.end())
-        return it->second;
+    {
+        CacaoContextSlot& slot = it->second;
+        if (slot.depthView == depthView && slot.normalsView == normalsView
+            && slot.outputView == outputView)
+            return slot.context;
+
+        // A view changed (the graph re-placed a transient): the baked
+        // descriptors are stale. Safe to destroy here - this slot's previous
+        // submission already retired when the frame slot was reacquired.
+        FFX_CACAO_VkDestroyScreenSizeDependentResources(slot.context);
+        FFX_CACAO_VkDestroyContext(slot.context);
+        free(slot.context);
+        m_cacaoContexts.erase(it);
+    }
 
     // Allocate a fresh context for this frame-in-flight slot
     size_t contextSize = FFX_CACAO_VkGetContextSize();
@@ -82,7 +95,7 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
     FFX_CACAO_VkInitScreenSizeDependentResources(ctx, &sizeInfo);
 
-    m_cacaoContexts[frameKey] = ctx;
+    m_cacaoContexts[frameKey] = { ctx, depthView, normalsView, outputView };
     return ctx;
 }
 

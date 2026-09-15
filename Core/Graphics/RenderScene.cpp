@@ -32,7 +32,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 
 	_meshBuffer = make_unique<MeshBufferManager>(device, resourceManager);
 	_material = make_unique<MaterialManager>(device, resourceManager);
-	_batch = make_unique<RendererBatch>(device, resourceManager);
+	_batch = make_unique<RendererBatch>(device, resourceManager, syncContext);
 
 	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, syncContext, transfer);
 }
@@ -40,7 +40,7 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 // Out of line for the unique_ptr members forward-declared in the header.
 RenderScene::~RenderScene() = default;
 
-void RenderScene::SyncManagers(Scene& scene)
+void RenderScene::SyncManagers(Scene& scene, FrameResources& frameResources)
 {
 	// Streaming producer: decides this frame's uploads, and submits them.
 	if (auto* camera = scene.GetMainCamera())
@@ -58,10 +58,15 @@ void RenderScene::SyncManagers(Scene& scene)
 
 	// Everything this frame produced - loader requests, the rebuild's table fills
 	_assetStreamer->SubmitQueued();
+
+	_batch->QueuePendingInit(frameResources);
+	_terrainSystem->QueuePendingInit(*_device, frameResources);
 }
 
 void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
-	Pipeline& pipeline, Buffer& indirectCommandBuffer, DescriptorSetBuilder& builder)
+	Pipeline& pipeline, Buffer& indirectCommandBuffer,
+	Buffer& drawCountBuffer, Buffer& instanceIDBuffer,
+	DescriptorSetBuilder& builder)
 {
 	if (_batch->GetDrawCommandCount() == 0)
 		return;
@@ -80,9 +85,9 @@ void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 	commandBuffer.BindPipeline(&pipeline);
 
 	builder.SetStorageBuffer(1, _batch->GetTransformBuffer());
-	builder.SetStorageBuffer(2, _batch->GetInstanceBuffer());
+	builder.SetStorageBuffer(2, instanceIDBuffer);
 	builder.SetUniformBuffer(8, _material->GetMaterialBuffer());
-	builder.SetStorageBuffer(9, _batch->GetMaterialIndexBuffer());
+	builder.SetStorageBuffer(9, _batch->GetInstanceDataBuffer());
 
 	auto& resources = builder.Build();
 
@@ -99,9 +104,10 @@ void RenderScene::DrawIndirect(CommandBuffer& commandBuffer, Shader& shader,
 
 	commandBuffer.BindDescriptorSets(pipeline.GetPipelineBindPoint(), shader, resourcesList);
 
-	commandBuffer.DrawIndexedIndirect(
-		indirectCommandBuffer,
+	commandBuffer.DrawIndexedIndirectCount(
+		indirectCommandBuffer, 0,
+		drawCountBuffer, 0,
 		_batch->GetDrawCommandCount(),
-		static_cast<uint32_t>(IndirectDrawBuffer::GetDrawCommandSize())
+		static_cast<uint32_t>(sizeof(DrawIndexedIndirectCommand))
 	);
 }

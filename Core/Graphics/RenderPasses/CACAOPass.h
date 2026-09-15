@@ -63,7 +63,14 @@ namespace Core
 
         Handle<Texture> _aoTexture;
 
-        unordered_map<FrameResources*, FFX_CACAO_VkContext*> m_cacaoContexts;
+        struct CacaoContextSlot
+        {
+            FFX_CACAO_VkContext* context = nullptr;
+            VkImageView depthView = VK_NULL_HANDLE;
+            VkImageView normalsView = VK_NULL_HANDLE;
+            VkImageView outputView = VK_NULL_HANDLE;
+        };
+        unordered_map<FrameResources*, CacaoContextSlot> m_cacaoContexts;
 
         Settings m_settings;
 
