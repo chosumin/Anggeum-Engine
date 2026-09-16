@@ -46,10 +46,10 @@ namespace Core
 
 		// Filled in once the upload job has scanned the POSITION stream (the allocation
 		// itself is recorded up front, at load time).
-		void SetBoundingSphere(const glm::vec3& center, float radius)
+		void SetBounds(const glm::vec3& min, const glm::vec3& max)
 		{
-			_globalAllocation.boundingSphereCenter = center;
-			_globalAllocation.boundingSphereRadius = radius;
+			_globalAllocation.boundsMin = min;
+			_globalAllocation.boundsMax = max;
 		}
 	private:
 		Device& _device;

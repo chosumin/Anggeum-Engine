@@ -9,17 +9,12 @@ namespace Core
 	class SubMesh;
 	class StagingRing;
 
-	// Bounding sphere computed from a POSITION stream. Filled on a worker
-	// thread and applied to the SubMesh once its upload has completed.
 	struct GeometryBounds
 	{
-		glm::vec3 center{ 0.0f };
-		float radius = 0.0f;
+		glm::vec3 min{ 0.0f };
+		glm::vec3 max{ 0.0f };
 	};
 
-	// Two passes over the positions (extent, then radius). Called from worker threads,
-	// so it touches nothing but its arguments. `stride` is the source byte stride,
-	// which is tightly packed and need not match sizeof(vec3).
 	inline void ComputeGeometryBounds(const uint8_t* data, size_t byteSize,
 		uint32_t stride, GeometryBounds& out)
 	{
@@ -34,23 +29,14 @@ namespace Core
 			return position;
 		};
 
-		glm::vec3 min = positionAt(0);
-		glm::vec3 max = min;
+		out.min = positionAt(0);
+		out.max = out.min;
 		for (size_t i = 1; i < count; ++i)
 		{
 			glm::vec3 position = positionAt(i);
-			min = glm::min(min, position);
-			max = glm::max(max, position);
+			out.min = glm::min(out.min, position);
+			out.max = glm::max(out.max, position);
 		}
-
-		glm::vec3 center = (min + max) * 0.5f;
-
-		float radius = 0.0f;
-		for (size_t i = 0; i < count; ++i)
-			radius = glm::max(radius, glm::distance(center, positionAt(i)));
-
-		out.center = center;
-		out.radius = radius;
 	}
 
 	// Raw geometry for one submesh, handed to ResourceManager at load time. Space is

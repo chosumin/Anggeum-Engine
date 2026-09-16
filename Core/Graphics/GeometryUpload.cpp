@@ -25,7 +25,7 @@ void GeometryUploadJob::Execute()
 {
 	// Runs here rather than on the loading thread: scanning every vertex is the
 	// expensive part of a mesh upload, and the data is already in hand. The
-	// sphere lands directly on the SubMesh.
+	// bounds land directly on the SubMesh.
 	if (_batch.boundsTarget != nullptr)
 	{
 		for (auto& copy : _batch.copies)
@@ -36,7 +36,7 @@ void GeometryUploadJob::Execute()
 			GeometryBounds bounds;
 			ComputeGeometryBounds(copy.data.data(), copy.data.size(),
 				copy.boundsStride, bounds);
-			_batch.boundsTarget->SetBoundingSphere(bounds.center, bounds.radius);
+			_batch.boundsTarget->SetBounds(bounds.min, bounds.max);
 		}
 	}
 

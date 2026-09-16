@@ -28,13 +28,14 @@ void main()
     if (inst.drawCommandIndex == DEAD_DRAW)
         return;
 
-    vec3 worldCenter;
-    float worldRadius;
-    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
+    vec3 worldMin;
+    vec3 worldMax;
+    InstanceWorldAABB(inst, transforms[inst.transformIndex], worldMin, worldMax);
 
-    if (!IsVisibleFrustum(cullData.frustumPlanes, worldCenter, worldRadius))
+    if (!IsVisibleFrustum(cullData.frustumPlanes, worldMin, worldMax))
         return;
-    if (IsOccluded(hiZBuffer, worldCenter, worldRadius))
+    if (IsOccluded(hiZBuffer, cullData.proj * cullData.view,
+            cullData.screenSize, cullData.hiZMipLevels, worldMin, worldMax))
         return;
 
     uint cmdIndex = inst.drawCommandIndex;

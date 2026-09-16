@@ -13,9 +13,10 @@ namespace Core
 		uint32_t indexOffset;
 		uint32_t indexCount;
 		uint32_t meshID;
-		
-		glm::vec3 boundingSphereCenter;
-		float boundingSphereRadius;
+
+		// Local AABB
+		glm::vec3 boundsMin;
+		glm::vec3 boundsMax;
 	};
 
 	class Buffer;

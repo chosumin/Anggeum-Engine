@@ -128,8 +128,7 @@ namespace Core
 		uint32_t patchIndexCount = 0; // PatchQuads()^2 * 6, for the draw args
 	};
 
-	// Uniform block for terrainPatchCull.comp; layout mirrors the mesh
-	// culler's CullData so the proven sphere frustum/Hi-Z tests port over.
+	// Uniform block for terrainPatchCull.comp
 	struct alignas(16) TerrainCullData
 	{
 		mat4 view;

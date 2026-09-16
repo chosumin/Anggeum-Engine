@@ -27,13 +27,14 @@ void main()
     if (inst.drawCommandIndex == DEAD_DRAW)
         return;
 
-    vec3 worldCenter;
-    float worldRadius;
-    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
+    vec3 worldMin;
+    vec3 worldMax;
+    InstanceWorldAABB(inst, transforms[inst.transformIndex], worldMin, worldMax);
 
-    bool visible = IsVisibleFrustum(cullData.frustumPlanes, worldCenter, worldRadius);
+    bool visible = IsVisibleFrustum(cullData.frustumPlanes, worldMin, worldMax);
     if (visible && cullData.enableOcclusionCulling == 1)
-        visible = !IsOccluded(hiZBuffer, worldCenter, worldRadius);
+        visible = !IsOccluded(hiZBuffer, cullData.proj * cullData.view,
+            cullData.screenSize, cullData.hiZMipLevels, worldMin, worldMax);
 
     uint cmdIndex = inst.drawCommandIndex;
     if (visible)

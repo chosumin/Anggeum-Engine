@@ -5,12 +5,12 @@
 // packs per-edge LOD stitch deltas from the LOD map. Survivors append to the
 // Visible Render Patch List; the draw's instanceCount is bumped atomically.
 //
-// The sphere frustum/occlusion tests mirror gpuCulling.comp's proven mesh
-// path; the patch AABB is wrapped in its bounding sphere (conservative).
+// Frustum/occlusion tests are the mesh path's, on the patch AABB.
 
 layout(local_size_x = 64) in; // = patchesPerNodeEdge^2, asserted on the CPU
 
 #include "terrainCommon.glsl"
+#include "gpuDriven.glsl"
 
 layout(set = 0, binding = 0) readonly buffer NodeList
 {
@@ -55,51 +55,6 @@ layout(push_constant) uniform Push
     TerrainTraversalPush push;
 };
 
-
-
-bool IsVisibleFrustum(vec3 center, float radius)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        if (dot(cull.frustumPlanes[i].xyz, center) + cull.frustumPlanes[i].w
-            < -radius)
-            return false;
-    }
-    return true;
-}
-
-bool IsOccluded(vec3 worldCenter, float worldRadius)
-{
-    vec4 viewCenter = cull.view * vec4(worldCenter, 1.0);
-    vec4 clipCenter = cull.proj * viewCenter;
-
-    // Behind camera / off screen: the frustum test is the authority.
-    if (clipCenter.w <= 0.0)
-        return false;
-
-    vec3 ndc = clipCenter.xyz / clipCenter.w;
-    vec2 screenUV = ndc.xy * 0.5 + 0.5;
-    if (any(lessThan(screenUV, vec2(0.0))) || any(greaterThan(screenUV, vec2(1.0))))
-        return false;
-
-    // abs(): the Vulkan Y-flip makes proj[1][1] negative.
-    float projRadius = worldRadius * abs(cull.proj[1][1]) / clipCenter.w;
-    float screenPixelRadius = projRadius * cull.screenHiZ.y * 0.5;
-
-    int mipLevel = int(ceil(log2(max(screenPixelRadius * 2.0, 1.0))));
-    mipLevel = clamp(mipLevel, 0, int(cull.screenHiZ.z) - 1);
-
-    float occluderDepth = textureLod(hiZBuffer, screenUV, float(mipLevel)).r;
-
-    // Nearest point of the sphere toward the camera (view looks down -Z).
-    float viewNearZ = viewCenter.z + worldRadius;
-    if (viewNearZ >= 0.0)
-        return false;
-
-    vec4 clipNear = cull.proj * vec4(0.0, 0.0, viewNearZ, 1.0);
-    return clipNear.z / clipNear.w > occluderDepth;
-}
-
 void main()
 {
     uvec2 entry = nodeList.entries[gl_WorkGroupID.x];
@@ -123,14 +78,13 @@ void main()
     float maxHeight = mix(cull.heightBounds.x, cull.heightBounds.y,
         float(minMax >> 16) / 65535.0) + cull.heightBounds.z;
 
-    vec3 halfExtents = vec3(patchSize * 0.5, (maxHeight - minHeight) * 0.5,
-        patchSize * 0.5);
-    vec3 center = vec3(patchMin.x, minHeight, patchMin.y) + halfExtents;
-    float radius = length(halfExtents);
+    vec3 aabbMin = vec3(patchMin.x, minHeight, patchMin.y);
+    vec3 aabbMax = vec3(patchMin.x + patchSize, maxHeight, patchMin.y + patchSize);
 
-    if (!IsVisibleFrustum(center, radius))
+    if (!IsVisibleFrustum(cull.frustumPlanes, aabbMin, aabbMax))
         return;
-    if (cull.screenHiZ.w != 0.0 && IsOccluded(center, radius))
+    if (cull.screenHiZ.w != 0.0 && IsOccluded(hiZBuffer, cull.proj * cull.view,
+            cull.screenHiZ.xy, uint(cull.screenHiZ.z), aabbMin, aabbMax))
         return;
 
     // Per-edge stitch deltas: sample the LOD map half a sector beyond each

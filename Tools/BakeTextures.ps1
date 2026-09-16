@@ -13,7 +13,7 @@ param(
 )
 
 $srgbImages = @{}
-foreach ($gltf in Get-ChildItem $AssetsDir -Recurse -Include *.gltf) {
+foreach ($gltf in Get-ChildItem $AssetsDir -Recurse -File -Include *.gltf) {
     $doc = Get-Content $gltf.FullName -Raw | ConvertFrom-Json
     if (-not $doc.materials -or -not $doc.textures -or -not $doc.images) { continue }
 

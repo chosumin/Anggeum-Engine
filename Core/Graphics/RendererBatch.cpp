@@ -210,8 +210,8 @@ vector<GPUInstanceData> Core::RendererBatch::BuildInstances(const DrawBatch& bat
     {
         const DrawInstance& instance = batch.Instances[i];
         GPUInstanceData& data = instances[i];
-        data.boundingSphere = glm::vec4(
-            allocation.boundingSphereCenter, allocation.boundingSphereRadius);
+        memcpy(data.aabbMin, &allocation.boundsMin, sizeof(data.aabbMin));
+        memcpy(data.aabbMax, &allocation.boundsMax, sizeof(data.aabbMax));
         data.transformIndex = instance.EntityId;
         data.drawCommandIndex = batch.CmdSlot;
         data.materialIndex = instance.Material.Get().GetMaterialIndex();

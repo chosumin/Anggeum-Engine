@@ -42,12 +42,9 @@ void main()
     InstanceData inst = instances[gid];
     if (inst.drawCommandIndex == DEAD_DRAW)
         return; // freed slot
-    vec3 worldCenter;
-    float worldRadius;
-    InstanceWorldSphere(inst, transforms[inst.transformIndex], worldCenter, worldRadius);
-
-    vec3 wMin = worldCenter - vec3(worldRadius);
-    vec3 wMax = worldCenter + vec3(worldRadius);
+    vec3 wMin;
+    vec3 wMax;
+    InstanceWorldAABB(inst, transforms[inst.transformIndex], wMin, wMax);
 
     atomicMin(bounds[0], floatToSortableUint(wMin.x));
     atomicMin(bounds[1], floatToSortableUint(wMin.y));

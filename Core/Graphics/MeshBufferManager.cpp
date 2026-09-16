@@ -232,8 +232,8 @@ MeshAllocation MeshBufferManager::Build()
 	allocation.indexCount = _pendingIndexCount;
 	allocation.meshID = _nextMeshID++;
 	// Bounds are filled in later, by the upload job that scans the POSITION stream.
-	allocation.boundingSphereCenter = glm::vec3(0.0f);
-	allocation.boundingSphereRadius = 0.0f;
+	allocation.boundsMin = glm::vec3(0.0f);
+	allocation.boundsMax = glm::vec3(0.0f);
 
 	// Store allocation
 	_allocations[allocation.meshID] = allocation;

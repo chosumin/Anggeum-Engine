@@ -198,11 +198,13 @@ struct DrawIndexedIndirectCommand
 
 struct alignas(16) GPUInstanceData
 {
-	glm::vec4 boundingSphere;  // xyz: center, w: radius
+	float aabbMin[3];    // local
 	uint32_t transformIndex;
+	float aabbMax[3];    // local
 	uint32_t drawCommandIndex;
 	uint32_t materialIndex;
 };
+static_assert(sizeof(GPUInstanceData) == 48, "matches InstanceData in gpuDriven.glsl");
 
 struct alignas(16) GPUCullData
 {
