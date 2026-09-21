@@ -16,7 +16,8 @@ namespace Core
 {
 	TerrainSystem::TerrainSystem(Device& device, ResourceManager& resourceManager,
 		SyncContext& syncContext, TransferContext& transfer)
-		: _store(TerrainNodeStore::Load(_config,
+		: _resourceManager(resourceManager)
+		, _store(TerrainNodeStore::Load(_config,
 			ProceduralTerrainHeightSource(TerrainNoiseParams{},
 				_config.heightMin, _config.heightMax)))
 	{
@@ -36,6 +37,17 @@ namespace Core
 
 			uint32_t zero = 0;
 			_patchCountReadback[slot].Get().Update(zero);
+		}
+	}
+
+	void TerrainSystem::CreatePickReadback()
+	{
+		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
+		{
+			_pickReadback[slot] = _resourceManager.LoadBuffer(
+				{ sizeof(uvec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MemoryType::UNIFORM },
+				"Terrain.PickReadback" + to_string(slot));
+			_pickReadback[slot].Get().Update(uvec4(0u));
 		}
 	}
 
@@ -99,7 +111,11 @@ namespace Core
 			if (length(direction) > 0.0f)
 				params.sunDirection = vec4(normalize(direction), 0.25f);
 		}
-		params.debugMode = ivec4(_debugMode, 0, 0, 0);
+		// yz = mouse in framebuffer pixels, w = pick on
+		ImGuiIO& io = ImGui::GetIO();
+		ivec2 mouse = ivec2(io.MousePos.x * io.DisplayFramebufferScale.x,
+			io.MousePos.y * io.DisplayFramebufferScale.y);
+		params.debugMode = ivec4(_debugMode, mouse.x, mouse.y, _bypassCulling ? 1 : 0);
 		params.worldParams = vec4(_config.WorldOrigin(), _config.rootNodeSize,
 			float(_config.lodCount));
 		params.atlasInfo = vec4(float(_config.atlasSlotsPerRow),
@@ -133,5 +149,61 @@ namespace Core
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");
+		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
+
+		if (_bypassCulling)
+		{
+			// Created on first use: the debug path costs nothing while off.
+			if (!_pickReadback[0].IsValid())
+				CreatePickReadback();
+			OnGUIPick(slot);
+		}
+	}
+
+	void TerrainSystem::OnGUIPick(uint32_t slot)
+	{
+		// Written by the terrain pass 2 frames ago; cleared so a stale pick
+		// does not outlive the mouse leaving the terrain.
+		uvec4 entry{};
+		void* mapped = nullptr;
+		_pickReadback[slot].Get().GetMappedPtr(&mapped);
+		memcpy(&entry, mapped, sizeof(entry));
+		_pickReadback[slot].Get().Update(uvec4(0u));
+
+		if ((entry.z & 0x80000000u) == 0u)
+		{
+			ImGui::Text("Under mouse: (no terrain)");
+			return;
+		}
+
+		uint32_t lod = entry.x >> 28;
+		uvec2 coord(entry.x & 0x3fffu, (entry.x >> 14) & 0x3fffu);
+		uint32_t slotIndex = entry.y;
+		uint32_t patchIdx = entry.z & 0xffu;
+		uvec2 patchXY(patchIdx % _config.patchesPerNodeEdge, patchIdx / _config.patchesPerNodeEdge);
+		const char* culledBy = (entry.z & TERRAIN_CULL_FRUSTUM) ? "frustum"
+			: (entry.z & TERRAIN_CULL_OCCLUDED) ? "occluded" : "visible";
+
+		// The same AABB the cull shader built for it.
+		float nodeSize = _config.NodeSize(lod);
+		float patchSize = nodeSize / float(_config.patchesPerNodeEdge);
+		vec2 patchMin = _config.WorldOrigin() + vec2(coord) * nodeSize + vec2(patchXY) * patchSize;
+		uint32_t minMax = _streamer->GetNodeDesc(uint16_t(slotIndex)).minMaxHeight;
+		float minHeight = glm::mix(_config.heightMin, _config.heightMax,
+			float(minMax & 0xffffu) / 65535.0f) - 2.0f;
+		float maxHeight = glm::mix(_config.heightMin, _config.heightMax,
+			float(minMax >> 16) / 65535.0f) + 2.0f;
+
+		ImGui::Text("Under mouse: lod %u node (%u, %u) patch (%u, %u) slot %u - %s",
+			lod, coord.x, coord.y, patchXY.x, patchXY.y, slotIndex, culledBy);
+
+		// terrainPatchCull.comp: one workgroup per listed node, 64 threads = patches.
+		uint32_t workGroup = entry.w >> 16;
+		ImGui::Text("  cull thread: WorkGroupID %u, LocalInvocationID %u, GlobalInvocationID %u"
+			"  (node list entry.x = 0x%08X)",
+			workGroup, patchIdx, workGroup * 64u + patchIdx, entry.x);
+		ImGui::Text("  AABB min (%.1f, %.1f, %.1f) max (%.1f, %.1f, %.1f)",
+			patchMin.x, minHeight, patchMin.y,
+			patchMin.x + patchSize, maxHeight, patchMin.y + patchSize);
 	}
 }

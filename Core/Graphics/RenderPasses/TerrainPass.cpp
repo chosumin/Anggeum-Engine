@@ -5,6 +5,7 @@
 #include "TerrainPatchCullPass.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameResources.h"
+#include "Graphics/FrameCounter.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Terrain/TerrainSystem.h"
@@ -89,6 +90,16 @@ void TerrainPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 	_params = builder.ImportBuffer("Terrain.Params", paramsHandle);
 	builder.Read(_params, BufferAccess::UniformFragment);
 
+	// Debug pick: TerrainSystem owns the slots and reads them in OnGUI.
+	_pick = FGBuffer{};
+	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+	if (_terrain.GetPickReadback(slot).IsValid())
+	{
+		_pick = builder.ImportBuffer("Terrain.PickReadback" + to_string(slot),
+			_terrain.GetPickReadback(slot));
+		builder.Write(_pick, BufferAccess::StorageFragmentWrite);
+	}
+
 	_active = true;
 }
 
@@ -118,6 +129,9 @@ void TerrainPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
 	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetTextureBuffer(4, quadTree.GetAlbedoAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
+	// Pick off: the binding still needs a buffer, and the shader never writes it.
+	builder.SetStorageBuffer(6, _pick.IsValid()
+		? context.GetBuffer(_pick) : context.GetBuffer(_patchList));
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);

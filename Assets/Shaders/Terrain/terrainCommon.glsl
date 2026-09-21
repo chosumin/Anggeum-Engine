@@ -12,6 +12,11 @@ const uint TERRAIN_NODE_QUADS = 128u;
 // Quads per patch edge (16) - the draw instance is one patch.
 const uint TERRAIN_PATCH_QUADS = TERRAIN_NODE_QUADS / TERRAIN_PATCHES_PER_EDGE;
 
+// Patch list entry .z: patch index in bits 0-7; debug mode keeps culled
+// patches and tags why (mirrors TerrainConfig.h).
+const uint TERRAIN_CULL_FRUSTUM = 0x100u;
+const uint TERRAIN_CULL_OCCLUDED = 0x200u;
+
 // Node list entry coord packing: [ lod:4 ][ y:14 ][ x:14 ].
 uint TerrainPackCoord(uint lod, uvec2 coord)
 {
@@ -28,7 +33,6 @@ uint TerrainUnpackLod(uint packedCoord)
     return packedCoord >> 28;
 }
 
-// Mirrors Core::TerrainParams.
 struct TerrainParams
 {
     vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
@@ -39,9 +43,6 @@ struct TerrainParams
     vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels
 };
 
-// Mirrors Core::TerrainTraversalPush, the push-constant block of the GPU
-// pipeline shaders: layout(push_constant) uniform Push
-// { TerrainTraversalPush push; };
 struct TerrainTraversalPush
 {
     vec2 cameraXZ;

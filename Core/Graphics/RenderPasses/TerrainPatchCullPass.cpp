@@ -70,6 +70,7 @@ void TerrainPatchCullPass::Setup(FrameGraphBuilder& builder,
 		_occlusionEnabled ? 1.0f : 0.0f);
 	// Same conservative pad the CPU culler uses for decimated coarse bakes.
 	cullData.heightBounds = vec4(config.heightMin, config.heightMax, 2.0f, 0.0f);
+	cullData.debug = uvec4(_terrain.IsCullingBypassed() ? 1u : 0u, 0u, 0u, 0u);
 
 	auto cullDataHandle = frameResources.GetOrCreateUniformBuffer<TerrainCullData>("Terrain.CullData");
 	cullDataHandle.Get().Update(cullData);

@@ -10,9 +10,19 @@ layout(set = 0, binding = 5) uniform TerrainParamsUniform
     TerrainParams params;
 };
 
+// Only the surviving fragment may report itself as the pick.
+layout(early_fragment_tests) in;
+
+// The patch under the mouse, for the terrain debug GUI (host-visible).
+layout(set = 0, binding = 6) buffer PickBuffer
+{
+    uvec4 entry; // patch list entry, z bit 31 = written
+} pick;
+
 layout(location = 0) in vec2 inTileUV;
 layout(location = 1) flat in uvec2 inColorOrigin;
 layout(location = 2) flat in uint inLod;
+layout(location = 3) flat in uvec4 inPatchEntry;
 
 layout(location = 0) out vec4 outColor;
 
@@ -46,6 +56,17 @@ void main()
         float line = step(0.9, max(grid.x, grid.y));
         lit = mix(vec3(0.2), vec3(1.0), line);
     }
+
+    // Debug mode: culled patches are drawn tinted by the test that dropped them.
+    uint cullBits = inPatchEntry.z & (TERRAIN_CULL_FRUSTUM | TERRAIN_CULL_OCCLUDED);
+    if (cullBits == TERRAIN_CULL_FRUSTUM)
+        lit = mix(lit, vec3(1.0, 0.0, 0.0), 0.6);
+    else if (cullBits == TERRAIN_CULL_OCCLUDED)
+        lit = mix(lit, vec3(0.0, 0.2, 1.0), 0.6);
+
+    // debugMode.yz = mouse pixel, .w = pick on
+    if (params.debugMode.w != 0 && ivec2(gl_FragCoord.xy) == params.debugMode.yz)
+        pick.entry = uvec4(inPatchEntry.xy, inPatchEntry.z | 0x80000000u, inPatchEntry.w);
 
     outColor = vec4(lit, 1.0);
 }

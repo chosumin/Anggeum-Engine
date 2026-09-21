@@ -38,7 +38,7 @@ namespace Core
 		unique_ptr<Pipeline> _wireframePipeline;
 
 		FGTexture _mainColor, _mainDepth;
-		FGBuffer _camera, _patchList, _patchDrawArgs, _params;
+		FGBuffer _camera, _patchList, _patchDrawArgs, _params, _pick;
 		bool _active = false;
 	};
 }

@@ -39,6 +39,7 @@ namespace Core
 		UniformCompute,
 		StorageVertexRead,
 		StorageFragmentRead,
+		StorageFragmentWrite,
 		StorageComputeRead,
 		StorageComputeWrite,
 		IndirectRead,

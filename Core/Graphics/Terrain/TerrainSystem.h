@@ -44,13 +44,22 @@ namespace Core
 			return _patchCountReadback[slot];
 		}
 
+		// Debug: the patch cull keeps culled patches tagged, the terrain pass
+		// tints them and reports the one under the mouse into the frame's slot.
+		// The pick buffers exist only once the mode was enabled.
+		bool IsCullingBypassed() const { return _bypassCulling; }
+		Handle<Buffer> GetPickReadback(uint32_t slot) const { return _pickReadback[slot]; }
+
 		void OnGUI();
 		bool IsWireframe() const { return _wireframe; }
 		int GetDebugMode() const { return _debugMode; }
 
 	private:
 		void CreateGridIndexBuffer(ResourceManager& resourceManager);
+		void CreatePickReadback();
+		void OnGUIPick(uint32_t slot);
 
+		ResourceManager& _resourceManager;
 		TerrainConfig _config;
 		TerrainNodeStore _store;
 		unique_ptr<TerrainQuadTree> _quadTree;
@@ -62,9 +71,11 @@ namespace Core
 		vector<uint16_t> _pendingGridIndices;
 
 		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _patchCountReadback;
+		array<Handle<Buffer>, MAX_FRAMES_IN_FLIGHT> _pickReadback;
 
 		bool _wireframe = false;
 		bool _freezeStreaming = false;
+		bool _bypassCulling = false;
 		int _debugMode = 0;
 	};
 }

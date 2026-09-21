@@ -50,6 +50,8 @@ namespace Core
 			return _runtime[ToLinearIndex(id, _config)].atlasSlot;
 		}
 
+		const TerrainNodeDescGPU& GetNodeDesc(uint16_t slot) const { return _descMirror[slot]; }
+
 		float LoadRadius(uint32_t lod) const
 		{
 			return _config.ringRadiusScale * _config.NodeSize(lod);

@@ -136,7 +136,12 @@ namespace Core
 		vec4 frustumPlanes[6];
 		vec4 screenHiZ{};     // xy = screen size, z = hiZ mip count, w = occlusion on
 		vec4 heightBounds{};  // x = min, y = max, z = conservative pad
+		uvec4 debug{};        // x = keep culled patches, tagged
 	};
+
+	// Patch list entry .z tags (mirrors terrainCommon.glsl).
+	constexpr uint32_t TERRAIN_CULL_FRUSTUM = 0x100u;
+	constexpr uint32_t TERRAIN_CULL_OCCLUDED = 0x200u;
 
 	// Shared uniform block for terrain.vert/.frag.
 	struct alignas(16) TerrainParams

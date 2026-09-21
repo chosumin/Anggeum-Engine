@@ -48,6 +48,7 @@ layout(set = 0, binding = 6) uniform CullData
     vec4 frustumPlanes[6];
     vec4 screenHiZ;    // xy = screen size, z = hiZ mip count, w = occlusion on
     vec4 heightBounds; // x = min, y = max, z = conservative pad
+    uvec4 debug;       // x = keep culled patches, tagged (see TERRAIN_CULL_*)
 } cull;
 
 layout(push_constant) uniform Push
@@ -81,10 +82,14 @@ void main()
     vec3 aabbMin = vec3(patchMin.x, minHeight, patchMin.y);
     vec3 aabbMax = vec3(patchMin.x + patchSize, maxHeight, patchMin.y + patchSize);
 
+    uint cullBits = 0u;
     if (!IsVisibleFrustum(cull.frustumPlanes, aabbMin, aabbMax))
-        return;
-    if (cull.screenHiZ.w != 0.0 && IsOccluded(hiZBuffer, cull.proj * cull.view,
+        cullBits = TERRAIN_CULL_FRUSTUM;
+    else if (cull.screenHiZ.w != 0.0 && IsOccluded(hiZBuffer, cull.proj * cull.view,
             cull.screenHiZ.xy, uint(cull.screenHiZ.z), aabbMin, aabbMax))
+        cullBits = TERRAIN_CULL_OCCLUDED;
+
+    if (cullBits != 0u && cull.debug.x == 0u)
         return;
 
     // Per-edge stitch deltas: sample the LOD map half a sector beyond each
@@ -114,5 +119,9 @@ void main()
     // No bounds guard: the list is sized for every patch of every listable
     // node (atlasCapacity * 64), so the counter cannot overflow it.
     uint dst = atomicAdd(drawArgs.instanceCount, 1u);
-    patchList.patches[dst] = uvec4(entry.x, slot, patchIdx, deltas);
+    // Debug: the node's workgroup id rides the free high bits of .w.
+    if (cull.debug.x != 0u)
+        deltas |= gl_WorkGroupID.x << 16u;
+
+    patchList.patches[dst] = uvec4(entry.x, slot, patchIdx | cullBits, deltas);
 }

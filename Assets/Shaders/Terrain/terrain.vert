@@ -25,6 +25,7 @@ layout(set = 0, binding = 5) uniform TerrainParamsUniform
 layout(location = 0) out vec2 outTileUV;       // node-relative, for the color apron math
 layout(location = 1) flat out uvec2 outColorOrigin;
 layout(location = 2) flat out uint outLod;
+layout(location = 3) flat out uvec4 outPatchEntry; // debug tint and pick
 
 const uint PATCH_VERTS = TERRAIN_PATCH_QUADS + 1u; // 17
 
@@ -35,9 +36,10 @@ void main()
     uvec2 nodeCoord = TerrainUnpackCoord(patchEntry.x);
     uint slot = patchEntry.y;
 
-    // Patch index in a node
-    uvec2 patchXY = uvec2(patchEntry.z % TERRAIN_PATCHES_PER_EDGE,
-        patchEntry.z / TERRAIN_PATCHES_PER_EDGE);
+    // Patch index in a node (the high bits are debug cull tags)
+    uint patchIdx = patchEntry.z & 0xffu;
+    uvec2 patchXY = uvec2(patchIdx % TERRAIN_PATCHES_PER_EDGE,
+        patchIdx / TERRAIN_PATCHES_PER_EDGE);
 
     // Vertex index in a patch
     uint vx = gl_VertexIndex % PATCH_VERTS;
@@ -83,6 +85,7 @@ void main()
     outTileUV = local;
     outColorOrigin = slotOrigin * uint(params.atlasInfo.z);
     outLod = lod;
+    outPatchEntry = patchEntry;
 
     gl_Position = camera.proj * camera.view * vec4(world, 1.0);
 }
