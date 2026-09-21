@@ -13,19 +13,22 @@ layout(push_constant) uniform PushConstants
 void main()
 {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-    
+
     if (pos.x >= pushConstants.outputSize.x || pos.y >= pushConstants.outputSize.y)
         return;
-    
+
+    // Farthest depth of the source block. An odd source axis (non-pow2
+    // screens) reads 3 texels there, so every texel a uv lookup of this level
+    // can land on is covered and the last row/column is never dropped.
+    ivec2 srcSize = textureSize(inputDepth, 0);
     ivec2 srcPos = pos * 2;
-    
-    // Sample 2x2 block and take maximum (furthest) depth
-    float d0 = texelFetch(inputDepth, srcPos + ivec2(0, 0), 0).r;
-    float d1 = texelFetch(inputDepth, srcPos + ivec2(1, 0), 0).r;
-    float d2 = texelFetch(inputDepth, srcPos + ivec2(0, 1), 0).r;
-    float d3 = texelFetch(inputDepth, srcPos + ivec2(1, 1), 0).r;
-    
-    float maxDepth = max(max(d0, d1), max(d2, d3));
-    
+    ivec2 span = ivec2(2) + (srcSize & 1);
+
+    float maxDepth = 0.0;
+    for (int y = 0; y < span.y; ++y)
+        for (int x = 0; x < span.x; ++x)
+            maxDepth = max(maxDepth,
+                texelFetch(inputDepth, min(srcPos + ivec2(x, y), srcSize - 1), 0).r);
+
     imageStore(outputDepth, pos, vec4(maxDepth, 0.0, 0.0, 0.0));
 }
