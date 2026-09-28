@@ -353,8 +353,10 @@ void Core::RendererBatch::GrowAndRepack()
         instancesNeeded += static_cast<uint32_t>(batch.Instances.size());
     }
 
-    _commandCapacity = std::max(commandsNeeded, _commandCapacity * 2);
-    _instanceCapacity = std::max(instancesNeeded, _instanceCapacity * 2);
+    // Headroom: streaming a few objects in must not grow the tables (and
+    // every transient sized by their capacity) right away.
+    _commandCapacity = std::max(commandsNeeded * 2, _commandCapacity * 2);
+    _instanceCapacity = std::max(instancesNeeded * 2, _instanceCapacity * 2);
 
     // Recreated buffers start empty, so fills already queued for them are void.
     _pendingTableFills.erase(std::remove_if(_pendingTableFills.begin(), _pendingTableFills.end(),

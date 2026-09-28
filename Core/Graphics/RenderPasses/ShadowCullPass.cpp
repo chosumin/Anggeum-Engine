@@ -50,9 +50,10 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	if (_cascadeCount == 0)
 		return;
 
-	const uint32_t drawCount = batch.GetDrawCommandCount();
-
-	const uint32_t instanceCount = batch.GetInstanceCount();
+	// Change only when the tables grow, so transients sized by them are not
+	// rebuilt on every load or unload.
+	const uint32_t drawCapacity = batch.GetDrawCommandCapacity();
+	const uint32_t instanceCapacity = batch.GetInstanceCapacity();
 
 	// Only the active cascades are declared, so the shadow pass sees exactly
 	// the lists that were culled this frame (HasBuffer fails for the rest).
@@ -61,18 +62,18 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 		_views[i] = _shadowPass.GetCascadeView(i);
 
 		_instanceCounts[i] = builder.CreateBuffer(CountsName(i),
-			{ drawCount * sizeof(uint32_t),
+			{ drawCapacity * sizeof(uint32_t),
 			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
 		builder.Write(_instanceCounts[i], BufferAccess::FillComputeWrite);
 
 		// Each cascade scatters into its own ID buffer, so its draw never
 		// reads another cascade's IDs.
 		_instanceIDs[i] = builder.CreateBuffer(InstanceIdsName(i),
-			{ instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+			{ instanceCapacity * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 		builder.Write(_instanceIDs[i], BufferAccess::StorageComputeWrite);
 
 		_indirect[i] = builder.CreateBuffer(IndirectName(i),
-			{ drawCount * sizeof(DrawIndexedIndirectCommand),
+			{ drawCapacity * sizeof(DrawIndexedIndirectCommand),
 			  VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
 		builder.Write(_indirect[i], BufferAccess::StorageComputeWrite);
 

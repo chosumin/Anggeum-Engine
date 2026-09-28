@@ -42,6 +42,9 @@ namespace Core
 		uint32_t GetDrawCommandCount() const { return _commandSlotEnd; }
 		uint32_t GetInstanceCount() const { return _instanceSlotEnd; }
 
+		uint32_t GetDrawCommandCapacity() const { return _commandCapacity; }
+		uint32_t GetInstanceCapacity() const { return _instanceCapacity; }
+
 	private:
 		static constexpr uint32_t DEAD_DRAW = 0xFFFFFFFFu;
 		static constexpr uint32_t NO_SLOT = 0xFFFFFFFFu;

@@ -66,14 +66,16 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         return;
 
 
-    const uint32_t drawCount = batch.GetDrawCommandCount();
-    const uint32_t instanceCount = batch.GetInstanceCount();
+    // Change only when the tables grow, so transients sized by them are not
+    // rebuilt on every load or unload.
+    const uint32_t drawCapacity = batch.GetDrawCommandCapacity();
+    const uint32_t instanceCapacity = batch.GetInstanceCapacity();
 
-    FGBufferDesc instanceIDsDesc{ instanceCount * sizeof(uint32_t),
+    FGBufferDesc instanceIDsDesc{ instanceCapacity * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
-    FGBufferDesc countsDesc{ drawCount * sizeof(uint32_t),
+    FGBufferDesc countsDesc{ drawCapacity * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT };
-    FGBufferDesc visibleDesc{ drawCount * sizeof(DrawIndexedIndirectCommand),
+    FGBufferDesc visibleDesc{ drawCapacity * sizeof(DrawIndexedIndirectCommand),
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT };
     FGBufferDesc drawCountDesc{ sizeof(uint32_t),
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
@@ -98,7 +100,7 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
         builder.Write(_visibleDrawCount, BufferAccess::FillComputeWrite);
 
         _rejectedIndices = builder.CreateBuffer(SB_REJECTED_INDICES,
-            { instanceCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+            { instanceCapacity * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
         builder.Write(_rejectedIndices, BufferAccess::StorageComputeWrite);
 
         _rejectedCount = builder.CreateBuffer(SB_REJECTED_COUNT,
