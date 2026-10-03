@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "Threadable.h"
-#include "WorkerThread.h"
 
-Core::Threadable::Threadable(WorkerThreadManager& workerThreadManager)
-	: _workerThreadManager(workerThreadManager)
+Core::Threadable::Threadable(Device& device, SyncContext& syncContext, size_t threadCount,
+	ThreadPriority priority)
+	: _workers(device, syncContext, threadCount, priority)
 {
 }
 
@@ -17,7 +17,7 @@ void Core::Threadable::Enqueue(unique_ptr<Job> job)
 void Core::Threadable::EnqueueUnowned(Job& job)
 {
 	job.completionWait = &_completionWait;
-	_workerThreadManager.Enqueue(&job);
+	_workers.Enqueue(&job);
 }
 
 void Core::Threadable::WaitForJobs()

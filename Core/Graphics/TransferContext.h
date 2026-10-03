@@ -8,7 +8,6 @@
 namespace Core
 {
 	class Device;
-	class WorkerThreadManager;
 	class CommandPool;
 	class Texture;
 	class SubMesh;
@@ -35,8 +34,9 @@ namespace Core
 			function<void()> onLanded;
 		};
 
-		TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
-			SyncContext& syncContext);
+		static constexpr size_t STREAMING_THREADS = 2;
+
+		TransferContext(Device& device, SyncContext& syncContext);
 		~TransferContext();
 
 		// For self-scheduling streamers that stage BEFORE building their job.

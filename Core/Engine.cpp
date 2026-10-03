@@ -27,9 +27,8 @@ Core::Engine::Engine(const EngineOptions& options)
     _syncContext = new Core::SyncContext(*_device);
 
     _resourceManager = new Core::ResourceManager(*_device, *_syncContext);
-    _workerThreadManager = new Core::WorkerThreadManager(*_device, *_syncContext);
-    _transferContext = new Core::TransferContext(*_device, *_workerThreadManager,
-        *_syncContext);
+
+    _transferContext = new Core::TransferContext(*_device, *_syncContext);
 
     auto* sampleScene = new SampleScene(*_device, *_resourceManager);
     _scene = sampleScene;
@@ -45,7 +44,12 @@ Core::Engine::Engine(const EngineOptions& options)
 
     sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
 
-    _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_resourceManager, *_workerThreadManager,
+    // Recording gets every hardware thread the main thread and the streaming
+    // threads leave over.
+    const size_t hardwareThreads = std::max<size_t>(std::thread::hardware_concurrency(), 4);
+    const size_t recordThreads = hardwareThreads - 1 - Core::TransferContext::STREAMING_THREADS;
+
+    _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_resourceManager, recordThreads,
         *_renderScene, swapChain, *_syncContext);
 }
 
@@ -58,7 +62,6 @@ Core::Engine::~Engine()
     delete(_renderScene);
     delete(_scene);
     delete(_transferContext);
-    delete(_workerThreadManager);
     delete(_resourceManager);
     delete(_syncContext);
     delete(_device);

@@ -7,7 +7,6 @@ namespace Core
     class Window;
     class Scene;
     class RenderContext;
-    class WorkerThreadManager;
     class IRenderPipeline;
     class RenderScene;
     class TransferContext;
@@ -36,8 +35,6 @@ namespace Core
 
         ResourceManager* _resourceManager;
 
-        WorkerThreadManager* _workerThreadManager;
-        
         IRenderPipeline* _renderPipeline;
         RenderContext* _renderContext;
 

@@ -26,7 +26,7 @@
 using namespace Core;
 
 Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManager& resourceManager,
-	WorkerThreadManager& workerThreadManager,
+	size_t recordThreadCount,
 	RenderScene& renderScene, SwapChain& swapChain, SyncContext& syncContext)
 	:_device(device)
 	,_renderScene(renderScene)
@@ -48,7 +48,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	_frameGraph = make_unique<FrameGraph>(device, resourceManager, workerThreadManager);
+	_frameGraph = make_unique<FrameGraph>(device, resourceManager, syncContext, recordThreadCount);
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));

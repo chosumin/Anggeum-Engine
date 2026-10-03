@@ -12,9 +12,10 @@
 
 using namespace Core;
 
-TransferContext::TransferContext(Device& device, WorkerThreadManager& workerThreadManager,
-	SyncContext& syncContext)
-	: Threadable(workerThreadManager)
+TransferContext::TransferContext(Device& device, SyncContext& syncContext)
+	// Below normal: when every core is busy the scheduler still favors the
+	// frame over a texture transcode.
+	: Threadable(device, syncContext, STREAMING_THREADS, ThreadPriority::BelowNormal)
 	, _device(device)
 	, _sync(syncContext)
 {

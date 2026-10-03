@@ -7,12 +7,19 @@ namespace Core
 	class SyncContext;
 	class CommandPool;
 	class CommandBuffer;
+
+	enum class ThreadPriority
+	{
+		Normal,
+		BelowNormal
+	};
+
 	class WorkerThread
 	{
 	private:
 		friend class WorkerThreadManager;
 	public:
-		WorkerThread(Device& device, SyncContext& syncContext);
+		WorkerThread(Device& device, SyncContext& syncContext, ThreadPriority priority);
 		~WorkerThread();
 
 		void Enqueue(const Job* job);
@@ -35,10 +42,13 @@ namespace Core
 		mutex _lock;
 	};
 
+	// A plain pool: the owner decides what shares it. Keep long-running jobs
+	// in a pool of their own, or short ones queue behind them.
 	class WorkerThreadManager
 	{
 	public:
-		WorkerThreadManager(Device& device, SyncContext& syncContext);
+		WorkerThreadManager(Device& device, SyncContext& syncContext, size_t threadCount,
+			ThreadPriority priority = ThreadPriority::Normal);
 		~WorkerThreadManager() = default;
 
 		void Enqueue(const Job* job);

@@ -41,8 +41,8 @@ namespace Core
 	void RunFrameGraphSelfTests();
 
 	FrameGraph::FrameGraph(Device& device, ResourceManager& resourceManager,
-		WorkerThreadManager& workerThreadManager)
-		: Threadable(workerThreadManager)
+		SyncContext& syncContext, size_t recordThreadCount)
+		: Threadable(device, syncContext, recordThreadCount)
 		, _device(device)
 		, _resourceManager(resourceManager)
 	{

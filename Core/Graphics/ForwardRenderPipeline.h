@@ -9,7 +9,6 @@ namespace Core
 	class ResourceManager;
 	class RenderScene;
 	class SwapChain;
-	class WorkerThreadManager;
 	class Buffer;
 	class RenderContext;
 	class FrameGraph;
@@ -19,7 +18,7 @@ namespace Core
 	{
 	public:
 		ForwardRenderPipeline(Device& device, ResourceManager& resourceManager,
-			WorkerThreadManager& workerThreadManager, RenderScene& renderScene,
+			size_t recordThreadCount, RenderScene& renderScene,
 			SwapChain& swapChain, SyncContext& syncContext);
 		virtual ~ForwardRenderPipeline() override;
 

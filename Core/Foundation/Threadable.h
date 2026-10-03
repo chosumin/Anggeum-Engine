@@ -1,22 +1,17 @@
 #pragma once
-#include "Job.h"
+#include "WorkerThread.h"
 
 namespace Core
 {
-	class WorkerThreadManager;
-
-	// Base for anything that farms jobs out to the worker pool and waits on
-	// their completion. Tracking the jobs here is optional: Enqueue takes
-	// ownership, EnqueueUnowned only wires the job up, for owners that keep
-	// richer per-job state in containers of their own.
+	// Base for anything that farms jobs out to worker threads and waits on
+	// their completion.
 	class Threadable
 	{
 	public:
-		explicit Threadable(WorkerThreadManager& workerThreadManager);
+		Threadable(Device& device, SyncContext& syncContext, size_t threadCount,
+			ThreadPriority priority = ThreadPriority::Normal);
 
 	protected:
-		WorkerThreadManager& GetWorkerThreadManager() { return _workerThreadManager; }
-
 		// Takes ownership, queues the job on a worker thread, and keeps it alive
 		// until ClearJobs.
 		void Enqueue(unique_ptr<Job> job);
@@ -51,10 +46,10 @@ namespace Core
 		void ClearJobs();
 
 	private:
-		WorkerThreadManager& _workerThreadManager;
-
 		vector<unique_ptr<Job>> _pendingJobs;
 		condition_variable _completionWait;
 		mutex _waitLock;
+
+		WorkerThreadManager _workers;
 	};
 }

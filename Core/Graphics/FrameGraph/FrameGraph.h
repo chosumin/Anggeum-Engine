@@ -14,7 +14,6 @@ namespace Core
 	class Texture;
 	class Buffer;
 	class Sampler;
-	class WorkerThreadManager;
 	class GpuQueueTimer;
 	class CommandBuffer;
 	class FrameGraphRecordJob;
@@ -118,7 +117,8 @@ namespace Core
 	class FrameGraph : public Threadable
 	{
 	public:
-		FrameGraph(Device& device, ResourceManager& resourceManager, WorkerThreadManager& workerThreadManager);
+		FrameGraph(Device& device, ResourceManager& resourceManager, 
+			SyncContext& syncContext, size_t recordThreadCount);
 		~FrameGraph();
 
 		FrameGraph(const FrameGraph&) = delete;

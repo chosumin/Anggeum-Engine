@@ -4,7 +4,7 @@
 #include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 
-Core::WorkerThread::WorkerThread(Device& device, SyncContext& syncContext)
+Core::WorkerThread::WorkerThread(Device& device, SyncContext& syncContext, ThreadPriority priority)
 	:_device(device), _shutdown(false)
 {
 
@@ -14,6 +14,9 @@ Core::WorkerThread::WorkerThread(Device& device, SyncContext& syncContext)
 
 	_thread = thread(&WorkerThread::Run, this);
     SetThreadDescription(_thread.native_handle(), L"Worker Thread");
+
+	if (priority == ThreadPriority::BelowNormal)
+		SetThreadPriority(_thread.native_handle(), THREAD_PRIORITY_BELOW_NORMAL);
 }
 
 Core::WorkerThread::~WorkerThread()
@@ -107,22 +110,19 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 	throw runtime_error("Invalid job type");
 }
 
-Core::WorkerThreadManager::WorkerThreadManager(Device& device, SyncContext& syncContext)
-	:_device(device)
+Core::WorkerThreadManager::WorkerThreadManager(Device& device, SyncContext& syncContext,
+	size_t threadCount, ThreadPriority priority)
+	:_device(device), _threadCount(std::max<size_t>(threadCount, 1)), _roundRobinIndex(0)
 {
-	_threadCount = std::thread::hardware_concurrency();
-
 	for (size_t i = 0; i < _threadCount; i++)
 	{
-		auto workerThread = make_unique<WorkerThread>(_device, syncContext);
+		auto workerThread = make_unique<WorkerThread>(_device, syncContext, priority);
 		_workerThreads.push_back(move(workerThread));
 	}
 }
 
 void Core::WorkerThreadManager::Enqueue(const Job* job)
 {
-	_roundRobinIndex = _roundRobinIndex % _threadCount;
-	WorkerThread& thread = *_workerThreads[_roundRobinIndex];
-	_workerThreads[_roundRobinIndex]->Enqueue(job);
-	++_roundRobinIndex;
+	const size_t index = _roundRobinIndex++ % _threadCount;
+	_workerThreads[index]->Enqueue(job);
 }
