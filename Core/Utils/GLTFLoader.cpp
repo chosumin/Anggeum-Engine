@@ -307,7 +307,14 @@ bool Core::GLTFLoader::LoadFromFile(tinygltf::Model* model, const string& path)
 
 	tinygltf::TinyGLTF loader;
 
-	bool ret = loader.LoadASCIIFromFile(_model, &err, &warn, path);
+	// Textures are streamed from their URIs by the upload jobs, so the default
+	// loader's stb_image decode of every image here is wasted main-thread time.
+	loader.SetImageLoader(
+		[](tinygltf::Image*, const int, string*, string*, int, int,
+			const unsigned char*, int, void*) { return true; },
+		nullptr);
+
+	bool ret = loader.LoadASCIIFromFile(model, &err, &warn, path);
 
 	if (ret == false)
 	{
