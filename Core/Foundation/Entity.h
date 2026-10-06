@@ -18,8 +18,10 @@ namespace Core
 		void SetParent(Entity& parent);
 		Entity* GetParent() const;
 		void AddChild(Entity& child);
+		void RemoveChild(Entity& child);
 		const vector<Entity*>& GetChildren() const;
 		void SetComponent(Component& component);
+		const unordered_map<type_index, Component*>& GetComponents() const { return _components; }
 
 		template <class T>
 		inline T& GetComponent()

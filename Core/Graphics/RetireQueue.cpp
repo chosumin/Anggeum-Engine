@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "RetireQueue.h"
 #include "SyncContext.h"
 
@@ -14,8 +14,21 @@ void RetireQueue::Retire(ErasedPtr resource)
 	if (resource == nullptr)
 		return;
 
+	Push(std::move(resource), nullptr);
+}
+
+void RetireQueue::Retire(function<void()> onRetired)
+{
+	if (!onRetired)
+		return;
+
+	Push(ErasedPtr(nullptr, [](void*) {}), std::move(onRetired));
+}
+
+void RetireQueue::Push(ErasedPtr resource, function<void()> action)
+{
 	// The current values bound everything submitted so far.
-	_entries.push_back({ std::move(resource),
+	_entries.push_back({ std::move(resource), std::move(action),
 		_sync.GetCurrentValue(QueueType::Graphics),
 		_sync.GetCurrentValue(QueueType::Compute),
 		_sync.GetCurrentValue(QueueType::Transfer) });
@@ -37,6 +50,11 @@ void RetireQueue::Collect()
 			|| transfer < front.transfer)
 			break;
 
+		// Taken off the queue before it runs: an action may retire more.
+		Entry done = std::move(_entries.front());
 		_entries.pop_front();
+
+		if (done.action)
+			done.action();
 	}
 }

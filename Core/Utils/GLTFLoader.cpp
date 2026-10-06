@@ -805,7 +805,8 @@ void Core::GLTFLoader::LoadNodes()
 	{
 		auto gltfNode = _model->nodes[i];
 
-		auto entity = make_unique<Entity>(i, gltfNode.name);
+		auto entity = make_unique<Entity>(_scene.AllocateEntityId(), gltfNode.name);
+		_loaded.entities.push_back(entity.get());
 
 		auto& transform = entity->GetTransform();
 

@@ -72,6 +72,27 @@ namespace Core
 		return handle;
 	}
 
+	void ResourceManager::UnloadMaterial(Handle<Material> handle)
+	{
+		lock_guard<mutex> guard(_materialMutex);
+
+		Material* material = handle.TryGet();
+		if (material == nullptr)
+			return;
+
+		// The table index leaves with the object: pending frames may still
+		// index it from their instance data.
+		if (material->HasMaterialIndex())
+		{
+			auto* materials = _renderContext->GetMaterialManager();
+			const uint32_t materialIndex = material->GetMaterialIndex();
+			_retire.Retire([materials, materialIndex] { materials->UnregisterMaterial(materialIndex); });
+		}
+
+		_materialHandles.erase(material->GetName());
+		_materialPool.Remove(handle);
+	}
+
 	Handle<Shader> ResourceManager::LoadShader(const string& shaderName)
 	{
 		lock_guard<mutex> guard(_shaderMutex);
@@ -224,9 +245,16 @@ namespace Core
 		if (texture == nullptr)
 			return;
 
-		// NOTE: bindless-registered textures also need their descriptor reset to
-		// the default texture; today's callers only unload unregistered ones
-		// (SDF volume). Revisit when the streaming policy starts evicting assets.
+		// The bindless slot leaves with the object: freed, and its descriptor
+		// pointed back at the default texture, only once no pending submission
+		// can still sample it.
+		if (_renderContext != nullptr && _renderContext->HasBindlessSupport())
+		{
+			auto* bindless = _renderContext->GetBindlessTextureManager();
+			const uint32_t bindlessIndex = texture->GetBindlessIndex();
+			_retire.Retire([bindless, bindlessIndex] { bindless->UnregisterTexture(bindlessIndex); });
+		}
+
 		_textureHandles.erase(texture->GetName());
 		_texturePool.Remove(handle);
 	}
@@ -325,12 +353,25 @@ namespace Core
 		}
 
 		if (!batch.copies.empty())
+
+	void ResourceManager::UnloadSubMesh(Handle<SubMesh> handle)
+	{
+		lock_guard<mutex> guard(_subMeshMutex);
+
+		SubMesh* subMesh = handle.TryGet();
+		if (subMesh == nullptr)
+			return;
+
+		// The spans leave with the object: a pending frame may still draw from them.
+		if (subMesh->HasAllocation())
 		{
-			handle.SetLoading();
-			_streamer->Push(move(batch));
+			auto* meshBuffers = _renderContext->GetMeshBufferManager();
+			const uint32_t meshID = subMesh->GetAllocation().meshID;
+			_retire.Retire([meshBuffers, meshID] { meshBuffers->FreeMesh(meshID); });
 		}
 
-		return handle;
+		_subMeshHandles.erase(subMesh->GetName());
+		_subMeshPool.Remove(handle);
 	}
 
 	Handle<Buffer> ResourceManager::LoadBuffer(const BufferDesc& desc, const string& debugName)

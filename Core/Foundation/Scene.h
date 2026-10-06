@@ -20,6 +20,11 @@ namespace Core
 		void SetEntities(vector<unique_ptr<Entity>>&& entities);
 		void AddEntity(unique_ptr<Entity>&& entity);
 
+		// Scene-unique ids for loaded entities.
+		size_t AllocateEntityId();
+
+		void RemoveEntity(Entity& entity);
+
 		void AddComponent(unique_ptr<Component>&& component);
 		void AddComponent(unique_ptr<Component>&& component, Entity& entity);
 
@@ -101,6 +106,10 @@ namespace Core
 		vector<unique_ptr<Core::Entity>> _entities;
 		unique_ptr<Entity> _root;
 		unordered_map<type_index, vector<unique_ptr<Component>>> _components;
+
+		// Root is 0, so allocated ids start after it.
+		size_t _nextEntityId = 1;
+		vector<size_t> _freeEntityIds;
 	};
 }
 

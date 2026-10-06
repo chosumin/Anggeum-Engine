@@ -33,6 +33,7 @@ namespace Core
 
 		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Material> LoadMaterial(const string materialName, const string& shaderName);
+		void UnloadMaterial(Handle<Material> handle);
 
 		Handle<Shader> LoadShader(const string& shaderName);
 		Handle<Shader> LoadShader(const string& vertPath, const string& fragPath);
@@ -60,6 +61,7 @@ namespace Core
 		//   LoadStandaloneSubMesh -> its own vertex/index buffers (e.g. the skybox)
 		Handle<SubMesh> LoadSubMesh(const string& name, SubMeshGeometry&& geometry);
 		Handle<SubMesh> LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry);
+		void UnloadSubMesh(Handle<SubMesh> handle);
 
 		// Global (app-lifetime) GPU buffers
 		// NOT name-deduped — each call makes a new buffer; the caller keeps the handle.

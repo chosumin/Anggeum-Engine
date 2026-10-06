@@ -43,6 +43,48 @@ namespace Core
 		_entities.emplace_back(std::move(entity));
 	}
 
+	size_t Scene::AllocateEntityId()
+	{
+		if (!_freeEntityIds.empty())
+		{
+			size_t id = _freeEntityIds.back();
+			_freeEntityIds.pop_back();
+			return id;
+		}
+
+		return _nextEntityId++;
+	}
+
+	void Scene::RemoveEntity(Entity& entity)
+	{
+		// The Transform is a member of the entity, so it has no scene-owned entry.
+		for (auto& [type, component] : entity.GetComponents())
+		{
+			auto owned = _components.find(type);
+			if (owned == _components.end())
+				continue;
+
+			auto& list = owned->second;
+			list.erase(std::remove_if(list.begin(), list.end(),
+				[component](const unique_ptr<Component>& candidate)
+				{
+					return candidate.get() == component;
+				}), list.end());
+		}
+
+		_root->RemoveChild(entity);
+
+		// Only ids this scene handed out go back to the pool.
+		if (entity.GetId() < _nextEntityId)
+			_freeEntityIds.push_back(entity.GetId());
+
+		_entities.erase(std::remove_if(_entities.begin(), _entities.end(),
+			[&entity](const unique_ptr<Entity>& candidate)
+			{
+				return candidate.get() == &entity;
+			}), _entities.end());
+	}
+
 	void Scene::AddComponent(unique_ptr<Component>&& component)
 	{
 		if (component)

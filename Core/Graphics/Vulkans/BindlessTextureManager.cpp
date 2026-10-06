@@ -128,12 +128,6 @@ namespace Core
 		vector<VkWriteDescriptorSet> writes;
 		writes.reserve(_pendingUpdates.size());
 
-		// Use default/null texture (VK_NULL_HANDLE is valid for partially bound)
-		VkDescriptorImageInfo defaultImageInfo{};
-		defaultImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		defaultImageInfo.imageView = VK_NULL_HANDLE;
-		defaultImageInfo.sampler = VK_NULL_HANDLE;
-
 		for (uint32_t packedIndex : _pendingUpdates)
 		{
 			bool isCubemap = (packedIndex & BindlessCubemapFlag) != 0;
@@ -172,17 +166,15 @@ namespace Core
 					_awaitingReal.push_back(packedIndex);
 				}
 			}
-			else
+			else if (!isCubemap)
 			{
-				VkWriteDescriptorSet write{};
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				// Freed: point the slot back at the placeholder. A null view needs
+				// the nullDescriptor feature, which is not enabled. Cubemap slots
+				// keep their stale write, which PARTIALLY_BOUND permits unless used.
+				auto write = _defaultTextureBuffer.CreateWriteDescriptorSet(
+					binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 				write.dstSet = _descriptorSet;
-				write.dstBinding = binding;
 				write.dstArrayElement = slotIndex;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				write.descriptorCount = 1;
-				write.pImageInfo = &defaultImageInfo;
-
 				writes.push_back(write);
 			}
 		}

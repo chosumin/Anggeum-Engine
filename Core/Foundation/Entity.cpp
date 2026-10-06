@@ -44,6 +44,11 @@ void Core::Entity::AddChild(Entity& child)
 	_children.push_back(&child);
 }
 
+void Core::Entity::RemoveChild(Entity& child)
+{
+	_children.erase(std::remove(_children.begin(), _children.end(), &child), _children.end());
+}
+
 const vector<Core::Entity*>& Core::Entity::GetChildren() const
 {
 	return _children;
