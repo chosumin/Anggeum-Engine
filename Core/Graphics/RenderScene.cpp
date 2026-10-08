@@ -49,8 +49,7 @@ void RenderScene::SyncManagers(Scene& scene, FrameResources& frameResources)
 	// The managers below are consumers of COMPLETED uploads: they fold
 	// promoted resources into the GPU mirrors.
 
-	if (_bindless)
-		_bindless->Sync();
+	_bindless->Sync();
 
 	_material->Sync();
 
