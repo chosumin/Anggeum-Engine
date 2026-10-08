@@ -4,6 +4,7 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/RendererBatch.h"
 #include "HiZCullPass.h"
+#include "Graphics/Terrain/TerrainRenderer.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -15,10 +16,12 @@
 
 using namespace Core;
 
-DepthPrePass::DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D extent,
+DepthPrePass::DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+	TerrainRenderer& terrainRenderer, VkExtent2D extent,
 	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase)
 	: _device(device)
 	, _renderScene(renderScene)
+	, _terrainRenderer(terrainRenderer)
 	, _extent(extent)
 	, _msaaSamples(msaaSamples)
 	, _phase(phase)
@@ -107,6 +110,11 @@ void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 			? HiZCullPass::SB_PASS1_INSTANCE_IDS : HiZCullPass::SB_PASS2_INSTANCE_IDS);
 		builder.Read(_instanceIDs, BufferAccess::StorageVertexRead);
 	}
+
+	// Terrain lands in this frame's depth here, so the Cull2 Hi-Z rebuild
+	// already sees it as an occluder.
+	if (first)
+		_terrainRenderer.SetupDepth(builder, frameResources);
 }
 
 void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -114,11 +122,10 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 	// Entered even with nothing to draw (no camera / no batch), so the declared
 	// loadOps still clear the targets for the passes that read them.
 	context.BeginRendering(commandBuffer);
+	commandBuffer.SetViewportAndScissor(context.GetRenderArea());
 
 	if (_indirect.IsValid())
 	{
-		commandBuffer.SetViewportAndScissor(context.GetRenderArea());
-
 		auto& depthNormalShader = _depthNormalShader.Get();
 		auto builder = context.CreateDescriptorSetBuilder(depthNormalShader, 0);
 		builder.SetUniformBuffer(0, context.GetBuffer(_camera));
@@ -127,6 +134,9 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 			context.GetBuffer(_indirect), context.GetBuffer(_indirectCount),
 			context.GetBuffer(_instanceIDs), builder);
 	}
+
+	if (_phase == Phase::First)
+		_terrainRenderer.RecordDepth(context, commandBuffer);
 
 	context.EndRendering(commandBuffer);
 }

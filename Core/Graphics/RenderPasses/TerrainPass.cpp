@@ -31,7 +31,7 @@ TerrainPass::TerrainPass(Device& device, ResourceManager& resourceManager, Rende
 	// Heightfields have no closed backside; GPU patch cone culling replaces
 	// this in the phase-2 pipeline.
 	_pipelineState->GetRasterizationStateCreateInfo().cullMode = VK_CULL_MODE_NONE;
-	// TerrainDepthPrePass owns the depth; this pass draws early-z against it
+	// The depth prepass owns the depth; this pass draws early-z against it
 	// (LESS_OR_EQUAL default + invariant positions), like GeometryPass does.
 	_pipelineState->GetDepthStencilStateCreateInfo().depthWriteEnable = VK_FALSE;
 

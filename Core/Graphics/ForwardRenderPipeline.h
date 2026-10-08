@@ -13,6 +13,7 @@ namespace Core
 	class RenderContext;
 	class FrameGraph;
 	class SyncContext;
+	class TerrainRenderer;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
@@ -42,6 +43,8 @@ namespace Core
 		Device& _device;
 		RenderScene& _renderScene;
 		VkExtent2D _swapChainExtents;
+
+		unique_ptr<TerrainRenderer> _terrainRenderer;
 
 		unique_ptr<FrameGraph> _frameGraph;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;

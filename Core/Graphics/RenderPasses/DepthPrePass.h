@@ -11,6 +11,7 @@ namespace Core
 	class Pipeline;
 	class PipelineState;
 	class Buffer;
+	class TerrainRenderer;
 
 	class DepthPrePass : public FrameGraphPass
 	{
@@ -20,7 +21,9 @@ namespace Core
 		static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 		static constexpr const char* RT_MAIN_NORMAL = "MainNormal";
 
-		DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkExtent2D extent,
+		// The first phase also hosts the terrain depth draw.
+		DepthPrePass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+			TerrainRenderer& terrainRenderer, VkExtent2D extent,
 			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, Phase phase);
 		~DepthPrePass();
 
@@ -34,7 +37,11 @@ namespace Core
 
 	private:
 		Device& _device;
+		
 		RenderScene& _renderScene;
+
+		TerrainRenderer& _terrainRenderer;
+		
 		VkExtent2D _extent;
 		VkSampleCountFlagBits _msaaSamples;
 		Phase _phase;
