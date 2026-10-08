@@ -14,6 +14,7 @@ namespace Core
     class Material;
     class SubMesh;
     class Buffer;
+    class TerrainRenderer;
 
     class GeometryPass : public FrameGraphPass
     {
@@ -21,8 +22,10 @@ namespace Core
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
         static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 
-        GeometryPass(Device& device, RenderScene& renderScene, SwapChain& swapChain,
-            VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums);
+        // Also hosts the terrain color draw.
+        GeometryPass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
+            SwapChain& swapChain, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples,
+            ivec2 tileNums);
         ~GeometryPass();
 
         const char* GetName() const override { return "GeometryPass"; }
@@ -40,6 +43,7 @@ namespace Core
     private:
         Device& _device;
         RenderScene& _renderScene;
+        TerrainRenderer& _terrainRenderer;
         VkSampleCountFlagBits _msaaSamples;
         VkFormat _swapChainFormat;
         VkFormat _depthFormat;

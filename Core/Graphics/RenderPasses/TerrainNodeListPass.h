@@ -34,6 +34,7 @@ namespace Core
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;
 		void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
+		void OnGUI(RenderFrame& renderFrame) override;
 
 	private:
 		RenderScene& _renderScene;

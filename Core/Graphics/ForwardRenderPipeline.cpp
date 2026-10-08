@@ -21,7 +21,6 @@
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
-#include "Graphics/RenderPasses/TerrainPass.h"
 #include "Graphics/Terrain/TerrainRenderer.h"
 #include "Utils/Utility.h"
 using namespace Core;
@@ -52,7 +51,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 	_frameGraph = make_unique<FrameGraph>(device, resourceManager, syncContext, recordThreadCount);
 
 	_terrainRenderer = make_unique<TerrainRenderer>(device, resourceManager, renderScene,
-		depthFormat, _msaaSamples);
+		swapChain.GetImageFormat(), depthFormat, _msaaSamples);
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));
@@ -79,10 +78,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 	_frameGraph->AddPass(make_unique<IBLPass>(device, resourceManager, renderScene));
 
 	_frameGraph->AddPass(make_unique<GeometryPass>(
-		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
-
-	_frameGraph->AddPass(make_unique<TerrainPass>(device, resourceManager, renderScene,
-		swapChain.GetImageFormat(), depthFormat, _msaaSamples));
+		device, renderScene, *_terrainRenderer, swapChain, depthFormat, _msaaSamples, tileNums));
 
 	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples,
 		syncContext));

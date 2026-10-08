@@ -6,6 +6,7 @@
 #include "AmbientOcclusionPass.h"
 #include "IBLPass.h"
 #include "HiZCullPass.h"
+#include "Graphics/Terrain/TerrainRenderer.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/ResourceManager.h"
@@ -24,10 +25,11 @@
 
 using namespace Core;
 
-GeometryPass::GeometryPass(Device& device, RenderScene& renderScene, SwapChain& swapChain,
-    VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums)
+GeometryPass::GeometryPass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
+    SwapChain& swapChain, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums)
     : _device(device)
     , _renderScene(renderScene)
+    , _terrainRenderer(terrainRenderer)
     , _msaaSamples(msaaSamples)
     , _swapChainFormat(swapChain.GetImageFormat())
     , _depthFormat(depthFormat)
@@ -180,6 +182,9 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
         frameResources.GetOrCreateUniformBuffer<GI>(IBLPass::UB_GI));
     builder.Read(_gi, BufferAccess::UniformFragment);
 
+    // Terrain draws here whether or not any mesh does.
+    _terrainRenderer.SetupColor(builder, frameResources);
+
     // Get a geometry shader for rendering (use first mesh's material shader)
     _geometryShader = nullptr;
     auto meshes = _renderScene.GetScene().GetComponents<Core::Mesh>();
@@ -228,37 +233,35 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
     // the declared loadOp still clears the colour target the GUI pass composites
     // onto.
     context.BeginRendering(commandBuffer);
-
-    if (!_pass1Indirect.IsValid() || _geometryShader == nullptr)
-    {
-        context.EndRendering(commandBuffer);
-        return;
-    }
-
     commandBuffer.SetViewportAndScissor(context.GetRenderArea());
 
-    auto builder = context.CreateDescriptorSetBuilder(*_geometryShader, 0);
-    builder.SetUniformBuffer(0, context.GetBuffer(_camera));
-    builder.SetUniformBuffer(3, context.GetBuffer(_gi));
-    builder.SetUniformBuffer(4, context.GetBuffer(_shadowUB));
-    builder.SetUniformBuffer(5, context.GetBuffer(_lights));
-    builder.SetStorageBuffer(6, context.GetBuffer(_lightVisibility));
-    builder.SetTextureBuffer(7, context.GetTexture(_shadow));
+    // Both compacted mesh lists, the terrain, then the skybox, in one scope.
+    if (_pass1Indirect.IsValid() && _geometryShader != nullptr)
+    {
+        auto builder = context.CreateDescriptorSetBuilder(*_geometryShader, 0);
+        builder.SetUniformBuffer(0, context.GetBuffer(_camera));
+        builder.SetUniformBuffer(3, context.GetBuffer(_gi));
+        builder.SetUniformBuffer(4, context.GetBuffer(_shadowUB));
+        builder.SetUniformBuffer(5, context.GetBuffer(_lights));
+        builder.SetStorageBuffer(6, context.GetBuffer(_lightVisibility));
+        builder.SetTextureBuffer(7, context.GetTexture(_shadow));
 
-    if (_sdfShadow.IsValid())
-        builder.SetTextureBuffer(10, context.GetTexture(_sdfShadow));
+        if (_sdfShadow.IsValid())
+            builder.SetTextureBuffer(10, context.GetTexture(_sdfShadow));
 
-    builder.SetTextureBuffer(11, context.GetTexture(_ao));
+        builder.SetTextureBuffer(11, context.GetTexture(_ao));
 
-    commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
+        commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
 
-    // Replay both compacted draw lists, then the skybox, all in one scope.
-    _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass1Indirect), context.GetBuffer(_pass1Count),
-        context.GetBuffer(_pass1InstanceIDs), builder);
-    _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
-        context.GetBuffer(_pass2Indirect), context.GetBuffer(_pass2Count),
-        context.GetBuffer(_pass2InstanceIDs), builder);
+        _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
+            context.GetBuffer(_pass1Indirect), context.GetBuffer(_pass1Count),
+            context.GetBuffer(_pass1InstanceIDs), builder);
+        _renderScene.DrawIndirect(commandBuffer, *_geometryShader, *_geometryPipeline,
+            context.GetBuffer(_pass2Indirect), context.GetBuffer(_pass2Count),
+            context.GetBuffer(_pass2InstanceIDs), builder);
+    }
+
+    _terrainRenderer.RecordColor(context, commandBuffer);
 
     RecordSkybox(context, commandBuffer);
 

@@ -81,6 +81,13 @@ void TerrainNodeListPass::Setup(FrameGraphBuilder& builder,
 	_active = true;
 }
 
+void TerrainNodeListPass::OnGUI(RenderFrame& renderFrame)
+{
+	if (!ImGui::CollapsingHeader("Terrain"))
+		return;
+	_terrain.OnGUI();
+}
+
 void TerrainNodeListPass::Execute(FrameGraphPassContext& context,
 	CommandBuffer& commandBuffer)
 {
