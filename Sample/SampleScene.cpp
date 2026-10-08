@@ -12,7 +12,10 @@
 #include "Graphics/Material.h"
 #include "Graphics/BufferObjects.h"
 #include "Graphics/RenderContext.h"
+#include "Core/Utils/Log.h"
 using namespace Core;
+
+static const char* HELMET_PATH = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 
 SampleScene::SampleScene(Core::Device& device, Core::ResourceManager& resourceManager)
 	:_renderContext(nullptr), _device(device), _resourceManager(resourceManager)
@@ -194,6 +197,8 @@ void SampleScene::Update()
 		ImGui::Text("  Allocated Meshes: %u", meshBufferManager->GetAllocatedMeshCount());
 	}
 
+	UpdateStreamingTest();
+
 	// Main Camera Section
 	ImGui::SeparatorText("Main Camera");
 	{
@@ -346,3 +351,76 @@ void SampleScene::Update()
 
 	ImGui::End();
 }
+
+bool SampleScene::KeyPressedThisFrame(KeyCode key)
+{
+	bool down = Core::Input::KeyPressed[key];
+	bool pressed = down && !_keyWasDown[key];
+	_keyWasDown[key] = down;
+	return pressed;
+}
+
+void SampleScene::UpdateStreamingTest()
+{
+	// Keyboard nav keeps WantCaptureKeyboard set; only a text field should eat the keys.
+	if (!ImGui::GetIO().WantTextInput)
+	{
+		if (KeyPressedThisFrame(KeyCode::_1)) SpawnAssets(1);
+		if (KeyPressedThisFrame(KeyCode::_2)) DespawnAssets(1);
+		if (KeyPressedThisFrame(KeyCode::_3)) SpawnAssets(10);
+		if (KeyPressedThisFrame(KeyCode::_4)) DespawnAssets(10);
+	}
+
+	ImGui::SeparatorText("Asset Streaming Test");
+	ImGui::Text("1: load 1   2: unload 1   3: load 10   4: unload 10  (LIFO)");
+	ImGui::Text("Spawned helmets: %zu", _spawned.size());
+
+	if (auto* bindless = _renderContext->GetBindlessTextureManager())
+		ImGui::Text("Bindless textures: %u", bindless->GetActiveTextureCount());
+}
+
+void SampleScene::SpawnAssets(int count)
+{
+	for (int i = 0; i < count; ++i)
+		_spawned.push_back(_gltfLoader->LoadScene(HELMET_PATH,
+			[this](const LoadedAsset& asset) { OnAssetLoaded(asset); }));
+}
+
+void SampleScene::OnAssetLoaded(const LoadedAsset& asset)
+{
+	if (asset.entities.empty())
+	{
+		LOG("Streaming test: helmet load failed");
+		return;
+	}
+
+	// Random ground position; the file's own rotation is kept.
+	std::uniform_real_distribution<float> position(-50.0f, 50.0f);
+	vec3 translation(position(_spawnRng), 0.0f, position(_spawnRng));
+	for (auto* entity : asset.entities)
+		entity->GetTransform().SetTranslation(translation);
+
+	auto* meshBuffers = _renderContext->GetMeshBufferManager();
+	LOG("Streaming test: loaded a helmet at (%.1f, 0, %.1f) - %zu spawned, meshes %u, vertex tail %u",
+		translation.x, translation.z, _spawned.size(),
+		meshBuffers->GetAllocatedMeshCount(), meshBuffers->GetTotalVertexCount());
+}
+
+void SampleScene::DespawnAssets(int count)
+{
+	int removed = 0;
+	for (; removed < count && !_spawned.empty(); ++removed)
+	{
+		_gltfLoader->UnloadScene(_spawned.back());
+		_spawned.pop_back();
+	}
+
+	if (removed > 0)
+	{
+		auto* meshBuffers = _renderContext->GetMeshBufferManager();
+		LOG("Streaming test: unloaded %d helmet(s) -> %zu left, meshes %u, vertex tail %u",
+			removed, _spawned.size(),
+			meshBuffers->GetAllocatedMeshCount(), meshBuffers->GetTotalVertexCount());
+	}
+}
+
