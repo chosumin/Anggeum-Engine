@@ -2,6 +2,7 @@
 #include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
+#include "Graphics/Terrain/TerrainPatchCuller.h"
 
 namespace Core
 {
@@ -33,8 +34,17 @@ namespace Core
 		{
 			return "ShadowCull.Cascade" + std::to_string(cascade) + ".InstanceIDs";
 		}
+		static string TerrainPatchListName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".TerrainPatchList";
+		}
+		static string TerrainDrawArgsName(uint32_t cascade)
+		{
+			return "ShadowCull.Cascade" + std::to_string(cascade) + ".TerrainDrawArgs";
+		}
 
-		ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass);
+		ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+			TerrainPatchCuller& terrainCuller, ShadowPass& shadowPass);
 		~ShadowCullPass();
 
 		const char* GetName() const override { return "ShadowCullPass"; }
@@ -46,6 +56,7 @@ namespace Core
 	private:
 		Device& _device;
 		RenderScene& _renderScene;
+		TerrainPatchCuller& _terrainCuller;
 		ShadowPass& _shadowPass;
 
 		Handle<Shader> _cullShader;
@@ -61,5 +72,12 @@ namespace Core
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _indirect{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _drawCounts{};
 		array<Handle<Buffer>, SHADOW_MAP_CASCADE_COUNT> _cullData{};
+
+		// Terrain: frustum-only cull of the camera's node list per cascade.
+		bool _terrainActive = false;
+		TerrainPatchCuller::Inputs _terrainInputs;
+		TerrainTraversalPush _terrainPush{};
+		array<TerrainPatchCuller::Output, SHADOW_MAP_CASCADE_COUNT> _terrainOutputs{};
+		array<Handle<Buffer>, SHADOW_MAP_CASCADE_COUNT> _terrainCullData{};
 	};
 }

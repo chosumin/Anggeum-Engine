@@ -480,6 +480,11 @@ namespace Core
 			vert = "shaders/Terrain/terrain.vert.spv";
 			frag = "shaders/Terrain/terrainDepth.frag.spv";
 			break;
+		case Utility::HashCode("TerrainShadow"):
+			pass = "Terrain";
+			vert = "shaders/Terrain/terrain.vert.spv";
+			frag = "shaders/shadow.frag.spv";
+			break;
 		default:
 			pass = "Geometry";
 			//Default is compute shader.

@@ -4,6 +4,7 @@
 #include "Graphics/RenderFrame.h"
 #include "Graphics/RendererBatch.h"
 #include "ShadowCullPass.h"
+#include "Graphics/Terrain/TerrainRenderer.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -18,9 +19,11 @@
 
 using namespace Core;
 
-ShadowPass::ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkFormat depthFormat)
+ShadowPass::ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+	TerrainRenderer& terrainRenderer, VkFormat depthFormat)
 	: _device(device)
 	, _renderScene(renderScene)
+	, _terrainRenderer(terrainRenderer)
 {
 	_shadowExtent = { SHADOW_MAP_DIM, SHADOW_MAP_DIM };
 
@@ -274,6 +277,8 @@ void ShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResource
 			builder.Read(_cascadeInstanceIDs[i], BufferAccess::StorageVertexRead);
 		}
 	}
+
+	_terrainRenderer.SetupShadow(builder, frameResources, _shadowBuffer.CascadeCount);
 }
 
 void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -322,6 +327,8 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 			context.GetBuffer(_cascadeIndirect[cascadeIndex]),
 			context.GetBuffer(_cascadeDrawCount[cascadeIndex]),
 			context.GetBuffer(_cascadeInstanceIDs[cascadeIndex]), builder);
+		_terrainRenderer.RecordShadow(context, commandBuffer, cascadeIndex,
+			context.GetBuffer(_cascadeBuffers[cascadeIndex]));
 		commandBuffer.EndRendering();
 
 		commandBuffer.EndDebugMarker();

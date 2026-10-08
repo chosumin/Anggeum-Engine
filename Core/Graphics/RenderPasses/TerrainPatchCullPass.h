@@ -1,28 +1,21 @@
 #pragma once
 #include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/ResourceHandle.h"
-#include "Graphics/Terrain/TerrainConfig.h"
+#include "Graphics/Terrain/TerrainPatchCuller.h"
 
 namespace Core
 {
-	class ResourceManager;
-	class Device;
 	class RenderScene;
 	class TerrainSystem;
-	class Shader;
-	class Pipeline;
-	class Buffer;
 
-	// Expands the Terrain Node List into 8x8 patches per node,
-	// culls each patch (frustum + previous-frame Hi-Z) and
-	// packs LOD stitch deltas from the LOD map, producing the Visible Render
-	// Patch List + the instanced draw's indirect args.
+	// The camera's patch cull: frustum + previous-frame Hi-Z, writing the
+	// traversal's draw args.
 	class TerrainPatchCullPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* SB_PATCH_LIST = "Terrain.PatchList";
 
-		TerrainPatchCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+		TerrainPatchCullPass(RenderScene& renderScene, TerrainPatchCuller& culler,
 			VkExtent2D screenExtent);
 
 		const char* GetName() const override { return "TerrainPatchCull"; }
@@ -34,19 +27,15 @@ namespace Core
 	private:
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
+		TerrainPatchCuller& _culler;
 		VkExtent2D _screenExtent{};
 
-		Handle<Shader> _shader;
-		Handle<Pipeline> _pipeline;
-
-		Handle<Buffer> _nodeDescBuffer;
-
-		FGTexture _lodMap, _hiZ;
-		FGBuffer _nodeList, _nodeListCount, _patchList,
-			_patchDrawArgs, _cullData, _readback;
+		TerrainPatchCuller::Inputs _inputs;
+		TerrainPatchCuller::Output _output;
+		FGTexture _hiZ;
+		FGBuffer _cullData, _readback;
 		TerrainTraversalPush _push{};
 		bool _active = false;
 		bool _hiZBound = false;
-		bool _occlusionEnabled = false;
 	};
 }

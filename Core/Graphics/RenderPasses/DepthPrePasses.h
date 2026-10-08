@@ -7,6 +7,7 @@ namespace Core
 	class Device;
 	class RenderScene;
 	class TerrainRenderer;
+	class TerrainPatchCuller;
 
 	// Bundles the depth prepass chain: two-pass occlusion culling interleaved
 	// with the split depth prepass and the depth/normal resolves.
@@ -14,7 +15,7 @@ namespace Core
 	{
 	public:
 		DepthPrePasses(FrameGraph& graph, Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
-			TerrainRenderer& terrainRenderer, VkExtent2D extent, VkFormat depthFormat,
-			VkSampleCountFlagBits msaaSamples);
+			TerrainRenderer& terrainRenderer, TerrainPatchCuller& terrainCuller, VkExtent2D extent,
+			VkFormat depthFormat, VkSampleCountFlagBits msaaSamples);
 	};
 }

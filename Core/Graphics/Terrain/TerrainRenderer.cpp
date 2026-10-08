@@ -3,6 +3,8 @@
 #include "TerrainSystem.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainPatchCullPass.h"
+#include "Graphics/RenderPasses/ShadowCullPass.h"
+#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/FrameResources.h"
@@ -55,6 +57,18 @@ TerrainRenderer::TerrainRenderer(Device& device, ResourceManager& resourceManage
 	wireframeState.GetRasterizationStateCreateInfo().polygonMode = VK_POLYGON_MODE_LINE;
 	_wireframePipeline = make_unique<Pipeline>(device, colorDesc, _colorShader.Get(),
 		wireframeState);
+
+	// terrain.vert under the cascade camera + the empty shadow fragment.
+	_shadowShader = resourceManager.LoadShader("TerrainShadow");
+
+	_shadowPipelineState = make_unique<PipelineState>();
+	_shadowPipelineState->GetRasterizationStateCreateInfo().cullMode = VK_CULL_MODE_NONE;
+	_shadowPipelineState->GetRasterizationStateCreateInfo().depthBiasEnable = VK_TRUE;
+
+	PipelineRenderingDesc shadowDesc;
+	shadowDesc.depthFormat = depthFormat;
+	_shadowPipeline = make_unique<Pipeline>(device, shadowDesc, _shadowShader.Get(),
+		*_shadowPipelineState);
 }
 
 TerrainRenderer::~TerrainRenderer() = default;
@@ -74,15 +88,20 @@ bool TerrainRenderer::SetupShared(FrameGraphBuilder& builder, FrameResources& fr
 	_patchDrawArgs = builder.GetBuffer(TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
 	builder.Read(_patchDrawArgs, BufferAccess::IndirectRead);
 
+	_params = SetupParams(builder, frameResources);
+	return true;
+}
+
+FGBuffer TerrainRenderer::SetupParams(FrameGraphBuilder& builder, FrameResources& frameResources)
+{
 	// One buffer for every terrain draw this frame; refreshed by whichever
 	// pass sets up first.
 	TerrainParams params = _terrain.BuildRenderParams(_renderScene.GetScene().GetMainLight());
 	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>("Terrain.Params");
 	paramsHandle.Get().Update(params);
-	_params = builder.ImportBuffer("Terrain.Params", paramsHandle);
-	builder.Read(_params, BufferAccess::UniformFragment);
-
-	return true;
+	FGBuffer fgParams = builder.ImportBuffer("Terrain.Params", paramsHandle);
+	builder.Read(fgParams, BufferAccess::UniformFragment);
+	return fgParams;
 }
 
 void TerrainRenderer::BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder)
@@ -140,6 +159,55 @@ bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& fra
 	}
 
 	return true;
+}
+
+void TerrainRenderer::SetupShadow(FrameGraphBuilder& builder, FrameResources& frameResources,
+	uint32_t cascadeCount)
+{
+	_shadowPatchLists.fill(FGBuffer{});
+	_shadowDrawArgs.fill(FGBuffer{});
+
+	bool any = false;
+	for (uint32_t i = 0; i < cascadeCount; ++i)
+	{
+		string listName = ShadowCullPass::TerrainPatchListName(i);
+		if (!builder.HasBuffer(listName))
+			continue;
+
+		_shadowPatchLists[i] = builder.GetBuffer(listName);
+		builder.Read(_shadowPatchLists[i], BufferAccess::StorageVertexRead);
+
+		_shadowDrawArgs[i] = builder.GetBuffer(ShadowCullPass::TerrainDrawArgsName(i));
+		builder.Read(_shadowDrawArgs[i], BufferAccess::IndirectRead);
+		any = true;
+	}
+
+	if (any)
+		_shadowParams = SetupParams(builder, frameResources);
+}
+
+void TerrainRenderer::RecordShadow(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+	uint32_t cascade, Buffer& cascadeCamera)
+{
+	if (!_shadowPatchLists[cascade].IsValid())
+		return;
+
+	commandBuffer.BindPipeline(_shadowPipeline.get());
+
+	Shader& shader = _shadowShader.Get();
+	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
+	builder.SetUniformBuffer(0, cascadeCamera);
+	builder.SetStorageBuffer(1, context.GetBuffer(_shadowPatchLists[cascade]));
+	builder.SetTextureBuffer(2, _terrain.GetQuadTree().GetHeightAtlas().Get(), 0,
+		VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetUniformBuffer(5, context.GetBuffer(_shadowParams));
+	auto& resources = builder.Build();
+
+	commandBuffer.BindDescriptorSet(_shadowPipeline->GetPipelineBindPoint(), shader, resources);
+
+	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
+	commandBuffer.DrawIndexedIndirect(context.GetBuffer(_shadowDrawArgs[cascade]), 1,
+		sizeof(VkDrawIndexedIndirectCommand));
 }
 
 void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer& commandBuffer)

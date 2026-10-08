@@ -12,13 +12,15 @@ namespace Core
 	class Pipeline;
 	class PipelineState;
 	class PerspectiveCamera;
+	class TerrainRenderer;
 
 	class ShadowPass : public FrameGraphPass
 	{
 	public:
 		static constexpr const char* RT_SHADOW_DEPTH = "ShadowDepth";
 
-		ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, VkFormat depthFormat);
+		ShadowPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+			TerrainRenderer& terrainRenderer, VkFormat depthFormat);
 		~ShadowPass();
 
 		const char* GetName() const override { return "ShadowPass"; }
@@ -43,6 +45,7 @@ namespace Core
 	private:
 		Device& _device;
 		RenderScene& _renderScene;
+		TerrainRenderer& _terrainRenderer;
 		VkExtent2D _shadowExtent;
 
 		Handle<Shader> _shadowShader;

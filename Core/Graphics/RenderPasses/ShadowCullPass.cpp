@@ -6,6 +6,8 @@
 #include "Graphics/FrameResources.h"
 #include "Graphics/RendererBatch.h"
 #include "Graphics/ResourceManager.h"
+#include "Graphics/Terrain/TerrainSystem.h"
+#include "TerrainNodeListPass.h"
 #include "Utils/Math.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -16,9 +18,11 @@
 
 using namespace Core;
 
-ShadowCullPass::ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene, ShadowPass& shadowPass)
+ShadowCullPass::ShadowCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
+	TerrainPatchCuller& terrainCuller, ShadowPass& shadowPass)
 	: _device(device)
 	, _renderScene(renderScene)
+	, _terrainCuller(terrainCuller)
 	, _shadowPass(shadowPass)
 {
 	_cullShader = resourceManager.LoadShader("Shaders/frustumCulling.comp.spv");
@@ -34,6 +38,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	RenderFrame& renderFrame)
 {
 	_active = false;
+	_terrainActive = false;
 	_cascadeCount = 0;
 
 	PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
@@ -87,6 +92,34 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 			"ShadowCull.Cascade" + std::to_string(i) + ".CullData");
 	}
 
+	// Terrain: the same node list the camera culls, against each cascade's
+	// frustum (no Hi-Z); the LOD map keeps the stitching identical to the
+	// main draw, so shadows match the rendered surface.
+	_terrainActive = builder.HasBuffer(TerrainNodeListPass::SB_NODE_LIST);
+	if (_terrainActive)
+	{
+		const TerrainConfig& config = _renderScene.GetTerrainSystem().GetConfig();
+		_terrainInputs = _terrainCuller.SetupInputs(builder, frameResources);
+		_terrainPush = _terrainCuller.BuildPush(*camera);
+
+		for (uint32_t i = 0; i < _cascadeCount; ++i)
+		{
+			_terrainOutputs[i].patchList = _terrainCuller.CreatePatchList(builder, TerrainPatchListName(i));
+			_terrainOutputs[i].drawArgs = _terrainCuller.CreateDrawArgs(builder, TerrainDrawArgsName(i));
+
+			TerrainCullData cullData{};
+			cullData.view = _views[i].View;
+			cullData.proj = _views[i].Projection;
+			Math::ExtractFrustumPlanes(cullData.proj * cullData.view, cullData.frustumPlanes);
+			cullData.screenHiZ = vec4(0.0f, 0.0f, 1.0f, 0.0f);
+			cullData.heightBounds = vec4(config.heightMin, config.heightMax, 2.0f, 0.0f);
+
+			_terrainCullData[i] = frameResources.GetOrCreateUniformBuffer<TerrainCullData>(
+				"ShadowCull.Cascade" + std::to_string(i) + ".TerrainCullData");
+			_terrainCullData[i].Get().Update(cullData);
+		}
+	}
+
 	_active = true;
 }
 
@@ -115,8 +148,25 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+
+		if (_terrainActive)
+		{
+			Buffer& terrainArgs = context.GetBuffer(_terrainOutputs[i].drawArgs);
+			_terrainCuller.ResetDrawArgs(commandBuffer, terrainArgs);
+			barriers.Buffer(terrainArgs,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		}
 	}
 	barriers.Submit();
+
+	if (_terrainActive)
+	{
+		for (uint32_t i = 0; i < _cascadeCount; ++i)
+			_terrainCuller.Dispatch(context, commandBuffer, _terrainInputs, _terrainOutputs[i],
+				_terrainCullData[i].Get(), nullptr, _terrainPush);
+	}
 
 	commandBuffer.BindPipeline(&_cullPipeline.Get());
 	auto& cullShader = _cullShader.Get();

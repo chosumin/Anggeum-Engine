@@ -9,8 +9,8 @@
 using namespace Core;
 
 DepthPrePasses::DepthPrePasses(FrameGraph& graph, Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
-	TerrainRenderer& terrainRenderer, VkExtent2D extent, VkFormat depthFormat,
-	VkSampleCountFlagBits msaaSamples)
+	TerrainRenderer& terrainRenderer, TerrainPatchCuller& terrainCuller, VkExtent2D extent,
+	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples)
 {
 	using CullPhase = HiZCullPass::Phase;
 	using DepthPhase = DepthPrePass::Phase;
@@ -22,7 +22,7 @@ DepthPrePasses::DepthPrePasses(FrameGraph& graph, Device& device, ResourceManage
 
 	// Terrain patch culling tests against the pyramid Cull1 just rebuilt
 	// (previous frame's depth, terrain included); DepthPre1 draws the patches.
-	graph.AddPass(make_unique<TerrainPatchCullPass>(device, resourceManager, renderScene, extent));
+	graph.AddPass(make_unique<TerrainPatchCullPass>(renderScene, terrainCuller, extent));
 
 	graph.AddPass(make_unique<DepthPrePass>(device, resourceManager, renderScene, terrainRenderer,
 		extent, depthFormat, msaaSamples, DepthPhase::First));

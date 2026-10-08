@@ -14,6 +14,7 @@ namespace Core
 	class FrameGraph;
 	class SyncContext;
 	class TerrainRenderer;
+	class TerrainPatchCuller;
 
 	class ForwardRenderPipeline : public IRenderPipeline
 	{
@@ -45,6 +46,7 @@ namespace Core
 		VkExtent2D _swapChainExtents;
 
 		unique_ptr<TerrainRenderer> _terrainRenderer;
+		unique_ptr<TerrainPatchCuller> _terrainCuller;
 
 		unique_ptr<FrameGraph> _frameGraph;
 		VkSampleCountFlagBits _msaaSamples = VK_SAMPLE_COUNT_1_BIT;

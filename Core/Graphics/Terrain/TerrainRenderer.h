@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/FrameGraph/FrameGraphResource.h"
 #include "Graphics/ResourceHandle.h"
+#include "Graphics/BufferObjects.h"
 
 namespace Core
 {
@@ -16,6 +17,7 @@ namespace Core
 	class FrameGraphPassContext;
 	class CommandBuffer;
 	class DescriptorSetBuilder;
+	class Buffer;
 
 	// Terrain's draws inside the shared passes. The host pass owns the
 	// attachments; this declares what a draw reads and records it.
@@ -35,8 +37,16 @@ namespace Core
 		bool SetupColor(FrameGraphBuilder& builder, FrameResources& frameResources);
 		void RecordColor(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
 
+		// Shadow cascades: depth-only draws of the per-cascade patch lists the
+		// shadow cull produced (absent lists leave the cascade without terrain).
+		void SetupShadow(FrameGraphBuilder& builder, FrameResources& frameResources,
+			uint32_t cascadeCount);
+		void RecordShadow(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+			uint32_t cascade, Buffer& cascadeCamera);
+
 	private:
 		bool SetupShared(FrameGraphBuilder& builder, FrameResources& frameResources);
+		FGBuffer SetupParams(FrameGraphBuilder& builder, FrameResources& frameResources);
 		void BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder);
 
 		RenderScene& _renderScene;
@@ -51,8 +61,16 @@ namespace Core
 		unique_ptr<Pipeline> _colorPipeline;
 		unique_ptr<Pipeline> _wireframePipeline;
 
+		Handle<Shader> _shadowShader;
+		unique_ptr<PipelineState> _shadowPipelineState;
+		unique_ptr<Pipeline> _shadowPipeline;
+
 		FGBuffer _camera, _patchList, _patchDrawArgs, _params, _pick;
 		bool _depthActive = false;
 		bool _colorActive = false;
+
+		FGBuffer _shadowParams;
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _shadowPatchLists{};
+		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _shadowDrawArgs{};
 	};
 }

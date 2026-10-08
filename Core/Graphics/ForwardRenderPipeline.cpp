@@ -22,6 +22,8 @@
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
 #include "Graphics/Terrain/TerrainRenderer.h"
+#include "Graphics/Terrain/TerrainPatchCuller.h"
+#include "Graphics/Terrain/TerrainSystem.h"
 #include "Utils/Utility.h"
 using namespace Core;
 
@@ -52,17 +54,19 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 
 	_terrainRenderer = make_unique<TerrainRenderer>(device, resourceManager, renderScene,
 		swapChain.GetImageFormat(), depthFormat, _msaaSamples);
+	_terrainCuller = make_unique<TerrainPatchCuller>(resourceManager, renderScene.GetTerrainSystem());
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, resourceManager, renderScene, *_terrainRenderer,
-		extent, depthFormat, _msaaSamples);
+		*_terrainCuller, extent, depthFormat, _msaaSamples);
 
 	_frameGraph->AddPass(make_unique<LightCullingPass>(device, resourceManager, renderScene, extent, tileNums, _msaaSamples));
 
 	// The shadow feature wires its own cull + draw passes into the graph.
-	ShadowPasses shadowPasses(*_frameGraph, device, resourceManager, renderScene, depthFormat);
+	ShadowPasses shadowPasses(*_frameGraph, device, resourceManager, renderScene,
+		*_terrainRenderer, *_terrainCuller, depthFormat);
 
 	auto fgSdfShadowPass = make_unique<SDFShadowPass>(
 		device, resourceManager, renderScene, extent, _msaaSamples, shadowPasses.GetShadowBuffer());
