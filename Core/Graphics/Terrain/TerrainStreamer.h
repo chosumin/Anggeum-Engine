@@ -78,8 +78,6 @@ namespace Core
 		vector<vector<uint16_t>> _indexMirror;           // CPU copy, per LOD
 		vector<TerrainNodeDescGPU> _descMirror;          // by atlas slot
 
-		bool _atlasLayoutPending = true;
-
 		Handle<Sampler> _indexSampler;
 
 		TerrainStreamingStats _stats;

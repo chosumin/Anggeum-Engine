@@ -33,8 +33,7 @@ namespace Core
 {
 	TerrainUploadJob::TerrainUploadJob(TerrainQuadTree& quadTree,
 		const TerrainNodeStore& store, const TerrainConfig& config,
-		vector<TerrainTileUpload>&& tiles, StagingRing::Span span,
-		bool initializeAtlases)
+		vector<TerrainTileUpload>&& tiles, StagingRing::Span span)
 		: UploadJob()
 		, _store(store)
 		, _config(config)
@@ -44,7 +43,6 @@ namespace Core
 		, _quadTree(quadTree)
 		, _tiles(std::move(tiles))
 		, _span(span)
-		, _initializeAtlases(initializeAtlases)
 	{
 		stagingSpanId = span.id;
 	}
@@ -87,24 +85,7 @@ namespace Core
 				albedoRegions, _quadTree.ColorTexelOrigin(tile.slot), colorTexels);
 		}
 
-		// First upload ever: the atlases leave UNDEFINED for their permanent
-		// GENERAL layout here, ahead of the first copies in this very
-		// recording. Explicit masks: the transition must be visible to the
-		// copies below (GENERAL's inferred shader dst scope would sanitize to
-		// nothing on the transfer family); visibility for shader consumers is
-		// the timeline gate.
-		if (_initializeAtlases)
-		{
-			auto batch = commandBuffer->CreateBarrierBatch();
-			for (Texture* atlas : { &_heightAtlas, &_normalAtlas, &_albedoAtlas })
-			{
-				batch.Image(*atlas, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
-					VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
-			}
-			batch.Submit();
-		}
-
+		// The atlases are in GENERAL since their creation (TerrainQuadTree).
 		commandBuffer->CopyBufferToImage(*source, _heightAtlas, heightRegions,
 			VK_IMAGE_LAYOUT_GENERAL);
 		commandBuffer->CopyBufferToImage(*source, _normalAtlas, normalRegions,

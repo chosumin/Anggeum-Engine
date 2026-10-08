@@ -24,7 +24,7 @@ namespace Core
 	public:
 		TerrainUploadJob(TerrainQuadTree& quadTree, const TerrainNodeStore& store,
 			const TerrainConfig& config, vector<TerrainTileUpload>&& tiles,
-			StagingRing::Span span, bool initializeAtlases);
+			StagingRing::Span span);
 		~TerrainUploadJob();
 
 		void Execute() override;
@@ -42,7 +42,6 @@ namespace Core
 
 		vector<TerrainTileUpload> _tiles;
 		StagingRing::Span _span;
-		bool _initializeAtlases;
 	};
 
 	class TerrainIndexUploadJob : public Job

@@ -177,9 +177,8 @@ namespace Core
 					PromoteNode(tile.id, tile.slot);
 			};
 			upload.job = make_unique<TerrainUploadJob>(_quadTree, _store, _config,
-				std::move(tiles), span, _atlasLayoutPending);
+				std::move(tiles), span);
 			_transfer.SubmitJob(std::move(upload), jobName);
-			_atlasLayoutPending = false;
 		}
 		else
 		{
