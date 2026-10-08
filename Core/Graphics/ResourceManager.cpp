@@ -58,7 +58,10 @@ namespace Core
 
 		auto it = _materialHandles.find(materialName);
 		if (it != _materialHandles.end() && _materialPool.IsAlive(it->second))
+		{
+			_materialPool.AddUse(it->second);
 			return it->second;
+		}
 
 		auto material =
 			make_unique<Core::Material>(_device, *this, LoadShader(shaderName), materialName);
@@ -78,6 +81,9 @@ namespace Core
 
 		Material* material = handle.TryGet();
 		if (material == nullptr)
+			return;
+
+		if (_materialPool.Release(handle) > 0)
 			return;
 
 		// The table index leaves with the object: pending frames may still
@@ -190,7 +196,10 @@ namespace Core
 
 		auto it = _textureHandles.find(newName);
 		if (it != _textureHandles.end() && _texturePool.IsAlive(it->second))
+		{
+			_texturePool.AddUse(it->second);
 			return it->second;
+		}
 
 		ImageCreateDesc resolvedInfo = imageCreateInfo;
 		resolvedInfo.filePath = Image::ResolveBakedPath(resolvedInfo.filePath);
@@ -228,7 +237,10 @@ namespace Core
 
 		auto it = _textureHandles.find(name);
 		if (it != _textureHandles.end() && _texturePool.IsAlive(it->second))
+		{
+			_texturePool.AddUse(it->second);
 			return it->second;
+		}
 
 		auto texture = make_unique<Core::Texture>(name, std::move(image), sampler);
 
@@ -243,6 +255,9 @@ namespace Core
 
 		Texture* texture = handle.TryGet();
 		if (texture == nullptr)
+			return;
+
+		if (_texturePool.Release(handle) > 0)
 			return;
 
 		// The bindless slot leaves with the object: freed, and its descriptor
@@ -276,7 +291,10 @@ namespace Core
 
 		auto it = _subMeshHandles.find(name);
 		if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
+		{
+			_subMeshPool.AddUse(it->second);
 			return it->second;
+		}
 
 		auto subMesh = make_unique<Core::SubMesh>(_device, name);
 		subMesh->SetIndexCount(IndexCountOf(geometry));
@@ -314,7 +332,10 @@ namespace Core
 
 			auto it = _subMeshHandles.find(name);
 			if (it != _subMeshHandles.end() && _subMeshPool.IsAlive(it->second))
+			{
+				_subMeshPool.AddUse(it->second);
 				return it->second;
+			}
 
 			auto created = make_unique<Core::SubMesh>(_device, name);
 			created->SetIndexCount(IndexCountOf(geometry));
@@ -360,6 +381,9 @@ namespace Core
 
 		SubMesh* subMesh = handle.TryGet();
 		if (subMesh == nullptr)
+			return;
+
+		if (_subMeshPool.Release(handle) > 0)
 			return;
 
 		// The spans leave with the object: a pending frame may still draw from them.

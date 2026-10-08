@@ -46,6 +46,7 @@ namespace Core
 			// Reused slots may carry a stale state; resources are Resident by
 			// default and only deferred-upload loaders mark Loading.
 			slot.state = ResourceState::Resident;
+			slot.useCount = 1;
 			++_liveCount;
 
 			return Handle<T>{ this, index, slot.generation };
@@ -96,6 +97,29 @@ namespace Core
 
 		bool IsAlive(Handle<T> handle) const { return Get(handle) != nullptr; }
 
+		// Use count: how many loads share the resource.
+		void AddUse(Handle<T> handle)
+		{
+			if (IsAlive(handle))
+				++_slots[handle.index].useCount;
+		}
+
+		uint32_t Release(Handle<T> handle)
+		{
+			if (!IsAlive(handle))
+				return 0;
+
+			auto& useCount = _slots[handle.index].useCount;
+			if (useCount > 0)
+				--useCount;
+			return useCount;
+		}
+
+		uint32_t GetUseCount(Handle<T> handle) const
+		{
+			return IsAlive(handle) ? _slots[handle.index].useCount : 0;
+		}
+
 		// Residency is slot metadata beside the generation - never a member on
 		// the resource object (transient load state must not outlive loading).
 		bool IsResident(Handle<T> handle) const
@@ -119,6 +143,7 @@ namespace Core
 			unique_ptr<T> resource;
 			uint32_t generation = 0;
 			ResourceState state = ResourceState::Resident;
+			uint32_t useCount = 0;
 		};
 
 		RetireQueue& _retire;
