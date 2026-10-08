@@ -71,7 +71,8 @@ void Core::WorkerThread::Run()
 			pendingJob->status = JobStatus::PROGRESS;
 			pendingJob->Execute();
 
-			commandBuffer->EndCommandBuffer();
+			if (commandBuffer != nullptr)
+				commandBuffer->EndCommandBuffer();
 
 			pendingJob->status = JobStatus::COMPLETE;
 
@@ -105,6 +106,9 @@ Core::CommandBuffer* Core::WorkerThread::RequestAndBeginCommandBuffer(Job* job)
 		job->commandBuffer = &commandBuffer;
 		return &commandBuffer;
 	}
+	case JobType::CPU:
+		job->commandBuffer = nullptr;
+		return nullptr;
 	}
 
 	throw runtime_error("Invalid job type");

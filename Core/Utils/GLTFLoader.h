@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/GeometryUpload.h"
+#include "Foundation/Threadable.h"
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION "KHR_lights_punctual"
 
@@ -14,6 +15,7 @@ namespace tinygltf
 namespace Core
 {
 	class Scene;
+	class Entity;
 	class Sampler;
 	class Texture;
 	class Material;
@@ -22,6 +24,8 @@ namespace Core
 	class Light;
 	class ResourceManager;
 	class RenderContext;
+	class AssetStreamer;
+	class GltfParseJob;
 
 	/**
 	 * @brief Helper Function to change array type T to array type Y
@@ -38,20 +42,42 @@ namespace Core
 		}
 	};
 
-	class GLTFLoader
+	struct LoadedAsset
 	{
+		vector<Entity*> entities;
+		vector<Handle<Core::Texture>> textures;
+		vector<Handle<Core::Material>> materials;
+		vector<Handle<Core::SubMesh>> subMeshes;
+	};
+
+	using AssetId = uint32_t;
+
+	class GLTFLoader : private Threadable
+	{
+		friend class GltfParseJob;
 	public:
-		GLTFLoader(Device& device, ResourceManager& resourceManager, Scene& scene);
+		static constexpr size_t PARSE_THREADS = 2;
+
+		GLTFLoader(Device& device, ResourceManager& resourceManager, Scene& scene,
+			AssetStreamer& assetStreamer, SyncContext& syncContext);
 		~GLTFLoader();
 
-		void LoadScene(string path);
+		AssetId LoadScene(string path, function<void(const LoadedAsset&)> onLoaded = nullptr);
+		void UnloadScene(AssetId id);
+
+		// Registers the parses that finished.
+		void Update();
+
 		void LoadSkybox(string path);
 
 		void SetRenderContext(RenderContext* renderContext) { _renderContext = renderContext; }
 
 	private:
-		bool LoadFromFile(tinygltf::Model* model, const string& path);
+		static bool LoadFromFile(tinygltf::Model* model, const string& path);
 		void LoadAssets(const string& modelPath);
+		LoadedAsset FinalizeLoad(GltfParseJob& job);
+		void ReleasePendingUnloads();
+		void UnloadResources(const LoadedAsset& asset);
 		void CheckExtensions();
 		void LoadLights();
 		vector<Handle<Core::Sampler>> LoadSamplers();
@@ -66,7 +92,8 @@ namespace Core
 		enum class GeometryStorage { Global, Standalone };
 
 		// Reads a primitive's attributes + indices into the form ResourceManager takes.
-		SubMeshGeometry ReadGeometry(const tinygltf::Primitive& primitive);
+		static SubMeshGeometry ReadGeometry(const tinygltf::Model* model,
+			const tinygltf::Primitive& primitive);
 		// Scene geometry: handed to the render side's global mesh buffers.
 		void LoadMeshes(vector<Handle<Core::Material>>& materials);
 		// Skybox geometry: per-submesh buffers, outside the GPU-driven draw set.
@@ -80,6 +107,7 @@ namespace Core
 		Device& _device;
 		Scene& _scene;
 		ResourceManager& _resourceManager;
+		AssetStreamer& _assetStreamer;
 		RenderContext* _renderContext = nullptr;
 
 		string _modelPath;
@@ -87,5 +115,34 @@ namespace Core
 		vector<Core::Mesh*> _meshes;
 		vector<Core::PerspectiveCamera*> _cameras;
 		vector<Core::Light*> _lights;
+		LoadedAsset _loaded;
+
+		// The parse job's output being registered: geometry in mesh/primitive
+		// order (LoadMeshes) and upload sizes per glTF image (LoadTextures).
+		vector<SubMeshGeometry> _pendingGeometry;
+		vector<VkDeviceSize> _pendingImageBytes;
+
+		// Parses in request order; a cancelled one is dropped when it finishes.
+		struct PendingLoad
+		{
+			AssetId id;
+			unique_ptr<GltfParseJob> job;
+			function<void(const LoadedAsset&)> onLoaded;
+			bool cancelled = false;
+		};
+		deque<PendingLoad> _pendingLoads;
+
+		// Assets in the scene, by id.
+		AssetId _nextAssetId = 1;
+		unordered_map<AssetId, LoadedAsset> _assets;
+
+		// Taken out of the scene; their resources wait for the frame's render
+		// sync to release the draws and for their uploads to land.
+		struct PendingUnload
+		{
+			LoadedAsset asset;
+			u64 removedFrame;
+		};
+		vector<PendingUnload> _pendingUnloads;
 	};
 }

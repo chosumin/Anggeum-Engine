@@ -4,7 +4,8 @@ namespace Core
 {
 	enum class JobType
 	{
-		GRAPHICS_PRIMARY, COMPUTE, TRANSFER
+		GRAPHICS_PRIMARY, COMPUTE, TRANSFER,
+		CPU   // no command buffer: pure CPU work such as file parsing
 	};
 
 	enum class JobStatus

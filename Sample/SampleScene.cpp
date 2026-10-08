@@ -19,13 +19,11 @@ SampleScene::SampleScene(Core::Device& device, Core::ResourceManager& resourceMa
 {
 }
 
-void SampleScene::Load(float width, float height, Core::RenderContext* renderContext)
+void SampleScene::Load(float width, float height, Core::RenderContext* renderContext,
+	Core::GLTFLoader& gltfLoader)
 {
 	_renderContext = renderContext;
-
-	_gltfLoader = make_unique<Core::GLTFLoader>(_device, _resourceManager, *this);
-
-	_gltfLoader->SetRenderContext(renderContext);
+	_gltfLoader = &gltfLoader;
 
 	string path = "./Assets/Models/Sponza/glTF/Sponza.gltf";
 	_gltfLoader->LoadScene(path);

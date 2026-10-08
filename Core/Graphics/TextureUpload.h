@@ -11,6 +11,8 @@ namespace Core
 
 	// A texture whose pixel data should be read from `filePath` and uploaded. The job
 	// itself reads the file on a worker thread, so only the path is handed over.
+	// Move-only: a request that still names a texture when it dies was never
+	// handed to the streamer, and that texture would stay without data.
 	struct TextureUploadRequest
 	{
 		Handle<Texture> texture;
@@ -18,6 +20,29 @@ namespace Core
 
 		// Bytes this upload will stage, for budget admission.
 		VkDeviceSize stagingBytes = 0;
+
+		TextureUploadRequest() = default;
+		TextureUploadRequest(Handle<Texture> texture, string filePath, VkDeviceSize stagingBytes)
+			: texture(texture), filePath(std::move(filePath)), stagingBytes(stagingBytes)
+		{
+		}
+		TextureUploadRequest(const TextureUploadRequest&) = delete;
+		TextureUploadRequest& operator=(const TextureUploadRequest&) = delete;
+		TextureUploadRequest(TextureUploadRequest&& other) noexcept { *this = std::move(other); }
+		TextureUploadRequest& operator=(TextureUploadRequest&& other) noexcept
+		{
+			texture = other.texture;
+			filePath = std::move(other.filePath);
+			stagingBytes = other.stagingBytes;
+			other.Release();
+			return *this;
+		}
+		~TextureUploadRequest()
+		{
+			assert(!texture.IsValid() && "texture upload request dropped without a Push");
+		}
+
+		void Release() { texture = Handle<Texture>{}; }
 	};
 
 	// One-shot hand-off between asset loading and the GPU upload: loaders push
@@ -26,10 +51,21 @@ namespace Core
 	class TextureUploadQueue
 	{
 	public:
+		// Shutdown: what was never admitted is abandoned on purpose.
+		~TextureUploadQueue()
+		{
+			for (auto& request : _requests)
+				request.Release();
+		}
+
 		void Push(TextureUploadRequest&& request)
 		{
+			// Covered by the request already pending for the same texture.
 			if (_queued.find(request.texture) != _queued.end())
+			{
+				request.Release();
 				return;
+			}
 
 			_queued.insert(request.texture);
 			_requests.push_back(std::move(request));

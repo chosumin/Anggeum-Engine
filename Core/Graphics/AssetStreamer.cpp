@@ -14,7 +14,25 @@ AssetStreamer::AssetStreamer(Device& device, TransferContext& transfer)
 {
 }
 
+void AssetStreamer::Push(TextureUploadRequest&& request)
+{
+	request.texture.SetLoading();
+	_textureUploads.Push(std::move(request));
+}
+
+void AssetStreamer::Push(GeometryCopyBatch&& batch)
+{
+	batch.subMesh.SetLoading();
+	_geometryCopies.Push(std::move(batch));
+}
+
 void AssetStreamer::SubmitQueued()
+{
+	SubmitQueuedTextures();
+	SubmitQueuedGeometry();
+}
+
+void AssetStreamer::SubmitQueuedTextures()
 {
 	// Admission control, FIFO: each request charges the shared frame budget
 	// before it becomes a job; the first one the budget cannot cover stops
@@ -35,8 +53,12 @@ void AssetStreamer::SubmitQueued()
 		upload.job = make_unique<TextureUploadJob>(_device, texture,
 			request.filePath);
 		_transfer.SubmitJob(std::move(upload), jobName);
+		request.Release();
 	}
+}
 
+void AssetStreamer::SubmitQueuedGeometry()
+{
 	// One upload job per batch (i.e. per submesh); the job consumes the
 	// request whole and resolves its destination handles itself.
 	vector<GeometryCopyBatch> deferred;

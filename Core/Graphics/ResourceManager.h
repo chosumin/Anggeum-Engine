@@ -7,6 +7,7 @@
 #include "Graphics/Material.h"
 #include "Graphics/SubMesh.h"
 #include "Graphics/ResourcePool.h"
+#include "Graphics/TextureUpload.h"
 
 #define DEFAULT_SAMPLER SamplerCreateInfo()
 #define DEFAULT_IMAGE "Assets/Textures/white.png"
@@ -17,7 +18,6 @@ namespace Core
 	class Device;
 	class Image;
 	class RenderContext;
-	class AssetStreamer;
 	class SyncContext;
 
 	class ResourceManager
@@ -26,12 +26,11 @@ namespace Core
 		ResourceManager(Device& device, SyncContext& syncContext);
 		~ResourceManager();
 
-		void Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer);
+		void Prepare(RenderContext& renderContext);
 
 		// Destroys retired resources whose timelines the GPU has passed.
 		void DestroyRetired();
 
-		// Pool-owned; resolve the handle with handle.Get().
 		Handle<Material> LoadMaterial(const string materialName, const string& shaderName);
 		void UnloadMaterial(Handle<Material> handle);
 
@@ -45,8 +44,10 @@ namespace Core
 		// Loads a file-based asset texture (ImageCreateInfo.filePath) into the pool
 		// and registers it with the bindless array. Pass a sampler handle, or leave
 		// it empty to bind none.
+		// outUpload null means the caller uploads the data itself.
 		Handle<Texture> LoadTexture(const string& textureName,
-			const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler = Handle<Sampler>{});
+			const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler = Handle<Sampler>{},
+			TextureUploadRequest* outUpload = nullptr);
 
 		// Adopts an externally built image (e.g. a GPU-generated volume) into the
 		// texture pool. For app-lifetime textures that aren't loaded from a file.
@@ -59,8 +60,10 @@ namespace Core
 		// geometry is reserved right here so the SubMesh is immediately usable
 		//   LoadSubMesh           -> global mesh buffers (GPU-driven draw set)
 		//   LoadStandaloneSubMesh -> its own vertex/index buffers (e.g. the skybox)
-		Handle<SubMesh> LoadSubMesh(const string& name, SubMeshGeometry&& geometry);
-		Handle<SubMesh> LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry);
+		Handle<SubMesh> LoadSubMesh(const string& name, SubMeshGeometry&& geometry,
+			GeometryCopyBatch& outBatch);
+		Handle<SubMesh> LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry,
+			GeometryCopyBatch& outBatch);
 		void UnloadSubMesh(Handle<SubMesh> handle);
 
 		// Global (app-lifetime) GPU buffers
@@ -80,7 +83,6 @@ namespace Core
 	private:
 		Device& _device;
 		RenderContext* _renderContext = nullptr;
-		AssetStreamer* _streamer = nullptr;
 
 		RetireQueue _retire;
 

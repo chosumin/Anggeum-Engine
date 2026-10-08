@@ -19,7 +19,11 @@ GeometryUploadJob::GeometryUploadJob(Device& device, GeometryCopyBatch&& batch)
 		_destinations.push_back(&copy.destination.Get());
 }
 
-GeometryUploadJob::~GeometryUploadJob() = default;
+GeometryUploadJob::~GeometryUploadJob()
+{
+	// The job was the batch's destination; nothing further takes it over.
+	_batch.Release();
+}
 
 void GeometryUploadJob::Execute()
 {

@@ -14,19 +14,16 @@ namespace Core
 	public:
 		AssetStreamer(Device& device, TransferContext& transfer);
 
-		void Push(TextureUploadRequest&& request)
-		{
-			_textureUploads.Push(std::move(request));
-		}
-		void Push(GeometryCopyBatch&& batch)
-		{
-			_geometryCopies.Push(std::move(batch));
-		}
+		void Push(TextureUploadRequest&& request);
+		void Push(GeometryCopyBatch&& batch);
 
-		// Drain both request queues into transfer jobs, within budget.
+		// Drain the request queues into transfer jobs, within budget.
 		void SubmitQueued();
 
 	private:
+		void SubmitQueuedTextures();
+		void SubmitQueuedGeometry();
+
 		Device& _device;
 		TransferContext& _transfer;
 

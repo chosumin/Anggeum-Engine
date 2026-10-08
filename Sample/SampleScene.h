@@ -15,14 +15,12 @@ public:
 	SampleScene(Core::Device& device, Core::ResourceManager& resourceManager);
 	~SampleScene();
 
-	// Loading needs the render-side managers (reached through the RenderContext),
-	// which are constructed after the scene object so RenderScene can take the
-	// scene by reference. Engine calls this once everything is wired.
-	void Load(float width, float height, Core::RenderContext* renderContext);
+	void Load(float width, float height, Core::RenderContext* renderContext,
+		Core::GLTFLoader& gltfLoader);
 
 	virtual void Update() override;
 private:
-	unique_ptr<Core::GLTFLoader> _gltfLoader;
+	Core::GLTFLoader* _gltfLoader = nullptr;
 	Core::RenderContext* _renderContext;
 	Core::Device& _device;
 	Core::ResourceManager& _resourceManager;

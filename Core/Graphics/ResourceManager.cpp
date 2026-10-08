@@ -6,7 +6,6 @@
 #include "Graphics/TextureUpload.h"
 #include "Graphics/SyncContext.h"
 #include "Graphics/RenderContext.h"
-#include "Graphics/AssetStreamer.h"
 #include "Graphics/RetireQueue.h"
 
 namespace Core
@@ -40,11 +39,10 @@ namespace Core
 		_retire.Collect();
 	}
 
-	void ResourceManager::Prepare(RenderContext& renderContext, AssetStreamer& assetStreamer)
+	void ResourceManager::Prepare(RenderContext& renderContext)
 	{
 		_renderContext = &renderContext;
-		_streamer = &assetStreamer;
-		
+
 		if (_renderContext->HasBindlessSupport())
 		{
 			cout << "ResourceManager: Bindless texture support enabled" << endl;
@@ -186,7 +184,8 @@ namespace Core
 		return handle;
 	}
 
-	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateDesc imageCreateInfo, const Handle<Sampler> sampler)
+	Handle<Texture> ResourceManager::LoadTexture(const string& textureName, const ImageCreateDesc imageCreateInfo,
+		const Handle<Sampler> sampler, TextureUploadRequest* outUpload)
 	{
 		lock_guard<mutex> guard(_textureMutex);
 
@@ -211,20 +210,21 @@ namespace Core
 		Handle<Texture> handle = _texturePool.Add(std::move(texture));
 		_textureHandles[newName] = handle;
 
-		// Only the ctor's default texture takes that path.
-		// The ctor needs neither the queue nor the Loading state.
-		if (_renderContext != nullptr)
+		// Only the ctor's default texture takes that path; it uploads itself.
+		if (_renderContext != nullptr && _renderContext->HasBindlessSupport())
 		{
-			if (_renderContext->HasBindlessSupport())
-			{
-				auto* bindlessManager = _renderContext->GetBindlessTextureManager();
-				uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
-				texturePtr->SetBindlessIndex(bindlessIndex);
-			}
+			auto* bindlessManager = _renderContext->GetBindlessTextureManager();
+			uint32_t bindlessIndex = bindlessManager->RegisterTexture(handle);
+			texturePtr->SetBindlessIndex(bindlessIndex);
+		}
 
-			handle.SetLoading();
-			_streamer->Push({ handle, resolvedInfo.filePath,
-				Image::QueryStagingBytes(resolvedInfo.filePath) });
+		if (outUpload != nullptr)
+		{
+			VkDeviceSize stagingBytes = resolvedInfo.stagingBytes != 0
+				? resolvedInfo.stagingBytes
+				: Image::QueryStagingBytes(resolvedInfo.filePath);
+
+			*outUpload = TextureUploadRequest(handle, resolvedInfo.filePath, stagingBytes);
 		}
 
 		return handle;
@@ -285,7 +285,8 @@ namespace Core
 		return static_cast<uint32_t>(geometry.indexData.size() / stride);
 	}
 
-	Handle<Core::SubMesh> ResourceManager::LoadSubMesh(const string& name, SubMeshGeometry&& geometry)
+	Handle<Core::SubMesh> ResourceManager::LoadSubMesh(const string& name, SubMeshGeometry&& geometry,
+		GeometryCopyBatch& outBatch)
 	{
 		lock_guard<mutex> guard(_subMeshMutex);
 
@@ -303,27 +304,21 @@ namespace Core
 		Handle<SubMesh> handle = _subMeshPool.Add(std::move(subMesh));
 		_subMeshHandles[name] = handle;
 
-		GeometryCopyBatch batch;
-		batch.debugName = "Geometry_" + name;
-		batch.subMesh = handle;
+		outBatch.debugName = "Geometry_" + name;
+		outBatch.subMesh = handle;
 
 		// Scanning every vertex for bounds is the expensive part, so the upload job
 		// does it on a worker thread and reports back here.
-		batch.boundsTarget = subMeshPtr;
+		outBatch.boundsTarget = subMeshPtr;
 
 		auto* meshBufferManager = _renderContext->GetMeshBufferManager();
-		subMeshPtr->SetAllocation(meshBufferManager->AllocateGeometry(geometry, batch.copies));
-
-		if (!batch.copies.empty())
-		{
-			handle.SetLoading();
-			_streamer->Push(move(batch));
-		}
+		subMeshPtr->SetAllocation(meshBufferManager->AllocateGeometry(geometry, outBatch.copies));
 
 		return handle;
 	}
 
-	Handle<Core::SubMesh> ResourceManager::LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry)
+	Handle<Core::SubMesh> ResourceManager::LoadStandaloneSubMesh(const string& name, SubMeshGeometry&& geometry,
+		GeometryCopyBatch& outBatch)
 	{
 		Handle<SubMesh> handle;
 		Core::SubMesh* subMesh = nullptr;
@@ -347,9 +342,8 @@ namespace Core
 
 		// Not part of the global storage, so this geometry gets its own buffers.
 		// LoadBuffer takes its own lock, hence outside the guard above.
-		GeometryCopyBatch batch;
-		batch.debugName = "Standalone_" + name;
-		batch.subMesh = handle;
+		outBatch.debugName = "Standalone_" + name;
+		outBatch.subMesh = handle;
 
 		for (auto& attr : geometry.attributes)
 		{
@@ -359,7 +353,7 @@ namespace Core
 				  MemoryType::DEVICE_LOCAL },
 				name + attr.name);
 			subMesh->SetVertexBuffer(attr.name, buffer);
-			batch.copies.push_back({ buffer, move(attr.data), 0 });
+			outBatch.copies.push_back({ buffer, move(attr.data), 0 });
 		}
 
 		if (geometry.hasIndex)
@@ -370,10 +364,11 @@ namespace Core
 				  MemoryType::DEVICE_LOCAL },
 				name + " index");
 			subMesh->SetIndexBuffer(buffer, geometry.indexType);
-			batch.copies.push_back({ buffer, move(geometry.indexData), 0 });
+			outBatch.copies.push_back({ buffer, move(geometry.indexData), 0 });
 		}
 
-		if (!batch.copies.empty())
+		return handle;
+	}
 
 	void ResourceManager::UnloadSubMesh(Handle<SubMesh> handle)
 	{

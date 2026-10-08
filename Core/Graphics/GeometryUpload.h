@@ -65,6 +65,8 @@ namespace Core
 	};
 
 	// Copies that should upload together in a single transfer job.
+	// Move-only: a batch that still names a submesh when it dies was never
+	// handed to the streamer, and that submesh would stay without data.
 	struct GeometryCopyBatch
 	{
 		string debugName;
@@ -75,6 +77,26 @@ namespace Core
 		SubMesh* boundsTarget = nullptr;
 
 		Handle<SubMesh> subMesh;
+
+		GeometryCopyBatch() = default;
+		GeometryCopyBatch(const GeometryCopyBatch&) = delete;
+		GeometryCopyBatch& operator=(const GeometryCopyBatch&) = delete;
+		GeometryCopyBatch(GeometryCopyBatch&& other) noexcept { *this = std::move(other); }
+		GeometryCopyBatch& operator=(GeometryCopyBatch&& other) noexcept
+		{
+			debugName = std::move(other.debugName);
+			copies = std::move(other.copies);
+			boundsTarget = other.boundsTarget;
+			subMesh = other.subMesh;
+			other.Release();
+			return *this;
+		}
+		~GeometryCopyBatch()
+		{
+			assert(!subMesh.IsValid() && "geometry copy batch dropped without a Push");
+		}
+
+		void Release() { subMesh = Handle<SubMesh>{}; }
 	};
 
 	// One-shot hand-off from resource loading to the GPU upload.
@@ -82,6 +104,13 @@ namespace Core
 	class GeometryCopyQueue
 	{
 	public:
+		// Shutdown: what was never admitted is abandoned on purpose.
+		~GeometryCopyQueue()
+		{
+			for (auto& batch : _batches)
+				batch.Release();
+		}
+
 		void Push(GeometryCopyBatch&& batch) { _batches.push_back(std::move(batch)); }
 
 		bool Empty() const { return _batches.empty(); }

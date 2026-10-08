@@ -10,6 +10,9 @@ namespace Core
 		VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
 		VkImageCreateFlags flags = 0;
 		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+
+		// Upload size when the caller already read the file header
+		VkDeviceSize stagingBytes = 0;
 	};
 
 	// The one description for every engine-created image.

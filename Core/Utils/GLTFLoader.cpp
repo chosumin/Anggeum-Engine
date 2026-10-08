@@ -14,6 +14,8 @@
 #include "Components/PerspectiveCamera.h"
 #include "Components/FreeCamera.h"
 #include "Components/Light.h"
+#include "Graphics/AssetStreamer.h"
+#include "Graphics/FrameCounter.h"
 #include "Utils/Utility.h"
 
 #define TINYGLTF_IMPLEMENTATION
@@ -243,29 +245,191 @@ inline size_t GetAttributeStride(const tinygltf::Model* model, uint32_t accessor
 	return accessor.ByteStride(bufferView);
 };
 
+namespace Core
+{
+	// Worker-side half of an async load: everything that touches only the file
+	// and plain memory. The pools are main-thread only, so registration waits
+	// for FinalizeLoad.
+	class GltfParseJob : public Job
+	{
+	public:
+		GltfParseJob(string path)
+			: Job(JobType::CPU), path(std::move(path))
+		{
+		}
+
+		void Execute() override
+		{
+			ok = GLTFLoader::LoadFromFile(&model, path);
+			if (!ok)
+				return;
+
+			for (auto& gltfMesh : model.meshes)
+				for (auto& primitive : gltfMesh.primitives)
+					geometry.push_back(GLTFLoader::ReadGeometry(&model, primitive));
+
+			// Reading the texture headers here keeps that file I/O off the
+			// main thread too.
+			const string modelPath = path.substr(0, path.find_last_of('/'));
+			for (auto& image : model.images)
+			{
+				string resolved = Image::ResolveBakedPath(modelPath + "/" + image.uri);
+				imageBytes.push_back(Image::QueryStagingBytes(resolved));
+			}
+		}
+
+		string path;
+		tinygltf::Model model;
+		vector<SubMeshGeometry> geometry;
+		vector<VkDeviceSize> imageBytes;
+		bool ok = false;
+	};
+}
+
 Core::GLTFLoader::GLTFLoader(Device& device, ResourceManager& resourceManager,
-	Scene& scene)
-	: _device(device), _scene(scene),
-	_resourceManager(resourceManager)
+	Scene& scene, AssetStreamer& assetStreamer, SyncContext& syncContext)
+	// Below normal: a parse must never take a core from the frame.
+	: Threadable(device, syncContext, PARSE_THREADS, ThreadPriority::BelowNormal),
+	_device(device), _scene(scene),
+	_resourceManager(resourceManager), _assetStreamer(assetStreamer)
 {
 	_model = new tinygltf::Model();
 }
 
 Core::GLTFLoader::~GLTFLoader()
 {
+	// A worker may still be inside a parse job this object owns.
+	WaitFor([this]
+	{
+		for (auto& pending : _pendingLoads)
+			if (pending.job->status != JobStatus::COMPLETE)
+				return false;
+		return true;
+	});
+
 	delete(_model);
 }
 
-void Core::GLTFLoader::LoadScene(string path)
+Core::AssetId Core::GLTFLoader::LoadScene(string path, function<void(const LoadedAsset&)> onLoaded)
 {
-	if (LoadFromFile(_model, path) == false)
+	const AssetId id = _nextAssetId++;
+
+	PendingLoad pending{ id, make_unique<GltfParseJob>(std::move(path)), std::move(onLoaded) };
+	EnqueueUnowned(*pending.job);
+	_pendingLoads.push_back(std::move(pending));
+
+	return id;
+}
+
+void Core::GLTFLoader::Update()
+{
+	// In order: a finished parse behind an unfinished one waits its turn, so
+	// callers see loads complete in the order they were requested.
+	while (!_pendingLoads.empty() && _pendingLoads.front().job->status == JobStatus::COMPLETE)
+	{
+		PendingLoad pending = std::move(_pendingLoads.front());
+		_pendingLoads.pop_front();
+
+		// Unloaded while still parsing: never enters the scene.
+		if (pending.cancelled)
+			continue;
+
+		if (!pending.job->ok)
+		{
+			if (pending.onLoaded)
+				pending.onLoaded(LoadedAsset{});
+			continue;
+		}
+
+		LoadedAsset& asset = _assets[pending.id] = FinalizeLoad(*pending.job);
+		if (pending.onLoaded)
+			pending.onLoaded(asset);
+	}
+
+	ReleasePendingUnloads();
+}
+
+void Core::GLTFLoader::ReleasePendingUnloads()
+{
+	// The draws leave in the render sync of the frame the entities left, so
+	// from the next frame on only the uploads still have to land: an
+	// in-flight job references the object. A handle already gone counts.
+	const u64 frame = FrameCounter::GetFrameNumber();
+
+	auto landed = [](const auto& handles)
+	{
+		return std::all_of(handles.begin(), handles.end(),
+			[](const auto& handle) { return handle.TryGet() == nullptr || handle.IsResident(); });
+	};
+
+	for (size_t i = 0; i < _pendingUnloads.size();)
+	{
+		const PendingUnload& pending = _pendingUnloads[i];
+		if (pending.removedFrame >= frame
+			|| !landed(pending.asset.subMeshes) || !landed(pending.asset.textures))
+		{
+			++i;
+			continue;
+		}
+
+		UnloadResources(pending.asset);
+		_pendingUnloads.erase(_pendingUnloads.begin() + i);
+	}
+}
+
+void Core::GLTFLoader::UnloadScene(AssetId id)
+{
+	for (auto& pending : _pendingLoads)
+	{
+		if (pending.id == id)
+		{
+			pending.cancelled = true;
+			return;
+		}
+	}
+
+	auto it = _assets.find(id);
+	if (it == _assets.end())
 		return;
 
-	size_t pos = path.find_last_of('/');
-	string modelPath = path.substr(0, pos);
+	LoadedAsset asset = std::move(it->second);
+	_assets.erase(it);
 
-	_modelPath = modelPath;
-	LoadAssets(modelPath);
+	for (Entity* entity : asset.entities)
+		_scene.RemoveEntity(*entity);
+	asset.entities.clear();
+
+	// Scene membership changed, so the draw set has to be rebuilt.
+	_renderContext->GetRendererBatch()->MarkDirty();
+
+	_pendingUnloads.push_back({ std::move(asset), FrameCounter::GetFrameNumber() });
+}
+
+void Core::GLTFLoader::UnloadResources(const LoadedAsset& asset)
+{
+	// One Unload per Load the asset recorded; what another asset still shares
+	// survives on its use count.
+	for (const auto& handle : asset.subMeshes)
+		_resourceManager.UnloadSubMesh(handle);
+
+	for (const auto& handle : asset.materials)
+		_resourceManager.UnloadMaterial(handle);
+
+	for (const auto& handle : asset.textures)
+		_resourceManager.UnloadTexture(handle);
+}
+
+Core::LoadedAsset Core::GLTFLoader::FinalizeLoad(GltfParseJob& job)
+{
+	*_model = std::move(job.model);
+	_pendingGeometry = std::move(job.geometry);
+	_pendingImageBytes = std::move(job.imageBytes);
+
+	size_t pos = job.path.find_last_of('/');
+	_modelPath = job.path.substr(0, pos);
+	LoadAssets(_modelPath);
+
+	return _loaded;
 }
 
 void Core::GLTFLoader::LoadSkybox(string path)
@@ -288,8 +452,11 @@ void Core::GLTFLoader::LoadSkybox(string path)
 		VK_FORMAT_R16G16B16A16_SFLOAT 
 	};
 
+	TextureUploadRequest upload;
 	auto texture = _resourceManager.LoadTexture(textureName,
-		imageCreateInfo, _resourceManager.LoadSampler(DEFAULT_SAMPLER));
+		imageCreateInfo, _resourceManager.LoadSampler(DEFAULT_SAMPLER), &upload);
+	if (upload.texture.IsValid())
+		_assetStreamer.Push(std::move(upload));
 
 	auto material = _resourceManager.LoadMaterial("skybox", "Skybox");
 	material.Get().AddTexture(1, texture);
@@ -345,9 +512,11 @@ void Core::GLTFLoader::LoadAssets(const string& modelPath)
 	auto samplers = LoadSamplers();
 
 	auto textures = LoadTextures(samplers, modelPath);
+	_loaded.textures = textures;
 
 	auto materials = LoadMaterials(textures);
-	
+	_loaded.materials = materials;
+
 	LoadMeshes(materials);
 
 	LoadCameras();
@@ -527,13 +696,20 @@ vector<Core::Handle<Core::Texture>> Core::GLTFLoader::LoadTextures(
 		imageCreateInfo.filePath = modelPath + "/" + _model->images[imageIndex].uri;
 		if (srgbTextures.count(static_cast<int>(i)))
 			imageCreateInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+		if (static_cast<size_t>(imageIndex) < _pendingImageBytes.size())
+			imageCreateInfo.stagingBytes = _pendingImageBytes[imageIndex];
 
+		TextureUploadRequest upload;
 		auto texture =
 			_resourceManager.LoadTexture(_model->textures[i].name,
-				imageCreateInfo, samplers[samplerIndex]);
+				imageCreateInfo, samplers[samplerIndex], &upload);
+		if (upload.texture.IsValid())
+			_assetStreamer.Push(std::move(upload));
 
 		textures[i] = texture;
 	}
+
+	_pendingImageBytes.clear();
 
 	return textures;
 }
@@ -709,22 +885,23 @@ static string MakeSubMeshName(const string& meshName, const tinygltf::Primitive&
 	return meshName + "_" + std::to_string(subMeshHash);
 }
 
-Core::SubMeshGeometry Core::GLTFLoader::ReadGeometry(const tinygltf::Primitive& primitive)
+Core::SubMeshGeometry Core::GLTFLoader::ReadGeometry(const tinygltf::Model* model,
+	const tinygltf::Primitive& primitive)
 {
 	SubMeshGeometry geometry;
 
 	for (auto& attribute : primitive.attributes)
 	{
-		uint32_t stride = Utility::ToU32(GetAttributeStride(_model, attribute.second));
+		uint32_t stride = Utility::ToU32(GetAttributeStride(model, attribute.second));
 		geometry.attributes.push_back(
-			{ attribute.first, stride, GetAttributeData(_model, attribute.second) });
+			{ attribute.first, stride, GetAttributeData(model, attribute.second) });
 	}
 
 	if (primitive.indices >= 0)
 	{
-		auto indexData = GetAttributeData(_model, primitive.indices);
+		auto indexData = GetAttributeData(model, primitive.indices);
 		geometry.indexType = NormalizeIndexData(
-			GetAttributeFormat(_model, primitive.indices), indexData);
+			GetAttributeFormat(model, primitive.indices), indexData);
 		geometry.indexData = move(indexData);
 		geometry.hasIndex = true;
 	}
@@ -749,6 +926,7 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
 	// ResourceManager reserves space for the geometry as it is registered and defers the
 	// copy (RenderScene::Sync); the only difference between the two storage modes is
 	// which buffers that space comes from.
+	size_t pendingIndex = 0;
 	for (auto& gltfMesh : _model->meshes)
 	{
 		auto meshName = gltfMesh.name;
@@ -759,12 +937,21 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
 		{
 			string subMeshName = MakeSubMeshName(meshName, primitive);
 
+			// Scene geometry was read by the parse job; the skybox parses inline.
+			SubMeshGeometry geometry = (storage == GeometryStorage::Global)
+				? std::move(_pendingGeometry.at(pendingIndex++))
+				: ReadGeometry(_model, primitive);
+
+			GeometryCopyBatch batch;
 			auto subMesh = (storage == GeometryStorage::Global)
-				? _resourceManager.LoadSubMesh(subMeshName, ReadGeometry(primitive))
-				: _resourceManager.LoadStandaloneSubMesh(subMeshName, ReadGeometry(primitive));
+				? _resourceManager.LoadSubMesh(subMeshName, std::move(geometry), batch)
+				: _resourceManager.LoadStandaloneSubMesh(subMeshName, std::move(geometry), batch);
+			if (!batch.copies.empty())
+				_assetStreamer.Push(std::move(batch));
 
 			mesh->AddSubMesh(subMesh);
 			mesh->AddMaterial(materials[primitive.material]);
+			_loaded.subMeshes.push_back(subMesh);
 		}
 
 		_meshes.push_back(mesh.get());
@@ -773,6 +960,8 @@ void Core::GLTFLoader::LoadMeshes(vector<Handle<Core::Material>>& materials,
 		// Scene membership changed, so the draw set has to be rebuilt.
 		_renderContext->GetRendererBatch()->MarkDirty();
 	}
+
+	_pendingGeometry.clear();
 }
 
 void Core::GLTFLoader::LoadCameras()
@@ -882,4 +1071,5 @@ void Core::GLTFLoader::ClearCaches()
 	_meshes.clear();
 	_cameras.clear();
 	_lights.clear();
+	_loaded = {};
 }

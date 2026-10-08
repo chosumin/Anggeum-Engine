@@ -12,6 +12,7 @@ namespace Core
     class TransferContext;
     class SyncContext;
     class ResourceManager;
+    class GLTFLoader;
 
     struct EngineOptions
     {
@@ -49,5 +50,7 @@ namespace Core
 
         // GPU mirror of the scene for GPU-driven rendering, synced from scene dirty.
         RenderScene* _renderScene;
+
+        unique_ptr<GLTFLoader> _gltfLoader;
     };
 }

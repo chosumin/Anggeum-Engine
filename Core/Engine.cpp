@@ -13,6 +13,7 @@
 #include "Sample/SampleScene.h"
 #include "Utils/timer.h"
 #include "Utils/CrashHandler.h"
+#include "Utils/GLTFLoader.h"
 
 Core::Engine::Engine(const EngineOptions& options)
 {
@@ -37,17 +38,23 @@ Core::Engine::Engine(const EngineOptions& options)
     _renderContext = new Core::RenderContext(*_device, *_resourceManager, *_renderScene, *_syncContext);
     _status = make_unique<Core::Status>(*_renderContext);
 
-    _resourceManager->Prepare(*_renderContext, _renderScene->GetAssetStreamer());
+    _resourceManager->Prepare(*_renderContext);
 
     auto swapChainExtent = _renderContext->GetSurfaceExtent();
     auto& swapChain = _renderContext->GetSwapChain();
 
-    sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext);
+    _gltfLoader = make_unique<Core::GLTFLoader>(*_device, *_resourceManager, *_scene,
+        _renderScene->GetAssetStreamer(), *_syncContext);
+    _gltfLoader->SetRenderContext(_renderContext);
 
-    // Recording gets every hardware thread the main thread and the streaming
-    // threads leave over.
+    sampleScene->Load((float)swapChainExtent.width, (float)swapChainExtent.height, _renderContext,
+        *_gltfLoader);
+
+    // Recording gets every hardware thread the main thread, the streaming
+    // threads and the parse threads leave over.
     const size_t hardwareThreads = std::max<size_t>(std::thread::hardware_concurrency(), 4);
-    const size_t recordThreads = hardwareThreads - 1 - Core::TransferContext::STREAMING_THREADS;
+    const size_t recordThreads = hardwareThreads - 1
+        - Core::TransferContext::STREAMING_THREADS - Core::GLTFLoader::PARSE_THREADS;
 
     _renderPipeline = new Core::ForwardRenderPipeline(*_device, *_resourceManager, recordThreads,
         *_renderScene, swapChain, *_syncContext);
@@ -56,7 +63,9 @@ Core::Engine::Engine(const EngineOptions& options)
 Core::Engine::~Engine()
 {
     // Reverse of construction: the context's frames reference the render scene's
-    // batch, and the render scene references the scene.
+    // batch, and the render scene references the scene. The loader's threads
+    // hold command pools, so it goes before the device.
+    _gltfLoader.reset();
     delete(_renderPipeline);
     delete(_renderContext);
     delete(_renderScene);
@@ -76,6 +85,9 @@ void Core::Engine::Update()
     ImGui::NewFrame();
 
     auto deltaTime = static_cast<float>(_timer->tick<Core::Timer::Seconds>());
+
+    // Finished parses enter the scene here, ahead of this frame's sync.
+    _gltfLoader->Update();
 
     auto components = _scene->GetComponents<Core::Component>();
     for (auto component : components)

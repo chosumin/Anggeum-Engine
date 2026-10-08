@@ -27,7 +27,17 @@ TransferContext::TransferContext(Device& device, SyncContext& syncContext)
 	_stagingRing = make_unique<StagingRing>(_device, 32ull * 1024 * 1024);
 }
 
-TransferContext::~TransferContext() = default;
+TransferContext::~TransferContext()
+{
+	// A worker may still be inside an upload job this object owns.
+	WaitFor([this]
+	{
+		for (auto& [name, upload] : _pendingUploads)
+			if (upload.job->status != JobStatus::COMPLETE)
+				return false;
+		return true;
+	});
+}
 
 void TransferContext::BeginFrame()
 {
