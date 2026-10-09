@@ -51,6 +51,18 @@ layout(set = 0, binding = 6) uniform CullData
     uvec4 debug;       // x = keep culled patches, tagged (see TERRAIN_CULL_*)
 } cull;
 
+// Occlusion-culled patches, re-tested by terrainPatchCullPass2.comp against
+// this frame's depth. Only written when occlusion is on.
+layout(set = 0, binding = 7) writeonly buffer RejectedList
+{
+    uvec4 entries[];
+} rejected;
+
+layout(set = 0, binding = 8) buffer RejectedCount
+{
+    uint count;
+} rejectedCount;
+
 layout(push_constant) uniform Push
 {
     TerrainTraversalPush push;
@@ -60,43 +72,22 @@ void main()
 {
     uvec2 entry = nodeList.entries[gl_WorkGroupID.x];
     uint lod = TerrainUnpackLod(entry.x);
-    uvec2 nodeCoord = TerrainUnpackCoord(entry.x);
     uint slot = entry.y;
 
     uint patchIdx = gl_LocalInvocationID.x;
-    uvec2 patchXY = uvec2(patchIdx % TERRAIN_PATCHES_PER_EDGE, patchIdx / TERRAIN_PATCHES_PER_EDGE);
 
-    float nodeSize = TerrainNodeSizeAt(push.rootNodeSize, push.lodCount, lod);
-    float patchSize = nodeSize / float(TERRAIN_PATCHES_PER_EDGE);
-    vec2 patchMin = push.worldOrigin + vec2(nodeCoord) * nodeSize
-        + vec2(patchXY) * patchSize;
-
-    // Height bounds are the NODE's baked min/max (conservative per patch),
-    // padded the same way the CPU culler pads for decimated coarse bakes.
-    uint minMax = nodeDescs.descs[slot].x;
-    float minHeight = mix(cull.heightBounds.x, cull.heightBounds.y,
-        float(minMax & 0xffffu) / 65535.0) - cull.heightBounds.z;
-    float maxHeight = mix(cull.heightBounds.x, cull.heightBounds.y,
-        float(minMax >> 16) / 65535.0) + cull.heightBounds.z;
-
-    vec3 aabbMin = vec3(patchMin.x, minHeight, patchMin.y);
-    vec3 aabbMax = vec3(patchMin.x + patchSize, maxHeight, patchMin.y + patchSize);
-
-    uint cullBits = 0u;
-    if (!IsVisibleFrustum(cull.frustumPlanes, aabbMin, aabbMax))
-        cullBits = TERRAIN_CULL_FRUSTUM;
-    else if (cull.screenHiZ.w != 0.0 && IsOccluded(hiZBuffer, cull.proj * cull.view,
-            cull.screenHiZ.xy, uint(cull.screenHiZ.z), aabbMin, aabbMax))
-        cullBits = TERRAIN_CULL_OCCLUDED;
-
-    if (cullBits != 0u && cull.debug.x == 0u)
-        return;
+    vec3 aabbMin;
+    vec3 aabbMax;
+    TerrainPatchAABB(entry.x, patchIdx, nodeDescs.descs[slot].x, cull.heightBounds,
+        push.worldOrigin, push.rootNodeSize, push.lodCount, aabbMin, aabbMax);
+    float patchSize = aabbMax.x - aabbMin.x;
 
     // Per-edge stitch deltas: sample the LOD map half a sector beyond each
     // edge. Interior edges land in this node's own sectors -> delta 0;
-    // out-of-map lookups (world border) also read as delta 0.
+    // out-of-map lookups (world border) also read as delta 0. Computed before
+    // the cull so a rejected entry carries them into pass 2.
     float sectorSize = TerrainNodeSizeAt(push.rootNodeSize, push.lodCount, 0u);
-    vec2 centerXZ = patchMin + patchSize * 0.5;
+    vec2 centerXZ = aabbMin.xz + patchSize * 0.5;
     const vec2 edgeDirs[4] = vec2[](
         vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0));
 
@@ -114,6 +105,24 @@ void main()
 
         uint delta = neighborLod > lod ? min(neighborLod - lod, 15u) : 0u;
         deltas |= delta << (edge * 4u);
+    }
+
+    uint cullBits = 0u;
+    if (!IsVisibleFrustum(cull.frustumPlanes, aabbMin, aabbMax))
+        cullBits = TERRAIN_CULL_FRUSTUM;
+    else if (cull.screenHiZ.w != 0.0 && IsOccluded(hiZBuffer, cull.proj * cull.view,
+            cull.screenHiZ.xy, uint(cull.screenHiZ.z), aabbMin, aabbMax))
+        cullBits = TERRAIN_CULL_OCCLUDED;
+
+    if (cullBits != 0u && cull.debug.x == 0u)
+    {
+        // Last frame's depth said hidden: pass 2 re-tests against this frame's.
+        if (cullBits == TERRAIN_CULL_OCCLUDED)
+        {
+            uint rej = atomicAdd(rejectedCount.count, 1u);
+            rejected.entries[rej] = uvec4(entry.x, slot, patchIdx, deltas);
+        }
+        return;
     }
 
     // No bounds guard: the list is sized for every patch of every listable

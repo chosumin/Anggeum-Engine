@@ -67,6 +67,9 @@ namespace Core
 		bool _active = false;
 		uint32_t _cascadeCount = 0;
 		array<CameraBuffer, SHADOW_MAP_CASCADE_COUNT> _views{};
+
+		// Meshes: frustum cull + compaction per cascade (absent without a batch).
+		bool _meshActive = false;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceCounts{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _instanceIDs{};
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _indirect{};

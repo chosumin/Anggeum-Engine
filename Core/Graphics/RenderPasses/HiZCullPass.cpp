@@ -1,6 +1,10 @@
 #include "stdafx.h"
 #include "HiZCullPass.h"
 #include "ResolvePass.h"
+#include "TerrainNodeListPass.h"
+#include "Graphics/Terrain/TerrainSystem.h"
+#include "Graphics/FrameCounter.h"
+#include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/RenderFrame.h"
 #include "Graphics/FrameResources.h"
@@ -18,10 +22,11 @@
 using namespace Core;
 
 HiZCullPass::HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
-    VkExtent2D screenExtent, Phase phase, HiZCullPass* cull1)
+    TerrainPatchCuller& terrainCuller, VkExtent2D screenExtent, Phase phase, HiZCullPass* cull1)
     : _device(device)
     , _resourceManager(resourceManager)
     , _renderScene(renderScene)
+    , _terrainCuller(terrainCuller)
     , _phase(phase)
 {
     if (_phase == Phase::Cull1)
@@ -56,15 +61,48 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
     RenderFrame& renderFrame)
 {
     _active = false;
+    _meshActive = false;
+    _terrainActive = false;
 
     PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera();
     if (!camera)
         return; // declares nothing: the pass culls itself this frame
 
+    if (_phase == Phase::Cull1)
+    {
+        _state->camera = camera->Matrices;
+        EnsureHiZTexture(frameResources);
+
+        _prevDepth = frameResources.GetPreviousDepthBuffer();
+    }
+    else
+    {
+        _resolvedDepth = builder.GetTexture(ResolvePass::RT_RESOLVED_DEPTH);
+        builder.Read(_resolvedDepth, TextureAccess::SampledCompute);
+
+        _hiZTexture = frameResources.GetRenderTarget(RT_HIZ);
+    }
+
+    SetupMeshes(builder, frameResources, renderFrame);
+    SetupTerrain(builder, frameResources, *camera);
+    if (!_meshActive && !_terrainActive)
+        return;
+
+    // Both phases rebuild and sample the pyramid with their own barriers.
+    FGTexture hiZ = _phase == Phase::Cull1
+        ? builder.ImportTexture(RT_HIZ, _hiZTexture)
+        : builder.GetTexture(RT_HIZ);
+    builder.WriteManual(hiZ, TextureAccess::SampledCompute);
+
+    _active = true;
+}
+
+void HiZCullPass::SetupMeshes(FrameGraphBuilder& builder, FrameResources& frameResources,
+    RenderFrame& renderFrame)
+{
     auto& batch = renderFrame.GetRendererBatch();
     if (batch.GetDrawCommandCount() == 0)
         return;
-
 
     // Change only when the tables grow, so transients sized by them are not
     // rebuilt on every load or unload.
@@ -83,10 +121,6 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 
     if (_phase == Phase::Cull1)
     {
-        _state->camera = camera->Matrices;
-
-        EnsureHiZTexture(frameResources);
-
         _counts = builder.CreateBuffer(SB_PASS1_COUNTS, countsDesc);
         builder.Write(_counts, BufferAccess::FillComputeWrite);
 
@@ -107,10 +141,6 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
             { sizeof(uint32_t),
               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
         builder.Write(_rejectedCount, BufferAccess::FillComputeWrite);
-
-        // Pass-1 Hi-Z reprojects the previous frame's resolved depth (another
-        // slot's image, outside this frame's graph); barriers are manual.
-        _prevDepth = frameResources.GetPreviousDepthBuffer();
     }
     else
     {
@@ -135,24 +165,62 @@ void HiZCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResourc
 
         _visibleDrawCount = builder.CreateBuffer(SB_PASS2_DRAW_COUNT, drawCountDesc);
         builder.Write(_visibleDrawCount, BufferAccess::FillComputeWrite);
-
-        _resolvedDepth = builder.GetTexture(ResolvePass::RT_RESOLVED_DEPTH);
-        builder.Read(_resolvedDepth, TextureAccess::SampledCompute);
-
-        _hiZTexture = frameResources.GetRenderTarget(RT_HIZ);
     }
-
-    // Both phases rebuild and sample the pyramid with their own barriers (the
-    // mip ping-pong is subresource-level, inexpressible as a declared access).
-    FGTexture hiZ = _phase == Phase::Cull1
-        ? builder.ImportTexture(RT_HIZ, _hiZTexture)
-        : builder.GetTexture(RT_HIZ);
-    builder.WriteManual(hiZ, TextureAccess::SampledCompute);
 
     _cullData = frameResources.GetOrCreateUniformBuffer<GPUCullData>(
         _phase == Phase::Cull1 ? "OcclusionCull.Pass1CullData" : "OcclusionCull.Pass2CullData");
 
-    _active = true;
+    _meshActive = true;
+}
+
+void HiZCullPass::SetupTerrain(FrameGraphBuilder& builder, FrameResources& frameResources,
+    const PerspectiveCamera& camera)
+{
+    if (_phase == Phase::Cull1)
+    {
+        if (!builder.HasBuffer(TerrainNodeListPass::SB_NODE_LIST))
+            return;
+
+        _terrainInputs = _terrainCuller.SetupInputs(builder, frameResources);
+
+        _terrainOutput.patchList = _terrainCuller.CreatePatchList(builder, SB_TERRAIN_PATCH_LIST);
+        _terrainOutput.drawArgs = builder.GetBuffer(TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
+        builder.Write(_terrainOutput.drawArgs, BufferAccess::StorageComputeWrite);
+        _terrainRejected = _terrainCuller.CreateRejectedList(builder, SB_TERRAIN_REJECTED);
+        _terrainRejectedCount = _terrainCuller.CreateRejectedCount(builder, SB_TERRAIN_REJECTED_COUNT);
+        _terrainOutput.rejectedList = _terrainRejected;
+        _terrainOutput.rejectedCount = _terrainRejectedCount;
+
+        // Stats feed: TerrainSystem owns the slots and reads them in OnGUI.
+        uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+        _terrainReadback = builder.ImportBuffer("Terrain.PatchCountReadback" + to_string(slot),
+            _renderScene.GetTerrainSystem().GetPatchCountReadback(slot));
+        builder.Write(_terrainReadback, BufferAccess::TransferDst);
+
+        _terrainCullData = frameResources.GetOrCreateUniformBuffer<TerrainCullData>("Terrain.CullData");
+    }
+    else
+    {
+        if (!builder.HasBuffer(SB_TERRAIN_REJECTED))
+            return;
+
+        _terrainRejected = builder.GetBuffer(SB_TERRAIN_REJECTED);
+        builder.Read(_terrainRejected, BufferAccess::StorageComputeRead);
+        _terrainRejectedCount = builder.GetBuffer(SB_TERRAIN_REJECTED_COUNT);
+        builder.Read(_terrainRejectedCount, BufferAccess::StorageComputeRead);
+        
+        // Pass 2 reads no node list but still needs the node descs.
+        _terrainCuller.AcquireNodeDescs(frameResources);
+
+        _terrainOutput = {};
+        _terrainOutput.patchList = _terrainCuller.CreatePatchList(builder, SB_TERRAIN_PASS2_PATCH_LIST);
+        _terrainOutput.drawArgs = _terrainCuller.CreateDrawArgs(builder, SB_TERRAIN_PASS2_DRAW_ARGS);
+
+        _terrainCullData = frameResources.GetOrCreateUniformBuffer<TerrainCullData>("Terrain.Pass2CullData");
+    }
+
+    _terrainPush = _terrainCuller.BuildPush(camera);
+    _terrainActive = true;
 }
 
 void HiZCullPass::EnsureHiZTexture(FrameResources& frameResources)
@@ -194,31 +262,36 @@ void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
     auto& batch = renderFrame.GetRendererBatch();
     auto& slot = _state->slots[&renderFrame.GetResources()];
 
+    const bool first = _phase == Phase::Cull1;
+    commandBuffer.BeginDebugMarker(first ? "Pass 1 Culling" : "Pass 2 Culling");
 
-    if (_phase == Phase::Cull1)
+    // Pass 1's depth is null on the frames before any has been produced.
+    PrepareHiZ(context, commandBuffer, slot,
+        first ? _prevDepth.TryGet() : &context.GetTexture(_resolvedDepth));
+
+    if (_meshActive)
     {
-        commandBuffer.BeginDebugMarker("Pass 1 Culling");
-        // Null on the frames before any depth has been produced.
-        DispatchCulling(context, commandBuffer, batch, slot, _prevDepth.TryGet());
+        CullMeshes(context, commandBuffer, batch, slot);
+
+        commandBuffer.BeginDebugMarker("Compact Draw Commands");
+        CompactDrawCommands(context, commandBuffer, batch);
         commandBuffer.EndDebugMarker();
     }
-    else
+
+    if (_terrainActive)
     {
-        commandBuffer.BeginDebugMarker("Pass 2 Culling");
-        DispatchCulling(context, commandBuffer, batch, slot,
-            &context.GetTexture(_resolvedDepth));
+        commandBuffer.BeginDebugMarker("Terrain Patch Culling");
+        CullTerrain(context, commandBuffer, slot);
         commandBuffer.EndDebugMarker();
     }
 
-    commandBuffer.BeginDebugMarker("Compact Draw Commands");
-    CompactDrawCommands(context, commandBuffer, batch);
     commandBuffer.EndDebugMarker();
 }
 
-void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
-    CommandBuffer& commandBuffer, RendererBatch& batch, SlotState& slot, Texture* depth)
+void HiZCullPass::PrepareHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    SlotState& slot, Texture* depth)
 {
-    // Build the Hi-Z pyramid from the depth this dispatch was given. It is
+    // Build the Hi-Z pyramid from the depth this phase was given. It is
     // absent on the frames before the first depth exists (pass 1 reads the
     // previous frame's), so the build is skipped rather than assumed.
     if (depth != nullptr)
@@ -240,7 +313,11 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
         slot.hiZBuilt = false;
     }
     slot.hiZImage = _hiZTexture;
+}
 
+void HiZCullPass::CullMeshes(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    RendererBatch& batch, SlotState& slot)
+{
     // Zero this phase's counters ahead of the dispatches.
     {
         commandBuffer.FillBuffer(context.GetBuffer(_counts), 0, VK_WHOLE_SIZE, 0);
@@ -303,6 +380,69 @@ void HiZCullPass::DispatchCulling(FrameGraphPassContext& context,
 
     uint32_t groupCount = (batch.GetInstanceCount() + 63) / 64;
     commandBuffer.Dispatch(groupCount, 1, 1);
+}
+
+void HiZCullPass::CullTerrain(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+    SlotState& slot)
+{
+    const TerrainSystem& terrain = _renderScene.GetTerrainSystem();
+    const TerrainConfig& config = terrain.GetConfig();
+    const CameraBuffer& camera = _state->camera;
+    const bool first = _phase == Phase::Cull1;
+
+    TerrainCullData cullData{};
+    cullData.view = camera.View;
+    cullData.proj = camera.Projection;
+    Math::ExtractFrustumPlanes(camera.Projection * camera.View, cullData.frustumPlanes);
+    cullData.screenHiZ = vec4(float(_state->extent.width), float(_state->extent.height),
+        float(_state->hiZMipLevels), slot.hiZBuilt ? 1.0f : 0.0f);
+    // Same conservative pad the CPU culler uses for decimated coarse bakes.
+    cullData.heightBounds = vec4(config.heightMin, config.heightMax, 2.0f, 0.0f);
+    cullData.debug = uvec4(first && terrain.IsCullingBypassed() ? 1u : 0u, 0u, 0u, 0u);
+
+    Buffer& cullDataBuffer = _terrainCullData.Get();
+    cullDataBuffer.Update(cullData);
+
+    Texture* hiZ = slot.hiZBuilt ? &_hiZTexture.Get() : nullptr;
+
+    if (first)
+    {
+        Buffer& rejectedCount = context.GetBuffer(_terrainRejectedCount);
+        commandBuffer.FillBuffer(rejectedCount, 0, VK_WHOLE_SIZE, 0);
+        commandBuffer.CreateBarrierBatch()
+            .Buffer(rejectedCount,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+            .Submit();
+
+        _terrainCuller.Dispatch(context, commandBuffer, _terrainInputs, _terrainOutput,
+            cullDataBuffer, hiZ, _terrainPush);
+
+        // Stats readback of instanceCount (offset 4 in the draw args).
+        Buffer& drawArgs = context.GetBuffer(_terrainOutput.drawArgs);
+        commandBuffer.CreateBarrierBatch()
+            .Buffer(drawArgs,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT)
+            .Submit();
+        commandBuffer.CopyBuffer(drawArgs, context.GetBuffer(_terrainReadback),
+            0, sizeof(uint32_t), sizeof(uint32_t));
+    }
+    else
+    {
+        Buffer& drawArgs = context.GetBuffer(_terrainOutput.drawArgs);
+        _terrainCuller.ResetDrawArgs(commandBuffer, drawArgs);
+        commandBuffer.CreateBarrierBatch()
+            .Buffer(drawArgs,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+            .Submit();
+
+        _terrainCuller.DispatchPass2(context, commandBuffer, _terrainRejected, _terrainRejectedCount,
+            _terrainOutput, cullDataBuffer, _hiZTexture.Get(), _terrainPush);
+    }
 }
 
 void HiZCullPass::CompactDrawCommands(FrameGraphPassContext& context,

@@ -60,6 +60,28 @@ float TerrainNodeSizeAt(float rootNodeSize, uint lodCount, uint lod)
     return rootNodeSize / float(1u << (lodCount - 1u - lod));
 }
 
+// World AABB of one patch: XZ from its node and index, Y from the node's
+// baked min/max (heightBounds: x = min, y = max, z = conservative pad).
+void TerrainPatchAABB(uint packedCoord, uint patchIdx, uint minMaxHeight, vec4 heightBounds,
+    vec2 worldOrigin, float rootNodeSize, uint lodCount, out vec3 aabbMin, out vec3 aabbMax)
+{
+    uint lod = TerrainUnpackLod(packedCoord);
+    uvec2 nodeCoord = TerrainUnpackCoord(packedCoord);
+    uvec2 patchXY = uvec2(patchIdx % TERRAIN_PATCHES_PER_EDGE, patchIdx / TERRAIN_PATCHES_PER_EDGE);
+
+    float nodeSize = TerrainNodeSizeAt(rootNodeSize, lodCount, lod);
+    float patchSize = nodeSize / float(TERRAIN_PATCHES_PER_EDGE);
+    vec2 patchMin = worldOrigin + vec2(nodeCoord) * nodeSize + vec2(patchXY) * patchSize;
+
+    float minHeight = mix(heightBounds.x, heightBounds.y,
+        float(minMaxHeight & 0xffffu) / 65535.0) - heightBounds.z;
+    float maxHeight = mix(heightBounds.x, heightBounds.y,
+        float(minMaxHeight >> 16) / 65535.0) + heightBounds.z;
+
+    aabbMin = vec3(patchMin.x, minHeight, patchMin.y);
+    aabbMax = vec3(patchMin.x + patchSize, maxHeight, patchMin.y + patchSize);
+}
+
 bool TerrainNodeResident(usampler2D quadTreeIndex, uint lod, uvec2 coord)
 {
     return texelFetch(quadTreeIndex, ivec2(coord), int(lod)).r

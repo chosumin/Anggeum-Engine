@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/FrameGraph/FrameGraphPass.h"
+#include "Graphics/Terrain/TerrainPatchCuller.h"
 #include "Graphics/ResourceHandle.h"
 #include "Graphics/BufferObjects.h"
 
@@ -11,6 +12,7 @@ namespace Core
     class Shader;
     class Pipeline;
     class Texture;
+    class PerspectiveCamera;
     class Buffer;
     class FrameResources;
     class RendererBatch;
@@ -42,9 +44,16 @@ namespace Core
         // FrameResources render target.
         static constexpr const char* RT_HIZ = "OcclusionCull.HiZ";
 
+        static constexpr const char* SB_TERRAIN_PATCH_LIST = "Terrain.PatchList";
+        static constexpr const char* SB_TERRAIN_REJECTED = "Terrain.RejectedPatches";
+        static constexpr const char* SB_TERRAIN_REJECTED_COUNT = "Terrain.RejectedPatchCount";
+        static constexpr const char* SB_TERRAIN_PASS2_PATCH_LIST = "Terrain.Pass2PatchList";
+        static constexpr const char* SB_TERRAIN_PASS2_DRAW_ARGS = "Terrain.Pass2DrawArgs";
+
         // Cull2 takes the Cull1 instance to share its CPU state.
         HiZCullPass(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
-            VkExtent2D screenExtent, Phase phase, HiZCullPass* cull1 = nullptr);
+            TerrainPatchCuller& terrainCuller, VkExtent2D screenExtent, Phase phase,
+            HiZCullPass* cull1 = nullptr);
         ~HiZCullPass();
 
         const char* GetName() const override
@@ -74,9 +83,18 @@ namespace Core
         };
 
         void EnsureHiZTexture(FrameResources& frameResources);
+        void SetupMeshes(FrameGraphBuilder& builder, FrameResources& frameResources,
+            RenderFrame& renderFrame);
+        void SetupTerrain(FrameGraphBuilder& builder, FrameResources& frameResources,
+            const PerspectiveCamera& camera);
 
-        void DispatchCulling(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            RendererBatch& batch, SlotState& slot, Texture* depth);
+        // Builds this phase's pyramid from `depth` (null: none exists yet).
+        void PrepareHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            SlotState& slot, Texture* depth);
+        void CullMeshes(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            RendererBatch& batch, SlotState& slot);
+        void CullTerrain(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+            SlotState& slot);
         void CompactDrawCommands(FrameGraphPassContext& context,
             CommandBuffer& commandBuffer, RendererBatch& batch);
         void BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
@@ -85,6 +103,7 @@ namespace Core
         Device& _device;
         ResourceManager& _resourceManager;
         RenderScene& _renderScene;
+        TerrainPatchCuller& _terrainCuller;
         Phase _phase;
 
         // Created by the Cull1 instance, shared by reference with Cull2 — both
@@ -104,8 +123,10 @@ namespace Core
         Handle<Pipeline> _hiZPipeline;
 
         // Per-frame scratch, set in Setup and consumed by the same frame's
-        // Execute. _active gates Execute entirely (no camera / empty batch).
+        // Execute. _active gates Execute entirely (no camera, nothing to cull).
         bool _active = false;
+        bool _meshActive = false;
+        bool _terrainActive = false;
         Handle<Buffer> _cullData;
         Handle<Texture> _hiZTexture;
         Handle<Texture> _prevDepth;   // Cull1: previous frame's resolved depth
@@ -116,5 +137,12 @@ namespace Core
         FGBuffer _visibleDrawCount;
         FGBuffer _rejectedIndices;
         FGBuffer _rejectedCount;
+
+        // Terrain: this phase's cull (Cull1 also feeds the stats readback).
+        TerrainPatchCuller::Inputs _terrainInputs;
+        TerrainPatchCuller::Output _terrainOutput;
+        FGBuffer _terrainRejected, _terrainRejectedCount, _terrainReadback;
+        Handle<Buffer> _terrainCullData;
+        TerrainTraversalPush _terrainPush{};
     };
 }

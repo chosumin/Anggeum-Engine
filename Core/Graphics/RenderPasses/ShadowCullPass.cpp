@@ -38,6 +38,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	RenderFrame& renderFrame)
 {
 	_active = false;
+	_meshActive = false;
 	_terrainActive = false;
 	_cascadeCount = 0;
 
@@ -45,27 +46,27 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 	if (!camera)
 		return; // declares nothing: the pass culls itself this frame
 
-	auto& batch = renderFrame.GetRendererBatch();
-	if (batch.GetDrawCommandCount() == 0)
-		return;
-
 	// This pass runs before the shadow pass, so the cascades are computed here.
 	_shadowPass.UpdateCascades(camera);
 	_cascadeCount = _shadowPass.GetCascadeCount();
 	if (_cascadeCount == 0)
 		return;
 
+	for (uint32_t i = 0; i < _cascadeCount; ++i)
+		_views[i] = _shadowPass.GetCascadeView(i);
+
+	// Only the active cascades are declared, so the shadow pass sees exactly
+	// the lists that were culled this frame (HasBuffer fails for the rest).
+	auto& batch = renderFrame.GetRendererBatch();
+	_meshActive = batch.GetDrawCommandCount() > 0;
+
 	// Change only when the tables grow, so transients sized by them are not
 	// rebuilt on every load or unload.
 	const uint32_t drawCapacity = batch.GetDrawCommandCapacity();
 	const uint32_t instanceCapacity = batch.GetInstanceCapacity();
 
-	// Only the active cascades are declared, so the shadow pass sees exactly
-	// the lists that were culled this frame (HasBuffer fails for the rest).
-	for (uint32_t i = 0; i < _cascadeCount; ++i)
+	for (uint32_t i = 0; _meshActive && i < _cascadeCount; ++i)
 	{
-		_views[i] = _shadowPass.GetCascadeView(i);
-
 		_instanceCounts[i] = builder.CreateBuffer(CountsName(i),
 			{ drawCapacity * sizeof(uint32_t),
 			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
@@ -120,7 +121,7 @@ void ShadowCullPass::Setup(FrameGraphBuilder& builder, FrameResources& frameReso
 		}
 	}
 
-	_active = true;
+	_active = _meshActive || _terrainActive;
 }
 
 void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -137,17 +138,20 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 	auto barriers = commandBuffer.CreateBarrierBatch();
 	for (uint32_t i = 0; i < _cascadeCount; ++i)
 	{
-		commandBuffer.FillBuffer(context.GetBuffer(_instanceCounts[i]), 0, VK_WHOLE_SIZE, 0);
-		commandBuffer.FillBuffer(context.GetBuffer(_drawCounts[i]), 0, VK_WHOLE_SIZE, 0);
+		if (_meshActive)
+		{
+			commandBuffer.FillBuffer(context.GetBuffer(_instanceCounts[i]), 0, VK_WHOLE_SIZE, 0);
+			commandBuffer.FillBuffer(context.GetBuffer(_drawCounts[i]), 0, VK_WHOLE_SIZE, 0);
 
-		barriers.Buffer(context.GetBuffer(_instanceCounts[i]),
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-		barriers.Buffer(context.GetBuffer(_drawCounts[i]),
-			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			barriers.Buffer(context.GetBuffer(_instanceCounts[i]),
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			barriers.Buffer(context.GetBuffer(_drawCounts[i]),
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		}
 
 		if (_terrainActive)
 		{
@@ -166,6 +170,12 @@ void ShadowCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& comm
 		for (uint32_t i = 0; i < _cascadeCount; ++i)
 			_terrainCuller.Dispatch(context, commandBuffer, _terrainInputs, _terrainOutputs[i],
 				_terrainCullData[i].Get(), nullptr, _terrainPush);
+	}
+
+	if (!_meshActive)
+	{
+		commandBuffer.EndDebugMarker();
+		return;
 	}
 
 	commandBuffer.BindPipeline(&_cullPipeline.Get());

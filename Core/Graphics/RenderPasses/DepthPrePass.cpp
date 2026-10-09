@@ -111,10 +111,8 @@ void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 		builder.Read(_instanceIDs, BufferAccess::StorageVertexRead);
 	}
 
-	// Terrain lands in this frame's depth here, so the Cull2 Hi-Z rebuild
-	// already sees it as an occluder.
-	if (first)
-		_terrainRenderer.SetupDepth(builder, frameResources);
+	_terrainRenderer.SetupDepth(builder, frameResources,
+		first ? TerrainRenderer::Phase::First : TerrainRenderer::Phase::Second);
 }
 
 void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -135,8 +133,8 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 			context.GetBuffer(_instanceIDs), builder);
 	}
 
-	if (_phase == Phase::First)
-		_terrainRenderer.RecordDepth(context, commandBuffer);
+	_terrainRenderer.RecordDepth(context, commandBuffer,
+		_phase == Phase::First ? TerrainRenderer::Phase::First : TerrainRenderer::Phase::Second);
 
 	context.EndRendering(commandBuffer);
 }

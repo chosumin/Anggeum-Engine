@@ -1,0 +1,78 @@
+#version 450
+
+// Terrain patch culling, pass 2: the patches pass 1 rejected against the
+// previous frame's Hi-Z are re-tested against this frame's; survivors form
+// the second patch list the depth prepass and color pass draw after the first.
+
+layout(local_size_x = 64) in;
+
+#include "terrainCommon.glsl"
+#include "gpuDriven.glsl"
+
+layout(set = 0, binding = 0) readonly buffer RejectedList
+{
+    uvec4 entries[]; // pass-1 patch entries (coord, slot, patch idx, deltas)
+} rejected;
+
+layout(set = 0, binding = 1) readonly buffer RejectedCount
+{
+    uint count;
+} rejectedCount;
+
+layout(set = 0, binding = 2) readonly buffer NodeDescs
+{
+    uvec2 descs[];   // x = minMaxHeight (unorm16 pair), y = slotLod
+} nodeDescs;
+
+layout(set = 0, binding = 3) uniform sampler2D hiZBuffer;
+
+layout(set = 0, binding = 4) writeonly buffer PatchList
+{
+    uvec4 patches[];
+} patchList;
+
+layout(set = 0, binding = 5) buffer PatchDrawArgs
+{
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+} drawArgs;
+
+layout(set = 0, binding = 6) uniform CullData
+{
+    mat4 view;
+    mat4 proj;
+    vec4 frustumPlanes[6];
+    vec4 screenHiZ;    // xy = screen size, z = hiZ mip count, w = occlusion on
+    vec4 heightBounds; // x = min, y = max, z = conservative pad
+    uvec4 debug;
+} cull;
+
+layout(push_constant) uniform Push
+{
+    TerrainTraversalPush push;
+};
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= rejectedCount.count)
+        return;
+
+    uvec4 entry = rejected.entries[index];
+
+    vec3 aabbMin;
+    vec3 aabbMax;
+    TerrainPatchAABB(entry.x, entry.z, nodeDescs.descs[entry.y].x, cull.heightBounds,
+        push.worldOrigin, push.rootNodeSize, push.lodCount, aabbMin, aabbMax);
+
+    // Frustum passed in pass 1; only the occluder changed.
+    if (IsOccluded(hiZBuffer, cull.proj * cull.view,
+            cull.screenHiZ.xy, uint(cull.screenHiZ.z), aabbMin, aabbMax))
+        return;
+
+    uint dst = atomicAdd(drawArgs.instanceCount, 1u);
+    patchList.patches[dst] = entry;
+}

@@ -22,6 +22,9 @@ TerrainPatchCuller::TerrainPatchCuller(ResourceManager& resourceManager, Terrain
 	_shader = resourceManager.LoadShader("Shaders/Terrain/terrainPatchCull.comp.spv");
 	_pipeline = resourceManager.LoadComputePipeline("Shaders/Terrain/terrainPatchCull.comp.spv");
 
+	_pass2Shader = resourceManager.LoadShader("Shaders/Terrain/terrainPatchCullPass2.comp.spv");
+	_pass2Pipeline = resourceManager.LoadComputePipeline("Shaders/Terrain/terrainPatchCullPass2.comp.spv");
+
 	assert(_terrain.GetConfig().patchesPerNodeEdge == 8
 		&& "terrainPatchCull.comp PATCHES_PER_EDGE / local_size mirror this");
 }
@@ -41,8 +44,13 @@ TerrainPatchCuller::Inputs TerrainPatchCuller::SetupInputs(FrameGraphBuilder& bu
 	inputs.lodMap = builder.GetTexture(TerrainLodMapPass::RT_LOD_MAP);
 	builder.Read(inputs.lodMap, TextureAccess::SampledCompute);
 
-	_nodeDescBuffer = frameResources.GetStorageBuffer(TerrainQuadTree::NODE_DESC);
+	AcquireNodeDescs(frameResources);
 	return inputs;
+}
+
+void TerrainPatchCuller::AcquireNodeDescs(FrameResources& frameResources)
+{
+	_nodeDescBuffer = frameResources.GetStorageBuffer(TerrainQuadTree::NODE_DESC);
 }
 
 FGBuffer TerrainPatchCuller::CreatePatchList(FrameGraphBuilder& builder, const string& name)
@@ -61,6 +69,22 @@ FGBuffer TerrainPatchCuller::CreateDrawArgs(FrameGraphBuilder& builder, const st
 		  | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
 	builder.Write(drawArgs, BufferAccess::FillComputeWrite);
 	return drawArgs;
+}
+
+FGBuffer TerrainPatchCuller::CreateRejectedList(FrameGraphBuilder& builder, const string& name)
+{
+	FGBuffer list = builder.CreateBuffer(name,
+		{ _terrain.GetConfig().MaxPatches() * sizeof(uvec4), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+	builder.Write(list, BufferAccess::StorageComputeWrite);
+	return list;
+}
+
+FGBuffer TerrainPatchCuller::CreateRejectedCount(FrameGraphBuilder& builder, const string& name)
+{
+	FGBuffer count = builder.CreateBuffer(name,
+		{ sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT });
+	builder.Write(count, BufferAccess::FillComputeWrite);
+	return count;
 }
 
 TerrainTraversalPush TerrainPatchCuller::BuildPush(const PerspectiveCamera& camera) const
@@ -95,6 +119,7 @@ void TerrainPatchCuller::Dispatch(FrameGraphPassContext& context, CommandBuffer&
 	builder.SetStorageBuffer(0, context.GetBuffer(inputs.nodeList));
 	builder.SetStorageBuffer(1, _nodeDescBuffer.Get());
 	builder.SetTextureBuffer(2, context.GetTexture(inputs.lodMap));
+
 	// Occlusion off: the binding still needs a resident texture, so the height
 	// atlas (GENERAL layout) stands in; the shader never samples it.
 	if (hiZ != nullptr)
@@ -102,9 +127,17 @@ void TerrainPatchCuller::Dispatch(FrameGraphPassContext& context, CommandBuffer&
 	else
 		builder.SetTextureBuffer(3, _terrain.GetQuadTree().GetHeightAtlas().Get(),
 			0, VK_IMAGE_LAYOUT_GENERAL);
+	
 	builder.SetStorageBuffer(4, context.GetBuffer(output.patchList));
 	builder.SetStorageBuffer(5, context.GetBuffer(output.drawArgs));
 	builder.SetUniformBuffer(6, cullData);
+	
+	// No pass 2 (occlusion off): the rejected bindings get the list/args as
+	// stand-ins; the shader writes them only on an occlusion reject.
+	builder.SetStorageBuffer(7, context.GetBuffer(
+		output.rejectedList.IsValid() ? output.rejectedList : output.patchList));
+	builder.SetStorageBuffer(8, context.GetBuffer(
+		output.rejectedCount.IsValid() ? output.rejectedCount : output.drawArgs));
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(_pipeline.Get().GetPipelineBindPoint(), shader, resources);
@@ -112,4 +145,28 @@ void TerrainPatchCuller::Dispatch(FrameGraphPassContext& context, CommandBuffer&
 
 	// One workgroup per listed node, straight from the node list's args.
 	commandBuffer.DispatchIndirect(context.GetBuffer(inputs.nodeListCount), sizeof(uint32_t));
+}
+
+void TerrainPatchCuller::DispatchPass2(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+	FGBuffer rejectedList, FGBuffer rejectedCount, const Output& output,
+	Buffer& cullData, Texture& hiZ, const TerrainTraversalPush& push)
+{
+	Shader& shader = _pass2Shader.Get();
+	commandBuffer.BindPipeline(&_pass2Pipeline.Get());
+
+	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
+	builder.SetStorageBuffer(0, context.GetBuffer(rejectedList));
+	builder.SetStorageBuffer(1, context.GetBuffer(rejectedCount));
+	builder.SetStorageBuffer(2, _nodeDescBuffer.Get());
+	builder.SetTextureBuffer(3, hiZ);
+	builder.SetStorageBuffer(4, context.GetBuffer(output.patchList));
+	builder.SetStorageBuffer(5, context.GetBuffer(output.drawArgs));
+	builder.SetUniformBuffer(6, cullData);
+	auto& resources = builder.Build();
+
+	commandBuffer.BindDescriptorSet(_pass2Pipeline.Get().GetPipelineBindPoint(), shader, resources);
+	commandBuffer.PushConstants(shader, 0, push);
+
+	// The GPU-side count bounds the threads; the dispatch covers every patch.
+	commandBuffer.Dispatch((_terrain.GetConfig().MaxPatches() + 63) / 64, 1, 1);
 }

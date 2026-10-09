@@ -302,9 +302,12 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 		setup.depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		setup.depthAttachment.clearValue.depthStencil = { 1.0f, 0 };
 
-		// Skip cascades beyond the SDF transition zone but still clear them
-		// so stale depth doesn't show up in the debug viewer.
-		if (cascadeIndex >= _shadowBuffer.CascadeCount || !_cascadeIndirect[cascadeIndex].IsValid())
+		// Skip cascades beyond the SDF transition zone (or with nothing culled
+		// into them) but still clear them so stale depth doesn't show up in
+		// the debug viewer.
+		const bool hasMeshes = _cascadeIndirect[cascadeIndex].IsValid();
+		if (cascadeIndex >= _shadowBuffer.CascadeCount
+			|| (!hasMeshes && !_terrainRenderer.HasShadowList(cascadeIndex)))
 		{
 			string clearName = "Shadow Cascade " + std::to_string(cascadeIndex) + " Clear (skipped)";
 			commandBuffer.BeginDebugMarker(clearName.c_str());
@@ -323,10 +326,13 @@ void ShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandB
 		commandBuffer.SetDepthBias(_depthBiasConstant, _depthBiasClamp, _depthBiasSlope);
 
 		commandBuffer.BeginRendering(setup);
-		_renderScene.DrawIndirect(commandBuffer, shader, *_pipeline,
-			context.GetBuffer(_cascadeIndirect[cascadeIndex]),
-			context.GetBuffer(_cascadeDrawCount[cascadeIndex]),
-			context.GetBuffer(_cascadeInstanceIDs[cascadeIndex]), builder);
+		if (hasMeshes)
+		{
+			_renderScene.DrawIndirect(commandBuffer, shader, *_pipeline,
+				context.GetBuffer(_cascadeIndirect[cascadeIndex]),
+				context.GetBuffer(_cascadeDrawCount[cascadeIndex]),
+				context.GetBuffer(_cascadeInstanceIDs[cascadeIndex]), builder);
+		}
 		_terrainRenderer.RecordShadow(context, commandBuffer, cascadeIndex,
 			context.GetBuffer(_cascadeBuffers[cascadeIndex]));
 		commandBuffer.EndRendering();

@@ -29,12 +29,15 @@ namespace Core
 			VkSampleCountFlagBits msaaSamples);
 		~TerrainRenderer();
 
-		// Depth prepass draw (depth + packed normal). False when there is no
-		// patch list this frame; Record then draws nothing.
-		bool SetupDepth(FrameGraphBuilder& builder, FrameResources& frameResources);
-		void RecordDepth(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
+		// The two patch lists of the two-phase cull.
+		enum class Phase { First, Second };
 
-		// Color draw, early-z against the prepass depth with writes off.
+		// Depth prepass draw (depth + packed normal) of one phase's list.
+		// False when that list does not exist this frame; Record then draws nothing.
+		bool SetupDepth(FrameGraphBuilder& builder, FrameResources& frameResources, Phase phase);
+		void RecordDepth(FrameGraphPassContext& context, CommandBuffer& commandBuffer, Phase phase);
+
+		// Color draw of both lists, early-z against the prepass depth with writes off.
 		bool SetupColor(FrameGraphBuilder& builder, FrameResources& frameResources);
 		void RecordColor(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
 
@@ -44,11 +47,24 @@ namespace Core
 			uint32_t cascadeCount);
 		void RecordShadow(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
 			uint32_t cascade, Buffer& cascadeCamera);
+		bool HasShadowList(uint32_t cascade) const { return _shadowPatchLists[cascade].IsValid(); }
 
 	private:
+		// A phase's list + args; false when the cull produced none this frame.
+		struct PatchList
+		{
+			FGBuffer patches, drawArgs;
+			bool IsValid() const { return patches.IsValid(); }
+		};
+
 		bool SetupShared(FrameGraphBuilder& builder, FrameResources& frameResources);
+		PatchList SetupPatchList(FrameGraphBuilder& builder, const char* listName,
+			const char* argsName);
 		FGBuffer SetupParams(FrameGraphBuilder& builder, FrameResources& frameResources);
-		void BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder);
+		void BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder,
+			const PatchList& list);
+		void DrawList(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+			const PatchList& list);
 
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
@@ -67,8 +83,8 @@ namespace Core
 		unique_ptr<PipelineState> _shadowPipelineState;
 		unique_ptr<Pipeline> _shadowPipeline;
 
-		FGBuffer _camera, _patchList, _patchDrawArgs, _params, _pick;
-		bool _depthActive = false;
+		FGBuffer _camera, _params, _pick;
+		PatchList _lists[2];           // indexed by Phase
 		bool _colorActive = false;
 
 		// Color draw shadow inputs (the SDF mask may be absent).

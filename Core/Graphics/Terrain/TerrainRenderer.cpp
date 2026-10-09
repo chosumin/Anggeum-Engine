@@ -2,7 +2,7 @@
 #include "TerrainRenderer.h"
 #include "TerrainSystem.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
-#include "Graphics/RenderPasses/TerrainPatchCullPass.h"
+#include "Graphics/RenderPasses/HiZCullPass.h"
 #include "Graphics/RenderPasses/ShadowCullPass.h"
 #include "Graphics/RenderPasses/ShadowPass.h"
 #include "Graphics/RenderPasses/SDFShadowPass.h"
@@ -76,20 +76,34 @@ TerrainRenderer::TerrainRenderer(Device& device, ResourceManager& resourceManage
 
 TerrainRenderer::~TerrainRenderer() = default;
 
+TerrainRenderer::PatchList TerrainRenderer::SetupPatchList(FrameGraphBuilder& builder,
+	const char* listName, const char* argsName)
+{
+	PatchList list;
+	if (!builder.HasBuffer(listName))
+		return list;
+
+	list.patches = builder.GetBuffer(listName);
+	builder.Read(list.patches, BufferAccess::StorageVertexRead);
+
+	list.drawArgs = builder.GetBuffer(argsName);
+	builder.Read(list.drawArgs, BufferAccess::IndirectRead);
+	return list;
+}
+
+// Declares every list that exists this frame; false when there is none.
 bool TerrainRenderer::SetupShared(FrameGraphBuilder& builder, FrameResources& frameResources)
 {
-	if (!builder.HasBuffer(TerrainPatchCullPass::SB_PATCH_LIST))
+	_lists[0] = SetupPatchList(builder, HiZCullPass::SB_TERRAIN_PATCH_LIST,
+		TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
+	_lists[1] = SetupPatchList(builder, HiZCullPass::SB_TERRAIN_PASS2_PATCH_LIST,
+		HiZCullPass::SB_TERRAIN_PASS2_DRAW_ARGS);
+	if (!_lists[0].IsValid() && !_lists[1].IsValid())
 		return false;
 
 	_camera = builder.ImportBuffer(UB_CAMERA,
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformVertex);
-
-	_patchList = builder.GetBuffer(TerrainPatchCullPass::SB_PATCH_LIST);
-	builder.Read(_patchList, BufferAccess::StorageVertexRead);
-
-	_patchDrawArgs = builder.GetBuffer(TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
-	builder.Read(_patchDrawArgs, BufferAccess::IndirectRead);
 
 	_params = SetupParams(builder, frameResources);
 	return true;
@@ -108,42 +122,51 @@ FGBuffer TerrainRenderer::SetupParams(FrameGraphBuilder& builder, FrameResources
 	return fgParams;
 }
 
-void TerrainRenderer::BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder)
+void TerrainRenderer::BindShared(FrameGraphPassContext& context, DescriptorSetBuilder& builder,
+	const PatchList& list)
 {
 	// The atlases are not graph resources: they live in GENERAL layout forever
 	// (the transfer queue streams tiles into them), read-only in here.
 	TerrainQuadTree& quadTree = _terrain.GetQuadTree();
 
 	builder.SetUniformBuffer(0, context.GetBuffer(_camera));
-	builder.SetStorageBuffer(1, context.GetBuffer(_patchList));
+	builder.SetStorageBuffer(1, context.GetBuffer(list.patches));
 	builder.SetTextureBuffer(2, quadTree.GetHeightAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetTextureBuffer(3, quadTree.GetNormalAtlas().Get(), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetUniformBuffer(5, context.GetBuffer(_params));
 }
 
-bool TerrainRenderer::SetupDepth(FrameGraphBuilder& builder, FrameResources& frameResources)
+void TerrainRenderer::DrawList(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+	const PatchList& list)
 {
-	_depthActive = SetupShared(builder, frameResources);
-	return _depthActive;
+	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
+	commandBuffer.DrawIndexedIndirect(context.GetBuffer(list.drawArgs), 1,
+		sizeof(VkDrawIndexedIndirectCommand));
 }
 
-void TerrainRenderer::RecordDepth(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+bool TerrainRenderer::SetupDepth(FrameGraphBuilder& builder, FrameResources& frameResources,
+	Phase phase)
 {
-	if (!_depthActive)
+	SetupShared(builder, frameResources);
+	return _lists[int(phase)].IsValid();
+}
+
+void TerrainRenderer::RecordDepth(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
+	Phase phase)
+{
+	const PatchList& list = _lists[int(phase)];
+	if (!list.IsValid())
 		return;
 
 	commandBuffer.BindPipeline(_depthPipeline.get());
 
 	Shader& shader = _depthShader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-	BindShared(context, builder);
+	BindShared(context, builder, list);
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(_depthPipeline->GetPipelineBindPoint(), shader, resources);
-
-	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
-	commandBuffer.DrawIndexedIndirect(context.GetBuffer(_patchDrawArgs), 1,
-		sizeof(VkDrawIndexedIndirectCommand));
+	DrawList(context, commandBuffer, list);
 }
 
 bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& frameResources)
@@ -219,11 +242,13 @@ void TerrainRenderer::RecordShadow(FrameGraphPassContext& context, CommandBuffer
 	builder.SetTextureBuffer(2, _terrain.GetQuadTree().GetHeightAtlas().Get(), 0,
 		VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetUniformBuffer(5, context.GetBuffer(_shadowParams));
+
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(_shadowPipeline->GetPipelineBindPoint(), shader, resources);
 
 	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
+
 	commandBuffer.DrawIndexedIndirect(context.GetBuffer(_shadowDrawArgs[cascade]), 1,
 		sizeof(VkDrawIndexedIndirectCommand));
 }
@@ -238,30 +263,34 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 	commandBuffer.BindPipeline(pipeline);
 
 	Shader& shader = _colorShader.Get();
-	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
-	BindShared(context, builder);
-	builder.SetTextureBuffer(4, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
-		VK_IMAGE_LAYOUT_GENERAL);
-	
-	// Pick off: the binding still needs a buffer, and the shader never writes it.
-	builder.SetStorageBuffer(6, _pick.IsValid()
-		? context.GetBuffer(_pick) : context.GetBuffer(_patchList));
-	
-	builder.SetUniformBuffer(7, context.GetBuffer(_shadowUB));
-	builder.SetTextureBuffer(8, context.GetTexture(_shadowMap));
-	
-	// No mask yet: any 2D texture fills the slot, the shader skips the sample.
-	if (_sdfShadow.IsValid())
-		builder.SetTextureBuffer(9, context.GetTexture(_sdfShadow));
-	else
-		builder.SetTextureBuffer(9, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
+	for (const PatchList& list : _lists)
+	{
+		if (!list.IsValid())
+			continue;
+
+		auto builder = context.CreateDescriptorSetBuilder(shader, 0);
+		BindShared(context, builder, list);
+		builder.SetTextureBuffer(4, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
 			VK_IMAGE_LAYOUT_GENERAL);
 
-	auto& resources = builder.Build();
+		// Pick off: the binding still needs a buffer, and the shader never writes it.
+		builder.SetStorageBuffer(6, _pick.IsValid()
+			? context.GetBuffer(_pick) : context.GetBuffer(list.patches));
 
-	commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);
+		builder.SetUniformBuffer(7, context.GetBuffer(_shadowUB));
+		builder.SetTextureBuffer(8, context.GetTexture(_shadowMap));
 
-	commandBuffer.BindIndexBuffer(_terrain.GetGridIndexBuffer().Get(), VK_INDEX_TYPE_UINT16);
-	commandBuffer.DrawIndexedIndirect(context.GetBuffer(_patchDrawArgs), 1,
-		sizeof(VkDrawIndexedIndirectCommand));
+		// No mask yet: any 2D texture fills the slot, the shader skips the sample.
+		if (_sdfShadow.IsValid())
+			builder.SetTextureBuffer(9, context.GetTexture(_sdfShadow));
+		else
+			builder.SetTextureBuffer(9, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
+				VK_IMAGE_LAYOUT_GENERAL);
+
+		auto& resources = builder.Build();
+
+		commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);
+
+		DrawList(context, commandBuffer, list);
+	}
 }
