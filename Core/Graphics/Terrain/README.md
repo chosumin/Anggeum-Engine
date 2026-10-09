@@ -4,7 +4,13 @@ A quadtree-based streaming heightfield terrain, modeled after the Far Cry 5
 (GDC 2018) pipeline. The CPU only decides **residency** — which quadtree nodes
 live in the GPU atlases — and the GPU decides **what is drawn**: it walks the
 quadtree, builds the covering set, culls patches, and issues one indirect
-instanced draw for the whole world.
+instanced draw per list for the whole world.
+
+Terrain has no passes of its own beyond the two traversal passes. Its culls and
+draws are folded into the mesh passes (Hi-Z cull, depth prepass, shadow cull and
+draw, geometry pass) through two helpers, `TerrainPatchCuller` and
+`TerrainRenderer`, so terrain and meshes share one depth pyramid, one depth
+prepass, one shadow map and one color pass.
 
 ## World structure
 
@@ -34,34 +40,47 @@ RenderScene::Update                       (main thread)
          ├─ Pass 2  sort (coarse LOD first, then near→far), ask the shared
          │          upload budget, acquire the staging span
          ├─ Pass 3  commit admitted tiles: slot alloc + index/desc mirrors
-         └─ Pass 4  ONE TerrainUploadJob (tiles + dirty tables)
+         │          (nodes enter PendingUpload)
+         └─ Pass 4  ONE TerrainUploadJob (tiles + dirty tables); when the
+                    transfer lands, onLanded promotes the nodes to Resident
 
 FrameGraph                                (GPU, per frame)
- ├─ TerrainNodeListPass    1 workgroup: quadtree walk → Node List + indirect args
- ├─ TerrainLodMapPass      1 thread per sector: LOD map (neighbour LOD lookup)
- ├─ [DepthPre phase]
- │   ├─ HiZCull1                          (previous frame's depth pyramid)
- │   ├─ TerrainPatchCullPass  indirect, 1 group per node: 8x8 patch expand,
- │   │                        frustum + Hi-Z cull, stitch deltas → Patch List
- │   ├─ DepthPre1
- │   ├─ TerrainDepthPrePass   indirect instanced draw → depth + normal
- │   └─ Resolve → HiZCull2    (terrain is already an occluder this frame)
- └─ TerrainPass            same patches, same positions, color pass with
-                           depth writes off (LESS_OR_EQUAL + `invariant`)
+ ├─ TerrainNodeListPass  1 workgroup: quadtree walk → Node List + indirect args
+ ├─ TerrainLodMapPass    1 thread per sector: LOD map (neighbour LOD lookup)
+ ├─ HiZCull1             pass-1 cull: 8x8 patch expand, frustum + previous-frame
+ │                       Hi-Z → Patch List; occlusion rejects → Rejected List
+ ├─ DepthPre1            pass-1 list → depth + normal
+ ├─ Resolve → HiZCull2   pass-2 cull: rejects re-tested against this frame's
+ │                       pyramid (terrain is already an occluder) → Pass2 list
+ ├─ DepthPre2            pass-2 list → depth + normal
+ ├─ ShadowCull           per cascade: frustum-only cull of the same node list
+ │                       → cascade Patch List
+ ├─ ShadowPass           per cascade: depth-only draw of the cascade list
+ └─ GeometryPass         both lists, color with depth writes off
 ```
 
 ## Core types
 
 | Type | Role |
 |------|------|
-| `TerrainSystem` | Facade. Owns the config, node store, quadtree and streamer; builds the shared 17x17 patch index buffer and the render params; ImGui panel |
+| `TerrainSystem` | Facade. Owns the config, node store, quadtree and streamer; builds the shared 17x17 patch index buffer and the render params; ImGui panel and mouse pick |
 | `TerrainConfig` | All world/bake/streaming parameters plus the derived math (`NodeSize`, `LevelOffset`, `MaxPatches`, ...). Also holds the GPU-mirrored structs |
 | `TerrainHeightSource` | Where height comes from: `Sample(worldXZ)` + `CacheKey()` for bake invalidation. `ProceduralTerrainHeightSource` implements it over FBM `TerrainNoise` |
 | `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, min/max height |
 | `TerrainNodeStore` | The baked CPU payloads — the in-memory stand-in for FC5's on-disk tiles. `Load()` reads the `.tbake` cache or bakes and writes it |
 | `TerrainQuadTree` | GPU face: 3 synchronized atlases, the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
-| `TerrainStreamer` | CPU residency: ring requests, load/evict diff, budgeted uploads, table mirrors |
+| `TerrainStreamer` | CPU residency: ring requests, load/evict diff, budgeted uploads, table mirrors, PendingUpload → Resident promotion |
 | `TerrainUploadJob` | Worker-thread job that stages tile payloads + lookup tables and records the copies |
+| `TerrainPatchCuller` | The cull dispatches a host pass embeds: declares the node list / LOD map inputs and the list / args / rejected outputs, resets args, dispatches pass 1 (`terrainPatchCull.comp`) and pass 2 (`terrainPatchCullPass2.comp`) |
+| `TerrainRenderer` | The draws a host pass embeds: depth prepass (per phase), color (both lists), shadow (per cascade). Owns the three pipelines; the host owns the attachments |
+
+Host passes: `HiZCullPass` and `ShadowCullPass` call the culler; `DepthPrePass`,
+`GeometryPass` and `ShadowPass` call the renderer. Each host declares the terrain
+side in its `Setup` and records it in its `Execute` right next to the mesh work.
+The helpers return false / early-out when their list does not exist that frame,
+so a host never branches on terrain itself. Where a host exists once per phase
+(`HiZCullPass`, `DepthPrePass`) it keeps a single list; the shared
+`TerrainRenderer` keeps one list per phase and one per cascade.
 
 ## Bake and cache
 
@@ -84,7 +103,8 @@ access: the seam where per-node disk streaming plugs in later.
   always requested**, so parent fallback always terminates.
 - **Eviction hysteresis** — a resident node is dropped only once the camera
   leaves `evictHysteresis` times that radius, so a camera hovering on the
-  boundary doesn't thrash.
+  boundary doesn't thrash. Only `Resident` nodes are evicted; a node still in
+  flight keeps its slot until it lands.
 - **Coarse-first ordering** — the load list sorts by LOD descending, then
   near-to-far. Refinement never breaks the fallback chain: a missing child just
   means its parent keeps covering that area.
@@ -95,6 +115,11 @@ access: the seam where per-node disk streaming plugs in later.
   staging span is acquired *before* any bookkeeping commits, so a full ring skips
   the whole frame rather than publishing tables that point at tiles which never
   uploaded.
+- **Promotion-gated residency** — admitted nodes are `PendingUpload` until the
+  transfer queue reports the job landed (`PendingUpload::onLanded` →
+  `PromoteNode`), and only then become `Resident` and enter the GPU tables the
+  traversal reads. There is no CPU wait on the transfer; frames that render
+  before the landing simply see the parent.
 - **Frame-stamped slot retire** — a released atlas slot may still be sampled by
   in-flight frames, so it re-enters the free list only after
   `MAX_FRAMES_IN_FLIGHT` frames. `AllocateSlot()` returns `TERRAIN_NODE_EMPTY`
@@ -122,19 +147,36 @@ per-level dispatch or indirect round trip. The refinement predicate
 walk so the two can never disagree: refine when the node is inside the child ring
 **and all four children are resident**. Non-refined resident nodes append to the
 covering set; non-resident ones are simply skipped, because a parent already
-covers them. The pass also initializes the draw args — it is the only single-
-workgroup pass, so it can zero the counter race-free.
+covers them. The pass also initializes the pass-1 draw args — it is the only
+single-workgroup pass, so it can zero the counter race-free.
 
 **LOD map** (`terrainLodMap.comp`) — one thread per LOD 0 sector, each walking its
 own ancestor chain with the same predicate, writing the LOD of the covering node.
 Gather form (per sector, not per node) keeps the work uniform where node-based
 dispatch would be exponentially uneven.
 
-**Patch cull** (`terrainPatchCull.comp`) — dispatched indirectly, one workgroup
-per listed node, 64 threads = 8x8 patches. Each patch's AABB (node min/max height,
-conservatively padded) is wrapped in its bounding sphere and tested against the
-frustum and the previous-frame Hi-Z pyramid, reusing the mesh culler's proven
-tests. Survivors append to the patch list and atomically bump `instanceCount`.
+## Culling
+
+Patches are culled as **AABBs** with the same `IsVisibleFrustum` / `IsOccluded`
+the mesh culler uses (`gpuDriven.glsl`); `TerrainPatchAABB` (`terrainCommon.glsl`)
+builds the box from the packed node coordinate, the patch index and the node's
+min/max height, conservatively padded by `heightBounds.z`. Three dispatches share
+this:
+
+- **Pass 1** (`terrainPatchCull.comp`, inside `HiZCull1`) — indirect, one
+  workgroup per listed node, 64 threads = 8x8 patches. Frustum first, then the
+  **previous frame's** Hi-Z. Survivors append to the pass-1 patch list; patches
+  that failed only the occlusion test append to the **rejected list** instead.
+  Stitch deltas (below) are computed before the tests so a rejected entry carries
+  them into pass 2.
+- **Pass 2** (`terrainPatchCullPass2.comp`, inside `HiZCull2`) — one thread per
+  rejected entry, re-tested against **this frame's** pyramid, which already
+  contains the pass-1 terrain and meshes. Survivors form the pass-2 list with its
+  own draw args. A disocclusion therefore costs one frame of latency at most,
+  never a hole.
+- **Shadow** (pass-1 shader, inside `ShadowCullPass`) — the same node list, once
+  per cascade against the cascade's frustum only (`screenHiZ.w = 0` disables the
+  Hi-Z test). Each cascade gets its own list and args, read by `ShadowPass`.
 
 **Stitching** — the culler probes the LOD map half a sector beyond each of the
 four patch edges and packs `neighbourLod - lod` as 4x4 bits. In `terrain.vert`,
@@ -145,14 +187,20 @@ close the T-junction — no skirts, no extra geometry.
 
 ## Drawing
 
-One `DrawIndexedIndirect`, instance = one visible patch. There is **no vertex
-buffer**: `terrain.vert` derives its position from `gl_VertexIndex` over a shared
-17x17 patch grid index buffer, fetches the height with an exact `texelFetch`
-(height texels sit on grid vertices), and reads its atlas slot from the patch
-entry. The depth prepass and the color pass rasterize the same patches through
-two pipelines; `invariant gl_Position` makes both emit bit-identical positions,
-so the color pass draws early-z against the prepass depth with writes off.
-Backface culling is off — a heightfield has no closed backside.
+One `DrawIndexedIndirect` per list, instance = one visible patch. There is **no
+vertex buffer**: `terrain.vert` derives its position from `gl_VertexIndex` over
+a shared 17x17 patch grid index buffer, fetches the height with an exact
+`texelFetch` (height texels sit on grid vertices), and reads its atlas slot from
+the patch entry. Three pipelines rasterize the same patches:
+
+| Pipeline | Shader set | Where | Notes |
+|----------|------------|-------|-------|
+| Depth | `TerrainDepth` | `DepthPrePass` (phase 1 and 2) | depth + packed normal |
+| Color (+ wireframe) | `Terrain` | `GeometryPass`, both lists | `LESS_OR_EQUAL`, depth writes off; `invariant gl_Position` makes it bit-identical to the prepass so early-z holds |
+| Shadow | `TerrainShadow` (`terrain.vert` + `shadow.frag`) | `ShadowPass`, per cascade | depth-only, cull none, shares the mesh depth bias |
+
+Backface culling is off everywhere — a heightfield has no closed backside.
+
 
 ## Verification
 
@@ -163,6 +211,12 @@ Backface culling is off — a heightfield has no closed backside.
   set and the LOD ring from outside.
 - **Wireframe** shows patch density and T-junctions; **Debug mode** switches
   between Lit / LOD tint / Normals / UV grid.
+- **Draw culled patches** bypasses the cull and tints what would have been
+  dropped (red = frustum, blue = occluded). With it on, the fragment shader also
+  writes a pick value, and the panel decodes the patch under the mouse: LOD,
+  node, patch, atlas slot, cull reason, world AABB, and the pass-1 cull thread
+  ids (workgroup / local / global) for shader-side debugging. The pick readback
+  buffers are created on first use, so the default path allocates nothing.
 - CPU-side invariants (square root grid, patch/quad divisibility, 16-bit index
   space, `patchesPerNodeEdge == 8` matching the shader) are asserted at
   construction; delete `Assets/Cache/terrain_bake.tbake` to force a re-bake.
