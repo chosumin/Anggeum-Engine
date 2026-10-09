@@ -75,6 +75,10 @@ namespace Core
 		u64 GetInvalidateEpoch() const { return _invalidateEpoch; }
 		void SetInvalidateEpoch(u64 epoch) { _invalidateEpoch = epoch; }
 
+		// Bumps on every rebuild: the way to detect a re-placement, since a
+		// recreated view can come back with the destroyed one's handle value.
+		u64 GetGeneration() const { return _generation; }
+
 		// Greedy interval placement: sort by size descending, place each request
 		// at the lowest aligned offset where every memory-overlapping placed
 		// entry has a disjoint pass interval. Returns the required heap size.
@@ -105,6 +109,8 @@ namespace Core
 		// Invalidation stamp: When bumping a graph-wide epoch,
 		// resets memory lazily on its next realize.
 		u64 _invalidateEpoch = 0;
+
+		u64 _generation = 0;
 
 		vector<Request> _lastRequests;
 		vector<Placement> _placements;

@@ -3,6 +3,7 @@
 #include "Foundation/Scene.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/FrameResources.h"
+#include "Graphics/FrameGraph/TransientResourceAllocator.h"
 #include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Components/PerspectiveCamera.h"
@@ -46,17 +47,20 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
     VkImageView depthView,
     VkImageView normalsView,
     VkImage outputImage,
-    VkImageView outputView)
+    VkImageView outputView,
+    u64 transientGeneration)
 {
     auto it = m_cacaoContexts.find(frameKey);
     if (it != m_cacaoContexts.end())
     {
         CacaoContextSlot& slot = it->second;
-        if (slot.depthView == depthView && slot.normalsView == normalsView
+
+        if (slot.transientGeneration == transientGeneration
+            && slot.depthView == depthView && slot.normalsView == normalsView
             && slot.outputView == outputView)
             return slot.context;
 
-        // A view changed (the graph re-placed a transient): the baked
+        // An input changed (the graph re-placed a transient): the baked
         // descriptors are stale. Safe to destroy here - this slot's previous
         // submission already retired when the frame slot was reacquired.
         FFX_CACAO_VkDestroyScreenSizeDependentResources(slot.context);
@@ -95,7 +99,7 @@ FFX_CACAO_VkContext* CACAOPass::GetOrCreateCacaoContext(
 
     FFX_CACAO_VkInitScreenSizeDependentResources(ctx, &sizeInfo);
 
-    m_cacaoContexts[frameKey] = { ctx, depthView, normalsView, outputView };
+    m_cacaoContexts[frameKey] = { ctx, depthView, normalsView, outputView, transientGeneration };
     return ctx;
 }
 
@@ -144,7 +148,8 @@ void CACAOPass::Record(CommandBuffer& commandBuffer, Texture& depth, Texture& no
         depth.GetImageView(),
         normal.GetImageView(),
         aoImage.GetImage(),
-        _aoTexture.Get().GetImageView());
+        _aoTexture.Get().GetImageView(),
+        _frameKey->GetTransientAllocator().GetGeneration());
 
     FFX_CACAO_Settings cacaoSettings = {};
     cacaoSettings.radius                           = m_settings.Radius;

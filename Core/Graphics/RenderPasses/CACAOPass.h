@@ -34,7 +34,8 @@ namespace Core
             VkImageView depthView,
             VkImageView normalsView,
             VkImage outputImage,
-            VkImageView outputView);
+            VkImageView outputView,
+            u64 transientGeneration);
 
         struct Settings
         {
@@ -69,6 +70,7 @@ namespace Core
             VkImageView depthView = VK_NULL_HANDLE;
             VkImageView normalsView = VK_NULL_HANDLE;
             VkImageView outputView = VK_NULL_HANDLE;
+            u64 transientGeneration = 0;
         };
         unordered_map<FrameResources*, CacaoContextSlot> m_cacaoContexts;
 

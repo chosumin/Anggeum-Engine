@@ -55,6 +55,7 @@ TransientResourceAllocator::~TransientResourceAllocator()
 void TransientResourceAllocator::Reset()
 {
 	DestroyResources();
+	_generation++;
 
 	if (_heap != VK_NULL_HANDLE)
 	{
@@ -174,6 +175,7 @@ void TransientResourceAllocator::Realize(const vector<Request>& requests, Handle
 	DestroyResources();
 	_placements.clear();
 	_lastRequests = requests;
+	_generation++;
 
 	if (requests.empty())
 		return;
