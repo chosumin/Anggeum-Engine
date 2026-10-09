@@ -51,7 +51,7 @@ struct alignas(16) ShadowUniform
 	float SDFTransitionDistance = 30.0f;
 	float SDFTransitionRange = 5.0f;
 
-	float _pad[1];
+	uint32_t SDFShadowBound = 0;
 };
 
 struct alignas(16) SDFShadowUniform

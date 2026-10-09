@@ -217,3 +217,34 @@ float CombineShadows(float csmShadow, float sdfShadow,
     float t = smoothstep(fadeStart, fadeEnd, distance);
     return mix(csmShadow, sdfShadow, t);
 }
+
+struct CascadeShadowParams
+{
+    mat4  viewProjection[SHADOW_MAP_CASCADE_COUNT];
+    float splitDepth[SHADOW_MAP_CASCADE_COUNT];
+    uint  cascadeCount;
+    float lightSize;
+    float minFilterRadius;
+    float maxFilterRadius;
+    float cascadeBlendFactor;
+    float sdfTransitionDistance;
+    float sdfTransitionRange;
+    uint  sdfShadowBound;
+};
+
+float ShadowVisibility(sampler2DArray shadowMap, sampler2D sdfShadowMap,
+    CascadeShadowParams csm, mat4 view, vec3 worldPos, vec2 screenUV)
+{
+    float viewDepth = (view * vec4(worldPos, 1.0)).z;
+    float csmVisibility = ShadowCalculation(shadowMap,
+        csm.viewProjection, csm.splitDepth, csm.cascadeCount,
+        csm.lightSize, csm.minFilterRadius, csm.maxFilterRadius,
+        csm.cascadeBlendFactor, worldPos, viewDepth);
+
+    if (csm.sdfShadowBound == 0u)
+        return csmVisibility;
+
+    float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
+    return CombineShadows(csmVisibility, sdfVisibility,
+        viewDepth, csm.sdfTransitionDistance, csm.sdfTransitionRange);
+}

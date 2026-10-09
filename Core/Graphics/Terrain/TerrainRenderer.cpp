@@ -4,6 +4,8 @@
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainPatchCullPass.h"
 #include "Graphics/RenderPasses/ShadowCullPass.h"
+#include "Graphics/RenderPasses/ShadowPass.h"
+#include "Graphics/RenderPasses/SDFShadowPass.h"
 #include "Graphics/Vulkans/Buffer.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameGraph/FrameGraphPass.h"
@@ -21,10 +23,11 @@
 using namespace Core;
 
 TerrainRenderer::TerrainRenderer(Device& device, ResourceManager& resourceManager,
-	RenderScene& renderScene, VkFormat colorFormat, VkFormat depthFormat,
-	VkSampleCountFlagBits msaaSamples)
+	RenderScene& renderScene, VkExtent2D screenExtent, VkFormat colorFormat,
+	VkFormat depthFormat, VkSampleCountFlagBits msaaSamples)
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
+	, _screenExtent(screenExtent)
 {
 	// terrain.vert + a normal-only fragment; positions are invariant with the
 	// color pipeline's, so the color draw can rely on this depth exactly.
@@ -97,6 +100,7 @@ FGBuffer TerrainRenderer::SetupParams(FrameGraphBuilder& builder, FrameResources
 	// One buffer for every terrain draw this frame; refreshed by whichever
 	// pass sets up first.
 	TerrainParams params = _terrain.BuildRenderParams(_renderScene.GetScene().GetMainLight());
+	params.viewport = vec4(float(_screenExtent.width), float(_screenExtent.height), 0.0f, 0.0f);
 	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>("Terrain.Params");
 	paramsHandle.Get().Update(params);
 	FGBuffer fgParams = builder.ImportBuffer("Terrain.Params", paramsHandle);
@@ -147,6 +151,20 @@ bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& fra
 	_colorActive = SetupShared(builder, frameResources);
 	if (!_colorActive)
 		return false;
+
+	_sdfShadow = FGTexture{};
+	if (builder.HasTexture(SDFShadowPass::RT_SDF_SHADOW))
+	{
+		_sdfShadow = builder.GetTexture(SDFShadowPass::RT_SDF_SHADOW);
+		builder.Read(_sdfShadow, TextureAccess::SampledFragment);
+	}
+
+	_shadowMap = builder.GetTexture(ShadowPass::RT_SHADOW_DEPTH);
+	builder.Read(_shadowMap, TextureAccess::SampledFragment);
+
+	_shadowUB = builder.ImportBuffer(UB_SHADOW,
+		frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW));
+	builder.Read(_shadowUB, BufferAccess::UniformFragment);
 
 	// Debug pick: TerrainSystem owns the slots and reads them in OnGUI.
 	_pick = FGBuffer{};
@@ -224,9 +242,21 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 	BindShared(context, builder);
 	builder.SetTextureBuffer(4, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
 		VK_IMAGE_LAYOUT_GENERAL);
+	
 	// Pick off: the binding still needs a buffer, and the shader never writes it.
 	builder.SetStorageBuffer(6, _pick.IsValid()
 		? context.GetBuffer(_pick) : context.GetBuffer(_patchList));
+	
+	builder.SetUniformBuffer(7, context.GetBuffer(_shadowUB));
+	builder.SetTextureBuffer(8, context.GetTexture(_shadowMap));
+	
+	// No mask yet: any 2D texture fills the slot, the shader skips the sample.
+	if (_sdfShadow.IsValid())
+		builder.SetTextureBuffer(9, context.GetTexture(_sdfShadow));
+	else
+		builder.SetTextureBuffer(9, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
+			VK_IMAGE_LAYOUT_GENERAL);
+
 	auto& resources = builder.Build();
 
 	commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);

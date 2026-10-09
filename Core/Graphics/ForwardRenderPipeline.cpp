@@ -53,7 +53,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 	_frameGraph = make_unique<FrameGraph>(device, resourceManager, syncContext, recordThreadCount);
 
 	_terrainRenderer = make_unique<TerrainRenderer>(device, resourceManager, renderScene,
-		swapChain.GetImageFormat(), depthFormat, _msaaSamples);
+		extent, swapChain.GetImageFormat(), depthFormat, _msaaSamples);
 	_terrainCuller = make_unique<TerrainPatchCuller>(resourceManager, renderScene.GetTerrainSystem());
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));

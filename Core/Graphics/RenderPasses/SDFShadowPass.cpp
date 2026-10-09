@@ -108,6 +108,11 @@ void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 		}
 	}
 
+	// The mask exists exactly when the volume does; the readers' uniform was
+	// uploaded by ShadowPass already, so stamp it again with the flag.
+	_shadowBuffer->SDFShadowBound = _sdfGenerator->GetSDFTexture().IsValid() ? 1u : 0u;
+	frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW).Get().Update(*_shadowBuffer);
+
 	RenderTargetDesc sdfShadowDesc{};
 	sdfShadowDesc.extent = {
 		_screenExtent.width / 2,

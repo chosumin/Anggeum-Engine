@@ -27,19 +27,9 @@ layout(set = 0, binding = 3) uniform GI
 	uint brdfLutIndex;
 } gi;
 
-layout(set = 0, binding = 4) uniform CascadeShadowUBO {
-    mat4  viewProjection[SHADOW_MAP_CASCADE_COUNT];
-    float splitDepth[SHADOW_MAP_CASCADE_COUNT];
-    uint  cascadeCount;
-	float lightSize;
-    float minFilterRadius;
-    float maxFilterRadius;
-    float cascadeBlendFactor;
-	float sdfTransitionDistance;
-	float sdfTransitionRange;
-} csm;
+layout(set = 0, binding = 4) uniform CascadeShadowUBO { CascadeShadowParams csm; };
 
-layout(set = 0, binding = 5) uniform Lights 
+layout(set = 0, binding = 5) uniform Lights
 {
 	Light lights[MAX_FORWARD_LIGHT_COUNT];
 	uint count;
@@ -195,20 +185,10 @@ void main()
         Lo += (kD * albedo.rgb / PI + specular) * radiance; 
     }   
   
-	// Calculate shadow visibility using CSM with PCSS (1.0 = fully lit, 0.0 = fully shadowed)
-	float viewDepth = (camera.view * worldPos).z;
-	float csmVisibility = ShadowCalculation(shadowMap,
-		csm.viewProjection, csm.splitDepth, csm.cascadeCount,
-		csm.lightSize, csm.minFilterRadius, csm.maxFilterRadius,
-		csm.cascadeBlendFactor,
-		worldPos.xyz, viewDepth);
-
+	// Shadow visibility (1.0 = fully lit, 0.0 = fully shadowed)
 	vec2 screenUV = gl_FragCoord.xy / vec2(tileInfo.viewportSize);
-	float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
-
-	// Distance-based split: near = CSM only, far = SDF only
-	float visibility = CombineShadows(csmVisibility, sdfVisibility,
-		viewDepth, csm.sdfTransitionDistance, csm.sdfTransitionRange);
+	float visibility = ShadowVisibility(shadowMap, sdfShadowMap, csm, camera.view,
+		worldPos.xyz, screenUV);
 
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;

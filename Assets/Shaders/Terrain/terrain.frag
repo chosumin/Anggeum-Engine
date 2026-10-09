@@ -1,5 +1,7 @@
 #version 450
 
+#include "common.glsl"
+#include "shadow.glsl"
 #include "terrainCommon.glsl"
 
 layout(set = 0, binding = 3) uniform sampler2D normalAtlas;
@@ -9,6 +11,10 @@ layout(set = 0, binding = 5) uniform TerrainParamsUniform
 {
     TerrainParams params;
 };
+
+layout(set = 0, binding = 7) uniform CascadeShadowUBO { CascadeShadowParams csm; };
+layout(set = 0, binding = 8) uniform sampler2DArray shadowMap;
+layout(set = 0, binding = 9) uniform sampler2D sdfShadowMap;
 
 // Only the surviving fragment may report itself as the pick.
 layout(early_fragment_tests) in;
@@ -23,6 +29,7 @@ layout(location = 0) in vec2 inTileUV;
 layout(location = 1) flat in uvec2 inColorOrigin;
 layout(location = 2) flat in uint inLod;
 layout(location = 3) flat in uvec4 inPatchEntry;
+layout(location = 4) in vec3 inWorldPos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -42,8 +49,12 @@ void main()
     vec3 normal = normalize(texture(normalAtlas, uv).xyz * 2.0 - 1.0);
     vec3 albedo = texture(albedoAtlas, uv).rgb;
 
+    // Shadow on the direct term only; ambient is unaffected. The SDF mask
+    // carries mesh shadows only, so distant terrain has no self-shadow.
     float diffuse = max(dot(normal, normalize(params.sunDirection.xyz)), 0.0);
-    vec3 lit = albedo * (diffuse + params.sunDirection.w);
+    float visibility = ShadowVisibility(shadowMap, sdfShadowMap, csm, camera.view,
+        inWorldPos, gl_FragCoord.xy / params.viewport.xy);
+    vec3 lit = albedo * (diffuse * visibility + params.sunDirection.w);
 
     int mode = params.debugMode.x;
     if (mode == 1)

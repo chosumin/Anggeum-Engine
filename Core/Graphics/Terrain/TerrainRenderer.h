@@ -25,7 +25,8 @@ namespace Core
 	{
 	public:
 		TerrainRenderer(Device& device, ResourceManager& resourceManager, RenderScene& renderScene,
-			VkFormat colorFormat, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples);
+			VkExtent2D screenExtent, VkFormat colorFormat, VkFormat depthFormat,
+			VkSampleCountFlagBits msaaSamples);
 		~TerrainRenderer();
 
 		// Depth prepass draw (depth + packed normal). False when there is no
@@ -51,6 +52,7 @@ namespace Core
 
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
+		VkExtent2D _screenExtent{};
 
 		Handle<Shader> _depthShader;
 		unique_ptr<PipelineState> _depthPipelineState;
@@ -68,6 +70,10 @@ namespace Core
 		FGBuffer _camera, _patchList, _patchDrawArgs, _params, _pick;
 		bool _depthActive = false;
 		bool _colorActive = false;
+
+		// Color draw shadow inputs (the SDF mask may be absent).
+		FGBuffer _shadowUB;
+		FGTexture _shadowMap, _sdfShadow;
 
 		FGBuffer _shadowParams;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _shadowPatchLists{};

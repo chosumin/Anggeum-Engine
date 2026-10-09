@@ -152,5 +152,6 @@ namespace Core
 		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
 		vec4 worldParams{};           // xy = worldOrigin, z = rootNodeSize, w = lodCount
 		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels
+		vec4 viewport{};              // xy = size
 	};
 }

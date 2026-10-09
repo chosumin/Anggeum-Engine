@@ -26,6 +26,7 @@ layout(location = 0) out vec2 outTileUV;       // node-relative, for the color a
 layout(location = 1) flat out uvec2 outColorOrigin;
 layout(location = 2) flat out uint outLod;
 layout(location = 3) flat out uvec4 outPatchEntry; // debug tint and pick
+layout(location = 4) out vec3 outWorldPos;
 
 const uint PATCH_VERTS = TERRAIN_PATCH_QUADS + 1u; // 17
 
@@ -86,6 +87,7 @@ void main()
     outColorOrigin = slotOrigin * uint(params.atlasInfo.z);
     outLod = lod;
     outPatchEntry = patchEntry;
+    outWorldPos = world;
 
     gl_Position = camera.proj * camera.view * vec4(world, 1.0);
 }

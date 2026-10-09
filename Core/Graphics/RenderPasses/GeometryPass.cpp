@@ -246,9 +246,8 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
         builder.SetStorageBuffer(6, context.GetBuffer(_lightVisibility));
         builder.SetTextureBuffer(7, context.GetTexture(_shadow));
 
-        if (_sdfShadow.IsValid())
-            builder.SetTextureBuffer(10, context.GetTexture(_sdfShadow));
-
+        // No mask yet: the AO map fills the slot, the shader skips the sample.
+        builder.SetTextureBuffer(10, context.GetTexture(_sdfShadow.IsValid() ? _sdfShadow : _ao));
         builder.SetTextureBuffer(11, context.GetTexture(_ao));
 
         commandBuffer.PushConstants(*_geometryShader, 0, _tileInfo);
