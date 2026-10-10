@@ -1,19 +1,9 @@
-/* Copyright (c) 2020, Arm Limited and Contributors
- *
- * SPDX-License-Identifier: Apache-2.0
- *
- * Licensed under the Apache License, Version 2.0 the "License";
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+#include "pbr.glsl"
+
+// Light data shared with the CPU (BufferObjects.h) and the tile light
+// culling, plus the forward shading every lit surface uses: the per-light
+// response, the Cook-Torrance direct term and the split-sum IBL ambient term.
+// Include after common.glsl (PI); pulls in pbr.glsl itself.
 
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
@@ -127,3 +117,67 @@ vec3 ApplyLight(Light light, vec3 pos, vec3 normal)
 	else
 		return ApplySpotLight(light, pos, normal);
 }
+
+struct Surface
+{
+    vec3 albedo;
+    float metallic;
+    float roughness;
+    vec3 N;
+    vec3 V;
+    vec3 F0;
+};
+
+Surface MakeSurface(vec3 albedo, float metallic, float roughness, vec3 N, vec3 V)
+{
+    Surface s;
+    s.albedo = albedo;
+    s.metallic = metallic;
+    s.roughness = roughness;
+    s.N = N;
+    s.V = V;
+    s.F0 = mix(vec3(0.04), albedo, metallic);
+    return s;
+}
+
+// Radiance from one light, unshadowed.
+vec3 DirectLighting(Surface s, Light light, vec3 worldPos)
+{
+    vec3 L = normalize(GetLightDirection(light, worldPos));
+    vec3 H = normalize(s.V + L);
+    vec3 radiance = ApplyLight(light, worldPos, s.N);
+
+    float NDF = DistributionGGX(s.N, H, s.roughness);
+    float G = GeometrySmith(s.N, s.V, L, s.roughness);
+    vec3 F = FresnelSchlick(max(dot(H, s.V), 0.0), s.F0);
+
+    vec3 kD = (1.0 - F) * (1.0 - s.metallic);
+    float denominator = 4.0 * max(dot(s.N, s.V), 0.0) * max(dot(s.N, L), 0.0) + 0.0001;
+    vec3 specular = NDF * G * F / denominator;
+
+    return (kD * s.albedo / PI + specular) * radiance;
+}
+
+// Split-sum IBL. ao darkens the diffuse part, specularOcclusion the specular.
+vec3 AmbientLighting(Surface s, samplerCube irradianceMap, samplerCube prefilterMap,
+    sampler2D brdfLut, float ao, float specularOcclusion)
+{
+    float NdotV = max(dot(s.N, s.V), 0.0);
+    vec3 kS = FresnelSchlick(NdotV, s.F0);
+    vec3 kD = (1.0 - kS) * (1.0 - s.metallic);
+
+    vec3 diffuse = texture(irradianceMap, s.N).rgb * s.albedo;
+
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 R = reflect(-s.V, s.N);
+    vec3 prefilteredColor = textureLod(prefilterMap, R, s.roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 brdf = texture(brdfLut, vec2(NdotV, s.roughness)).rg;
+    vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y) * specularOcclusion;
+
+    // Global factor keeping the ambient term below the direct one.
+    const float AMBIENT_SCALE = 0.1;
+    return (kD * diffuse * ao + specular) * AMBIENT_SCALE;
+}
+
+// Every forward shader tonemaps with the same exposure.
+const float FORWARD_EXPOSURE = 4.5;

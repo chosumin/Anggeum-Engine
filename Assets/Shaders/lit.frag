@@ -1,14 +1,11 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
-#define GPU_DRIVEN_RENDERING 1
-
-// Source: https://learnopengl.com/PBR/Theory (Theory, Lighting and IBL sections)
-
-#include "lighting.h"
 #include "common.glsl"
-#include "pbr.glsl"
+#include "lighting.glsl"
 #include "shadow.glsl"
+
+#define GPU_DRIVEN_RENDERING 1
 
 layout(location = 0) in vec4 worldPos;
 layout(location = 1) in vec3 worldNormal;
@@ -103,6 +100,23 @@ layout(std140, push_constant) uniform TileInfo
 	ivec2 tileNums;
 } tileInfo;
 
+// Tangent-space normal map to world space, with the tangent frame derived
+// from screen-space derivatives.
+vec3 Normal(vec3 normalMap, vec3 worldPos, vec3 worldNormal, vec2 uv)
+{
+	vec3 dx = dFdx(worldPos);
+	vec3 dy = dFdy(worldPos);
+	vec3 st1 = dFdx(vec3(uv, 0.0));
+	vec3 st2 = dFdy(vec3(uv, 0.0));
+	vec3 T = (st2.t * dx - st1.t * dy) / (st1.s * st2.t - st2.s * st1.t);
+	vec3 N = normalize(worldNormal);
+	T = normalize(T - N * dot(N, T));
+	vec3 B = normalize(cross(N, T));
+	mat3 TBN = mat3(T, B, N);
+
+	return normalize(TBN * (2.0 * normalMap - 1.0));
+}
+
 void main()
 {
 #ifdef GPU_DRIVEN_RENDERING
@@ -148,43 +162,20 @@ void main()
 	vec3 n = texture(bindlessTextures2D[nonuniformEXT(pbr.normalmapIndex)], uv).rgb;
 	vec3 N = normalize(Normal(n, worldPos.xyz, worldNormal, uv));
     vec3 V = normalize(camera.pos - worldPos.xyz);
-	vec3 R = reflect(-V, N);
+	
+	Surface surface = MakeSurface(albedo.rgb, metallic, roughness, N, V);
 
-    vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo.rgb, metallic);
-	           
-    // reflectance equation
     vec3 Lo = vec3(0.0);
 
 	ivec2 tileId = ivec2(gl_FragCoord.xy / TILE_SIZE);
 	uint tileIndex = tileId.y * tileInfo.tileNums.x + tileId.x;
 	uint tileLightCount = lightVisiblities[tileIndex].count;
-    for(int i = 0; i < tileLightCount; ++i) 
+    for(int i = 0; i < tileLightCount; ++i)
     {
 		uint index = lightVisiblities[tileIndex].lightIndices[i];
+		Lo += DirectLighting(surface, lights.lights[index], worldPos.xyz);
+    }
 
-        // calculate per-light radiance
-        vec3 L = normalize(GetLightDirection(lights.lights[index], worldPos.xyz));
-        vec3 H = normalize(V + L);
-        vec3 radiance = ApplyLight(lights.lights[index], worldPos.xyz, N);        
-        
-        // cook-torrance brdf
-        float NDF = DistributionGGX(N, H, roughness);        
-        float G = GeometrySmith(N, V, L, roughness);      
-        vec3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);       
-        
-        vec3 kS = F;
-        vec3 kD = 1.0 - kS;
-        kD *= 1.0 - metallic;	  
-        
-        vec3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
-        vec3 specular = numerator / denominator;  
-            
-        // add to outgoing radiance Lo             
-        Lo += (kD * albedo.rgb / PI + specular) * radiance; 
-    }   
-  
 	// Shadow visibility (1.0 = fully lit, 0.0 = fully shadowed)
 	vec2 screenUV = gl_FragCoord.xy / vec2(tileInfo.viewportSize);
 	float visibility = ShadowVisibility(shadowMap, sdfShadowMap, csm, camera.view,
@@ -196,28 +187,14 @@ void main()
 	// Sample AO: applied globally across the full screen to the ambient term
 	float ao = texture(aoMap, screenUV).r;
 
-	// ambient lighting
-	vec3 kS = FresnelSchlick(max(dot(N, V), 0.0), F0);
-	vec3 kD = 1.0 - kS;
-	kD *= 1.0 - metallic;
-
-	vec3 irradiance = texture(bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)], N).rgb;
-	vec3 diffuse = irradiance * albedo.rgb;
-	
-	// split-sum approximation to get the IBL specular part.
-	const float MAX_REFLECTION_LOD = 4.0;
-
-	vec3 prefilteredColor = textureLod(bindlessTexturesCube[nonuniformEXT(gi.prefiltermapIndex)], R, roughness * MAX_REFLECTION_LOD).rgb;
-
-	vec2 brdf = texture(bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)], vec2(max(dot(N, V), 0.0), roughness)).rg;
-	vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y);
-
-	const float AO = 0.1; // Global AO factor to reduce ambient lighting
-	vec3 ambient = (kD * diffuse * ao + specular) * AO;
+	vec3 ambient = AmbientLighting(surface,
+		bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)],
+		bindlessTexturesCube[nonuniformEXT(gi.prefiltermapIndex)],
+		bindlessTextures2D[nonuniformEXT(gi.brdfLutIndex)],
+		ao, 1.0);
     vec3 color = ambient + Lo;
-	
-	float exposure = 4.5;
-	vec4 mapped = Tonemap(vec4(color, 1.0), exposure, 1.0);
-	
+
+	vec4 mapped = Tonemap(vec4(color, 1.0), FORWARD_EXPOSURE, 1.0);
+
     outColor = vec4(mapped.rgb, 1.0);
 }

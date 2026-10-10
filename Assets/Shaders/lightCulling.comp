@@ -2,8 +2,8 @@
 
 // Source : https://github.com/WindyDarian/Vulkan-Forward-Plus-Renderer/blob/master/src/shaders/light_culling.comp.glsl
 
-#include "lighting.h"
 #include "common.glsl"
+#include "lighting.glsl"
 
 layout(push_constant) uniform TileInfo
 {
