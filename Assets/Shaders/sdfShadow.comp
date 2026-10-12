@@ -3,6 +3,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 #include "sdfCommon.glsl"
+#include "Terrain/terrainCommon.glsl"
 
 layout(set = 0, binding = 0) uniform CameraUniform
 {
@@ -24,11 +25,18 @@ layout(set = 0, binding = 2) uniform SDFParams
     float paddingFactor;
     float sdfTransitionDistance;
     float sdfTransitionRange;
+    float pad0;
+    vec4 terrainShadow;    // x: max distance, y: softness, z: bias, w: steps (0 = off)
 } sdf;
 
 layout(set = 0, binding = 3) uniform sampler2D depthTexture;
 layout(set = 0, binding = 4, r8) uniform writeonly image2D shadowOutput;
 layout(set = 0, binding = 5) readonly buffer SDFBoundsBuffer { uint rawBounds[8]; };
+
+// The terrain heightfield
+layout(set = 0, binding = 6) uniform usampler2D terrainQuadTreeIndex;
+layout(set = 0, binding = 7) uniform sampler2D terrainHeightAtlas;
+layout(set = 0, binding = 8) uniform TerrainParamsUniform { TerrainParams terrain; };
 
 vec3 ReconstructWorldPos(vec2 uv, float depth)
 {
@@ -92,6 +100,58 @@ float SDFSoftShadow(vec3 origin, vec3 dir, float tMin, float tMax, float k,
     return clamp(result, 0.0, 1.0);
 }
 
+// Soft shadow from the terrain heightfield: march toward the light with
+// geometrically growing steps and treat the ray's clearance above the
+// terrain as the occluder distance. 
+// Ends once the ray clears the world's height range or leaves the world.
+float TerrainHeightfieldShadow(vec3 origin, vec3 dir)
+{
+    int steps = int(sdf.terrainShadow.w);
+    if (steps == 0 || dir.y <= 0.0)
+        return 1.0;
+
+    float maxDistance = sdf.terrainShadow.x;
+    float k = sdf.terrainShadow.y;
+    float bias = sdf.terrainShadow.z;
+    float heightMax = terrain.heightMinMaxInvAtlas.y;
+
+    const float FIRST_STEP = 1.0;
+    float growth = pow(max(maxDistance, FIRST_STEP * 2.0) / FIRST_STEP, 1.0 / float(steps));
+
+    // Start on the sampled heightfield, not the rasterized depth: the depth
+    // position carries its own quantization and bilinear-vs-triangle error,
+    // which against a sub-metre penumbra reads as noise. Anything within
+    // GROUND_TOLERANCE of the ground is ground; higher points (meshes) keep
+    // their height.
+    const float GROUND_TOLERANCE = 4.0;
+    float groundHeight;
+    if (TerrainSampleHeight(terrainQuadTreeIndex, terrainHeightAtlas, terrain, origin.xz, groundHeight)
+        && origin.y < groundHeight + bias + GROUND_TOLERANCE)
+        origin.y = groundHeight + bias;
+
+    float result = 1.0;
+    float t = FIRST_STEP;
+    for (int i = 0; i < steps; ++i)
+    {
+        vec3 pos = origin + dir * t;
+        if (pos.y > heightMax)
+            break;
+
+        float height;
+        if (!TerrainSampleHeight(terrainQuadTreeIndex, terrainHeightAtlas, terrain, pos.xz, height))
+            break;
+
+        float clearance = pos.y - height;
+        if (clearance < 0.0)
+            return 0.0;
+
+        result = min(result, k * clearance / t);
+        t *= growth;
+    }
+
+    return clamp(result, 0.0, 1.0);
+}
+
 void main()
 {
     ivec2 outputSize = imageSize(shadowOutput);
@@ -103,8 +163,11 @@ void main()
     vec3 boundsMin, boundsMax;
     sdfDecodeBounds(rawBounds, sdf.paddingFactor, boundsMin, boundsMax);
 
-    vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(outputSize);
-    float depth = texture(depthTexture, uv).r;
+    // One full-res depth texel per mask pixel: filtering depth across a
+    // silhouette would average two surfaces into a position in mid-air.
+    ivec2 depthCoord = pixelCoord * 2;
+    vec2 uv = (vec2(depthCoord) + 0.5) / vec2(textureSize(depthTexture, 0));
+    float depth = texelFetch(depthTexture, depthCoord, 0).r;
 
     if (depth >= 1.0)
     {
@@ -113,7 +176,7 @@ void main()
     }
 
     vec3 worldPos = ReconstructWorldPos(uv, depth);
-    
+
     // Distance-based CSM/SDF split: skip SDF shadow for pixels within CSM range.
     // Compute view-space depth (linear depth from camera).
     vec3 viewPos = (camera.view * vec4(worldPos, 1.0)).xyz;
@@ -137,6 +200,8 @@ void main()
     float shadow = SDFSoftShadow(worldPos, lightDir,
         tMin, sdf.maxDistance, sdf.shadowSoftness,
         boundsMin, boundsMax, voxelSize);
+
+    shadow = min(shadow, TerrainHeightfieldShadow(worldPos, lightDir));
 
     imageStore(shadowOutput, pixelCoord, vec4(shadow, shadow, shadow, 1.0));
 }

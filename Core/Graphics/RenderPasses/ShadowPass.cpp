@@ -5,6 +5,8 @@
 #include "Graphics/RendererBatch.h"
 #include "ShadowCullPass.h"
 #include "Graphics/Terrain/TerrainRenderer.h"
+#include "Graphics/Terrain/TerrainSystem.h"
+#include "Graphics/RenderScene.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/Material.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
@@ -125,6 +127,14 @@ void ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 
 	float shadowMapSize = static_cast<float>(SHADOW_MAP_DIM);
 
+	// Casters between a slice and the light must still land in its map: a
+	// terrain ridge under a low sun shadows ground hundreds of metres away.
+	// Open the near plane toward the light by the ray length an occluder
+	// spanning the world's height range can reach over (capped at grazing).
+	const TerrainConfig& terrain = _renderScene.GetTerrainSystem().GetConfig();
+	float heightRange = terrain.heightMax - terrain.heightMin;
+	float nearExtension = heightRange / std::max(std::abs(lightDir.y), 0.15f);
+
 	// Build cascade matrices for active cascades only.
 	// The last active cascade's far plane is clamped to transitionFar so
 	// the cascade tightly fits the CSM-only region.
@@ -183,7 +193,7 @@ void ShadowPass::UpdateCascades(PerspectiveCamera* camera)
 		glm::mat4 lightOrthoMatrix = glm::ortho(
 			minExtents.x, maxExtents.x,
 			minExtents.y, maxExtents.y,
-			0.0f, maxExtents.z - minExtents.z);
+			-nearExtension, maxExtents.z - minExtents.z);
 
 		// Texel snapping: round the light-space origin to shadow map texel boundaries
 		// This prevents shadow shaking/swimming when the camera moves

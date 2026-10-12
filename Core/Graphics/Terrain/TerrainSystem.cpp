@@ -143,6 +143,22 @@ namespace Core
 			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0");
 		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
 
+		if (ImGui::TreeNode("Shadow"))
+		{
+			ImGui::SeparatorText("Cascade depth bias");
+			ImGui::SliderFloat("Constant", &_shadowSettings.depthBiasConstant, 0.0f, 4.0f, "%.2f");
+			ImGui::SliderFloat("Slope", &_shadowSettings.depthBiasSlope, 0.0f, 8.0f, "%.2f");
+			ImGui::SliderFloat("Clamp", &_shadowSettings.depthBiasClamp, 0.0f, 0.1f, "%.4f");
+
+			ImGui::SeparatorText("Far heightfield march (SDF shadow mask)");
+			ImGui::SliderInt("Steps", &_shadowSettings.farSteps, 0, 128);
+			ImGui::SetItemTooltip("0 disables the march; distant terrain then casts no shadow");
+			ImGui::SliderFloat("Max distance", &_shadowSettings.farMaxDistance, 50.0f, 2000.0f, "%.0f m");
+			ImGui::SliderFloat("Softness", &_shadowSettings.farSoftness, 1.0f, 256.0f, "%.1f");
+			ImGui::SliderFloat("Bias", &_shadowSettings.farBias, 0.0f, 5.0f, "%.2f m");
+			ImGui::TreePop();
+		}
+
 		if (_bypassCulling)
 		{
 			// Created on first use: the debug path costs nothing while off.

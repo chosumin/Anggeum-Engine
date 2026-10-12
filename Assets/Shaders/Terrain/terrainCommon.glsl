@@ -95,6 +95,45 @@ bool TerrainNodeResident(usampler2D quadTreeIndex, uint lod, uvec2 coord)
         < TERRAIN_NODE_INVALID;
 }
 
+// Terrain height under worldXZ from the finest resident node covering it -
+// the node the traversal draws there, so the result matches the rendered
+// surface up to bilinear vs. triangle interpolation. False outside the
+// world or where nothing is resident (any stage; explicit LOD 0 fetch).
+bool TerrainSampleHeight(usampler2D quadTreeIndex, sampler2D heightAtlas,
+    TerrainParams params, vec2 worldXZ, out float height)
+{
+    uint lodCount = uint(params.worldParams.w);
+    float sectorSize = TerrainNodeSizeAt(params.worldParams.z, lodCount, 0u);
+    vec2 sectorPos = (worldXZ - params.worldParams.xy) / sectorSize;
+    ivec2 sectorsPerSide = textureSize(quadTreeIndex, 0);
+    if (any(lessThan(sectorPos, vec2(0.0)))
+        || any(greaterThanEqual(sectorPos, vec2(sectorsPerSide))))
+        return false;
+
+    ivec2 sector = ivec2(sectorPos);
+    uint slot = TERRAIN_NODE_EMPTY;
+    uint lod = 0u;
+    for (; lod < lodCount; ++lod)
+    {
+        slot = texelFetch(quadTreeIndex, sector >> int(lod), int(lod)).r;
+        if (slot < TERRAIN_NODE_INVALID)
+            break;
+    }
+    if (slot >= TERRAIN_NODE_INVALID)
+        return false;
+
+    float nodeSize = TerrainNodeSizeAt(params.worldParams.z, lodCount, lod);
+    vec2 nodeMin = params.worldParams.xy + vec2(sector >> int(lod)) * nodeSize;
+    vec2 local = (worldXZ - nodeMin) / nodeSize; // 0..1 across the node
+
+    uint slotsPerRow = uint(params.atlasInfo.x);
+    vec2 slotOrigin = vec2(slot % slotsPerRow, slot / slotsPerRow) * params.atlasInfo.y;
+    vec2 texel = slotOrigin + local * float(TERRAIN_NODE_QUADS) + 0.5;
+    float height01 = textureLod(heightAtlas, texel * params.heightMinMaxInvAtlas.zw, 0.0).r;
+    height = mix(params.heightMinMaxInvAtlas.x, params.heightMinMaxInvAtlas.y, height01);
+    return true;
+}
+
 // The covering-set refinement predicate: refine into children when the node
 // is inside the child ring AND all four children are resident. Shared so the
 // node list traversal and the per-sector LOD map walk can never diverge.

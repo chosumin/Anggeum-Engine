@@ -56,6 +56,8 @@ FrameGraph                                (GPU, per frame)
  ├─ ShadowCull           per cascade: frustum-only cull of the same node list
  │                       → cascade Patch List
  ├─ ShadowPass           per cascade: depth-only draw of the cascade list
+ ├─ SDFShadowPass        far shadow mask: mesh SDF march + terrain heightfield
+ │                       march (TerrainSampleHeight over the quadtree index)
  └─ GeometryPass         both lists, color with depth writes off
 ```
 
@@ -68,7 +70,7 @@ FrameGraph                                (GPU, per frame)
 | `TerrainHeightSource` | Where height comes from: `Sample(worldXZ)` + `CacheKey()` for bake invalidation. `ProceduralTerrainHeightSource` implements it over FBM `TerrainNoise` |
 | `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, min/max height |
 | `TerrainNodeStore` | The baked CPU payloads — the in-memory stand-in for FC5's on-disk tiles. `Load()` reads the `.tbake` cache or bakes and writes it |
-| `TerrainQuadTree` | GPU face: 3 synchronized atlases, the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
+| `TerrainQuadTree` | GPU face: 3 synchronized atlases (height; normal + roughness + AO; albedo), the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
 | `TerrainStreamer` | CPU residency: ring requests, load/evict diff, budgeted uploads, table mirrors, PendingUpload → Resident promotion |
 | `TerrainUploadJob` | Worker-thread job that stages tile payloads + lookup tables and records the copies |
 | `TerrainPatchCuller` | The cull dispatches a host pass embeds: declares the node list / LOD map inputs and the list / args / rejected outputs, resets args, dispatches pass 1 (`terrainPatchCull.comp`) and pass 2 (`terrainPatchCullPass2.comp`) |
@@ -178,8 +180,8 @@ this:
   per cascade against the cascade's frustum only (`screenHiZ.w = 0` disables the
   Hi-Z test). Each cascade gets its own list and args, read by `ShadowPass`.
 
-**Stitching** — the culler probes the LOD map half a sector beyond each of the
-four patch edges and packs `neighbourLod - lod` as 4x4 bits. In `terrain.vert`,
+**Stitching** — the culler probes the LOD map one patch length beyond each of
+the four patch edges and packs `neighbourLod - lod` as 4x4 bits. In `terrain.vert`,
 an edge vertex snaps its along-edge coordinate down to a multiple of `2^delta`,
 which lands exactly on a neighbour vertex (position *and* height, since the bake
 is pure noise). The snapped vertices collapse into degenerate triangles that
@@ -201,6 +203,29 @@ the patch entry. Three pipelines rasterize the same patches:
 
 Backface culling is off everywhere — a heightfield has no closed backside.
 
+## Shading
+
+`terrain.frag` shades with the same `lighting.glsl` functions as `lit.frag`
+(`DirectLighting` per tile light, `AmbientLighting` split-sum IBL, one
+exposure), so it binds the geometry pass's inputs too: the GI indices and
+bindless IBL maps (set 2), the light list, the tile light visibility (tile
+counts ride in `TerrainParams.viewport.zw`), the screen-space AO map, the
+cascades and the far mask. Terrain is a dielectric (metallic 0); roughness and
+the baked AO come from the normal atlas. The baked AO multiplies the
+screen-space AO on the ambient diffuse and feeds `SpecularOcclusion` on the
+IBL specular.
+
+Shadows come from two sources. Inside the CSM range the cascades draw the
+per-cascade patch lists with terrain's own depth bias (`TerrainShadowSettings`).
+Past the transition `ShadowVisibility` blends into
+the SDF shadow mask, which `sdfShadow.comp` extends with a heightfield march:
+`TerrainSampleHeight` (`terrainCommon.glsl`) resolves the finest resident node
+under a world XZ through the quadtree index mips and samples the height atlas.
+The ray starts on the sampled heightfield (`farBias` above it) rather than the
+depth-reconstructed position, steps grow geometrically to `farMaxDistance`, and
+the clearance over the terrain widens the penumbra (`farSoftness`).
+Terrain and meshes both receive it; the mask exists only while the SDF volume
+does.
 
 ## Verification
 
@@ -210,7 +235,10 @@ Backface culling is off everywhere — a heightfield has no closed backside.
 - **Freeze streaming** pins residency so you can fly out and inspect the covering
   set and the LOD ring from outside.
 - **Wireframe** shows patch density and T-junctions; **Debug mode** switches
-  between Lit / LOD tint / Normals / UV grid.
+  between Lit / LOD tint / Normals / UV grid / Roughness / Baked AO.
+- **Shadow** tree: cascade depth bias and the far heightfield march (steps 0
+  turns it off for A/B, max distance, softness, bias). The SDF Shadow panel
+  previews the mask itself.
 - **Draw culled patches** bypasses the cull and tints what would have been
   dropped (red = frustum, blue = occluded). With it on, the fragment shader also
   writes a pick value, and the panel decodes the patch under the mouse: LOD,

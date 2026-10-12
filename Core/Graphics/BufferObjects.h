@@ -67,8 +67,12 @@ struct alignas(16) SDFShadowUniform
 	// Distance-based CSM/SDF split (same as ShadowUniform)
 	float SDFTransitionDistance;
 	float SDFTransitionRange;
-	
+
 	float _pad[1];
+
+	// Terrain heightfield march: x = max distance, y = softness, z = bias,
+	// w = steps (0 = off). Mirrors TerrainShadowSettings.
+	vec4 TerrainShadow;
 };
 
 struct alignas(16) DFAOUniform

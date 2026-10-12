@@ -12,8 +12,8 @@ namespace Core
 	class Pipeline;
 	class SDFGenerator;
 
-	// Screen-space SDF shadow mask: ray-marches the scene's SDF
-	// volume blended with the cascaded shadow maps.
+	// Screen-space far shadow mask, blended in past the cascades: ray-marches
+	// the scene's SDF volume (meshes) and the terrain heightfield.
 	class SDFShadowPass : public FrameGraphPass
 	{
 	public:
@@ -72,6 +72,10 @@ namespace Core
 		FGTexture _depth;
 		FGBuffer _camera;
 		FGBuffer _sdfParamsBuffer;
+
+		// Terrain heightfield inputs
+		Handle<Texture> _terrainIndex;
+		FGBuffer _terrainParams;
 		VolumeRaytracePushConstants _slicePushConstants{};
 		bool _sliceReady = false;
 

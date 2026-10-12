@@ -7,6 +7,7 @@
 #include "Graphics/RendererBatch.h"
 #include "Graphics/SDFGenerator.h"
 #include "Graphics/ResourceManager.h"
+#include "Graphics/Terrain/TerrainSystem.h"
 #include "Graphics/Vulkans/Device.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
@@ -72,6 +73,10 @@ void SDFShadowPass::UpdateSDFParams()
 	auto* shadowUniform = _shadowBuffer;
 	_sdfParams.SDFTransitionDistance = shadowUniform->SDFTransitionDistance;
 	_sdfParams.SDFTransitionRange    = shadowUniform->SDFTransitionRange;
+
+	const TerrainShadowSettings& terrain = _renderScene.GetTerrainSystem().GetShadowSettings();
+	_sdfParams.TerrainShadow = vec4(terrain.farMaxDistance, terrain.farSoftness,
+		terrain.farBias, float(terrain.farSteps));
 }
 
 void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
@@ -171,6 +176,15 @@ void SDFShadowPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 	_sdfParamsBuffer = builder.ImportBuffer("SDFShadowPass.Params", sdfParamsHandle);
 	builder.Read(_sdfParamsBuffer, BufferAccess::UniformCompute);
 
+	// Own copy of the terrain params: independent of which pass set up first.
+	TerrainSystem& terrain = _renderScene.GetTerrainSystem();
+	_terrainIndex = frameResources.GetRenderTarget(TerrainQuadTree::QUADTREE_INDEX);
+	auto terrainParamsHandle =
+		frameResources.GetOrCreateUniformBuffer<TerrainParams>("SDFShadowPass.TerrainParams");
+	terrainParamsHandle.Get().Update(terrain.BuildRenderParams());
+	_terrainParams = builder.ImportBuffer("SDFShadowPass.TerrainParams", terrainParamsHandle);
+	builder.Read(_terrainParams, BufferAccess::UniformCompute);
+
 	// Volume raytrace debug view (ImGui samples it in the GUI pass).
 	if (PerspectiveCamera* camera = _renderScene.GetScene().GetMainCamera())
 	{
@@ -213,6 +227,10 @@ void SDFShadowPass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
 	builder.SetTextureBuffer(3, context.GetTexture(_depth));
 	builder.SetTextureBuffer(4, context.GetTexture(_sdfShadow), 0, VK_IMAGE_LAYOUT_GENERAL);
 	builder.SetStorageBuffer(5, *_sdfGenerator->GetBoundsBuffer());
+	builder.SetTextureBuffer(6, _terrainIndex.Get());
+	builder.SetTextureBuffer(7, _renderScene.GetTerrainSystem().GetQuadTree().GetHeightAtlas().Get(),
+		0, VK_IMAGE_LAYOUT_GENERAL);
+	builder.SetUniformBuffer(8, context.GetBuffer(_terrainParams));
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(&_sdfShadowPipeline.Get());

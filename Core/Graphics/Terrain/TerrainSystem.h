@@ -30,6 +30,8 @@ namespace Core
 		// Everything but the viewport, which the binding pass fills in.
 		TerrainParams BuildRenderParams() const;
 
+		const TerrainShadowSettings& GetShadowSettings() const { return _shadowSettings; }
+
 		// Shared 17x17 patch grid, indexed by the GPU-driven instanced draw.
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }
 		uint32_t GetGridIndexCount() const { return _gridIndexCount; }
@@ -77,5 +79,6 @@ namespace Core
 		bool _freezeStreaming = false;
 		bool _bypassCulling = false;
 		int _debugMode = 0;
+		TerrainShadowSettings _shadowSettings;
 	};
 }

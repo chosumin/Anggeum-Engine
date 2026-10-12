@@ -253,6 +253,11 @@ void TerrainRenderer::RecordShadow(FrameGraphPassContext& context, CommandBuffer
 
 	commandBuffer.BindPipeline(_shadowPipeline.get());
 
+	// Terrain's own bias; the host re-sets the mesh bias per cascade.
+	const TerrainShadowSettings& shadow = _terrain.GetShadowSettings();
+	commandBuffer.SetDepthBias(shadow.depthBiasConstant, shadow.depthBiasClamp,
+		shadow.depthBiasSlope);
+
 	Shader& shader = _shadowShader.Get();
 	auto builder = context.CreateDescriptorSetBuilder(shader, 0);
 	builder.SetUniformBuffer(0, cascadeCamera);

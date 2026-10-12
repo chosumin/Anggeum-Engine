@@ -153,5 +153,18 @@ namespace Core
 		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels
 		vec4 viewport{};              // xy = size, zw = light tile counts
 	};
+
+	// Runtime shadow tunables read by the shadow passes: the cascade draw's
+	// depth bias (a heightfield needs more slope bias than meshes) and the far
+	// mask's heightfield march.
+	struct TerrainShadowSettings
+	{
+		float depthBiasConstant = 1.25f;
+		float depthBiasSlope = 2.5f;
+		float depthBiasClamp = 0.0f;
+		float farMaxDistance = 800.0f;
+		float farSoftness = 48.0f;
+		float farBias = 0.5f;
+		int farSteps = 64;
 	};
 }
