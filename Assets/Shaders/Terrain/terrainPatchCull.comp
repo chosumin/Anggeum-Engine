@@ -82,10 +82,11 @@ void main()
         push.worldOrigin, push.rootNodeSize, push.lodCount, aabbMin, aabbMax);
     float patchSize = aabbMax.x - aabbMin.x;
 
-    // Per-edge stitch deltas: sample the LOD map half a sector beyond each
-    // edge. Interior edges land in this node's own sectors -> delta 0;
-    // out-of-map lookups (world border) also read as delta 0. Computed before
-    // the cull so a rejected entry carries them into pass 2.
+    // Per-edge stitch deltas: sample the LOD map at the centre of the patch
+    // across each edge - the neighbouring patch of this node (delta 0) or,
+    // on a node border, a point inside the neighbouring node.
+    // Out-of-map lookups (world border) read as delta 0.
+    // Computed before the cull so a rejected entry carries them into pass 2.
     float sectorSize = TerrainNodeSizeAt(push.rootNodeSize, push.lodCount, 0u);
     vec2 centerXZ = aabbMin.xz + patchSize * 0.5;
     const vec2 edgeDirs[4] = vec2[](
@@ -94,8 +95,7 @@ void main()
     uint deltas = 0u;
     for (uint edge = 0u; edge < 4u; ++edge)
     {
-        vec2 probe = centerXZ
-            + edgeDirs[edge] * (patchSize * 0.5 + sectorSize * 0.5);
+        vec2 probe = centerXZ + edgeDirs[edge] * patchSize;
         ivec2 sector = ivec2(floor((probe - push.worldOrigin) / sectorSize));
 
         uint neighborLod = lod;
