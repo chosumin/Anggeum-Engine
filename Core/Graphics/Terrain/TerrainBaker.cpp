@@ -34,10 +34,10 @@ namespace
 		return uint16_t(glm::clamp(t, 0.0f, 1.0f) * 65535.0f + 0.5f);
 	}
 
-	uint32_t PackRGBA8(vec3 color)
+	uint32_t PackRGBA8(vec4 color)
 	{
-		uvec3 c = uvec3(clamp(color, 0.0f, 1.0f) * 255.0f + 0.5f);
-		return c.r | (c.g << 8) | (c.b << 16) | 0xff000000u;
+		uvec4 c = uvec4(clamp(color, 0.0f, 1.0f) * 255.0f + 0.5f);
+		return c.r | (c.g << 8) | (c.b << 16) | (c.a << 24);
 	}
 
 	float Dither(uint32_t x, uint32_t y)
@@ -47,7 +47,15 @@ namespace
 		return (float(h & 0xffffu) / 65535.0f - 0.5f);
 	}
 
-	vec3 ShadeAlbedo(float heightMeters, float slopeY, float dither,
+	struct SurfaceSample
+	{
+		vec3 albedo;
+		float roughness;
+	};
+
+	// Biome rules from height and slope; albedo and roughness share the
+	// weights so a texel's material reads consistently.
+	SurfaceSample ShadeSurface(float heightMeters, float slopeY, float dither,
 		const TerrainConfig& config)
 	{
 		const vec3 grass{ 0.22f, 0.34f, 0.12f };
@@ -58,11 +66,53 @@ namespace
 		float heightT = (heightMeters - config.heightMin)
 			/ (config.heightMax - config.heightMin);
 
-		vec3 color = mix(grass, dirt, smoothstep(0.55f, 0.7f, heightT));
-		color = mix(color, rock, smoothstep(0.95f, 0.85f, slopeY));
-		color = mix(color, snow,
-			smoothstep(0.78f, 0.88f, heightT) * smoothstep(0.7f, 0.9f, slopeY));
-		return color + dither * 0.02f;
+		float dirtT = smoothstep(0.55f, 0.7f, heightT);
+		float rockT = smoothstep(0.95f, 0.85f, slopeY);
+		float snowT = smoothstep(0.78f, 0.88f, heightT) * smoothstep(0.7f, 0.9f, slopeY);
+
+		vec3 color = mix(grass, dirt, dirtT);
+		color = mix(color, rock, rockT);
+		color = mix(color, snow, snowT);
+
+		float roughness = mix(0.95f, 0.9f, dirtT);
+		roughness = mix(roughness, 0.7f, rockT);
+		roughness = mix(roughness, 0.55f, snowT);
+
+		return { color + dither * 0.02f, roughness };
+	}
+
+	// Horizon search radius in texels: the height grid's apron must cover it.
+	constexpr int kAoRadiusTexels = 8;
+
+	// Sky visibility from the horizon in 8 directions, HBAO-style against the
+	// tangent plane: occlusion = sin(horizon) - sin(tangent) per direction.
+	float HorizonAO(const vector<float>& heights, int gridSize, int gx, int gy,
+		vec3 normal, float spacing)
+	{
+		static const ivec2 kDirections[8] = {
+			{ 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
+			{ 1, 1 }, { -1, 1 }, { 1, -1 }, { -1, -1 } };
+
+		float h0 = heights[gy * gridSize + gx];
+		float occlusion = 0.0f;
+		for (const ivec2& d : kDirections)
+		{
+			float dirLength = length(vec2(d));
+			// Rise per meter of the tangent plane along d (normal ∝ (-dH/dx, 1, -dH/dz)).
+			float slope = -(normal.x * float(d.x) + normal.z * float(d.y))
+				/ (normal.y * dirLength);
+			float sinTangent = slope / sqrt(1.0f + slope * slope);
+
+			float sinHorizon = sinTangent;
+			for (int k = 1; k <= kAoRadiusTexels; ++k)
+			{
+				float dh = heights[(gy + d.y * k) * gridSize + gx + d.x * k] - h0;
+				float dist = spacing * dirLength * float(k);
+				sinHorizon = std::max(sinHorizon, dh / sqrt(dh * dh + dist * dist));
+			}
+			occlusion += sinHorizon - sinTangent;
+		}
+		return glm::clamp(1.0f - occlusion / 8.0f, 0.0f, 1.0f);
 	}
 
 	void BakeNode(const TerrainNodeId& id, TerrainNodePayload& payload,
@@ -93,18 +143,21 @@ namespace
 		payload.minHeight = minHeight;
 		payload.maxHeight = maxHeight;
 
-		// Sample heights once on a (colorTexels + 2)^2 grid at color-texel
-		// centers so normals reuse them for central differences. Color texel i
-		// center maps to local fraction (i - border + 0.5) / quadCountPerNodeEdge; apron
-		// texels sample outside the node, which the global noise makes valid.
-		const uint32_t gridSize = colorTexels + 2;
-		vector<float> heights(gridSize * gridSize);
-		for (uint32_t j = 0; j < gridSize; ++j)
-			for (uint32_t i = 0; i < gridSize; ++i)
+		// Sample heights once on a color-texel-centered grid with an apron wide
+		// enough for the AO horizon walk (and the normals' central
+		// differences). Color texel i center maps to local fraction
+		// (i - border + 0.5) / quadCountPerNodeEdge; apron texels sample
+		// outside the node, which the global noise makes valid - and the
+		// lattice is the same for every node of a LOD, so AO stays seamless.
+		const int apron = kAoRadiusTexels;
+		const int gridSize = int(colorTexels) + 2 * apron;
+		vector<float> heights(size_t(gridSize) * gridSize);
+		for (int j = 0; j < gridSize; ++j)
+			for (int i = 0; i < gridSize; ++i)
 			{
-				vec2 local = (vec2(float(i), float(j)) - float(border) - 0.5f)
+				vec2 local = (vec2(float(i), float(j)) - float(apron) - float(border) + 0.5f)
 					/ float(config.quadCountPerNodeEdge);
-				heights[j * gridSize + i] =
+				heights[size_t(j) * gridSize + i] =
 					heightSource.Sample(nodeOrigin + local * nodeSize);
 			}
 
@@ -113,20 +166,24 @@ namespace
 		for (uint32_t j = 0; j < colorTexels; ++j)
 			for (uint32_t i = 0; i < colorTexels; ++i)
 			{
-				uint32_t gx = i + 1, gy = j + 1;
+				int gx = int(i) + apron, gy = int(j) + apron;
 				float dHdx = heights[gy * gridSize + gx + 1]
 					- heights[gy * gridSize + gx - 1];
 				float dHdz = heights[(gy + 1) * gridSize + gx]
 					- heights[(gy - 1) * gridSize + gx];
 				vec3 normal = normalize(vec3(-dHdx, 2.0f * spacing, -dHdz));
+				float ao = HorizonAO(heights, gridSize, gx, gy, normal, spacing);
 
-				uint32_t texel = j * colorTexels + i;
-				payload.normal[texel] = PackRGBA8(normal * 0.5f + 0.5f);
-				payload.albedo[texel] = PackRGBA8(ShadeAlbedo(
+				SurfaceSample surface = ShadeSurface(
 					heights[gy * gridSize + gx], normal.y,
 					Dither(uint32_t(id.x) * colorTexels + i,
 						uint32_t(id.y) * colorTexels + j),
-					config));
+					config);
+
+				uint32_t texel = j * colorTexels + i;
+				payload.normal[texel] = PackRGBA8(vec4(
+					normal.x * 0.5f + 0.5f, normal.z * 0.5f + 0.5f, surface.roughness, ao));
+				payload.albedo[texel] = PackRGBA8(vec4(surface.albedo, 1.0f));
 			}
 	}
 }

@@ -27,6 +27,6 @@ void main()
         + inTileUV * GRID_QUADS;
     vec2 uv = texel * params.invColorAtlasBorder.xy;
 
-    vec3 normal = normalize(texture(normalAtlas, uv).xyz * 2.0 - 1.0);
+    vec3 normal = TerrainDecodeNormal(texture(normalAtlas, uv));
     outNormal = vec4(normal * 0.5 + 0.5, 1.0);
 }

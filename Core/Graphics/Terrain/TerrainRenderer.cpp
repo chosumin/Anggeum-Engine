@@ -6,14 +6,16 @@
 #include "Graphics/RenderPasses/ShadowCullPass.h"
 #include "Graphics/RenderPasses/ShadowPass.h"
 #include "Graphics/RenderPasses/SDFShadowPass.h"
+#include "Graphics/RenderPasses/AmbientOcclusionPass.h"
+#include "Graphics/RenderPasses/IBLPass.h"
 #include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "Graphics/FrameGraph/FrameGraphBuilder.h"
 #include "Graphics/FrameGraph/FrameGraphPass.h"
 #include "Graphics/FrameResources.h"
 #include "Graphics/FrameCounter.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/ResourceManager.h"
-#include "Foundation/Scene.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Pipeline.h"
 #include "Graphics/Vulkans/PipelineState.h"
@@ -28,6 +30,7 @@ TerrainRenderer::TerrainRenderer(Device& device, ResourceManager& resourceManage
 	: _renderScene(renderScene)
 	, _terrain(renderScene.GetTerrainSystem())
 	, _screenExtent(screenExtent)
+	, _tileNums((screenExtent.width - 1) / TILE_SIZE + 1, (screenExtent.height - 1) / TILE_SIZE + 1)
 {
 	// terrain.vert + a normal-only fragment; positions are invariant with the
 	// color pipeline's, so the color draw can rely on this depth exactly.
@@ -113,8 +116,9 @@ FGBuffer TerrainRenderer::SetupParams(FrameGraphBuilder& builder, FrameResources
 {
 	// One buffer for every terrain draw this frame; refreshed by whichever
 	// pass sets up first.
-	TerrainParams params = _terrain.BuildRenderParams(_renderScene.GetScene().GetMainLight());
-	params.viewport = vec4(float(_screenExtent.width), float(_screenExtent.height), 0.0f, 0.0f);
+	TerrainParams params = _terrain.BuildRenderParams();
+	params.viewport = vec4(float(_screenExtent.width), float(_screenExtent.height),
+		float(_tileNums.x), float(_tileNums.y));
 	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>("Terrain.Params");
 	paramsHandle.Get().Update(params);
 	FGBuffer fgParams = builder.ImportBuffer("Terrain.Params", paramsHandle);
@@ -188,6 +192,20 @@ bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& fra
 	_shadowUB = builder.ImportBuffer(UB_SHADOW,
 		frameResources.GetOrCreateUniformBuffer<ShadowUniform>(UB_SHADOW));
 	builder.Read(_shadowUB, BufferAccess::UniformFragment);
+
+	_gi = builder.ImportBuffer(IBLPass::UB_GI,
+		frameResources.GetOrCreateUniformBuffer<GI>(IBLPass::UB_GI));
+	builder.Read(_gi, BufferAccess::UniformFragment);
+
+	_lights = builder.ImportBuffer(UB_LIGHTS,
+		frameResources.GetOrCreateUniformBuffer<LightBuffer>(UB_LIGHTS));
+	builder.Read(_lights, BufferAccess::UniformFragment);
+
+	_lightVisibility = builder.GetBuffer(SB_LIGHT_VISIBILITY);
+	builder.Read(_lightVisibility, BufferAccess::StorageFragmentRead);
+
+	_ao = builder.GetTexture(AmbientOcclusionPass::RT_AO);
+	builder.Read(_ao, TextureAccess::SampledFragment);
 
 	// Debug pick: TerrainSystem owns the slots and reads them in OnGUI.
 	_pick = FGBuffer{};
@@ -287,9 +305,22 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 			builder.SetTextureBuffer(9, _terrain.GetQuadTree().GetAlbedoAtlas().Get(), 0,
 				VK_IMAGE_LAYOUT_GENERAL);
 
+		builder.SetUniformBuffer(10, context.GetBuffer(_gi));
+		builder.SetUniformBuffer(11, context.GetBuffer(_lights));
+		builder.SetStorageBuffer(12, context.GetBuffer(_lightVisibility));
+		builder.SetTextureBuffer(13, context.GetTexture(_ao));
+
 		auto& resources = builder.Build();
 
-		commandBuffer.BindDescriptorSet(pipeline->GetPipelineBindPoint(), shader, resources);
+		// The IBL maps come through the bindless set, like the mesh shader.
+		BindlessTextureManager* bindless = _renderScene.GetBindlessTextureManager();
+		assert(shader.UsesBindlessTextures() && bindless != nullptr);
+		DescriptorSetResources bindlessResources{};
+		bindlessResources.descriptorSet = bindless->GetDescriptorSet();
+		bindlessResources.setIndex = static_cast<uint32_t>(DescriptorSetType::Bindless);
+
+		commandBuffer.BindDescriptorSets(pipeline->GetPipelineBindPoint(), shader,
+			{ &resources, &bindlessResources });
 
 		DrawList(context, commandBuffer, list);
 	}

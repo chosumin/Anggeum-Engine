@@ -37,12 +37,19 @@ struct TerrainParams
 {
     vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
     vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
-    vec4 sunDirection;         // xyz = direction (toward light), w = ambient
-    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
+    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO
     vec4 worldParams;          // xy = worldOrigin, z = rootNodeSize, w = lodCount
     vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels
-    vec4 viewport;             // xy = size
+    vec4 viewport;             // xy = size, zw = light tile counts
 };
+
+// Normal atlas texel: rg = normal xz * 0.5 + 0.5, b = roughness, a = horizon AO. 
+// A heightfield normal always points up, so y is reconstructed.
+vec3 TerrainDecodeNormal(vec4 packedNormal)
+{
+    vec2 xz = packedNormal.rg * 2.0 - 1.0;
+    return normalize(vec3(xz.x, sqrt(max(1.0 - dot(xz, xz), 0.0)), xz.y));
+}
 
 struct TerrainTraversalPush
 {

@@ -11,7 +11,6 @@ namespace Core
 	class PerspectiveCamera;
 	class TransferContext;
 	class SyncContext;
-	class Light;
 	class FrameResources;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
@@ -28,7 +27,8 @@ namespace Core
 		TerrainQuadTree& GetQuadTree() { return *_quadTree; }
 		TerrainStreamer& GetStreamer() { return *_streamer; }
 
-		TerrainParams BuildRenderParams(Light* mainLight) const;
+		// Everything but the viewport, which the binding pass fills in.
+		TerrainParams BuildRenderParams() const;
 
 		// Shared 17x17 patch grid, indexed by the GPU-driven instanced draw.
 		Handle<Buffer> GetGridIndexBuffer() const { return _gridIndexBuffer; }

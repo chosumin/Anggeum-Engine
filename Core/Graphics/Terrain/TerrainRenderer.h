@@ -69,6 +69,7 @@ namespace Core
 		RenderScene& _renderScene;
 		TerrainSystem& _terrain;
 		VkExtent2D _screenExtent{};
+		ivec2 _tileNums{};
 
 		Handle<Shader> _depthShader;
 		unique_ptr<PipelineState> _depthPipelineState;
@@ -87,9 +88,8 @@ namespace Core
 		PatchList _lists[2];           // indexed by Phase
 		bool _colorActive = false;
 
-		// Color draw shadow inputs (the SDF mask may be absent).
-		FGBuffer _shadowUB;
-		FGTexture _shadowMap, _sdfShadow;
+		FGBuffer _shadowUB, _gi, _lights, _lightVisibility;
+		FGTexture _shadowMap, _sdfShadow, _ao;
 
 		FGBuffer _shadowParams;
 		array<FGBuffer, SHADOW_MAP_CASCADE_COUNT> _shadowPatchLists{};

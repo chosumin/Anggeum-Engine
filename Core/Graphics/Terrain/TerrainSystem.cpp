@@ -3,8 +3,6 @@
 #include "Procedural/ProceduralTerrainHeightSource.h"
 #include "Foundation/Entity.h"
 #include "Components/PerspectiveCamera.h"
-#include "Components/Light.h"
-#include "Components/Transform.h"
 #include "Graphics/ResourceManager.h"
 #include "Graphics/BufferUpload.h"
 #include "Graphics/FrameCounter.h"
@@ -96,7 +94,7 @@ namespace Core
 		_streamer->QueueTableInit(device, frameResources);
 	}
 
-	TerrainParams TerrainSystem::BuildRenderParams(Light* mainLight) const
+	TerrainParams TerrainSystem::BuildRenderParams() const
 	{
 		TerrainParams params{};
 		params.heightMinMaxInvAtlas = vec4(_config.heightMin, _config.heightMax,
@@ -104,13 +102,6 @@ namespace Core
 		params.invColorAtlasBorder = vec4(1.0f / vec2(_quadTree->GetColorAtlasExtent()),
 			float(_config.borderTexels), 0.0f);
 
-		if (mainLight)
-		{
-			auto& transform = mainLight->GetEntity().GetTransform();
-			vec3 direction = transform.GetRotation() * mainLight->GetProperties().Direction;
-			if (length(direction) > 0.0f)
-				params.sunDirection = vec4(normalize(direction), 0.25f);
-		}
 		// yz = mouse in framebuffer pixels, w = pick on
 		ImGuiIO& io = ImGui::GetIO();
 		ivec2 mouse = ivec2(io.MousePos.x * io.DisplayFramebufferScale.x,
@@ -148,7 +139,8 @@ namespace Core
 		ImGui::Text("Visible patches (GPU, 2f delay): %u", patchCount);
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
-		ImGui::Combo("Debug mode", &_debugMode, "Lit\0LOD tint\0Normals\0UV grid\0");
+		ImGui::Combo("Debug mode", &_debugMode,
+			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0");
 		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
 
 		if (_bypassCulling)

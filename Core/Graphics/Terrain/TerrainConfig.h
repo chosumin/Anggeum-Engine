@@ -143,15 +143,15 @@ namespace Core
 	constexpr uint32_t TERRAIN_CULL_FRUSTUM = 0x100u;
 	constexpr uint32_t TERRAIN_CULL_OCCLUDED = 0x200u;
 
-	// Shared uniform block for terrain.vert/.frag.
+	// Shared uniform block for terrain.vert/.frag and the far shadow mask.
 	struct alignas(16) TerrainParams
 	{
 		vec4 heightMinMaxInvAtlas{};  // x = min, y = max, zw = 1 / heightAtlasExtent
 		vec4 invColorAtlasBorder{};   // xy = 1 / colorAtlasExtent, z = borderTexels
-		vec4 sunDirection{};          // xyz = direction, w = ambient
-		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid
+		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO
 		vec4 worldParams{};           // xy = worldOrigin, z = rootNodeSize, w = lodCount
 		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels
-		vec4 viewport{};              // xy = size
+		vec4 viewport{};              // xy = size, zw = light tile counts
+	};
 	};
 }

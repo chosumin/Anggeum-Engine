@@ -10,7 +10,7 @@ namespace Core
 	struct TerrainNodePayload
 	{
 		vector<uint16_t> height;  // HeightTexels()^2, unorm16
-		vector<uint32_t> normal;  // ColorTexels()^2, RGBA8 packed (n * 0.5 + 0.5)
+		vector<uint32_t> normal;  // ColorTexels()^2, RGBA8: n.xz * 0.5 + 0.5, roughness, horizon AO
 		vector<uint32_t> albedo;  // ColorTexels()^2, RGBA8
 		uint16_t minHeight = 0;
 		uint16_t maxHeight = 0;

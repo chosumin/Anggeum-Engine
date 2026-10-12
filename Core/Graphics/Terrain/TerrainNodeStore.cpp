@@ -10,7 +10,7 @@ namespace
 	using namespace Core;
 
 	constexpr uint32_t kTerrainBakeMagic = 0x4B414254u; // 'TBAK'
-	constexpr uint32_t kTerrainBakeVersion = 1;
+	constexpr uint32_t kTerrainBakeVersion = 2; // 2: normal atlas packs roughness + AO
 	constexpr const char* kTerrainBakeCachePath = "Assets/Cache/terrain_bake.tbake";
 
 	struct TerrainBakeFileHeader
