@@ -20,6 +20,11 @@ namespace Core
 
 		uint32_t borderTexels = 2;  // normal/albedo filtering apron
 
+		// Splat (material ID) map: a texel on every splatQuadsPerTexel-th grid
+		// vertex, so 128 quads give 65 texels per edge and the last one sits on
+		// the node border, shared with the neighbour like heights (no apron).
+		uint32_t splatQuadsPerTexel = 2;
+
 		// Chosen so the average terrain height lands near y = 0 (the Sponza
 		// floor): the FBM mapping averages to the middle of the range.
 		float heightMin = -100.0f;
@@ -29,6 +34,7 @@ namespace Core
 		VkFormat heightFormat = VK_FORMAT_R16_UNORM;
 		VkFormat normalFormat = VK_FORMAT_R8G8B8A8_UNORM;
 		VkFormat albedoFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		VkFormat splatFormat = VK_FORMAT_R8_UINT;
 
 		// Streaming. Capacity is intentionally smaller than the total node
 		// count so slot pressure and parent fallback actually happen.
@@ -40,6 +46,7 @@ namespace Core
 
 		uint32_t HeightTexels() const { return quadCountPerNodeEdge + 1; }
 		uint32_t ColorTexels() const { return quadCountPerNodeEdge + 2 * borderTexels; }
+		uint32_t SplatTexels() const { return quadCountPerNodeEdge / splatQuadsPerTexel + 1; }
 
 		// The world is centered on the origin; the min corner follows from the
 		// root tile grid so growing rootTilesX/Z cannot leave a stale origin.
@@ -148,9 +155,9 @@ namespace Core
 	{
 		vec4 heightMinMaxInvAtlas{};  // x = min, y = max, zw = 1 / heightAtlasExtent
 		vec4 invColorAtlasBorder{};   // xy = 1 / colorAtlasExtent, z = borderTexels
-		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO
+		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 detail albedo
 		vec4 worldParams{};           // xy = worldOrigin, z = rootNodeSize, w = lodCount
-		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels
+		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
 		vec4 viewport{};              // xy = size, zw = light tile counts
 	};
 

@@ -13,6 +13,13 @@ namespace
 		x ^= x >> 16;
 		return x;
 	}
+
+	// Positive modulo, so negative cells wrap too.
+	int Wrap(int value, int period)
+	{
+		int m = value % period;
+		return m < 0 ? m + period : m;
+	}
 }
 
 namespace Core
@@ -39,6 +46,24 @@ namespace Core
 		return mix(mix(g00, g10, u.x), mix(g01, g11, u.x), u.y);
 	}
 
+	float TerrainNoise::NoisePeriodic(vec2 p, int period, uint32_t seed)
+	{
+		ivec2 cell = ivec2(floor(p));
+		vec2 f = p - vec2(cell);
+		vec2 u = f * f * (3.0f - 2.0f * f);
+
+		// The corner lattice wraps, the offsets do not: cell period-1 blends
+		// toward cell 0's gradient exactly like cell -1 would.
+		auto corner = [&](int dx, int dy)
+			{
+				ivec2 wrapped(Wrap(cell.x + dx, period), Wrap(cell.y + dy, period));
+				return Gradient(wrapped, f - vec2(float(dx), float(dy)), seed);
+			};
+
+		return mix(mix(corner(0, 0), corner(1, 0), u.x),
+			mix(corner(0, 1), corner(1, 1), u.x), u.y);
+	}
+
 	float TerrainNoise::Fbm(vec2 worldXZ, const TerrainNoiseParams& params)
 	{
 		vec2 p = worldXZ * params.baseFrequency;
@@ -55,5 +80,26 @@ namespace Core
 		}
 
 		return glm::clamp(total / totalAmplitude * params.amplitude, -1.0f, 1.0f);
+	}
+
+	float TerrainNoise::TileableFbm(vec2 uv, int period, int octaves, float gain,
+		uint32_t seed)
+	{
+		float amplitude = 1.0f;
+		float total = 0.0f;
+		float totalAmplitude = 0.0f;
+
+		for (int octave = 0; octave < octaves; ++octave)
+		{
+			total += amplitude * NoisePeriodic(uv * float(period), period,
+				seed + uint32_t(octave));
+			totalAmplitude += amplitude;
+			period *= 2;
+			amplitude *= gain;
+		}
+
+		// Normalized gradient noise sits well inside [-1, 1]; the same gain
+		// Fbm applies brings the relief out.
+		return glm::clamp(total / totalAmplitude * 1.8f, -1.0f, 1.0f);
 	}
 }

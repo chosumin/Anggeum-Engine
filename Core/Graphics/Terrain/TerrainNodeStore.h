@@ -1,29 +1,19 @@
 #pragma once
-#include "TerrainNode.h"
+#include "TerrainBaker.h"
 
 namespace Core
 {
 	class TerrainHeightSource;
 
-	// Baked CPU payload for one quadtree node. This is the in-memory stand-in
-	// for FC5's on-disk tile: streaming copies from here into the GPU atlases.
-	struct TerrainNodePayload
-	{
-		vector<uint16_t> height;  // HeightTexels()^2, unorm16
-		vector<uint32_t> normal;  // ColorTexels()^2, RGBA8: n.xz * 0.5 + 0.5, roughness, horizon AO
-		vector<uint32_t> albedo;  // ColorTexels()^2, RGBA8
-		uint16_t minHeight = 0;
-		uint16_t maxHeight = 0;
-	};
-
 	class TerrainNodeStore
 	{
 	public:
 		// The runtime entry point: loads the bake cache when it matches the
-		// config and height source, otherwise bakes and saves
-		// the cache for the next run.
+		// config, height source and palette far side, otherwise bakes and
+		// saves the cache for the next run.
 		static TerrainNodeStore Load(const TerrainConfig& config,
-			const TerrainHeightSource& heightSource);
+			const TerrainHeightSource& heightSource,
+			const vector<TerrainMaterialBakeDesc>& materials);
 
 		TerrainNodeStore(const TerrainConfig& config, vector<TerrainNodePayload>&& payloads)
 			: _config(config), _payloads(move(payloads)) {}

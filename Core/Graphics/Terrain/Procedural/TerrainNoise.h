@@ -22,8 +22,14 @@ namespace Core
 		// Fractal noise shaped to [-1, 1].
 		static float Fbm(vec2 worldXZ, const TerrainNoiseParams& params);
 
+		// Fractal noise over uv in [0, 1) whose lattice wraps every `period`
+		// cells (doubling per octave), so the result tiles seamlessly. [-1, 1].
+		static float TileableFbm(vec2 uv, int period, int octaves, float gain,
+			uint32_t seed);
+
 	private:
 		static float Gradient(ivec2 cell, vec2 offset, uint32_t seed);
 		static float Noise(vec2 p, uint32_t seed);
+		static float NoisePeriodic(vec2 p, int period, uint32_t seed);
 	};
 }

@@ -10,22 +10,25 @@ namespace
 	using namespace Core;
 
 	constexpr uint32_t kTerrainBakeMagic = 0x4B414254u; // 'TBAK'
-	constexpr uint32_t kTerrainBakeVersion = 2; // 2: normal atlas packs roughness + AO
+	constexpr uint32_t kTerrainBakeVersion = 3; // 3: splat (material ID) map
 	constexpr const char* kTerrainBakeCachePath = "Assets/Cache/terrain_bake.tbake";
 
 	struct TerrainBakeFileHeader
 	{
 		uint32_t magic = 0;
 		uint32_t version = 0;
-		uint32_t bakeKey = 0;    // config + height source identity
+		uint32_t bakeKey = 0;    // config + height source + palette identity
 		uint32_t nodeCount = 0;
 		uint32_t heightTexels = 0;
 		uint32_t colorTexels = 0;
+		uint32_t splatTexels = 0;
 	};
 
 	// Everything that changes baked output. Streaming/format fields are
-	// deliberately excluded: they do not affect payload contents.
-	uint32_t BakeKey(const TerrainConfig& config, const TerrainHeightSource& heightSource)
+	// deliberately excluded: they do not affect payload contents. Of the
+	// palette only the far side matters (the detail look is not baked).
+	uint32_t BakeKey(const TerrainConfig& config, const TerrainHeightSource& heightSource,
+		const vector<TerrainMaterialBakeDesc>& materials)
 	{
 		uint32_t hash = heightSource.CacheKey();
 		hash = TerrainHashBytes(&config.rootTilesX, sizeof(config.rootTilesX), hash);
@@ -35,8 +38,17 @@ namespace
 		hash = TerrainHashBytes(&config.quadCountPerNodeEdge,
 			sizeof(config.quadCountPerNodeEdge), hash);
 		hash = TerrainHashBytes(&config.borderTexels, sizeof(config.borderTexels), hash);
+		hash = TerrainHashBytes(&config.splatQuadsPerTexel,
+			sizeof(config.splatQuadsPerTexel), hash);
 		hash = TerrainHashBytes(&config.heightMin, sizeof(config.heightMin), hash);
 		hash = TerrainHashBytes(&config.heightMax, sizeof(config.heightMax), hash);
+		
+		for (const TerrainMaterialBakeDesc& material : materials)
+		{
+			// Three floats, not sizeof(vec3): aligned gentypes pad it with garbage.
+			hash = TerrainHashBytes(&material.albedo.x, 3 * sizeof(float), hash);
+			hash = TerrainHashBytes(&material.roughness, sizeof(material.roughness), hash);
+		}
 		return hash;
 	}
 
@@ -47,7 +59,8 @@ namespace
 	{
 		return 2 * sizeof(uint16_t)
 			+ size_t(config.HeightTexels()) * config.HeightTexels() * sizeof(uint16_t)
-			+ 2 * size_t(config.ColorTexels()) * config.ColorTexels() * sizeof(uint32_t);
+			+ 2 * size_t(config.ColorTexels()) * config.ColorTexels() * sizeof(uint32_t)
+			+ size_t(config.SplatTexels()) * config.SplatTexels() * sizeof(uint8_t);
 	}
 
 	bool TryLoadBakeCache(const TerrainConfig& config, uint32_t bakeKey,
@@ -75,14 +88,25 @@ namespace
 			|| header.bakeKey != bakeKey
 			|| header.nodeCount != config.TotalNodeCount()
 			|| header.heightTexels != config.HeightTexels()
-			|| header.colorTexels != config.ColorTexels())
+			|| header.colorTexels != config.ColorTexels()
+			|| header.splatTexels != config.SplatTexels())
+		{
+			LOG("Terrain store: cache rejected (version %u/%u, key %08x/%08x, nodes %u/%u)",
+				header.version, kTerrainBakeVersion, header.bakeKey, bakeKey,
+				header.nodeCount, config.TotalNodeCount());
 			return false;
+		}
 
 		if (fileData.size() != sizeof(header) + size_t(header.nodeCount) * NodeByteSize(config))
+		{
+			LOG("Terrain store: cache rejected (size %zu, expected %zu)", fileData.size(),
+				sizeof(header) + size_t(header.nodeCount) * NodeByteSize(config));
 			return false;
+		}
 
 		size_t heightCount = size_t(config.HeightTexels()) * config.HeightTexels();
 		size_t colorCount = size_t(config.ColorTexels()) * config.ColorTexels();
+		size_t splatCount = size_t(config.SplatTexels()) * config.SplatTexels();
 		const uint8_t* cursor = fileData.data() + sizeof(header);
 
 		payloads.resize(header.nodeCount);
@@ -102,6 +126,8 @@ namespace
 			read(payload.normal.data(), colorCount * sizeof(uint32_t));
 			payload.albedo.resize(colorCount);
 			read(payload.albedo.data(), colorCount * sizeof(uint32_t));
+			payload.splat.resize(splatCount);
+			read(payload.splat.data(), splatCount * sizeof(uint8_t));
 		}
 		return true;
 	}
@@ -116,6 +142,7 @@ namespace
 		header.nodeCount = uint32_t(payloads.size());
 		header.heightTexels = config.HeightTexels();
 		header.colorTexels = config.ColorTexels();
+		header.splatTexels = config.SplatTexels();
 
 		vector<uint8_t> fileData(sizeof(header) + payloads.size() * NodeByteSize(config));
 		uint8_t* cursor = fileData.data();
@@ -133,6 +160,7 @@ namespace
 			write(payload.height.data(), payload.height.size() * sizeof(uint16_t));
 			write(payload.normal.data(), payload.normal.size() * sizeof(uint32_t));
 			write(payload.albedo.data(), payload.albedo.size() * sizeof(uint32_t));
+			write(payload.splat.data(), payload.splat.size() * sizeof(uint8_t));
 		}
 
 		try
@@ -149,9 +177,10 @@ namespace
 namespace Core
 {
 	TerrainNodeStore TerrainNodeStore::Load(const TerrainConfig& config,
-		const TerrainHeightSource& heightSource)
+		const TerrainHeightSource& heightSource,
+		const vector<TerrainMaterialBakeDesc>& materials)
 	{
-		uint32_t bakeKey = BakeKey(config, heightSource);
+		uint32_t bakeKey = BakeKey(config, heightSource, materials);
 
 		auto start = chrono::high_resolution_clock::now();
 		vector<TerrainNodePayload> payloads;
@@ -164,7 +193,7 @@ namespace Core
 			return TerrainNodeStore(config, move(payloads));
 		}
 
-		payloads = TerrainBaker::Bake(config, heightSource);
+		payloads = TerrainBaker::Bake(config, heightSource, materials);
 		SaveBakeCache(config, bakeKey, payloads);
 		return TerrainNodeStore(config, move(payloads));
 	}
