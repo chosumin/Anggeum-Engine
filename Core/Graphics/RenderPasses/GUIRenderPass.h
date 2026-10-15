@@ -7,6 +7,7 @@ namespace Core
     class Device;
     class SwapChain;
     class Texture;
+    class Buffer;
     class SyncContext;
 
     class GUIRenderPass : public FrameGraphPass
@@ -36,5 +37,24 @@ namespace Core
         VkDescriptorPool _pool = VK_NULL_HANDLE;
 
         FGTexture _mainColor;
+
+        // Debug screenshot of the presented frame: F11, or the
+        // ANGGEUM_SCREENSHOT env var ("path.png@frame") for scripted runs.
+        void PollScreenshotRequest();
+        void WriteScreenshot(uint32_t slot);
+
+        struct ScreenshotCapture
+        {
+            Handle<Buffer> buffer;
+            string path;
+            bool pending = false;
+        };
+        array<ScreenshotCapture, MAX_FRAMES_IN_FLIGHT> _screenshots;
+        string _screenshotRequest;
+        string _screenshotEnvPath;
+        uint64_t _screenshotEnvFrame = 0;
+        bool _screenshotKeyHeld = false;
+        bool _captureThisFrame = false;
+        FGBuffer _captureBuffer;
     };
 }

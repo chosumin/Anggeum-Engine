@@ -7,6 +7,10 @@
 #include "Graphics/SyncContext.h"
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/Texture.h"
+#include "Graphics/Vulkans/Buffer.h"
+#include "Graphics/FrameCounter.h"
+#include "Utils/Log.h"
+#include "stb_image_write.h"
 
 using namespace Core;
 
@@ -18,6 +22,15 @@ GUIRenderPass::GUIRenderPass(Device& device, SwapChain& swapChain,
     , _swapChainFormat(swapChain.GetImageFormat())
 {
     _extent = swapChain.GetSwapChainExtent();
+
+    if (const char* env = getenv("ANGGEUM_SCREENSHOT"))
+    {
+        string spec = env;
+        size_t at = spec.find("@");
+        _screenshotEnvPath = spec.substr(0, at);
+        _screenshotEnvFrame = at == string::npos
+            ? 1 : strtoull(spec.c_str() + at + 1, nullptr, 10);
+    }
 
     VkDescriptorPoolSize pool_sizes[] =
     {
@@ -87,6 +100,26 @@ void GUIRenderPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResou
 	_mainColor = builder.GetTexture(RT_MAIN_COLOR);
 	builder.Write(_mainColor, TextureAccess::ColorLoadWrite);
 
+    PollScreenshotRequest();
+    uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
+    if (_screenshots[slot].pending)
+        WriteScreenshot(slot);
+
+    _captureThisFrame = !_screenshotRequest.empty();
+    if (_captureThisFrame)
+    {
+        ScreenshotCapture& capture = _screenshots[slot];
+        capture.buffer = frameResources.GetOrCreateStorageBuffer("Screenshot.Readback",
+            { VkDeviceSize(_extent.width) * _extent.height * 4,
+              VK_BUFFER_USAGE_TRANSFER_DST_BIT, MemoryType::UNIFORM });
+        capture.path = _screenshotRequest;
+        capture.pending = true;
+        _screenshotRequest.clear();
+
+        _captureBuffer = builder.ImportBuffer("Screenshot.Readback", capture.buffer);
+        builder.Write(_captureBuffer, BufferAccess::TransferDst);
+    }
+
 	// The resolve target is the raw swapchain image (no graph declaration) and
     // ImGui's draw data is external state.
     builder.SetSideEffect();
@@ -134,6 +167,32 @@ void GUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
 
     commandBuffer.EndRendering();
 
+    if (_captureThisFrame)
+    {
+        // Read the resolved frame back on its way to the presentation engine.
+        commandBuffer.CreateBarrierBatch()
+            .Image(swapChainImage, VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT)
+            .Submit();
+
+        VkBufferImageCopy region{};
+        region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        region.imageExtent = { _extent.width, _extent.height, 1 };
+        vkCmdCopyImageToBuffer(commandBuffer.GetHandle(), swapChainImage,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            context.GetBuffer(_captureBuffer).GetBuffer(), 1, &region);
+
+        commandBuffer.CreateBarrierBatch()
+            .Image(swapChainImage, VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+                VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE)
+            .Submit();
+        return;
+    }
+
     // Hand the resolved image to the presentation engine.
     commandBuffer.CreateBarrierBatch()
         .Image(swapChainImage, VK_IMAGE_ASPECT_COLOR_BIT,
@@ -141,4 +200,45 @@ void GUIRenderPass::Execute(FrameGraphPassContext& context, CommandBuffer& comma
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE)
         .Submit();
+}
+
+void GUIRenderPass::PollScreenshotRequest()
+{
+    // One request per press; a focused ImGui text field keeps the key.
+    bool held = Input::KeyPressed[KeyCode::F11] && !ImGui::GetIO().WantTextInput;
+    if (held && !_screenshotKeyHeld)
+        _screenshotRequest = "screenshot_" + to_string(FrameCounter::GetFrameNumber()) + ".png";
+    _screenshotKeyHeld = held;
+
+    if (!_screenshotEnvPath.empty() && FrameCounter::GetFrameNumber() >= _screenshotEnvFrame)
+    {
+        _screenshotRequest = _screenshotEnvPath;
+        _screenshotEnvPath.clear();
+    }
+}
+
+void GUIRenderPass::WriteScreenshot(uint32_t slot)
+{
+    ScreenshotCapture& capture = _screenshots[slot];
+    capture.pending = false;
+
+    void* mapped = nullptr;
+    capture.buffer.Get().GetMappedPtr(&mapped);
+    const uint8_t* pixels = static_cast<const uint8_t*>(mapped);
+
+    // Swapchains are BGRA nearly everywhere; PNG wants RGBA, opaque.
+    const bool bgra = _swapChainFormat == VK_FORMAT_B8G8R8A8_UNORM
+        || _swapChainFormat == VK_FORMAT_B8G8R8A8_SRGB;
+    vector<uint8_t> rgba(size_t(_extent.width) * _extent.height * 4);
+    for (size_t i = 0; i < rgba.size(); i += 4)
+    {
+        rgba[i + 0] = pixels[i + (bgra ? 2 : 0)];
+        rgba[i + 1] = pixels[i + 1];
+        rgba[i + 2] = pixels[i + (bgra ? 0 : 2)];
+        rgba[i + 3] = 255;
+    }
+
+    int ok = stbi_write_png(capture.path.c_str(), int(_extent.width), int(_extent.height), 4,
+        rgba.data(), int(_extent.width) * 4);
+    LOG("Screenshot %s: %s", ok ? "written" : "FAILED", capture.path.c_str());
 }
