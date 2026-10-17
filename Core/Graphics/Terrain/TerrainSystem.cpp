@@ -146,8 +146,14 @@ namespace Core
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode,
-			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0");
+			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0Material ID\0Detail albedo\0");
 		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
+
+		if (ImGui::TreeNode("Materials"))
+		{
+			_materials->OnGUI();
+			ImGui::TreePop();
+		}
 
 		if (ImGui::TreeNode("Shadow"))
 		{

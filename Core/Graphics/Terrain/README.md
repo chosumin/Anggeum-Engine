@@ -26,6 +26,7 @@ so a coarse node covers more world per quad. Every node splits further into
 | `lodCount`, `quadCountPerNodeEdge` | Depth of the quadtree and the vertex density of one node |
 | `patchesPerNodeEdge` | Patches per node edge; **mirrored as a literal** in `terrainPatchCull.comp` (CPU-asserted) |
 | `borderTexels` | Normal/albedo filtering apron so bilinear taps stay seamless across node edges |
+| `splatQuadsPerTexel` | Splat (material ID) map density: one texel every N grid vertices, edges shared (65 per node edge) |
 | `atlasCapacity`, `atlasSlotsPerRow` | Atlas slot count/layout. Deliberately **smaller than the total node count**, so slot pressure and parent fallback actually happen |
 | `ringRadiusScale`, `evictHysteresis` | Load ring radius (`scale * NodeSize(lod)`) and the wider radius eviction must cross |
 | `uploadBudgetPerFrame` | Tile cap per frame, converted to bytes and asked of the shared upload budget |
@@ -68,11 +69,14 @@ FrameGraph                                (GPU, per frame)
 | `TerrainSystem` | Facade. Owns the config, node store, quadtree and streamer; builds the shared 17x17 patch index buffer and the render params; ImGui panel and mouse pick |
 | `TerrainConfig` | All world/bake/streaming parameters plus the derived math (`NodeSize`, `LevelOffset`, `MaxPatches`, ...). Also holds the GPU-mirrored structs |
 | `TerrainHeightSource` | Where height comes from: `Sample(worldXZ)` + `CacheKey()` for bake invalidation. `ProceduralTerrainHeightSource` implements it over FBM `TerrainNoise` |
-| `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, min/max height |
+| `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, splat (material ID), min/max height |
 | `TerrainNodeStore` | The baked CPU payloads — the in-memory stand-in for FC5's on-disk tiles. `Load()` reads the `.tbake` cache or bakes and writes it |
-| `TerrainQuadTree` | GPU face: 3 synchronized atlases (height; normal + roughness + AO; albedo), the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
+| `TerrainQuadTree` | GPU face: 4 synchronized atlases (height; normal + roughness + AO; albedo; splat material IDs), the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
 | `TerrainStreamer` | CPU residency: ring requests, load/evict diff, budgeted uploads, table mirrors, PendingUpload → Resident promotion |
 | `TerrainUploadJob` | Worker-thread job that stages tile payloads + lookup tables and records the copies |
+| `TerrainMaterialDesc` / `TerrainMaterialBakeDesc` | One palette entry split by consumer: the runtime side (`TerrainMaterial.h`: name, tile size/rotation, the GPU palette structs) and the bake side (`TerrainBaker.h`: the albedo/roughness the atlases average to). Ready-made tiles never need the bake side |
+| `TerrainMaterialSet` | The runtime palette: the descriptors, the detail texture handles behind them (registered bindless by whoever produced them) and the GPU palette they resolve to |
+| `ProceduralTerrainMaterials` | The procedural producer: the biome palette (`TerrainProceduralMaterial` = runtime desc + bake desc + noise look), its bake descs for the node bake, and `CreateProceduralTerrainMaterials()`, which bakes the detail maps with `TerrainDetailBaker`, uploads them once (`TerrainDetailUploadJob`) and hands the set the handles |
 | `TerrainPatchCuller` | The cull dispatches a host pass embeds: declares the node list / LOD map inputs and the list / args / rejected outputs, resets args, dispatches pass 1 (`terrainPatchCull.comp`) and pass 2 (`terrainPatchCullPass2.comp`) |
 | `TerrainRenderer` | The draws a host pass embeds: depth prepass (per phase), color (both lists), shadow (per cascade). Owns the three pipelines; the host owns the attachments |
 
@@ -92,9 +96,25 @@ so do parent/child across LODs. Heights sit exactly on grid vertices
 (`quadCountPerNodeEdge + 1` texels); normal/albedo get a `borderTexels` apron on
 each side so filtering never samples a foreign slot.
 
+The bake takes the palette's far side, one `TerrainMaterialBakeDesc` per
+material. The biome rules (height, slope) produce **weights** over the
+palette, the atlas albedo/roughness blend the entries with those weights, and
+the **splat map** draws one material ID per texel from the same weights
+(stochastic pick, hashed from the world position so every LOD draws the same
+ID at the same point - a 50/50 zone bakes a dithered mix of both IDs for the
+near shader to blend). Splat texels sit on every `splatQuadsPerTexel`-th grid
+vertex (65 per edge), edges shared like heights. Bit 7 of the ID is reserved
+for the Phase 4 cliff flag.
+
+The detail maps are baked too, per material rather than per node, and not
+cached: `TerrainDetailBaker` builds tileable noise with a full mip chain,
+with the albedo centered on the bake albedo so near and far average to the
+same color. They are uploaded once (`TerrainDetailUploadJob`, an init job)
+and registered with the bindless set like any file texture.
+
 `Assets/Cache/terrain_bake.tbake` is keyed by a hash of every field that changes
 baked output (world dims, LOD count, texel counts, height range, height-source
-key) — streaming and format knobs are excluded because they don't. The layout is
+key, the far side of the palette) — streaming and format knobs are excluded because they don't. The layout is
 a fixed per-node stride, so `offset = header + index * stride` gives random
 access: the seam where per-node disk streaming plugs in later.
 
@@ -140,7 +160,7 @@ The three GPU tables the passes read are all maintained by streaming:
 |----------|----------|
 | Quadtree index texture | `R16_UINT`, one texel per node, **mip m = LOD m**. Value = atlas slot, or `TERRAIN_NODE_EMPTY` / `_INVALID` |
 | Node desc buffer | One `TerrainNodeDescGPU` per atlas slot: packed min/max height + slot/LOD |
-| Height / normal / albedo atlases | Synchronized — one slot index addresses all three |
+| Height / normal / albedo / splat atlases | Synchronized — one slot index addresses all four |
 
 **Node list** (`terrainNodeList.comp`) — a single workgroup walks the quadtree
 root-down, ping-ponging the per-level lists through shared memory, so there is no
@@ -215,6 +235,16 @@ the baked AO come from the normal atlas. The baked AO multiplies the
 screen-space AO on the ambient diffuse and feeds `SpecularOcclusion` on the
 IBL specular.
 
+**Materials.** The splat atlas (`R8_UINT`, nearest) holds one material ID
+per texel; the material palette (`TerrainMaterialPaletteGPU`, rebuilt per
+frame from `TerrainMaterialSet` so the GUI edits tiling live) maps an ID to
+three **bindless detail map indices** (albedo, tangent-space normal +
+smoothness, height) plus `1 / tileSize` and a rotation. `TerrainDetailUV`
+(world XZ -> rotated, tiled uv) and `TerrainSplatTexel` live in
+`terrainCommon.glsl`. Phase 3b stops here: the lit path still shades from
+the atlases; the Material ID / Detail albedo debug modes read the splat and
+detail maps, and the four-texel height-weighted near blend is Phase 3c.
+
 Shadows come from two sources. Inside the CSM range the cascades draw the
 per-cascade patch lists with terrain's own depth bias (`TerrainShadowSettings`).
 Past the transition `ShadowVisibility` blends into
@@ -235,10 +265,16 @@ does.
 - **Freeze streaming** pins residency so you can fly out and inspect the covering
   set and the LOD ring from outside.
 - **Wireframe** shows patch density and T-junctions; **Debug mode** switches
-  between Lit / LOD tint / Normals / UV grid / Roughness / Baked AO.
+  between Lit / LOD tint / Normals / UV grid / Roughness / Baked AO / Material ID /
+  Detail albedo (nearest splat texel -> palette -> detail albedo at world uv).
+- **Materials** tree: per-material tile size and rotation (live) and the bindless
+  indices the palette carries.
 - **Shadow** tree: cascade depth bias and the far heightfield march (steps 0
   turns it off for A/B, max distance, softness, bias). The SDF Shadow panel
   previews the mask itself.
+- **F11** writes the presented frame to `screenshot_<frame>.png` (or launch with
+  `ANGGEUM_SCREENSHOT=path.png@frame` for scripted runs); external screen capture
+  of the swapchain comes back blank on this driver.
 - **Draw culled patches** bypasses the cull and tints what would have been
   dropped (red = frustum, blue = occluded). With it on, the fragment shader also
   writes a pick value, and the panel decodes the patch under the mouse: LOD,

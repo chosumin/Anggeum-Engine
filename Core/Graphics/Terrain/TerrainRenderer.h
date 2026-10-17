@@ -84,7 +84,7 @@ namespace Core
 		unique_ptr<PipelineState> _shadowPipelineState;
 		unique_ptr<Pipeline> _shadowPipeline;
 
-		FGBuffer _camera, _params, _pick;
+		FGBuffer _camera, _params, _pick, _palette;
 		PatchList _lists[2];           // indexed by Phase
 		bool _colorActive = false;
 

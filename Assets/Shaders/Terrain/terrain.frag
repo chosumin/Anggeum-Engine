@@ -48,6 +48,14 @@ layout(set = 0, binding = 12) buffer readonly TileLightVisiblities
 
 layout(set = 0, binding = 13) uniform sampler2D aoMap;
 
+// Material IDs per splat texel, and the palette they index.
+layout(set = 0, binding = 14) uniform usampler2D splatAtlas;
+layout(set = 0, binding = 15) uniform TerrainMaterialPalette
+{
+    TerrainMaterial materials[TERRAIN_MAX_MATERIALS];
+    uvec4 count; // x = material count
+} palette;
+
 layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
 layout(set = 2, binding = 1) uniform samplerCube bindlessTexturesCube[];
 
@@ -65,6 +73,14 @@ const vec3 LOD_COLORS[6] = vec3[](
     vec3(1.0, 0.2, 0.2), vec3(1.0, 0.6, 0.1), vec3(0.9, 0.9, 0.1),
     vec3(0.2, 0.9, 0.2), vec3(0.2, 0.5, 1.0), vec3(0.7, 0.3, 0.9));
 
+// One tint per palette slot; sized by the palette so a bigger palette
+// fails to compile until this grows with it.
+const vec3 MATERIAL_COLORS[TERRAIN_MAX_MATERIALS] = vec3[](
+    vec3(0.2, 0.8, 0.2), vec3(0.6, 0.4, 0.2), vec3(0.5, 0.5, 0.5), vec3(1.0, 1.0, 1.0),
+    vec3(1.0, 0.2, 0.2), vec3(0.2, 0.2, 1.0), vec3(1.0, 1.0, 0.2), vec3(1.0, 0.2, 1.0),
+    vec3(0.2, 1.0, 1.0), vec3(1.0, 0.6, 0.0), vec3(0.5, 0.0, 0.8), vec3(0.0, 0.5, 0.3),
+    vec3(0.8, 0.5, 0.5), vec3(0.3, 0.3, 0.0), vec3(0.6, 0.8, 1.0), vec3(0.1, 0.1, 0.1));
+
 void main()
 {
     // The apron makes bilinear filtering seamless right up to node edges.
@@ -73,14 +89,14 @@ void main()
     vec2 uv = texel * params.invColorAtlasBorder.xy;
 
     vec4 packedNormal = texture(normalAtlas, uv);
-    
+
     vec3 albedo = texture(albedoAtlas, uv).rgb;
     float roughness = packedNormal.b;
     float bakedAO = packedNormal.a;
 
     vec3 N = TerrainDecodeNormal(packedNormal);
     vec3 V = normalize(camera.pos - inWorldPos);
-    
+
     Surface surface = MakeSurface(albedo, 0.0, roughness, N, V); // dielectric
 
     vec2 screenUV = gl_FragCoord.xy / params.viewport.xy;
@@ -127,6 +143,23 @@ void main()
         color = vec3(roughness);
     else if (mode == 5)
         color = vec3(bakedAO);
+    else if (mode == 6 || mode == 7)
+    {
+        // Nearest splat texel -> palette entry; the near-shading blend of the
+        // four surrounding texels comes with Phase 3c.
+        uint materialId = texelFetch(splatAtlas,
+            TerrainSplatTexel(inPatchEntry.y, inTileUV, params), 0).r & TERRAIN_SPLAT_ID_MASK;
+        if (mode == 6)
+            color = MATERIAL_COLORS[min(materialId, TERRAIN_MAX_MATERIALS - 1u)];
+        else
+        {
+            TerrainMaterial material = palette.materials[min(materialId, palette.count.x - 1u)];
+            vec2 detailUV = TerrainDetailUV(material, inWorldPos.xz);
+            vec3 detail = texture(bindlessTextures2D[nonuniformEXT(material.textures.x)], detailUV).rgb;
+            color = Tonemap(vec4(detail * (ambient + Lo) / max(albedo, vec3(1e-3)), 1.0),
+                FORWARD_EXPOSURE, 1.0).rgb;
+        }
+    }
 
     // Debug mode: culled patches are drawn tinted by the test that dropped them.
     uint cullBits = inPatchEntry.z & (TERRAIN_CULL_FRUSTUM | TERRAIN_CULL_OCCLUDED);

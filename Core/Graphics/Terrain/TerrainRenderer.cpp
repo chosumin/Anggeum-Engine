@@ -207,6 +207,13 @@ bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& fra
 	_ao = builder.GetTexture(AmbientOcclusionPass::RT_AO);
 	builder.Read(_ao, TextureAccess::SampledFragment);
 
+	// The material palette, rebuilt per frame so the GUI edits tiling live.
+	auto paletteHandle = frameResources.GetOrCreateUniformBuffer<TerrainMaterialPaletteGPU>(
+		"Terrain.MaterialPalette");
+	paletteHandle.Get().Update(_terrain.GetMaterials().BuildPalette());
+	_palette = builder.ImportBuffer("Terrain.MaterialPalette", paletteHandle);
+	builder.Read(_palette, BufferAccess::UniformFragment);
+
 	// Debug pick: TerrainSystem owns the slots and reads them in OnGUI.
 	_pick = FGBuffer{};
 	uint32_t slot = uint32_t(FrameCounter::GetFrameNumber() % MAX_FRAMES_IN_FLIGHT);
@@ -314,6 +321,9 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 		builder.SetUniformBuffer(11, context.GetBuffer(_lights));
 		builder.SetStorageBuffer(12, context.GetBuffer(_lightVisibility));
 		builder.SetTextureBuffer(13, context.GetTexture(_ao));
+		builder.SetTextureBuffer(14, _terrain.GetQuadTree().GetSplatAtlas().Get(), 0,
+			VK_IMAGE_LAYOUT_GENERAL);
+		builder.SetUniformBuffer(15, context.GetBuffer(_palette));
 
 		auto& resources = builder.Build();
 

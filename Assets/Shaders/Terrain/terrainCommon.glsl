@@ -37,11 +37,38 @@ struct TerrainParams
 {
     vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
     vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
-    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO
+    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 detail albedo
     vec4 worldParams;          // xy = worldOrigin, z = rootNodeSize, w = lodCount
-    vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels
+    vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
     vec4 viewport;             // xy = size, zw = light tile counts
 };
+
+// Mirrors TerrainMaterialGPU: bindless detail map indices and world tiling.
+struct TerrainMaterial
+{
+    uvec4 textures; // x albedo, y normal + smoothness, z height
+    vec4 tiling;    // x = 1 / tileSize, y = cos(rotation), z = sin(rotation)
+};
+const uint TERRAIN_MAX_MATERIALS = 16u;
+const uint TERRAIN_SPLAT_ID_MASK = 0x7fu; // bit 7 reserved for the cliff flag
+
+// World XZ -> detail UV: rotate, then scale to tiles.
+vec2 TerrainDetailUV(TerrainMaterial material, vec2 worldXZ)
+{
+    vec2 p = worldXZ * material.tiling.x;
+    return vec2(p.x * material.tiling.y - p.y * material.tiling.z,
+                p.x * material.tiling.z + p.y * material.tiling.y);
+}
+
+// Splat atlas texel nearest to a node-relative uv: splat texel k sits on
+// grid vertex k * splatQuadsPerTexel, so k = uv * (splatTexels - 1).
+ivec2 TerrainSplatTexel(uint slot, vec2 tileUV, TerrainParams params)
+{
+    uint slotsPerRow = uint(params.atlasInfo.x);
+    uint splatTexels = uint(params.atlasInfo.w);
+    uvec2 origin = uvec2(slot % slotsPerRow, slot / slotsPerRow) * splatTexels;
+    return ivec2(origin + uvec2(round(tileUV * float(splatTexels - 1u))));
+}
 
 // Normal atlas texel: rg = normal xz * 0.5 + 0.5, b = roughness, a = horizon AO. 
 // A heightfield normal always points up, so y is reconstructed.
