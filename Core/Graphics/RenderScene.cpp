@@ -34,7 +34,8 @@ RenderScene::RenderScene(Device& device, ResourceManager& resourceManager, Scene
 	_material = make_unique<MaterialManager>(device, resourceManager);
 	_batch = make_unique<RendererBatch>(device, resourceManager, syncContext);
 
-	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, syncContext, transfer);
+	_terrainSystem = make_unique<TerrainSystem>(device, resourceManager, syncContext, transfer,
+		_bindless.get());
 }
 
 // Out of line for the unique_ptr members forward-declared in the header.

@@ -121,6 +121,7 @@ namespace Core
 		VkDeviceSize tileBytes =
 			VkDeviceSize(_config.HeightTexels()) * _config.HeightTexels() * 2
 			+ VkDeviceSize(_config.ColorTexels()) * _config.ColorTexels() * 4 * 2
+			+ VkDeviceSize(_config.SplatTexels()) * _config.SplatTexels()
 			+ 64; // per-tile alignment slack
 
 		uint32_t budgetTiles = std::min<uint32_t>(_config.uploadBudgetPerFrame,

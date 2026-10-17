@@ -1,7 +1,10 @@
 #pragma once
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
+	class Texture;
+
 	// One entry of the runtime material palette
 	struct TerrainMaterialDesc
 	{
@@ -10,6 +13,12 @@ namespace Core
 		// World-space detail tiling
 		float tileSize = 4.0f;      // meters per detail tile
 		float rotationDegrees = 0.0f;
+	};
+
+	// The detail maps behind one palette entry
+	struct TerrainMaterialTextures
+	{
+		Handle<Texture> albedo, normal, height;
 	};
 
 	enum TerrainMaterialId : uint8_t

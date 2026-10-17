@@ -43,7 +43,7 @@ namespace
 	Handle<Texture> CreateAtlasTexture(Device& device,
 		ResourceManager& resourceManager, const char* name,
 		uvec2 extent, VkFormat format, uint32_t mipLevels = 1,
-		// Integer formats (the quadtree index) cannot be linearly filtered.
+		// Integer formats (the quadtree index, the splat IDs) cannot be linearly filtered.
 		VkFilter filter = VK_FILTER_LINEAR)
 	{
 		ImageDesc desc{};
@@ -72,6 +72,7 @@ namespace Core
 		uint32_t rows = config.AtlasRows();
 		_heightExtent = uvec2(config.atlasSlotsPerRow, rows) * config.HeightTexels();
 		_colorExtent = uvec2(config.atlasSlotsPerRow, rows) * config.ColorTexels();
+		_splatExtent = uvec2(config.atlasSlotsPerRow, rows) * config.SplatTexels();
 
 		_heightAtlas = CreateAtlasTexture(device, resourceManager, HEIGHT_ATLAS,
 			_heightExtent, config.heightFormat);
@@ -79,8 +80,11 @@ namespace Core
 			_colorExtent, config.normalFormat);
 		_albedoAtlas = CreateAtlasTexture(device, resourceManager, ALBEDO_ATLAS,
 			_colorExtent, config.albedoFormat);
+		_splatAtlas = CreateAtlasTexture(device, resourceManager, SPLAT_ATLAS,
+			_splatExtent, config.splatFormat, 1, VK_FILTER_NEAREST);
 
-		AtlasLayoutJob layoutJob({ &_heightAtlas.Get(), &_normalAtlas.Get(), &_albedoAtlas.Get() });
+		AtlasLayoutJob layoutJob({ &_heightAtlas.Get(), &_normalAtlas.Get(),
+			&_albedoAtlas.Get(), &_splatAtlas.Get() });
 		syncContext.SubmitImmediate(layoutJob);
 
 		// Every LOD must map to an exact mip extent of the index texture.
@@ -123,15 +127,23 @@ namespace Core
 		_retiredSlots.emplace_back(slot, _sync.GetCurrentValue(QueueType::Graphics));
 	}
 
+	uvec2 TerrainQuadTree::SlotCoord(uint16_t slot) const
+	{
+		return uvec2(slot % _config.atlasSlotsPerRow, slot / _config.atlasSlotsPerRow);
+	}
+
 	uvec2 TerrainQuadTree::HeightTexelOrigin(uint16_t slot) const
 	{
-		return uvec2(slot % _config.atlasSlotsPerRow,
-			slot / _config.atlasSlotsPerRow) * _config.HeightTexels();
+		return SlotCoord(slot) * _config.HeightTexels();
 	}
 
 	uvec2 TerrainQuadTree::ColorTexelOrigin(uint16_t slot) const
 	{
-		return uvec2(slot % _config.atlasSlotsPerRow,
-			slot / _config.atlasSlotsPerRow) * _config.ColorTexels();
+		return SlotCoord(slot) * _config.ColorTexels();
+	}
+
+	uvec2 TerrainQuadTree::SplatTexelOrigin(uint16_t slot) const
+	{
+		return SlotCoord(slot) * _config.SplatTexels();
 	}
 }

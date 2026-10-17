@@ -2,6 +2,7 @@
 #include "TerrainUpload.h"
 #include "TerrainNodeStore.h"
 #include "TerrainQuadTree.h"
+#include "Graphics/ResourceManager.h"
 #include "Graphics/StagingRing.h"
 #include "Graphics/Vulkans/Texture.h"
 #include "Graphics/Vulkans/Buffer.h"
@@ -40,6 +41,7 @@ namespace Core
 		, _heightAtlas(quadTree.GetHeightAtlas().Get())
 		, _normalAtlas(quadTree.GetNormalAtlas().Get())
 		, _albedoAtlas(quadTree.GetAlbedoAtlas().Get())
+		, _splatAtlas(quadTree.GetSplatAtlas().Get())
 		, _quadTree(quadTree)
 		, _tiles(std::move(tiles))
 		, _span(span)
@@ -53,6 +55,7 @@ namespace Core
 	{
 		uint32_t heightTexels = _config.HeightTexels();
 		uint32_t colorTexels = _config.ColorTexels();
+		uint32_t splatTexels = _config.SplatTexels();
 
 		// Regions carry offsets into the ring buffer, so rebase the write
 		// pointer to the buffer's origin and append at absolute offsets.
@@ -60,10 +63,11 @@ namespace Core
 		Buffer* source = _span.buffer;
 		VkDeviceSize offset = _span.offset;
 
-		vector<VkBufferImageCopy> heightRegions, normalRegions, albedoRegions;
+		vector<VkBufferImageCopy> heightRegions, normalRegions, albedoRegions, splatRegions;
 		heightRegions.reserve(_tiles.size());
 		normalRegions.reserve(_tiles.size());
 		albedoRegions.reserve(_tiles.size());
+		splatRegions.reserve(_tiles.size());
 
 		auto append = [&](const void* data, VkDeviceSize bytes,
 			vector<VkBufferImageCopy>& regions, uvec2 texelOrigin, uint32_t extent)
@@ -83,6 +87,8 @@ namespace Core
 				normalRegions, _quadTree.ColorTexelOrigin(tile.slot), colorTexels);
 			append(payload.albedo.data(), payload.albedo.size() * 4,
 				albedoRegions, _quadTree.ColorTexelOrigin(tile.slot), colorTexels);
+			append(payload.splat.data(), payload.splat.size(),
+				splatRegions, _quadTree.SplatTexelOrigin(tile.slot), splatTexels);
 		}
 
 		// The atlases are in GENERAL since their creation (TerrainQuadTree).
@@ -91,6 +97,8 @@ namespace Core
 		commandBuffer->CopyBufferToImage(*source, _normalAtlas, normalRegions,
 			VK_IMAGE_LAYOUT_GENERAL);
 		commandBuffer->CopyBufferToImage(*source, _albedoAtlas, albedoRegions,
+			VK_IMAGE_LAYOUT_GENERAL);
+		commandBuffer->CopyBufferToImage(*source, _splatAtlas, splatRegions,
 			VK_IMAGE_LAYOUT_GENERAL);
 	}
 
@@ -146,6 +154,65 @@ namespace Core
 			.Image(_indexTexture, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 			.Submit();
+
+		status = JobStatus::COMPLETE;
+	}
+
+	TerrainDetailUploadJob::TerrainDetailUploadJob(Device& device,
+		vector<TerrainDetailUpload>&& uploads)
+		: Job(JobType::TRANSFER)
+		, _device(device)
+		, _uploads(std::move(uploads))
+	{
+	}
+
+	TerrainDetailUploadJob::~TerrainDetailUploadJob() = default;
+
+	void TerrainDetailUploadJob::Execute()
+	{
+		VkDeviceSize stagingBytes = 0;
+		for (const TerrainDetailUpload& upload : _uploads)
+			for (const auto& mip : upload.mips)
+				stagingBytes = Align(stagingBytes, 16) + mip.size();
+
+		_stagingBuffer = make_unique<Buffer>(_device, stagingBytes,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MemoryType::DEDICATED_HOST);
+		void* mappedRaw = nullptr;
+		_stagingBuffer->GetMappedPtr(&mappedRaw);
+		uint8_t* mapped = static_cast<uint8_t*>(mappedRaw);
+
+		VkDeviceSize offset = 0;
+		for (const TerrainDetailUpload& upload : _uploads)
+		{
+			vector<VkBufferImageCopy> regions;
+			regions.reserve(upload.mips.size());
+
+			// Every mip of one square texture, still on the CPU: mips[m] holds
+			// (size >> m)^2 texels of bytesPerTexel bytes each.
+			for (uint32_t mip = 0; mip < uint32_t(upload.mips.size()); ++mip)
+			{
+				const auto& pixels = upload.mips[mip];
+				uint32_t extent = std::max(upload.size >> mip, 1u);
+				assert(pixels.size() == size_t(extent) * extent * upload.bytesPerTexel);
+
+				offset = Align(offset, 16);
+				memcpy(mapped + offset, pixels.data(), pixels.size());
+				regions.push_back(MakeRegion(offset, uvec2(0), extent, mip));
+				offset += pixels.size();
+			}
+
+			commandBuffer->CreateBarrierBatch()
+				.Image(upload.texture.Get(), VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+				.Submit();
+
+			commandBuffer->CopyBufferToImage(*_stagingBuffer, upload.texture.Get(), regions);
+
+			commandBuffer->CreateBarrierBatch()
+				.Image(upload.texture.Get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				.Submit();
+		}
 
 		status = JobStatus::COMPLETE;
 	}

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "TerrainSystem.h"
 #include "Procedural/ProceduralTerrainHeightSource.h"
+#include "Procedural/ProceduralTerrainMaterials.h"
 #include "Foundation/Entity.h"
 #include "Components/PerspectiveCamera.h"
 #include "Graphics/ResourceManager.h"
@@ -13,11 +14,14 @@
 namespace Core
 {
 	TerrainSystem::TerrainSystem(Device& device, ResourceManager& resourceManager,
-		SyncContext& syncContext, TransferContext& transfer)
+		SyncContext& syncContext, TransferContext& transfer,
+		BindlessTextureManager* bindless)
 		: _resourceManager(resourceManager)
+		, _materials(CreateProceduralTerrainMaterials(device, resourceManager, bindless))
 		, _store(TerrainNodeStore::Load(_config,
 			ProceduralTerrainHeightSource(TerrainNoiseParams{},
-				_config.heightMin, _config.heightMax)))
+				_config.heightMin, _config.heightMax),
+			ProceduralTerrainMaterialBakeDescs()))
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree,
@@ -26,7 +30,7 @@ namespace Core
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
 		// each slot before its first GPU write has happened.
-		
+
 		for (uint32_t slot = 0; slot < MAX_FRAMES_IN_FLIGHT; ++slot)
 		{
 			_patchCountReadback[slot] = resourceManager.LoadBuffer(
@@ -91,6 +95,7 @@ namespace Core
 			_pendingGridIndices.clear();
 		}
 
+		_materials->QueuePendingInit(frameResources);
 		_streamer->QueueTableInit(device, frameResources);
 	}
 
@@ -110,7 +115,8 @@ namespace Core
 		params.worldParams = vec4(_config.WorldOrigin(), _config.rootNodeSize,
 			float(_config.lodCount));
 		params.atlasInfo = vec4(float(_config.atlasSlotsPerRow),
-			float(_config.HeightTexels()), float(_config.ColorTexels()), 0.0f);
+			float(_config.HeightTexels()), float(_config.ColorTexels()),
+			float(_config.SplatTexels()));
 		return params;
 	}
 

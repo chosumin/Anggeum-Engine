@@ -3,6 +3,7 @@
 #include "TerrainConfig.h"
 #include "Graphics/UploadJob.h"
 #include "Graphics/StagingRing.h"
+#include "Graphics/ResourceHandle.h"
 
 namespace Core
 {
@@ -36,6 +37,7 @@ namespace Core
 		Texture& _heightAtlas;
 		Texture& _normalAtlas;
 		Texture& _albedoAtlas;
+		Texture& _splatAtlas;
 
 		// Slot -> texel origin mapping, resolved on the main thread.
 		TerrainQuadTree& _quadTree;
@@ -60,6 +62,28 @@ namespace Core
 		Texture& _indexTexture;
 		vector<vector<uint16_t>> _indexMips;
 
+		unique_ptr<Buffer> _stagingBuffer;
+	};
+
+	struct TerrainDetailUpload
+	{
+		Handle<Texture> texture;
+		uint32_t size = 0;
+		uint32_t bytesPerTexel = 0;
+		vector<vector<uint8_t>> mips;
+	};
+
+	class TerrainDetailUploadJob : public Job
+	{
+	public:
+		TerrainDetailUploadJob(Device& device, vector<TerrainDetailUpload>&& uploads);
+		~TerrainDetailUploadJob();
+
+		void Execute() override;
+
+	private:
+		Device& _device;
+		vector<TerrainDetailUpload> _uploads;
 		unique_ptr<Buffer> _stagingBuffer;
 	};
 }

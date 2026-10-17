@@ -3,6 +3,7 @@
 #include "TerrainNodeStore.h"
 #include "TerrainStreamer.h"
 #include "TerrainQuadTree.h"
+#include "TerrainMaterialSet.h"
 
 namespace Core
 {
@@ -12,20 +13,24 @@ namespace Core
 	class TransferContext;
 	class SyncContext;
 	class FrameResources;
+	class BindlessTextureManager;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
-	// startup and owns the quadtree GPU face and the streamer.
+	// startup and owns the quadtree GPU face, the streamer and the material
+	// palette.
 	class TerrainSystem
 	{
 	public:
 		TerrainSystem(Device& device, ResourceManager& resourceManager,
-			SyncContext& syncContext, TransferContext& transfer);
+			SyncContext& syncContext, TransferContext& transfer,
+			BindlessTextureManager* bindless);
 
 		void Update(PerspectiveCamera& camera);
 
 		const TerrainConfig& GetConfig() const { return _config; }
 		TerrainQuadTree& GetQuadTree() { return *_quadTree; }
 		TerrainStreamer& GetStreamer() { return *_streamer; }
+		TerrainMaterialSet& GetMaterials() { return *_materials; }
 
 		// Everything but the viewport, which the binding pass fills in.
 		TerrainParams BuildRenderParams() const;
@@ -63,6 +68,7 @@ namespace Core
 
 		ResourceManager& _resourceManager;
 		TerrainConfig _config;
+		unique_ptr<TerrainMaterialSet> _materials;
 		TerrainNodeStore _store;
 		unique_ptr<TerrainQuadTree> _quadTree;
 		unique_ptr<TerrainStreamer> _streamer;
