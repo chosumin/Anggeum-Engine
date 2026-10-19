@@ -117,6 +117,8 @@ namespace Core
 		params.atlasInfo = vec4(float(_config.atlasSlotsPerRow),
 			float(_config.HeightTexels()), float(_config.ColorTexels()),
 			float(_config.SplatTexels()));
+		params.detailBlend = vec4(_detailSettings.nearDistance, _detailSettings.fadeWidth,
+			_detailSettings.heightBlendDepth, _detailSettings.normalStrength);
 		return params;
 	}
 
@@ -146,11 +148,19 @@ namespace Core
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode,
-			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0Material ID\0Detail albedo\0");
+			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0Material ID\0Albedo\0"
+			"Blend weights\0Near/far\0");
 		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
 
 		if (ImGui::TreeNode("Materials"))
 		{
+			ImGui::SeparatorText("Near blend");
+			ImGui::SliderFloat("Near distance", &_detailSettings.nearDistance, 0.0f, 500.0f, "%.0f m");
+			ImGui::SliderFloat("Fade width", &_detailSettings.fadeWidth, 1.0f, 300.0f, "%.0f m");
+			ImGui::SliderFloat("Height blend depth", &_detailSettings.heightBlendDepth, 0.01f, 1.0f, "%.2f");
+			ImGui::SliderFloat("Detail normal", &_detailSettings.normalStrength, 0.0f, 2.0f, "%.2f");
+
+			ImGui::SeparatorText("Palette");
 			_materials->OnGUI();
 			ImGui::TreePop();
 		}

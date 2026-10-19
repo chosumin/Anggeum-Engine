@@ -37,10 +37,11 @@ struct TerrainParams
 {
     vec4 heightMinMaxInvAtlas; // x = min, y = max, zw = 1 / heightAtlasExtent
     vec4 invColorAtlasBorder;  // xy = 1 / colorAtlasExtent, z = borderTexels
-    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 detail albedo
+    ivec4 debugMode;           // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 albedo, 8 blend weights, 9 near/far
     vec4 worldParams;          // xy = worldOrigin, z = rootNodeSize, w = lodCount
     vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
     vec4 viewport;             // xy = size, zw = light tile counts
+    vec4 detailBlend;          // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
 };
 
 // Mirrors TerrainMaterialGPU: bindless detail map indices and world tiling.
@@ -68,6 +69,20 @@ ivec2 TerrainSplatTexel(uint slot, vec2 tileUV, TerrainParams params)
     uint splatTexels = uint(params.atlasInfo.w);
     uvec2 origin = uvec2(slot % slotsPerRow, slot / slotsPerRow) * splatTexels;
     return ivec2(origin + uvec2(round(tileUV * float(splatTexels - 1u))));
+}
+
+// The four splat texels around a node-relative uv: base = the min corner,
+// frac = the bilinear weight toward the +x / +y neighbours (all in one slot).
+void TerrainSplatBilinear(uint slot, vec2 tileUV, TerrainParams params,
+    out ivec2 base, out vec2 frac)
+{
+    uint slotsPerRow = uint(params.atlasInfo.x);
+    uint splatTexels = uint(params.atlasInfo.w);
+    uvec2 origin = uvec2(slot % slotsPerRow, slot / slotsPerRow) * splatTexels;
+    vec2 coord = tileUV * float(splatTexels - 1u);
+    vec2 baseF = min(floor(coord), float(splatTexels - 2u));
+    base = ivec2(origin) + ivec2(baseF);
+    frac = coord - baseF;
 }
 
 // Normal atlas texel: rg = normal xz * 0.5 + 0.5, b = roughness, a = horizon AO. 

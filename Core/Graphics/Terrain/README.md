@@ -240,10 +240,25 @@ per texel; the material palette (`TerrainMaterialPaletteGPU`, rebuilt per
 frame from `TerrainMaterialSet` so the GUI edits tiling live) maps an ID to
 three **bindless detail map indices** (albedo, tangent-space normal +
 smoothness, height) plus `1 / tileSize` and a rotation. `TerrainDetailUV`
-(world XZ -> rotated, tiled uv) and `TerrainSplatTexel` live in
-`terrainCommon.glsl`. Phase 3b stops here: the lit path still shades from
-the atlases; the Material ID / Detail albedo debug modes read the splat and
-detail maps, and the four-texel height-weighted near blend is Phase 3c.
+(world XZ -> rotated, tiled uv), `TerrainSplatTexel` (nearest) and
+`TerrainSplatBilinear` (the four surrounding texels + weights) live in
+`terrainCommon.glsl`.
+
+**Near shading.** Within `TerrainDetailSettings::nearDistance` the fragment
+reads the four splat texels around it (`ShadeNear`): duplicate IDs merge
+their bilinear weights, each distinct material samples its three detail maps
+once at the world uv (`textureLod` with the mip derived from the world
+position's gradients, so the per-material branches stay valid; explicit
+gradient sampling cost almost twice as much), and the taps are
+**height-blended** - each tap's relief is lifted by its bilinear weight, and
+only taps within `heightBlendDepth` of the highest keep a share, so a
+material's bumps cut through its neighbour instead of cross-fading. The
+blended tangent-space normal is rotated back through each material's detail
+rotation and reoriented onto the baked macro normal (RNM); smoothness becomes
+roughness. Past `nearDistance` the result fades over `fadeWidth` into the
+atlas albedo / normal / roughness, which the detail maps average to by
+construction, so the transition carries no color shift. Beyond the fade the
+shader skips the detail path entirely.
 
 Shadows come from two sources. Inside the CSM range the cascades draw the
 per-cascade patch lists with terrain's own depth bias (`TerrainShadowSettings`).
@@ -265,10 +280,13 @@ does.
 - **Freeze streaming** pins residency so you can fly out and inspect the covering
   set and the LOD ring from outside.
 - **Wireframe** shows patch density and T-junctions; **Debug mode** switches
-  between Lit / LOD tint / Normals / UV grid / Roughness / Baked AO / Material ID /
-  Detail albedo (nearest splat texel -> palette -> detail albedo at world uv).
-- **Materials** tree: per-material tile size and rotation (live) and the bindless
-  indices the palette carries.
+  between Lit / LOD tint / Normals (near: with the detail normal) / UV grid /
+  Roughness / Baked AO / Material ID (nearest splat texel) / Albedo (the
+  blended albedo the lighting sees, unlit) / Blend weights (material tints
+  mixed by the near blend weights) / Near/far (white = full detail).
+- **Materials** tree: the near blend (near distance, fade width, height blend
+  depth, detail normal strength), then per-material tile size and rotation
+  (live) and the bindless indices the palette carries.
 - **Shadow** tree: cascade depth bias and the far heightfield march (steps 0
   turns it off for A/B, max distance, softness, bias). The SDF Shadow panel
   previews the mask itself.

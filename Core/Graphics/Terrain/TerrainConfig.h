@@ -155,10 +155,20 @@ namespace Core
 	{
 		vec4 heightMinMaxInvAtlas{};  // x = min, y = max, zw = 1 / heightAtlasExtent
 		vec4 invColorAtlasBorder{};   // xy = 1 / colorAtlasExtent, z = borderTexels
-		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 detail albedo
+		ivec4 debugMode{};            // x: 0 lit, 1 LOD tint, 2 normals, 3 uv grid, 4 roughness, 5 baked AO, 6 material ID, 7 albedo, 8 blend weights, 9 near/far
 		vec4 worldParams{};           // xy = worldOrigin, z = rootNodeSize, w = lodCount
 		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
 		vec4 viewport{};              // xy = size, zw = light tile counts
+		vec4 detailBlend{};           // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
+	};
+
+	// Runtime tunables of the near material blend in terrain.frag.
+	struct TerrainDetailSettings
+	{
+		float nearDistance = 120.0f;    // full detail up to here
+		float fadeWidth = 80.0f;        // detail -> atlas over this range
+		float heightBlendDepth = 0.25f; // smaller = sharper material borders
+		float normalStrength = 1.0f;
 	};
 
 	// Runtime shadow tunables read by the shadow passes: the cascade draw's

@@ -86,5 +86,6 @@ namespace Core
 		bool _bypassCulling = false;
 		int _debugMode = 0;
 		TerrainShadowSettings _shadowSettings;
+		TerrainDetailSettings _detailSettings;
 	};
 }
