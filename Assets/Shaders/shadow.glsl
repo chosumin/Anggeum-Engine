@@ -199,23 +199,16 @@ float SampleSDFShadow(sampler2D sdfShadowMap, vec2 screenUV)
     return texture(sdfShadowMap, screenUV).r;
 }
 
-// Distance-based shadow technique selection.
-// CSM is used at close range for high-quality contact shadows.
-// SDF takes over at long range where CSM resolution degrades.
-//
+// 0 inside the CSM zone, 1 inside the SDF zone, a smoothstep between.
 // viewDepth      : view-space Z (negative; -|distance|)
 // transitionDist : world-space distance where the switch begins
 // transitionRange: world-space width of the smooth fade zone
-float CombineShadows(float csmShadow, float sdfShadow,
-    float viewDepth, float transitionDist, float transitionRange)
+float ShadowInterpolation(float viewDepth, float transitionDist, float transitionRange)
 {
     float distance = -viewDepth; // view space looks down -Z
     float fadeStart = transitionDist - transitionRange * 0.5;
     float fadeEnd   = transitionDist + transitionRange * 0.5;
-
-    // 0.0 inside CSM zone, 1.0 inside SDF zone
-    float t = smoothstep(fadeStart, fadeEnd, distance);
-    return mix(csmShadow, sdfShadow, t);
+    return smoothstep(fadeStart, fadeEnd, distance);
 }
 
 struct CascadeShadowParams
@@ -236,15 +229,20 @@ float ShadowVisibility(sampler2DArray shadowMap, sampler2D sdfShadowMap,
     CascadeShadowParams csm, mat4 view, vec3 worldPos, vec2 screenUV)
 {
     float viewDepth = (view * vec4(worldPos, 1.0)).z;
+    float interpolation = csm.sdfShadowBound != 0u
+        ? ShadowInterpolation(viewDepth, csm.sdfTransitionDistance, csm.sdfTransitionRange)
+        : 0.0;
+
+    if (interpolation >= 1.0)
+        return SampleSDFShadow(sdfShadowMap, screenUV);
+
     float csmVisibility = ShadowCalculation(shadowMap,
         csm.viewProjection, csm.splitDepth, csm.cascadeCount,
         csm.lightSize, csm.minFilterRadius, csm.maxFilterRadius,
         csm.cascadeBlendFactor, worldPos, viewDepth);
 
-    if (csm.sdfShadowBound == 0u)
+    if (interpolation <= 0.0)
         return csmVisibility;
 
-    float sdfVisibility = SampleSDFShadow(sdfShadowMap, screenUV);
-    return CombineShadows(csmVisibility, sdfVisibility,
-        viewDepth, csm.sdfTransitionDistance, csm.sdfTransitionRange);
+    return mix(csmVisibility, SampleSDFShadow(sdfShadowMap, screenUV), interpolation);
 }
