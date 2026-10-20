@@ -119,6 +119,8 @@ namespace Core
 			float(_config.SplatTexels()));
 		params.detailBlend = vec4(_detailSettings.nearDistance, _detailSettings.fadeWidth,
 			_detailSettings.heightBlendDepth, _detailSettings.normalStrength);
+		params.hexTiling = vec4(_detailSettings.hexTiling ? 1.0f : 0.0f,
+			_detailSettings.hexCellsPerTile, 0.0f, 0.0f);
 		return params;
 	}
 
@@ -159,6 +161,8 @@ namespace Core
 			ImGui::SliderFloat("Fade width", &_detailSettings.fadeWidth, 1.0f, 300.0f, "%.0f m");
 			ImGui::SliderFloat("Height blend depth", &_detailSettings.heightBlendDepth, 0.01f, 1.0f, "%.2f");
 			ImGui::SliderFloat("Detail normal", &_detailSettings.normalStrength, 0.0f, 2.0f, "%.2f");
+			ImGui::Checkbox("Hex tiling (3 samples)", &_detailSettings.hexTiling);
+			ImGui::SliderFloat("Hex cells per tile", &_detailSettings.hexCellsPerTile, 0.25f, 4.0f, "%.2f");
 
 			ImGui::SeparatorText("Palette");
 			_materials->OnGUI();

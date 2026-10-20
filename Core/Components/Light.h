@@ -15,7 +15,7 @@ namespace Core
 	{
 		glm::vec3 Direction{ 0.0f, 0.0f, -1.0f };
 		glm::vec3 Color{ 1.0f, 1.0f, 1.0f };
-		float Intensity{ 1.0f };
+		float Intensity{ 2.0f };
 		float Range{ 0.0f };
 		float InnerConeAngle{ 0.0f };
 		float OuterConeAngle{ 0.0f };

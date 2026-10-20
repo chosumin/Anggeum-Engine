@@ -48,7 +48,7 @@ struct alignas(16) ShadowUniform
 	// Distance-based CSM/SDF split
 	// CSM is used when view-space distance < SDFTransitionDistance.
 	// SDF is used beyond. SDFTransitionRange controls the smooth fade width.
-	float SDFTransitionDistance = 30.0f;
+	float SDFTransitionDistance = 120.0f;
 	float SDFTransitionRange = 5.0f;
 
 	uint32_t SDFShadowBound = 0;

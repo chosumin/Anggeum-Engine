@@ -160,6 +160,7 @@ namespace Core
 		vec4 atlasInfo{};             // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
 		vec4 viewport{};              // xy = size, zw = light tile counts
 		vec4 detailBlend{};           // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
+		vec4 hexTiling{};             // x = on, y = hex cells per detail tile
 	};
 
 	// Runtime tunables of the near material blend in terrain.frag.
@@ -169,6 +170,8 @@ namespace Core
 		float fadeWidth = 80.0f;        // detail -> atlas over this range
 		float heightBlendDepth = 0.25f; // smaller = sharper material borders
 		float normalStrength = 1.0f;
+		bool hexTiling = true;          // 3 rotated/offset samples per map
+		float hexCellsPerTile = 1.0f;   // hex cell size relative to the detail tile
 	};
 
 	// Runtime shadow tunables read by the shadow passes: the cascade draw's

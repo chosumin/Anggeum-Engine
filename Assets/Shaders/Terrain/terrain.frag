@@ -113,25 +113,107 @@ vec4 SampleDetail(uint textureIndex, vec2 uv, float lod)
 struct DetailTap
 {
     vec3 albedo;
-    vec4 normalSmooth;
+    vec3 normal;   // tangent space of the material's detail uv, decoded
+    float smoothness;
     vec2 rotation; // cos, sin of the material's detail rotation
     float h;
 };
 
+// Hex tiling (Mikkelsen 2022): a triangle grid over the tile uv; every cell
+// gets its own rotation and offset, and the three cells around a point blend
+// with sharpened barycentric weights, so no two spots share a tile.
+struct HexTap
+{
+    vec2 uv;
+    vec2 rotation; // cos, sin of the cell's rotation
+    float w;
+};
+
+HexTap MakeHexTap(vec2 uv, ivec2 cell, float w, float cellsPerTile)
+{
+    const mat2 unskew = mat2(1.0, 0.0, 0.5, 0.8660254);
+    uint h = TerrainHashUint(uvec2(cell + 0x4000));
+    float angle = float(h & 0xffffu) * (6.2831853 / 65535.0);
+    HexTap t;
+    t.rotation = vec2(cos(angle), sin(angle));
+    vec2 center = unskew * vec2(cell) / cellsPerTile;
+    vec2 d = uv - center;
+    t.uv = center + vec2(d.x * t.rotation.x - d.y * t.rotation.y,
+        d.x * t.rotation.y + d.y * t.rotation.x)
+        + vec2(float((h >> 16u) & 0xffu), float(h >> 24u)) / 255.0;
+    t.w = w;
+    return t;
+}
+
+void HexTiling(vec2 uv, float cellsPerTile, out HexTap taps[3])
+{
+    const mat2 skew = mat2(1.0, 0.0, -0.57735027, 1.15470054);
+    const float SHARPNESS = 7.0; // keeps mostly one cell per pixel, blending only at edges
+    vec2 skewed = skew * (uv * cellsPerTile);
+    ivec2 base = ivec2(floor(skewed));
+    vec2 f = skewed - vec2(base);
+    float z = 1.0 - f.x - f.y;
+    vec3 w;
+    ivec2 c0, c1, c2;
+    if (z > 0.0)
+    {
+        w = vec3(z, f.y, f.x);
+        c0 = base; c1 = base + ivec2(0, 1); c2 = base + ivec2(1, 0);
+    }
+    else
+    {
+        w = vec3(-z, 1.0 - f.y, 1.0 - f.x);
+        c0 = base + ivec2(1, 1); c1 = base + ivec2(1, 0); c2 = base + ivec2(0, 1);
+    }
+    w = pow(w, vec3(SHARPNESS));
+    w /= w.x + w.y + w.z;
+    taps[0] = MakeHexTap(uv, c0, w.x, cellsPerTile);
+    taps[1] = MakeHexTap(uv, c1, w.y, cellsPerTile);
+    taps[2] = MakeHexTap(uv, c2, w.z, cellsPerTile);
+}
+
 // w > 0: merged-away taps are skipped by the caller.
 DetailTap SampleTap(uint id, float w, vec2 worldXZ, vec2 dWdx, vec2 dWdy)
 {
-    DetailTap tap;
     TerrainMaterial material = palette.materials[min(id, palette.count.x - 1u)];
     vec2 uv = TerrainDetailUV(material, worldXZ);
     vec2 duvdx = TerrainDetailUV(material, dWdx); // linear, so deltas map alike
     vec2 duvdy = TerrainDetailUV(material, dWdy);
     float lod = DetailLod(material.textures.x, duvdx, duvdy); // the three maps share a size
-    tap.albedo = SampleDetail(material.textures.x, uv, lod).rgb;
-    tap.normalSmooth = SampleDetail(material.textures.y, uv, lod);
-    tap.rotation = material.tiling.yz;
+
+    HexTap hex[3];
+    int tapCount = 1;
+    hex[0].uv = uv;
+    hex[0].rotation = vec2(1.0, 0.0);
+    hex[0].w = 1.0;
+    if (params.hexTiling.x != 0.0)
+    {
+        HexTiling(uv, params.hexTiling.y, hex);
+        tapCount = 3;
+    }
+
     // A lone material (w = 1 after the merge) wins the height blend outright.
-    tap.h = w >= 0.999 ? w : SampleDetail(material.textures.z, uv, lod).r + w;
+    bool needHeight = w < 0.999;
+    DetailTap tap;
+    tap.albedo = vec3(0.0);
+    tap.normal = vec3(0.0);
+    tap.smoothness = 0.0;
+    float height = 0.0;
+    for (int i = 0; i < tapCount; ++i)
+    {
+        HexTap h = hex[i];
+        tap.albedo += h.w * SampleDetail(material.textures.x, h.uv, lod).rgb;
+        vec4 ns = SampleDetail(material.textures.y, h.uv, lod);
+        vec3 n = ns.xyz * 2.0 - 1.0;
+        // Undo the cell's rotation so the tilt is in the material's uv frame.
+        tap.normal += h.w * vec3(n.x * h.rotation.x + n.y * h.rotation.y,
+            -n.x * h.rotation.y + n.y * h.rotation.x, n.z);
+        tap.smoothness += h.w * ns.a;
+        if (needHeight)
+            height += h.w * SampleDetail(material.textures.z, h.uv, lod).r;
+    }
+    tap.rotation = material.tiling.yz;
+    tap.h = height + w;
     return tap;
 }
 
@@ -139,11 +221,11 @@ void AccumulateTap(inout NearSurface s, inout float sum, DetailTap tap, uint id,
 {
     float b = max(tap.h - hMax + params.detailBlend.z, 0.0);
     // Tangent-space xy back through the material rotation: +u = (cos, -sin), +v = (sin, cos) in world XZ.
-    vec3 n = tap.normalSmooth.xyz * 2.0 - 1.0;
+    vec3 n = tap.normal;
     vec2 tilt = n.x * vec2(tap.rotation.x, -tap.rotation.y) + n.y * vec2(tap.rotation.y, tap.rotation.x);
     s.albedo += b * tap.albedo;
     s.normal += b * vec3(tilt.x, n.z, tilt.y);
-    s.roughness += b * (1.0 - tap.normalSmooth.a);
+    s.roughness += b * (1.0 - tap.smoothness);
     s.idTint += b * MaterialTint(id);
     sum += b;
 }

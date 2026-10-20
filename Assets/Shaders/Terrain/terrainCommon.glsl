@@ -42,7 +42,15 @@ struct TerrainParams
     vec4 atlasInfo;            // x = slotsPerRow, y = heightTexels, z = colorTexels, w = splatTexels
     vec4 viewport;             // xy = size, zw = light tile counts
     vec4 detailBlend;          // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
+    vec4 hexTiling;            // x = on, y = hex cells per detail tile
 };
+
+uint TerrainHashUint(uvec2 p)
+{
+    uint h = p.x * 0x8da6b343u ^ p.y * 0xd8163841u;
+    h ^= h >> 15u; h *= 0x2c1b3c6du; h ^= h >> 12u;
+    return h;
+}
 
 // Mirrors TerrainMaterialGPU: bindless detail map indices and world tiling.
 struct TerrainMaterial
