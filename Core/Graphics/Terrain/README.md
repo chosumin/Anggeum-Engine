@@ -260,6 +260,15 @@ atlas albedo / normal / roughness, which the detail maps average to by
 construction, so the transition carries no color shift. Beyond the fade the
 shader skips the detail path entirely.
 
+**Anti-tiling.** A 3-6 m tile repeats visibly at walking distance, so the
+near path samples each map through **hex tiling** (Mikkelsen 2022,
+`HexTiling`): a triangle grid over the tile uv gives every hex cell its own
+hashed rotation and offset, the three cells around the pixel are sampled and
+blended with sharpened barycentric weights (one cell dominates, edges blend),
+and the tangent normals are rotated back out of their cell. Three samples per
+map; `hexTiling` toggles it and `hexCellsPerTile` sets the cell size
+(`TerrainParams.hexTiling`). It is per pixel, so it fades with the near blend.
+
 Shadows come from two sources. Inside the CSM range the cascades draw the
 per-cascade patch lists with terrain's own depth bias (`TerrainShadowSettings`).
 Past the transition `ShadowVisibility` blends into
@@ -285,7 +294,8 @@ does.
   blended albedo the lighting sees, unlit) / Blend weights (material tints
   mixed by the near blend weights) / Near/far (white = full detail).
 - **Materials** tree: the near blend (near distance, fade width, height blend
-  depth, detail normal strength), then per-material tile size and rotation
+  depth, detail normal strength, hex tiling on/off and cell size), then
+  per-material tile size and rotation
   (live) and the bindless indices the palette carries.
 - **Shadow** tree: cascade depth bias and the far heightfield march (steps 0
   turns it off for A/B, max distance, softness, bias). The SDF Shadow panel
