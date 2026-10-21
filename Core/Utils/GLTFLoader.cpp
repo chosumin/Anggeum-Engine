@@ -822,27 +822,21 @@ vector<Core::Handle<Core::Material>> Core::GLTFLoader::LoadMaterials(vector<Core
 			else if (additionalValue.first.find("occlusionTexture") != string::npos)
 			{
 			}
-			else if (additionalValue.first.find("alphaMode") != string::npos)
-			{
-				/*tinygltf::Parameter param = additionalValue.first["alphaMode"];
-				if (param.string_value == "BLEND") {
-					material.alphaMode = AlphaMode::Blend;
-				}
-				if (param.string_value == "MASK") {
-					material.alphaCutoff = 0.5f;
-					material.alphaMode = AlphaMode::Mask;
-				}*/
-			}
-			else if (additionalValue.first.find("alphaCutoff") != string::npos)
-			{
-				/*material.alphaCutoff =
-					static_cast<float>(additionalValue.first["alphaCutoff"].Factor());*/
-			}
 			else if (additionalValue.first.find("emissiveFactor") != string::npos)
 			{
 				/*material.emissiveFactor = glm::vec4(glm::make_vec3(gltfMaterial.additionalValues["emissiveFactor"].ColorFactor().data()), 1.0);*/
 			}
 		}
+
+		// tinygltf parses these out of additionalValues into typed fields.
+		if (gltfMaterial.alphaMode == "BLEND")
+			mat.SetAlphaMode(AlphaMode::Blend);
+		else if (gltfMaterial.alphaMode == "MASK")
+			mat.SetAlphaMode(AlphaMode::Mask);
+		else
+			mat.SetAlphaMode(AlphaMode::Opaque);
+		mat.SetAlphaCutoff(static_cast<float>(gltfMaterial.alphaCutoff));
+		mat.SetDoubleSided(gltfMaterial.doubleSided);
 
 		materials[i] = material;
 	}

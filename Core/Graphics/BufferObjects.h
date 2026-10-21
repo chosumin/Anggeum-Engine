@@ -175,7 +175,7 @@ struct alignas(16) GPUMaterialData
 	float metallic = 0.0f;
 	float roughness = 0.5f;
 	float ao = 1.0f;
-	int flags = 1;  // bit 0: enabled
+	int flags = 1;  // MATERIAL_FLAG_* bits
 
 	int albedoTextureSet = 0;
 	int metallicTextureSet = 0;
@@ -187,8 +187,21 @@ struct alignas(16) GPUMaterialData
 	uint32_t normalmapIndex = 0;
 	uint32_t metallicRoughnessmapIndex = 0;
 
-	glm::vec3 padding;  // 16-byte alignment
+	float alphaCutoff = 0.5f;
+	float padding0 = 0.0f;
+	float padding1 = 0.0f;
 };
+static_assert(sizeof(GPUMaterialData) == 80, "matches PBR in lit.frag / depthNormal.frag");
+
+// GPUMaterialData::flags, mirrored in gpuDriven.glsl.
+inline constexpr int MATERIAL_FLAG_ENABLED = 1 << 0;
+inline constexpr int MATERIAL_FLAG_ALPHA_MASK = 1 << 1;
+inline constexpr int MATERIAL_FLAG_ALPHA_BLEND = 1 << 2;
+inline constexpr int MATERIAL_FLAG_DOUBLE_SIDED = 1 << 3;
+
+// GPUInstanceData::flags, mirrored in gpuDriven.glsl. The culls route a
+// transparent instance into the transparent draw lists instead of the opaque ones.
+inline constexpr uint32_t INSTANCE_FLAG_TRANSPARENT = 1 << 0;
 
 // Same layout as VkDrawIndexedIndirectCommand.
 struct DrawIndexedIndirectCommand
@@ -207,6 +220,7 @@ struct alignas(16) GPUInstanceData
 	float aabbMax[3];    // local
 	uint32_t drawCommandIndex;
 	uint32_t materialIndex;
+	uint32_t flags;      // INSTANCE_FLAG_* bits
 };
 static_assert(sizeof(GPUInstanceData) == 48, "matches InstanceData in gpuDriven.glsl");
 

@@ -4,6 +4,7 @@
 #include "common.glsl"
 #include "lighting.glsl"
 #include "shadow.glsl"
+#include "gpuDriven.glsl"
 
 #define GPU_DRIVEN_RENDERING 1
 
@@ -61,7 +62,9 @@ struct PBR
 	uint normalmapIndex;            // Material texture 1
 	uint metallicRoughnessmapIndex; // Material texture 2
 
-	vec3 padding;
+	float alphaCutoff;
+	float padding0;
+	float padding1;
 };
 
 layout(set = 0, binding = 8) uniform PBRBuffer
@@ -124,16 +127,17 @@ void main()
     PBR pbr = pbrBuffer.materials[materialIndex];
 #endif
 
-	vec4 albedo = vec4(1.0);
+	vec4 albedo = pbr.albedo;
 	float roughness = 0.0;
 	float metallic = 0.0;
 
 	if (pbr.albedoTextureSet == 1)
 	{
-		albedo = texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], uv);
+		albedo *= texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], uv);
 	}
-	else
-		albedo = pbr.albedo;
+
+	if ((pbr.flags & MATERIAL_FLAG_ALPHA_MASK) != 0 && albedo.a < pbr.alphaCutoff)
+		discard;
 
 	vec4 metallicRoughness = vec4(0.0);
 	if (pbr.metallicTextureSet == 1 || pbr.roughnessTextureSet == 1)
@@ -196,5 +200,8 @@ void main()
 
 	vec4 mapped = Tonemap(vec4(color, 1.0), FORWARD_EXPOSURE, 1.0);
 
-    outColor = vec4(mapped.rgb, 1.0);
+	// Only the transparent pass blends; opaque and mask stay fully covered.
+	float alpha = (pbr.flags & MATERIAL_FLAG_ALPHA_BLEND) != 0 ? albedo.a : 1.0;
+
+    outColor = vec4(mapped.rgb, alpha);
 }

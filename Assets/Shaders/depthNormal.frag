@@ -4,6 +4,7 @@
 #define GPU_DRIVEN_RENDERING 1
 
 #include "common.glsl"
+#include "gpuDriven.glsl"
 
 layout(location = 0) in vec4 inWorldPos;
 layout(location = 1) in vec3 inWorldNormal;
@@ -31,7 +32,9 @@ struct PBR
     uint normalmapIndex;            // Material texture 1
     uint metallicRoughnessmapIndex; // Material texture 2
 
-    vec3 padding;
+    float alphaCutoff;
+    float padding0;
+    float padding1;
 };
 
 layout(set = 0, binding = 8) uniform PBRBuffer
@@ -67,6 +70,15 @@ void main()
 {
     uint materialIndex = inMaterialIndex;
     PBR pbr = pbrBuffer.materials[materialIndex];
+
+    if ((pbr.flags & MATERIAL_FLAG_ALPHA_MASK) != 0)
+    {
+        float alpha = pbr.albedo.a;
+        if (pbr.albedoTextureSet == 1)
+            alpha *= texture(bindlessTextures2D[nonuniformEXT(pbr.basemapIndex)], inUV).a;
+        if (alpha < pbr.alphaCutoff)
+            discard;
+    }
 
     // Start from the interpolated geometric normal, then apply the normal map
     // when the material provides one (normalmapIndex != 0).

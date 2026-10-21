@@ -20,7 +20,7 @@ namespace Core
 		  _name(other._name + "_copy"),
 		  _isDoubledSided(other._isDoubledSided),
 		  _alphaMode(other._alphaMode),
-		  _isAlphaCutoff(other._isAlphaCutoff),
+		  _alphaCutoff(other._alphaCutoff),
 		  _buffers(other._buffers),
 		  _textures(other._textures)
 	{
@@ -34,7 +34,7 @@ namespace Core
 			_name = other._name;
 			_isDoubledSided = other._isDoubledSided;
 			_alphaMode = other._alphaMode;
-			_isAlphaCutoff = other._isAlphaCutoff;
+			_alphaCutoff = other._alphaCutoff;
 			_buffers = other._buffers;
 			_textures = other._textures;
 		}

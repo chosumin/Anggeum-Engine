@@ -56,7 +56,14 @@ void MaterialManager::UpdateMaterialData(uint32_t materialIndex)
 		data.metallicRoughnessmapIndex = pbrBuffer->MetallicRoughnessmapIndex;
 	}
 
-	data.flags = 1;  // Enabled
+	data.flags = MATERIAL_FLAG_ENABLED;
+	if (material->GetAlphaMode() == AlphaMode::Mask)
+		data.flags |= MATERIAL_FLAG_ALPHA_MASK;
+	else if (material->GetAlphaMode() == AlphaMode::Blend)
+		data.flags |= MATERIAL_FLAG_ALPHA_BLEND;
+	if (material->IsDoubleSided())
+		data.flags |= MATERIAL_FLAG_DOUBLE_SIDED;
+	data.alphaCutoff = material->GetAlphaCutoff();
 }
 
 uint32_t MaterialManager::RegisterMaterial(Handle<Material> material)

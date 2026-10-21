@@ -66,6 +66,13 @@ namespace Core
 		bool HasMaterialIndex() const { return _materialIndex != UINT32_MAX; }
 
 		void SetShader(Handle<Shader> shader) { _shader = shader; }
+
+		void SetAlphaMode(AlphaMode mode) { _alphaMode = mode; }
+		AlphaMode GetAlphaMode() const { return _alphaMode; }
+		void SetAlphaCutoff(float cutoff) { _alphaCutoff = cutoff; }
+		float GetAlphaCutoff() const { return _alphaCutoff; }
+		void SetDoubleSided(bool doubleSided) { _isDoubledSided = doubleSided; }
+		bool IsDoubleSided() const { return _isDoubledSided; }
 	private:
 		void SetDefault(Handle<Texture> defaultTexture);
 	protected:
@@ -75,9 +82,9 @@ namespace Core
 	private:
 		string _name;
 
-		bool _isDoubledSided;
+		bool _isDoubledSided = false;
 		AlphaMode _alphaMode = AlphaMode::Opaque;
-		bool _isAlphaCutoff;
+		float _alphaCutoff = 0.5f;
 
 		// Legacy bound resources (Set 1)
 		unordered_map<uint32_t, void*> _buffers;
