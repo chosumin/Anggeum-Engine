@@ -1,0 +1,75 @@
+#version 450
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "terrainCommon.glsl"
+
+// Fills shading cache pages: one workgroup column per page (z), one thread
+// per cache texel including the border apron. Every texel evaluates the
+// same near blend terrain.frag would at that world position, from the
+// finest resident node, so the cache and the per-pixel path agree.
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform usampler2D quadTreeIndex;
+layout(set = 0, binding = 1) uniform usampler2D splatAtlas;
+
+layout(set = 0, binding = 2) uniform TerrainParamsUniform
+{
+    TerrainParams params;
+};
+
+layout(set = 0, binding = 3) uniform TerrainMaterialPalette
+{
+    TerrainMaterial materials[TERRAIN_MAX_MATERIALS];
+    uvec4 count; // x = material count
+} palette;
+
+layout(set = 0, binding = 4) uniform PageRenderList
+{
+    TerrainPageRender pages[TERRAIN_CACHE_MAX_PAGE_RENDERS];
+    uvec4 count; // x = pages this dispatch
+} renderList;
+
+layout(set = 0, binding = 5, rgba8) uniform writeonly image2D cacheAlbedo;
+layout(set = 0, binding = 6, rgba8) uniform writeonly image2D cacheNormal; // rg = detail normal xz, b = roughness
+
+layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
+
+#include "terrainShading.glsl"
+
+void main()
+{
+    TerrainPageRender page = renderList.pages[gl_WorkGroupID.z];
+    float pageTexels = params.cacheInfo.y;
+    float border = params.cacheInfo.z;
+    uint stride = uint(pageTexels + 2.0 * border);
+
+    uvec2 texel = gl_GlobalInvocationID.xy;
+    if (any(greaterThanEqual(texel, uvec2(stride))))
+        return;
+
+    // Texel centers; the apron continues the same world function past the
+    // page edge, so bilinear taps across pages are seamless by construction.
+    vec2 pageUV = (vec2(texel) - border + 0.5) / pageTexels;
+    vec2 worldXZ = page.originXZ + pageUV * page.size;
+
+    NearSurface s;
+    uint slot, lod;
+    vec2 local;
+    if (TerrainResolveNode(quadTreeIndex, params, worldXZ, slot, lod, local))
+    {
+        float texelSize = page.size / pageTexels;
+        s = ShadeNear(slot, local, worldXZ, vec2(texelSize, 0.0), vec2(0.0, texelSize));
+    }
+    else
+    {
+        // Outside the world (an edge page's apron): flat and neutral.
+        s.albedo = vec3(0.5);
+        s.normal = vec3(0.0, 1.0, 0.0);
+        s.roughness = 1.0;
+    }
+
+    uint slotsPerRow = uint(params.cacheInfo.w);
+    ivec2 dst = ivec2(uvec2(page.slot % slotsPerRow, page.slot / slotsPerRow) * stride + texel);
+    imageStore(cacheAlbedo, dst, vec4(s.albedo, 1.0));
+    imageStore(cacheNormal, dst, vec4(s.normal.xz * 0.5 + 0.5, s.roughness, 1.0));
+}

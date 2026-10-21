@@ -4,6 +4,7 @@
 #include "TerrainStreamer.h"
 #include "TerrainQuadTree.h"
 #include "TerrainMaterialSet.h"
+#include "TerrainShadingCache.h"
 
 namespace Core
 {
@@ -21,6 +22,10 @@ namespace Core
 	class TerrainSystem
 	{
 	public:
+		// Per-frame uniform blocks every terrain pass shares.
+		static constexpr const char* UB_PARAMS = "Terrain.Params";
+		static constexpr const char* UB_PALETTE = "Terrain.MaterialPalette";
+
 		TerrainSystem(Device& device, ResourceManager& resourceManager,
 			SyncContext& syncContext, TransferContext& transfer,
 			BindlessTextureManager* bindless);
@@ -31,6 +36,7 @@ namespace Core
 		TerrainQuadTree& GetQuadTree() { return *_quadTree; }
 		TerrainStreamer& GetStreamer() { return *_streamer; }
 		TerrainMaterialSet& GetMaterials() { return *_materials; }
+		TerrainShadingCache& GetShadingCache() { return *_shadingCache; }
 
 		// Everything but the viewport, which the binding pass fills in.
 		TerrainParams BuildRenderParams() const;
@@ -72,6 +78,7 @@ namespace Core
 		TerrainNodeStore _store;
 		unique_ptr<TerrainQuadTree> _quadTree;
 		unique_ptr<TerrainStreamer> _streamer;
+		unique_ptr<TerrainShadingCache> _shadingCache;
 
 		Handle<Buffer> _gridIndexBuffer;
 		uint32_t _gridIndexCount = 0;

@@ -1,5 +1,6 @@
 #pragma once
 #include "TerrainConfig.h"
+#include "TerrainSlotAllocator.h"
 #include "Graphics/ResourceHandle.h"
 
 namespace Core
@@ -34,23 +35,16 @@ namespace Core
 		uvec2 GetColorAtlasExtent() const { return _colorExtent; }
 		uvec2 GetSplatAtlasExtent() const { return _splatExtent; }
 
-		// Returns TERRAIN_NODE_EMPTY when no slot can be handed out safely
-		// this frame (all occupied or still retiring).
-		uint16_t AllocateSlot();
-
-		// Frame-stamped retire: a released slot may still be sampled by
-		// in-flight frames, so it re-enters the free list only after
-		// MAX_FRAMES_IN_FLIGHT frames.
-		void ReleaseSlot(uint16_t slot);
+		// Slot lifetime (see TerrainSlotAllocator): a released slot may still
+		// be sampled by in-flight frames, so it is retired, not freed.
+		uint16_t AllocateSlot() { return _slots.Allocate(); }
+		void ReleaseSlot(uint16_t slot) { _slots.Release(slot); }
 
 		uvec2 HeightTexelOrigin(uint16_t slot) const;
 		uvec2 ColorTexelOrigin(uint16_t slot) const;
 		uvec2 SplatTexelOrigin(uint16_t slot) const;
 
-		uint32_t GetFreeSlotCount() const
-		{
-			return uint32_t(_freeSlots.size() + _retiredSlots.size());
-		}
+		uint32_t GetFreeSlotCount() const { return _slots.GetFreeCount(); }
 
 	private:
 		uvec2 SlotCoord(uint16_t slot) const;
@@ -65,11 +59,6 @@ namespace Core
 		Handle<Texture> _albedoAtlas;
 		Handle<Texture> _splatAtlas;
 
-		SyncContext& _sync;
-
-		vector<uint16_t> _freeSlots;
-
-		// slot + the graphics value covering its last possible reader.
-		deque<pair<uint16_t, u64>> _retiredSlots;
+		TerrainSlotAllocator _slots;
 	};
 }

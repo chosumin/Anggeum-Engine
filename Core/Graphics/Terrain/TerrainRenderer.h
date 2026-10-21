@@ -77,14 +77,16 @@ namespace Core
 
 		Handle<Shader> _colorShader;
 		unique_ptr<PipelineState> _colorPipelineState;
-		unique_ptr<Pipeline> _colorPipeline;
+		unique_ptr<Pipeline> _colorPipeline;        // per-pixel blend where no page is resident
+		unique_ptr<Pipeline> _cachedColorPipeline;  // shading cache only (terrain.frag CACHE_ONLY)
 		unique_ptr<Pipeline> _wireframePipeline;
 
 		Handle<Shader> _shadowShader;
 		unique_ptr<PipelineState> _shadowPipelineState;
 		unique_ptr<Pipeline> _shadowPipeline;
 
-		FGBuffer _camera, _params, _pick, _palette;
+		FGBuffer _camera, _params, _pick, _palette, _pageTable;
+		FGTexture _cacheAlbedo, _cacheNormal;
 		PatchList _lists[2];           // indexed by Phase
 		bool _colorActive = false;
 

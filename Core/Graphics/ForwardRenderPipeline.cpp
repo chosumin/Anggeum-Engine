@@ -21,6 +21,7 @@
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
+#include "Graphics/RenderPasses/TerrainPageRenderPass.h"
 #include "Graphics/Terrain/TerrainRenderer.h"
 #include "Graphics/Terrain/TerrainPatchCuller.h"
 #include "Graphics/Terrain/TerrainSystem.h"
@@ -58,6 +59,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainPageRenderPass>(device, resourceManager, renderScene));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, resourceManager, renderScene, *_terrainRenderer,
 		*_terrainCuller, extent, depthFormat, _msaaSamples);

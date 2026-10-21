@@ -26,6 +26,8 @@ namespace Core
 		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
 		_streamer = make_unique<TerrainStreamer>(_config, _store, *_quadTree,
 			transfer, resourceManager);
+		_shadingCache = make_unique<TerrainShadingCache>(device, resourceManager, syncContext,
+			_config, _store, *_streamer);
 		CreateGridIndexBuffer(resourceManager);
 
 		// Zero-initialized: fresh device memory is undefined, and OnGUI reads
@@ -121,6 +123,7 @@ namespace Core
 			_detailSettings.heightBlendDepth, _detailSettings.normalStrength);
 		params.hexTiling = vec4(_detailSettings.hexTiling ? 1.0f : 0.0f,
 			_detailSettings.hexCellsPerTile, 0.0f, 0.0f);
+		_shadingCache->FillParams(params);
 		return params;
 	}
 
@@ -130,7 +133,10 @@ namespace Core
 		vec2 cameraXZ{ position.x, position.z };
 
 		if (!_freezeStreaming)
+		{
 			_streamer->Update(cameraXZ);
+			_shadingCache->Update(position);
+		}
 	}
 
 	void TerrainSystem::OnGUI()
@@ -151,7 +157,7 @@ namespace Core
 		ImGui::Checkbox("Freeze streaming", &_freezeStreaming);
 		ImGui::Combo("Debug mode", &_debugMode,
 			"Lit\0LOD tint\0Normals\0UV grid\0Roughness\0Baked AO\0Material ID\0Albedo\0"
-			"Blend weights\0Near/far\0");
+			"Blend weights\0Near/far\0Cache level\0");
 		ImGui::Checkbox("Draw culled patches (red = frustum, blue = occluded)", &_bypassCulling);
 
 		if (ImGui::TreeNode("Materials"))
@@ -166,6 +172,12 @@ namespace Core
 
 			ImGui::SeparatorText("Palette");
 			_materials->OnGUI();
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNode("Shading cache"))
+		{
+			_shadingCache->OnGUI();
 			ImGui::TreePop();
 		}
 

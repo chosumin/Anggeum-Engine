@@ -48,6 +48,8 @@ RenderScene::Update                       (main thread)
 FrameGraph                                (GPU, per frame)
  ├─ TerrainNodeListPass  1 workgroup: quadtree walk → Node List + indirect args
  ├─ TerrainLodMapPass    1 thread per sector: LOD map (neighbour LOD lookup)
+ ├─ TerrainPageRender    this frame's shading cache pages: near material blend
+ │                       per cache texel → albedo / normal cache (culled when none)
  ├─ HiZCull1             pass-1 cull: 8x8 patch expand, frustum + previous-frame
  │                       Hi-Z → Patch List; occlusion rejects → Rejected List
  ├─ DepthPre1            pass-1 list → depth + normal
@@ -59,8 +61,13 @@ FrameGraph                                (GPU, per frame)
  ├─ ShadowPass           per cascade: depth-only draw of the cascade list
  ├─ SDFShadowPass        far shadow mask: mesh SDF march + terrain heightfield
  │                       march (TerrainSampleHeight over the quadtree index)
- └─ GeometryPass         both lists, color with depth writes off
+ └─ GeometryPass         both lists, color with depth writes off (near pixels
+                         resolve the shading cache through the page table)
 ```
+
+Before the graph, `TerrainSystem::Update` also runs `TerrainShadingCache::Update`
+(after the streamer): the page ring diff, evictions and this frame's page
+render list.
 
 ## Core types
 
@@ -72,6 +79,8 @@ FrameGraph                                (GPU, per frame)
 | `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, splat (material ID), min/max height |
 | `TerrainNodeStore` | The baked CPU payloads — the in-memory stand-in for FC5's on-disk tiles. `Load()` reads the `.tbake` cache or bakes and writes it |
 | `TerrainQuadTree` | GPU face: 4 synchronized atlases (height; normal + roughness + AO; albedo; splat material IDs), the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |
+| `TerrainSlotAllocator` | A fixed slot pool (atlas tiles, cache pages): free list + frame-stamped retire, so a released slot is reused only once the GPU passed its last reader |
+| `TerrainShadingCache` | The virtual-texture shading cache: page residency per level around the camera, the two physical cache textures, the toroidal page table windows the fragment shader resolves through, and the frame's page render list |
 | `TerrainStreamer` | CPU residency: ring requests, load/evict diff, budgeted uploads, table mirrors, PendingUpload → Resident promotion |
 | `TerrainUploadJob` | Worker-thread job that stages tile payloads + lookup tables and records the copies |
 | `TerrainMaterialDesc` / `TerrainMaterialBakeDesc` | One palette entry split by consumer: the runtime side (`TerrainMaterial.h`: name, tile size/rotation, the GPU palette structs) and the bake side (`TerrainBaker.h`: the albedo/roughness the atlases average to). Ready-made tiles never need the bake side |
@@ -81,7 +90,8 @@ FrameGraph                                (GPU, per frame)
 | `TerrainRenderer` | The draws a host pass embeds: depth prepass (per phase), color (both lists), shadow (per cascade). Owns the three pipelines; the host owns the attachments |
 
 Host passes: `HiZCullPass` and `ShadowCullPass` call the culler; `DepthPrePass`,
-`GeometryPass` and `ShadowPass` call the renderer. Each host declares the terrain
+`GeometryPass` and `ShadowPass` call the renderer. `TerrainPageRenderPass` is
+terrain's own third pass: it dispatches the shading cache's page renders. Each host declares the terrain
 side in its `Setup` and records it in its `Execute` right next to the mesh work.
 The helpers return false / early-out when their list does not exist that frame,
 so a host never branches on terrain itself. Where a host exists once per phase
@@ -269,6 +279,49 @@ and the tangent normals are rotated back out of their cell. Three samples per
 map; `hexTiling` toggles it and `hexCellsPerTile` sets the cell size
 (`TerrainParams.hexTiling`). It is per pixel, so it fades with the near blend.
 
+**Shading cache (virtual texture).** The near blend above costs up to four
+materials x three maps x three hex taps per pixel every frame, so by default
+it runs once per *page* instead: `TerrainShadingCache` keeps a page tree over
+the world — level 0 pages cover `finestPageSize` (2 m, 0.8 cm texels, about
+the detail texel), every level doubles, 7 levels — and requests pages per
+level within `ringScale x pageSize` of the camera (3D distance to the page's
+box, so a high camera asks for coarser pages), with the same eviction
+hysteresis as tile streaming. A requested page gets a slot in two physical
+RGBA8 textures (`slotsPerRow^2` slots of `pageTexels + 2 x border`; 16x16
+slots of 264 texels = 2 x 71 MB) and `TerrainPageRenderPass` renders it with
+`terrainPageRender.comp`: every cache texel resolves the finest resident node
+under its world position (`TerrainResolveNode`) and evaluates the same
+`ShadeNear` (`terrainShading.glsl`, shared with the per-pixel path) with the
+texel size as its footprint, storing albedo and the detail normal (xz) +
+roughness. The apron continues the world function past the page edge, so
+bilinear taps are seamless across pages. Pages are pure functions of the
+world, so camera motion only renders the ring's new edge; a page rendered
+while only a coarser node was resident is re-rendered in place once a finer
+node lands (`sourceLod`).
+
+The fragment shader picks the level like an anisotropic mip — the texel size
+of the footprint's minor axis, unless the major axis exceeds the sampler's
+anisotropy ratio — walks coarser until a page is resident and optionally
+blends the next coarser level (`trilinear`): the whole near surface in at
+most four cache taps. The taps are `textureGrad` with the world gradients
+mapped into the page, so the sampler's anisotropy filters along the view
+inside the page (the cache has no mips; the levels are the mips) and stays
+defined inside the level walk's non-uniform control flow. The page table is a
+`TERRAIN_CACHE_WINDOW^2` window per level centered on the camera, addressed
+toroidally (absolute page coordinate modulo the window), uploaded as one
+small uniform block per frame, so it never scales with the world. Macro
+normal, AO and the far atlases still come from the quadtree atlases; the
+cached detail normal is reoriented onto the macro normal per pixel.
+
+Two color pipelines share `terrain.frag`: the default one keeps the per-pixel
+blend as the fallback where no level is resident, so the cache never pops in
+— it only decides who pays; the `CACHE_ONLY` specialization (used whenever
+the cache is on, except for the blend-weight debug view) compiles that
+fallback out, because its register footprint alone costs every fragment
+occupancy, and shows the far atlases on a miss instead. With coarse levels
+rendered first a miss at every level only happens at startup or after a
+teleport.
+
 Shadows come from two sources. Inside the CSM range the cascades draw the
 per-cascade patch lists with terrain's own depth bias (`TerrainShadowSettings`).
 Past the transition `ShadowVisibility` blends into
@@ -292,11 +345,16 @@ does.
   between Lit / LOD tint / Normals (near: with the detail normal) / UV grid /
   Roughness / Baked AO / Material ID (nearest splat texel) / Albedo (the
   blended albedo the lighting sees, unlit) / Blend weights (material tints
-  mixed by the near blend weights) / Near/far (white = full detail).
+  mixed by the near blend weights) / Near/far (white = full detail) / Cache
+  level (page level tint with page borders; magenta = per-pixel fallback).
 - **Materials** tree: the near blend (near distance, fade width, height blend
   depth, detail normal strength, hex tiling on/off and cell size), then
   per-material tile size and rotation
   (live) and the bindless indices the palette carries.
+- **Shading cache** tree: on/off (off = per-pixel blend everywhere, for A/B),
+  page counts (requested / resident / pending / starved), renders, refreshes
+  and evictions this frame, free slots, ring scale, hysteresis, render budget
+  and trilinear.
 - **Shadow** tree: cascade depth bias and the far heightfield march (steps 0
   turns it off for A/B, max distance, softness, bias). The SDF Shadow panel
   previews the mask itself.

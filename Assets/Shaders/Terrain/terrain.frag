@@ -56,8 +56,21 @@ layout(set = 0, binding = 15) uniform TerrainMaterialPalette
     uvec4 count; // x = material count
 } palette;
 
+// The shading cache: the near blend rendered per page by
+// terrainPageRender.comp, and the per-level page table windows around the
+// camera (toroidal: entry = absolute page coordinate modulo the window).
+layout(set = 0, binding = 16) uniform sampler2D cacheAlbedo;
+layout(set = 0, binding = 17) uniform sampler2D cacheNormal;
+layout(set = 0, binding = 18) uniform TerrainPageTable
+{
+    ivec4 windowOrigin[TERRAIN_CACHE_MAX_LEVELS]; // xy = page coord of the window's min corner
+    uvec4 entries[TERRAIN_CACHE_MAX_LEVELS * TERRAIN_CACHE_WINDOW * TERRAIN_CACHE_WINDOW / 4u];
+} pageTable;
+
 layout(set = 2, binding = 0) uniform sampler2D bindlessTextures2D[];
 layout(set = 2, binding = 1) uniform samplerCube bindlessTexturesCube[];
+
+#include "terrainShading.glsl"
 
 layout(location = 0) in vec2 inTileUV;
 layout(location = 1) flat in uvec2 inColorOrigin;
@@ -73,235 +86,90 @@ const vec3 LOD_COLORS[6] = vec3[](
     vec3(1.0, 0.2, 0.2), vec3(1.0, 0.6, 0.1), vec3(0.9, 0.9, 0.1),
     vec3(0.2, 0.9, 0.2), vec3(0.2, 0.5, 1.0), vec3(0.7, 0.3, 0.9));
 
-// One tint per palette slot; sized by the palette so a bigger palette
-// fails to compile until this grows with it.
-const vec3 MATERIAL_COLORS[TERRAIN_MAX_MATERIALS] = vec3[](
-    vec3(0.2, 0.8, 0.2), vec3(0.6, 0.4, 0.2), vec3(0.5, 0.5, 0.5), vec3(1.0, 1.0, 1.0),
-    vec3(1.0, 0.2, 0.2), vec3(0.2, 0.2, 1.0), vec3(1.0, 1.0, 0.2), vec3(1.0, 0.2, 1.0),
-    vec3(0.2, 1.0, 1.0), vec3(1.0, 0.6, 0.0), vec3(0.5, 0.0, 0.8), vec3(0.0, 0.5, 0.3),
-    vec3(0.8, 0.5, 0.5), vec3(0.3, 0.3, 0.0), vec3(0.6, 0.8, 1.0), vec3(0.1, 0.1, 0.1));
+const uint CACHE_LEVEL_NONE = 0xffu; // debug: the per-pixel path shaded this fragment
 
-vec3 MaterialTint(uint materialId)
+// Pipeline variant without the per-pixel blend: its register footprint
+// costs every fragment occupancy even when all of them hit the cache, and
+// with coarse pages rendered first a miss at every level is rare (startup,
+// teleports), so that variant shows the far atlases there instead.
+layout(constant_id = 0) const bool CACHE_ONLY = false;
+
+uint CachePageSlot(uint level, ivec2 page)
 {
-    return MATERIAL_COLORS[min(materialId, TERRAIN_MAX_MATERIALS - 1u)];
+    const int W = int(TERRAIN_CACHE_WINDOW);
+    ivec2 rel = page - pageTable.windowOrigin[level].xy;
+    if (any(lessThan(rel, ivec2(0))) || any(greaterThanEqual(rel, ivec2(W))))
+        return TERRAIN_PAGE_EMPTY;
+
+    ivec2 wrapped = ((page % W) + W) % W;
+    uint i = level * uint(W * W) + uint(wrapped.y * W + wrapped.x);
+    return pageTable.entries[i >> 2u][i & 3u];
 }
 
-// The near surface: the detail maps of the materials around the fragment,
-// height-weighted into one albedo / normal / roughness.
-struct NearSurface
+// The cache has no mips (the levels are the mips), so the sampler's
+// anisotropy acts within the page: explicit gradients keep it on inside the
+// level walk's non-uniform control flow.
+NearSurface SampleCachePage(uint level, uint slot, vec2 pagePos, vec2 dWdx, vec2 dWdy)
 {
-    vec3 albedo;
-    vec3 normal;    // world axes, unperturbed = +Y
-    float roughness;
-    vec3 idTint;    // MaterialTint blended by the same weights (debug)
-};
+    vec2 uv = TerrainCacheTexel(params, slot, pagePos - floor(pagePos)) * params.cacheLevels.z;
+    float duvdW = params.cacheInfo.y / TerrainCachePageSize(params, level) * params.cacheLevels.z;
+    vec4 albedo = textureGrad(cacheAlbedo, uv, dWdx * duvdW, dWdy * duvdW);
+    vec4 packed = textureGrad(cacheNormal, uv, dWdx * duvdW, dWdy * duvdW);
+    vec2 xz = packed.rg * 2.0 - 1.0;
 
-// LOD from the world-position gradients: the mip textureGrad would pick, but
-// textureLod runs at full sampler rate and textureGrad does not.
-float DetailLod(uint textureIndex, vec2 duvdx, vec2 duvdy)
-{
-    float size = float(textureSize(bindlessTextures2D[nonuniformEXT(textureIndex)], 0).x);
-    return 0.5 * log2(max(dot(duvdx, duvdx), dot(duvdy, duvdy)) * size * size);
-}
-
-vec4 SampleDetail(uint textureIndex, vec2 uv, float lod)
-{
-    return textureLod(bindlessTextures2D[nonuniformEXT(textureIndex)], uv, lod);
-}
-
-// One splat tap: its material's detail maps at the world uv
-struct DetailTap
-{
-    vec3 albedo;
-    vec3 normal;   // tangent space of the material's detail uv, decoded
-    float smoothness;
-    vec2 rotation; // cos, sin of the material's detail rotation
-    float h;
-};
-
-// Hex tiling (Mikkelsen 2022): a triangle grid over the tile uv; every cell
-// gets its own rotation and offset, and the three cells around a point blend
-// with sharpened barycentric weights, so no two spots share a tile.
-struct HexTap
-{
-    vec2 uv;
-    vec2 rotation; // cos, sin of the cell's rotation
-    float w;
-};
-
-HexTap MakeHexTap(vec2 uv, ivec2 cell, float w, float cellsPerTile)
-{
-    const mat2 unskew = mat2(1.0, 0.0, 0.5, 0.8660254);
-    uint h = TerrainHashUint(uvec2(cell + 0x4000));
-    float angle = float(h & 0xffffu) * (6.2831853 / 65535.0);
-    HexTap t;
-    t.rotation = vec2(cos(angle), sin(angle));
-    vec2 center = unskew * vec2(cell) / cellsPerTile;
-    vec2 d = uv - center;
-    t.uv = center + vec2(d.x * t.rotation.x - d.y * t.rotation.y,
-        d.x * t.rotation.y + d.y * t.rotation.x)
-        + vec2(float((h >> 16u) & 0xffu), float(h >> 24u)) / 255.0;
-    t.w = w;
-    return t;
-}
-
-void HexTiling(vec2 uv, float cellsPerTile, out HexTap taps[3])
-{
-    const mat2 skew = mat2(1.0, 0.0, -0.57735027, 1.15470054);
-    const float SHARPNESS = 7.0; // keeps mostly one cell per pixel, blending only at edges
-    vec2 skewed = skew * (uv * cellsPerTile);
-    ivec2 base = ivec2(floor(skewed));
-    vec2 f = skewed - vec2(base);
-    float z = 1.0 - f.x - f.y;
-    vec3 w;
-    ivec2 c0, c1, c2;
-    if (z > 0.0)
-    {
-        w = vec3(z, f.y, f.x);
-        c0 = base; c1 = base + ivec2(0, 1); c2 = base + ivec2(1, 0);
-    }
-    else
-    {
-        w = vec3(-z, 1.0 - f.y, 1.0 - f.x);
-        c0 = base + ivec2(1, 1); c1 = base + ivec2(1, 0); c2 = base + ivec2(0, 1);
-    }
-    w = pow(w, vec3(SHARPNESS));
-    w /= w.x + w.y + w.z;
-    taps[0] = MakeHexTap(uv, c0, w.x, cellsPerTile);
-    taps[1] = MakeHexTap(uv, c1, w.y, cellsPerTile);
-    taps[2] = MakeHexTap(uv, c2, w.z, cellsPerTile);
-}
-
-// w > 0: merged-away taps are skipped by the caller.
-DetailTap SampleTap(uint id, float w, vec2 worldXZ, vec2 dWdx, vec2 dWdy)
-{
-    TerrainMaterial material = palette.materials[min(id, palette.count.x - 1u)];
-    vec2 uv = TerrainDetailUV(material, worldXZ);
-    vec2 duvdx = TerrainDetailUV(material, dWdx); // linear, so deltas map alike
-    vec2 duvdy = TerrainDetailUV(material, dWdy);
-    float lod = DetailLod(material.textures.x, duvdx, duvdy); // the three maps share a size
-
-    HexTap hex[3];
-    int tapCount = 1;
-    hex[0].uv = uv;
-    hex[0].rotation = vec2(1.0, 0.0);
-    hex[0].w = 1.0;
-    if (params.hexTiling.x != 0.0)
-    {
-        HexTiling(uv, params.hexTiling.y, hex);
-        tapCount = 3;
-    }
-
-    // A lone material (w = 1 after the merge) wins the height blend outright.
-    bool needHeight = w < 0.999;
-    DetailTap tap;
-    tap.albedo = vec3(0.0);
-    tap.normal = vec3(0.0);
-    tap.smoothness = 0.0;
-    float height = 0.0;
-    for (int i = 0; i < tapCount; ++i)
-    {
-        HexTap h = hex[i];
-        tap.albedo += h.w * SampleDetail(material.textures.x, h.uv, lod).rgb;
-        vec4 ns = SampleDetail(material.textures.y, h.uv, lod);
-        vec3 n = ns.xyz * 2.0 - 1.0;
-        // Undo the cell's rotation so the tilt is in the material's uv frame.
-        tap.normal += h.w * vec3(n.x * h.rotation.x + n.y * h.rotation.y,
-            -n.x * h.rotation.y + n.y * h.rotation.x, n.z);
-        tap.smoothness += h.w * ns.a;
-        if (needHeight)
-            height += h.w * SampleDetail(material.textures.z, h.uv, lod).r;
-    }
-    tap.rotation = material.tiling.yz;
-    tap.h = height + w;
-    return tap;
-}
-
-void AccumulateTap(inout NearSurface s, inout float sum, DetailTap tap, uint id, float hMax)
-{
-    float b = max(tap.h - hMax + params.detailBlend.z, 0.0);
-    // Tangent-space xy back through the material rotation: +u = (cos, -sin), +v = (sin, cos) in world XZ.
-    vec3 n = tap.normal;
-    vec2 tilt = n.x * vec2(tap.rotation.x, -tap.rotation.y) + n.y * vec2(tap.rotation.y, tap.rotation.x);
-    s.albedo += b * tap.albedo;
-    s.normal += b * vec3(tilt.x, n.z, tilt.y);
-    s.roughness += b * (1.0 - tap.smoothness);
-    s.idTint += b * MaterialTint(id);
-    sum += b;
-}
-
-// Four surrounding splat texels -> up to four materials, duplicates merged so
-// each is sampled once.
-NearSurface ShadeNear(vec2 worldXZ, vec2 dWdx, vec2 dWdy)
-{
-    ivec2 base;
-    vec2 f;
-    TerrainSplatBilinear(inPatchEntry.y, inTileUV, params, base, f);
-
-    // One gather at the shared corner returns the 2x2 as (0,1) (1,1) (1,0) (0,0).
-    uvec4 gathered = textureGather(splatAtlas,
-        (vec2(base) + 1.0) / vec2(textureSize(splatAtlas, 0)), 0) & TERRAIN_SPLAT_ID_MASK;
-    uint ids[4];
-    float w[4];
-    ids[0] = gathered.w; ids[1] = gathered.z; ids[2] = gathered.x; ids[3] = gathered.y;
-    w[0] = (1.0 - f.x) * (1.0 - f.y);
-    w[1] = f.x * (1.0 - f.y);
-    w[2] = (1.0 - f.x) * f.y;
-    w[3] = f.x * f.y;
-
-    // Merge each tap into the first earlier tap with the same ID.
-    for (int i = 1; i < 4; ++i)
-        for (int j = 0; j < i; ++j)
-            if (ids[i] == ids[j])
-            {
-                w[j] += w[i];
-                w[i] = 0.0;
-                break;
-            }
-
-    DetailTap taps[4];
-    float hMax = 0.0; // every sampled tap has h = relief + w > 0
-    for (int i = 0; i < 4; ++i)
-    {
-        if (w[i] <= 0.0)
-            continue;
-
-        taps[i] = SampleTap(ids[i], w[i], worldXZ, dWdx, dWdy);
-        hMax = max(hMax, taps[i].h);
-    }
-
-    // Height blend: the bilinear weight lifts each tap's relief, and only
-    // taps within detailBlend.z of the highest keep a share.
     NearSurface s;
-    s.albedo = vec3(0.0);
-    s.normal = vec3(0.0);
-    s.roughness = 0.0;
+    s.albedo = albedo.rgb;
+    s.normal = vec3(xz.x, sqrt(max(1.0 - dot(xz, xz), 0.0)), xz.y);
+    s.roughness = packed.b;
     s.idTint = vec3(0.0);
-    float sum = 0.0;
-    for (int i = 0; i < 4; ++i)
-    {
-        if (w[i] <= 0.0)
-            continue;
-        AccumulateTap(s, sum, taps[i], ids[i], hMax);
-    }
-
-    float invSum = 1.0 / max(sum, 1e-4);
-    s.albedo *= invSum;
-    s.roughness *= invSum;
-    s.idTint *= invSum;
-    s.normal = normalize(vec3(s.normal.x * params.detailBlend.w, s.normal.y,
-        s.normal.z * params.detailBlend.w));
-
     return s;
 }
 
-// Reoriented normal mapping, with +Y as the shared up axis.
-vec3 PerturbNormal(vec3 N, vec3 detail)
+// The near surface from the cache: the page level the pixel footprint asks
+// for (texel size = finest * 2^level, chosen like an anisotropic mip: the
+// minor axis, unless the major axis exceeds the anisotropy ratio), walking
+// coarser until a page is resident; trilinear blends in the next coarser
+// level. False when no level covers the point, which only happens while
+// pages are still rendering.
+bool SampleShadingCache(vec2 worldXZ, vec2 dWdx, vec2 dWdy, out NearSurface s, out uint level)
 {
-    vec3 t = N.xzy + vec3(0.0, 0.0, 1.0);
-    vec3 u = detail.xzy * vec3(-1.0, -1.0, 1.0);
-    vec3 r = t * dot(t, u) / t.z - u;
-    return normalize(r.xzy);
+    const float MAX_ANISOTROPY = 16.0; // the sampler uses the device maximum
+    uint levelCount = uint(params.cacheLevels.y);
+    float finestTexel = params.cacheLevels.x / params.cacheInfo.y;
+    float lenX = length(dWdx);
+    float lenY = length(dWdy);
+    float footprint = max(min(lenX, lenY), max(lenX, lenY) / MAX_ANISOTROPY);
+    float levelF = clamp(log2(max(footprint / finestTexel, 1.0)), 0.0, float(levelCount - 1u));
+    uint wanted = uint(levelF);
+
+    uint slot = TERRAIN_PAGE_EMPTY;
+    vec2 pagePos;
+    for (level = wanted; level < levelCount; ++level)
+    {
+        pagePos = (worldXZ - params.worldParams.xy) / TerrainCachePageSize(params, level);
+        slot = CachePageSlot(level, ivec2(floor(pagePos)));
+        if (slot != TERRAIN_PAGE_EMPTY)
+            break;
+    }
+    if (slot == TERRAIN_PAGE_EMPTY)
+        return false;
+
+    s = SampleCachePage(level, slot, pagePos, dWdx, dWdy);
+
+    float t = levelF - float(level); // > 0 only when the wanted level itself was hit
+    if (params.cacheLevels.w != 0.0 && t > 0.0 && level + 1u < levelCount)
+    {
+        vec2 coarsePos = pagePos * 0.5;
+        uint coarseSlot = CachePageSlot(level + 1u, ivec2(floor(coarsePos)));
+        if (coarseSlot != TERRAIN_PAGE_EMPTY)
+        {
+            NearSurface c = SampleCachePage(level + 1u, coarseSlot, coarsePos, dWdx, dWdy);
+            s.albedo = mix(s.albedo, c.albedo, t);
+            s.normal = normalize(mix(s.normal, c.normal, t));
+            s.roughness = mix(s.roughness, c.roughness, t);
+        }
+    }
+    return true;
 }
 
 void main()
@@ -318,9 +186,11 @@ void main()
     float bakedAO = packedNormal.a;
     vec3 N = TerrainDecodeNormal(packedNormal);
 
+    int mode = params.debugMode.x;
+
     // Debug views only: the nearest texel's ID (far side of Blend weights too).
     uint nearestId = 0u;
-    if (params.debugMode.x == 6 || params.debugMode.x == 8)
+    if (mode == 6 || mode == 8)
         nearestId = texelFetch(splatAtlas,
             TerrainSplatTexel(inPatchEntry.y, inTileUV, params), 0).r & TERRAIN_SPLAT_ID_MASK;
     vec3 idTint = MaterialTint(nearestId);
@@ -331,9 +201,27 @@ void main()
     float viewDistance = length(camera.pos - inWorldPos);
     float nearWeight = 1.0 - smoothstep(params.detailBlend.x,
         params.detailBlend.x + params.detailBlend.y, viewDistance);
+    uint cacheLevel = CACHE_LEVEL_NONE;
     if (nearWeight > 0.0)
     {
-        NearSurface near = ShadeNear(inWorldPos.xz, dWdx, dWdy);
+        // The cache holds the blend already; the per-pixel path covers pages
+        // still rendering and the blend-weight view (no tint in the cache).
+        NearSurface near;
+        bool cached = params.cacheInfo.x != 0.0 && mode != 8
+            && SampleShadingCache(inWorldPos.xz, dWdx, dWdy, near, cacheLevel);
+        if (!cached)
+        {
+            cacheLevel = CACHE_LEVEL_NONE;
+            if (CACHE_ONLY)
+            {
+                near.albedo = albedo;
+                near.normal = vec3(0.0, 1.0, 0.0);
+                near.roughness = roughness;
+                near.idTint = idTint;
+            }
+            else
+                near = ShadeNear(inPatchEntry.y, inTileUV, inWorldPos.xz, dWdx, dWdy);
+        }
         albedo = mix(albedo, near.albedo, nearWeight);
         roughness = mix(roughness, near.roughness, nearWeight);
         N = normalize(mix(N, PerturbNormal(N, near.normal), nearWeight));
@@ -373,7 +261,6 @@ void main()
     vec3 color = Tonemap(vec4(ambient + Lo, 1.0), FORWARD_EXPOSURE, 1.0).rgb;
 
     // Debug views replace or tint the tonemapped color.
-    int mode = params.debugMode.x;
     if (mode == 1)
         color = mix(color, LOD_COLORS[min(inLod, 5u)], 0.5);
     else if (mode == 2)
@@ -396,6 +283,21 @@ void main()
         color = idTint;
     else if (mode == 9)
         color = vec3(nearWeight);
+    else if (mode == 10)
+    {
+        // Cache level tint with page borders; magenta = per-pixel fallback,
+        // grey = far (no near blend at all).
+        if (cacheLevel == CACHE_LEVEL_NONE)
+            color = nearWeight > 0.0 ? vec3(1.0, 0.0, 1.0) : vec3(0.3);
+        else
+        {
+            vec2 pagePos = (inWorldPos.xz - params.worldParams.xy)
+                / TerrainCachePageSize(params, cacheLevel);
+            vec2 edge = abs(fract(pagePos) - 0.5);
+            float line = step(0.49, max(edge.x, edge.y));
+            color = mix(LOD_COLORS[min(cacheLevel, 5u)] * (0.5 + 0.5 * albedo), vec3(1.0), line);
+        }
+    }
 
     // Debug mode: culled patches are drawn tinted by the test that dropped them.
     uint cullBits = inPatchEntry.z & (TERRAIN_CULL_FRUSTUM | TERRAIN_CULL_OCCLUDED);

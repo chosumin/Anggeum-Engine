@@ -2,6 +2,26 @@
 
 namespace Core
 {
+	// Shading cache (virtual texture): the near material blend rendered once
+	// per page into a physical texture instead of per pixel per frame. Pages
+	// form their own tree below the quadtree: level 0 covers finestPageSize
+	// meters, every level doubles, each page is pageTexels^2 content plus a
+	// bilinear apron. Allocation-time knobs; TerrainShadingCacheSettings has
+	// the live ones.
+	struct TerrainShadingCacheConfig
+	{
+		uint32_t pageTexels = 256;
+		uint32_t borderTexels = 4;
+		uint32_t slotsPerRow = 16;      // physical texture holds slotsPerRow^2 pages (2 x 71 MB)
+		float finestPageSize = 2.0f;    // meters per level-0 page (0.8 cm texels, ~the detail texel)
+		uint32_t levelCount = 7;        // coarsest page = finest * 2^(levelCount - 1)
+
+		uint32_t Stride() const { return pageTexels + 2 * borderTexels; }
+		uint32_t SlotCount() const { return slotsPerRow * slotsPerRow; }
+		uint32_t Extent() const { return slotsPerRow * Stride(); }
+		float PageSize(uint32_t level) const { return finestPageSize * float(1u << level); }
+	};
+
 	// World, bake, and streaming parameters for the terrain system.
 	// The world is a grid of root quadtree tiles; each root subdivides into
 	// lodCount levels. LOD 0 is the finest (a "sector"), lodCount-1 the root.
@@ -43,6 +63,8 @@ namespace Core
 		float ringRadiusScale = 2.0f;   // load radius = scale * NodeSize(lod)
 		float evictHysteresis = 1.15f;
 		uint32_t uploadBudgetPerFrame = 8;
+
+		TerrainShadingCacheConfig shadingCache;
 
 		uint32_t HeightTexels() const { return quadCountPerNodeEdge + 1; }
 		uint32_t ColorTexels() const { return quadCountPerNodeEdge + 2 * borderTexels; }
@@ -104,6 +126,37 @@ namespace Core
 	constexpr uint16_t TERRAIN_NODE_EMPTY = 0xffff;   // not resident
 	constexpr uint16_t TERRAIN_NODE_INVALID = 0xfffe; // outside the world
 
+	// Shading cache limits, mirrored in terrainCommon.glsl. The page table is
+	// a camera-centered window per level, addressed toroidally, so its size
+	// does not depend on the world size.
+	constexpr uint32_t TERRAIN_CACHE_MAX_LEVELS = 8;
+	constexpr uint32_t TERRAIN_CACHE_WINDOW = 12;
+	constexpr uint32_t TERRAIN_CACHE_MAX_PAGE_RENDERS = 32;
+	constexpr uint16_t TERRAIN_PAGE_EMPTY = 0xffff;
+
+	// Uniform block terrain.frag resolves pages through: per level the page
+	// coordinate of the window's min corner, then W*W slots per level packed
+	// four per uvec4 (std140 would pad a uint array to 16 bytes per entry).
+	struct alignas(16) TerrainPageTableGPU
+	{
+		ivec4 windowOrigin[TERRAIN_CACHE_MAX_LEVELS];
+		uvec4 entries[TERRAIN_CACHE_MAX_LEVELS * TERRAIN_CACHE_WINDOW * TERRAIN_CACHE_WINDOW / 4];
+	};
+
+	// One page render request for terrainPageRender.comp.
+	struct alignas(16) TerrainPageRenderGPU
+	{
+		vec2 originXZ{};
+		float size = 0.0f;
+		uint32_t slot = 0;
+	};
+
+	struct alignas(16) TerrainPageRenderListGPU
+	{
+		TerrainPageRenderGPU pages[TERRAIN_CACHE_MAX_PAGE_RENDERS];
+		uvec4 count{}; // x = pages this dispatch
+	};
+
 	// GPU node description, one per atlas slot (slot index == desc index).
 	// Mirrored in terrain shaders; consumed by the phase-2 GPU pipeline.
 	struct TerrainNodeDescGPU
@@ -161,6 +214,18 @@ namespace Core
 		vec4 viewport{};              // xy = size, zw = light tile counts
 		vec4 detailBlend{};           // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
 		vec4 hexTiling{};             // x = on, y = hex cells per detail tile
+		vec4 cacheInfo{};             // x = shading cache on, y = page texels, z = page border texels, w = cache slots per row
+		vec4 cacheLevels{};           // x = finest page size (m), y = level count, z = 1 / cache extent, w = trilinear on
+	};
+
+	// Runtime tunables of the shading cache.
+	struct TerrainShadingCacheSettings
+	{
+		bool enabled = true;
+		float ringScale = 2.0f;         // request radius = scale * PageSize(level)
+		float evictHysteresis = 1.15f;  // drop a page only past scale * hysteresis
+		int renderBudgetPerFrame = 6;   // pages per frame
+		bool trilinear = true;          // blend the next coarser level by the footprint fraction
 	};
 
 	// Runtime tunables of the near material blend in terrain.frag.

@@ -43,7 +43,38 @@ struct TerrainParams
     vec4 viewport;             // xy = size, zw = light tile counts
     vec4 detailBlend;          // x = near distance, y = fade width, z = height blend depth, w = detail normal strength
     vec4 hexTiling;            // x = on, y = hex cells per detail tile
+    vec4 cacheInfo;            // x = shading cache on, y = page texels, z = page border texels, w = cache slots per row
+    vec4 cacheLevels;          // x = finest page size (m), y = level count, z = 1 / cache extent, w = trilinear on
 };
+
+// Shading cache (virtual texture) constants; mirror TerrainConfig.h.
+const uint TERRAIN_CACHE_MAX_LEVELS = 8u;
+const uint TERRAIN_CACHE_WINDOW = 12u;  // page table window per level, in pages
+const uint TERRAIN_CACHE_MAX_PAGE_RENDERS = 32u;
+const uint TERRAIN_PAGE_EMPTY = 0xffffu;
+
+// One page render request: a world square -> one cache slot.
+struct TerrainPageRender
+{
+    vec2 originXZ;
+    float size;
+    uint slot;
+};
+
+float TerrainCachePageSize(TerrainParams params, uint level)
+{
+    return params.cacheLevels.x * float(1u << level);
+}
+
+// Cache texel (unnormalized) of a page-relative uv in a slot: slots are laid
+// out stride = pageTexels + 2 * border apart, content starts after the border.
+vec2 TerrainCacheTexel(TerrainParams params, uint slot, vec2 pageUV)
+{
+    float stride = params.cacheInfo.y + 2.0 * params.cacheInfo.z;
+    uint slotsPerRow = uint(params.cacheInfo.w);
+    vec2 slotOrigin = vec2(slot % slotsPerRow, slot / slotsPerRow) * stride;
+    return slotOrigin + params.cacheInfo.z + pageUV * params.cacheInfo.y;
+}
 
 uint TerrainHashUint(uvec2 p)
 {
@@ -145,12 +176,11 @@ bool TerrainNodeResident(usampler2D quadTreeIndex, uint lod, uvec2 coord)
         < TERRAIN_NODE_INVALID;
 }
 
-// Terrain height under worldXZ from the finest resident node covering it -
-// the node the traversal draws there, so the result matches the rendered
-// surface up to bilinear vs. triangle interpolation. False outside the
-// world or where nothing is resident (any stage; explicit LOD 0 fetch).
-bool TerrainSampleHeight(usampler2D quadTreeIndex, sampler2D heightAtlas,
-    TerrainParams params, vec2 worldXZ, out float height)
+// The finest resident node under worldXZ - the node the traversal draws
+// there - and the position inside it (0..1 across the node). False outside
+// the world or where nothing is resident (any stage; explicit LOD 0 fetch).
+bool TerrainResolveNode(usampler2D quadTreeIndex, TerrainParams params, vec2 worldXZ,
+    out uint slot, out uint lod, out vec2 local)
 {
     uint lodCount = uint(params.worldParams.w);
     float sectorSize = TerrainNodeSizeAt(params.worldParams.z, lodCount, 0u);
@@ -161,9 +191,8 @@ bool TerrainSampleHeight(usampler2D quadTreeIndex, sampler2D heightAtlas,
         return false;
 
     ivec2 sector = ivec2(sectorPos);
-    uint slot = TERRAIN_NODE_EMPTY;
-    uint lod = 0u;
-    for (; lod < lodCount; ++lod)
+    slot = TERRAIN_NODE_EMPTY;
+    for (lod = 0u; lod < lodCount; ++lod)
     {
         slot = texelFetch(quadTreeIndex, sector >> int(lod), int(lod)).r;
         if (slot < TERRAIN_NODE_INVALID)
@@ -174,7 +203,19 @@ bool TerrainSampleHeight(usampler2D quadTreeIndex, sampler2D heightAtlas,
 
     float nodeSize = TerrainNodeSizeAt(params.worldParams.z, lodCount, lod);
     vec2 nodeMin = params.worldParams.xy + vec2(sector >> int(lod)) * nodeSize;
-    vec2 local = (worldXZ - nodeMin) / nodeSize; // 0..1 across the node
+    local = (worldXZ - nodeMin) / nodeSize;
+    return true;
+}
+
+// Terrain height under worldXZ from the finest resident node, so the result
+// matches the rendered surface up to bilinear vs. triangle interpolation.
+bool TerrainSampleHeight(usampler2D quadTreeIndex, sampler2D heightAtlas,
+    TerrainParams params, vec2 worldXZ, out float height)
+{
+    uint slot, lod;
+    vec2 local;
+    if (!TerrainResolveNode(quadTreeIndex, params, worldXZ, slot, lod, local))
+        return false;
 
     uint slotsPerRow = uint(params.atlasInfo.x);
     vec2 slotOrigin = vec2(slot % slotsPerRow, slot / slotsPerRow) * params.atlasInfo.y;

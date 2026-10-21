@@ -58,6 +58,9 @@ TerrainRenderer::TerrainRenderer(Device& device, ResourceManager& resourceManage
 	colorDesc.depthFormat = depthFormat;
 	_colorPipeline = make_unique<Pipeline>(device, colorDesc, _colorShader.Get(),
 		*_colorPipelineState);
+	// constant_id 0 = CACHE_ONLY: the per-pixel blend compiled out.
+	_cachedColorPipeline = make_unique<Pipeline>(device, colorDesc, _colorShader.Get(),
+		*_colorPipelineState, SpecConstants{ { { 0, 1 } } });
 
 	auto wireframeState = *_colorPipelineState;
 	wireframeState.GetRasterizationStateCreateInfo().polygonMode = VK_POLYGON_MODE_LINE;
@@ -119,9 +122,9 @@ FGBuffer TerrainRenderer::SetupParams(FrameGraphBuilder& builder, FrameResources
 	TerrainParams params = _terrain.BuildRenderParams();
 	params.viewport = vec4(float(_screenExtent.width), float(_screenExtent.height),
 		float(_tileNums.x), float(_tileNums.y));
-	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>("Terrain.Params");
+	auto paramsHandle = frameResources.GetOrCreateUniformBuffer<TerrainParams>(TerrainSystem::UB_PARAMS);
 	paramsHandle.Get().Update(params);
-	FGBuffer fgParams = builder.ImportBuffer("Terrain.Params", paramsHandle);
+	FGBuffer fgParams = builder.ImportBuffer(TerrainSystem::UB_PARAMS, paramsHandle);
 	builder.Read(fgParams, BufferAccess::UniformFragment);
 	return fgParams;
 }
@@ -209,10 +212,25 @@ bool TerrainRenderer::SetupColor(FrameGraphBuilder& builder, FrameResources& fra
 
 	// The material palette, rebuilt per frame so the GUI edits tiling live.
 	auto paletteHandle = frameResources.GetOrCreateUniformBuffer<TerrainMaterialPaletteGPU>(
-		"Terrain.MaterialPalette");
+		TerrainSystem::UB_PALETTE);
 	paletteHandle.Get().Update(_terrain.GetMaterials().BuildPalette());
-	_palette = builder.ImportBuffer("Terrain.MaterialPalette", paletteHandle);
+	_palette = builder.ImportBuffer(TerrainSystem::UB_PALETTE, paletteHandle);
 	builder.Read(_palette, BufferAccess::UniformFragment);
+
+	// The shading cache: pages rendered by TerrainPageRenderPass this frame
+	// or earlier, resolved through this frame's page table. Bound even while
+	// the cache is off, so the shader's bindings stay complete.
+	TerrainShadingCache& cache = _terrain.GetShadingCache();
+	_cacheAlbedo = builder.ImportTexture(TerrainShadingCache::ALBEDO_CACHE, cache.GetAlbedoCache());
+	builder.Read(_cacheAlbedo, TextureAccess::SampledFragment);
+	_cacheNormal = builder.ImportTexture(TerrainShadingCache::NORMAL_CACHE, cache.GetNormalCache());
+	builder.Read(_cacheNormal, TextureAccess::SampledFragment);
+
+	auto tableHandle = frameResources.GetOrCreateUniformBuffer<TerrainPageTableGPU>(
+		TerrainShadingCache::UB_PAGE_TABLE);
+	tableHandle.Get().Update(cache.BuildPageTable());
+	_pageTable = builder.ImportBuffer(TerrainShadingCache::UB_PAGE_TABLE, tableHandle);
+	builder.Read(_pageTable, BufferAccess::UniformFragment);
 
 	// Debug pick: TerrainSystem owns the slots and reads them in OnGUI.
 	_pick = FGBuffer{};
@@ -288,8 +306,10 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 	if (!_colorActive)
 		return;
 
-	Pipeline* pipeline = _terrain.IsWireframe()
-		? _wireframePipeline.get() : _colorPipeline.get();
+	// The blend-weight debug view (8) has no cached form.
+	bool cacheOnly = _terrain.GetShadingCache().IsEnabled() && _terrain.GetDebugMode() != 8;
+	Pipeline* pipeline = _terrain.IsWireframe() ? _wireframePipeline.get()
+		: cacheOnly ? _cachedColorPipeline.get() : _colorPipeline.get();
 	commandBuffer.BindPipeline(pipeline);
 
 	Shader& shader = _colorShader.Get();
@@ -324,6 +344,9 @@ void TerrainRenderer::RecordColor(FrameGraphPassContext& context, CommandBuffer&
 		builder.SetTextureBuffer(14, _terrain.GetQuadTree().GetSplatAtlas().Get(), 0,
 			VK_IMAGE_LAYOUT_GENERAL);
 		builder.SetUniformBuffer(15, context.GetBuffer(_palette));
+		builder.SetTextureBuffer(16, context.GetTexture(_cacheAlbedo));
+		builder.SetTextureBuffer(17, context.GetTexture(_cacheNormal));
+		builder.SetUniformBuffer(18, context.GetBuffer(_pageTable));
 
 		auto& resources = builder.Build();
 
