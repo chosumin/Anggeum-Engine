@@ -96,6 +96,8 @@ void Core::Engine::Update()
     }
 
     _scene->Update();
+
+    Core::Input::EndFrame();
 }
 
 void Core::Engine::Draw()

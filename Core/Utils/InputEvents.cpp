@@ -82,8 +82,6 @@ void Core::Input::InputEvent(const Core::InputEvent& inputEvent)
 	{
 		const auto& mouse_button = static_cast<const MouseButtonInputEvent&>(inputEvent);
 
-		MouseMoveDelta = {};
-
 		glm::vec2 mouse_pos{ floor(mouse_button.GetPosX()), floor(mouse_button.GetPosY()) };
 
 		if (mouse_button.GetAction() == MouseAction::Down)
@@ -98,8 +96,14 @@ void Core::Input::InputEvent(const Core::InputEvent& inputEvent)
 
 		if (mouse_button.GetAction() == MouseAction::Move)
 		{
-			MouseMoveDelta = mouse_pos - MouseLastPos;
+			// Accumulate: several move events can arrive in one frame
+			MouseMoveDelta += mouse_pos - MouseLastPos;
 			MouseLastPos = mouse_pos;
 		}
 	}
+}
+
+void Core::Input::EndFrame()
+{
+	MouseMoveDelta = {};
 }

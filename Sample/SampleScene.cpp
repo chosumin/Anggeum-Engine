@@ -146,10 +146,12 @@ void SampleScene::Load(float width, float height, Core::RenderContext* renderCon
 		vec3 center(posX(gen), posY(gen), posZ(gen));
 		auto& transform = lightEntity->GetTransform();
 		transform.SetTranslation(center);
-		transform.SetRotation(vec3(rotDist(gen), rotDist(gen), rotDist(gen)));
+		vec3 euler(rotDist(gen), rotDist(gen), rotDist(gen));
+		transform.SetRotation(euler);
 
 		// Store animation data
 		_spotLightCenters.push_back(center);
+		_spotLightEulers.push_back(euler);
 		_spotLightAngles.push_back(angleDist(gen));
 		_spotLightSpeeds.push_back(speedDist(gen));
 		_spotLightRadii.push_back(radiusDist(gen));
@@ -202,19 +204,18 @@ void SampleScene::Update()
 	// Main Camera Section
 	ImGui::SeparatorText("Main Camera");
 	{
-		auto mainCamera = GetMainCamera();
-		auto& transform = mainCamera->GetEntity().GetTransform();
-		auto translation = transform.GetTranslation();
-		ImGui::InputFloat3("Position", &translation[0]);
+		// The camera transform holds the view matrix, so read the world-space
+		// state from FreeCamera instead of the transform's translation/rotation.
+		auto& freeCamera = GetMainCamera()->GetEntity().GetComponent<FreeCamera>();
 
-		auto& rotation = transform.GetRotation();
-		glm::vec3 euler = glm::eulerAngles(rotation);
-		euler = glm::degrees(euler);
+		glm::vec3 position = freeCamera.GetPosition();
+		if (ImGui::InputFloat3("Position", &position[0]))
+			freeCamera.SetPosition(position);
 
-		ImGui::InputFloat3("Direction", &euler[0]);
-
-		transform.SetTranslation(translation);
-		transform.SetRotation(euler);
+		// Euler degrees: X = pitch, Y = yaw; Z (roll) is unsupported by FreeCamera
+		glm::vec3 euler(freeCamera.GetPitch(), freeCamera.GetYaw(), 0.0f);
+		if (ImGui::InputFloat3("Rotation", &euler[0]))
+			freeCamera.SetYawPitch(euler.y, euler.x);
 	}
 
 	// Lights Section
@@ -234,8 +235,8 @@ void SampleScene::Update()
 		ImGui::InputFloat3("Position", &position[0]);
 		transform.SetTranslation(position);
 
-		// DragFloat3: drag to rotate freely without clamping, enabling full 360�� rotation
-		ImGui::DragFloat3("Rotation (Pitch / Yaw / Roll)", &_dirLightEuler[0], 1.0f);
+		// DragFloat3 so the rotation is not clamped (full 360 degrees)
+		ImGui::DragFloat3("Rotation", &_dirLightEuler[0], 1.0f);
 		transform.SetRotation(_dirLightEuler);
 
 		ImGui::TreePop();
@@ -323,17 +324,15 @@ void SampleScene::Update()
 				auto& properties = lights[actualIndex]->GetProperties();
 				auto& transform = lights[actualIndex]->GetEntity().GetTransform();
 
-				auto& rotation = transform.GetRotation();
-				glm::vec3 euler = glm::eulerAngles(rotation);
-				euler = glm::degrees(euler);
-
 				auto& position = transform.GetTranslation();
 
 				ImGui::Text("Light Name: %s", lights[actualIndex]->GetEntity().GetName().c_str());
 				ImGui::SliderFloat3("Color", &properties.Color[0], 0, 1);
 				ImGui::InputFloat3("Position", &position[0]);
-				ImGui::SliderFloat3("Direction", &euler[0], -90.0f, 90.0f);
-				transform.SetRotation(euler);
+				// Edit the stored Euler angles rather than decomposing the quaternion
+				// each frame, which jumps between equivalent angle sets.
+				if (ImGui::DragFloat3("Rotation (Euler XYZ)", &_spotLightEulers[spotLightIndex][0], 1.0f))
+					transform.SetRotation(_spotLightEulers[spotLightIndex]);
 				ImGui::SliderFloat("Range", &properties.Range, 0, 10);
 				ImGui::SliderFloat("Inner cone angle", &properties.InnerConeAngle, 0, 360);
 				ImGui::SliderFloat("Outer cone angle", &properties.OuterConeAngle, 0, 360);

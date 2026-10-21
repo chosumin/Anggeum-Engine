@@ -190,5 +190,7 @@ namespace Core
 		static vec2 MouseLastPos;
 
 		static void InputEvent(const Core::InputEvent& inputEvent);
+		// Clears per-frame accumulators once every consumer has read them.
+		static void EndFrame();
 	};
 }

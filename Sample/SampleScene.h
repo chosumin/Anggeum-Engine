@@ -46,6 +46,7 @@ private:
 
 	std::vector<glm::vec3> _pointLightCenters;
 	std::vector<glm::vec3> _spotLightCenters;
+	std::vector<glm::vec3> _spotLightEulers;
 	std::vector<float> _pointLightAngles;
 	std::vector<float> _spotLightAngles;
 	std::vector<float> _pointLightSpeeds;

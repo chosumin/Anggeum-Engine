@@ -11,7 +11,7 @@ Core::FreeCamera::FreeCamera()
 	, _pitch(0.0f)
 	, _initialized(false)
 	, _moveSpeed(5.0f)
-	, _fastMultiplier(3.0f)
+	, _fastMultiplier(6.0f)
 	, _slowMultiplier(0.33f)
 	, _mouseSensitivity(0.15f)
 {
@@ -42,10 +42,12 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 
 	HandleRotation();
 	HandleMovement(deltaTime);
+	WriteViewMatrix();
+}
 
-	// Build view matrix from camera world position and orientation
+glm::vec3 Core::FreeCamera::GetForward() const
+{
 	// Unity-style: yaw around world Y, then pitch around local X
-	// Forward = direction camera looks at
 	float yawRad = glm::radians(_yaw);
 	float pitchRad = glm::radians(_pitch);
 
@@ -53,13 +55,29 @@ void Core::FreeCamera::UpdateFrame(float deltaTime)
 	forward.x = sin(yawRad) * cos(pitchRad);
 	forward.y = sin(pitchRad);
 	forward.z = cos(yawRad) * cos(pitchRad);
-	forward = glm::normalize(forward);
+	return glm::normalize(forward);
+}
 
-	glm::vec3 target = _position + forward;
+void Core::FreeCamera::SetPosition(const glm::vec3& position)
+{
+	_position = position;
+	WriteViewMatrix();
+}
+
+void Core::FreeCamera::SetYawPitch(float yaw, float pitch)
+{
+	_yaw = yaw;
+	_pitch = glm::clamp(pitch, -89.0f, 89.0f);
+	WriteViewMatrix();
+}
+
+void Core::FreeCamera::WriteViewMatrix()
+{
+	glm::vec3 target = _position + GetForward();
 	glm::mat4 viewMatrix = glm::lookAt(_position, target, glm::vec3(0.0f, 1.0f, 0.0f));
 
-	// Decompose and set back to transform so the rest of the engine works
-	transform.SetMatrix(viewMatrix);
+	// The transform doubles as the view matrix for the rest of the engine
+	_entity->GetComponent<Transform>().SetMatrix(viewMatrix);
 }
 
 void Core::FreeCamera::HandleRotation()
@@ -87,16 +105,7 @@ void Core::FreeCamera::HandleMovement(float deltaTime)
 	if (!mouseButtonPressed[MouseButton::Right])
 		return;
 
-	// Calculate camera axes from current yaw/pitch
-	float yawRad = glm::radians(_yaw);
-	float pitchRad = glm::radians(_pitch);
-
-	glm::vec3 forward;
-	forward.x = sin(yawRad) * cos(pitchRad);
-	forward.y = sin(pitchRad);
-	forward.z = cos(yawRad) * cos(pitchRad);
-	forward = glm::normalize(forward);
-
+	glm::vec3 forward = GetForward();
 	glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
 	glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
 	glm::vec3 up = glm::normalize(glm::cross(right, forward));
