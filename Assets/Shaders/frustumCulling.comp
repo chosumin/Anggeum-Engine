@@ -22,6 +22,10 @@ void main()
     if (inst.drawCommandIndex == DEAD_DRAW)
         return;
 
+    // Blend materials cast no shadow.
+    if ((inst.flags & INSTANCE_FLAG_TRANSPARENT) != 0u)
+        return;
+
     vec3 worldMin;
     vec3 worldMax;
     InstanceWorldAABB(inst, transforms[inst.transformIndex], worldMin, worldMax);

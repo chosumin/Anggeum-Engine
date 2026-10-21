@@ -13,6 +13,11 @@ layout(set = 0, binding = 4) readonly buffer DrawCommands { DrawIndexedIndirectC
 layout(set = 0, binding = 5) uniform sampler2D hiZBuffer;
 layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
 
+// Transparent instances: their own counts and IDs over the same command slots,
+// compacted into a separate list the transparent pass draws after the opaque one.
+layout(set = 0, binding = 7) buffer TransparentCounts { uint transparentCounts[]; };
+layout(set = 0, binding = 8) writeonly buffer TransparentInstanceIDBuffer { uint transparentInstanceIDs[]; };
+
 // Pass 2 re-tests these against this frame's depth.
 layout(set = 0, binding = 10) buffer RejectedIndicesBuffer { uint rejectedIndices[]; };
 layout(set = 0, binding = 11) buffer RejectedCountBuffer { uint rejectedCount; };
@@ -39,8 +44,16 @@ void main()
     uint cmdIndex = inst.drawCommandIndex;
     if (visible)
     {
-        uint localIdx = atomicAdd(counts[cmdIndex], 1);
-        instanceIDs[commands[cmdIndex].firstInstance + localIdx] = index;
+        if ((inst.flags & INSTANCE_FLAG_TRANSPARENT) != 0u)
+        {
+            uint localIdx = atomicAdd(transparentCounts[cmdIndex], 1);
+            transparentInstanceIDs[commands[cmdIndex].firstInstance + localIdx] = index;
+        }
+        else
+        {
+            uint localIdx = atomicAdd(counts[cmdIndex], 1);
+            instanceIDs[commands[cmdIndex].firstInstance + localIdx] = index;
+        }
     }
     else
     {

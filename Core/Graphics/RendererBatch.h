@@ -45,6 +45,8 @@ namespace Core
 		uint32_t GetDrawCommandCapacity() const { return _commandCapacity; }
 		uint32_t GetInstanceCapacity() const { return _instanceCapacity; }
 
+		bool HasTransparentInstances() const { return _transparentInstanceCount > 0; }
+
 	private:
 		static constexpr uint32_t DEAD_DRAW = 0xFFFFFFFFu;
 		static constexpr uint32_t NO_SLOT = 0xFFFFFFFFu;
@@ -135,6 +137,8 @@ namespace Core
 		deque<pair<InstanceRange, u64>> _retiredInstanceRanges;
 
 		uint32_t _transformCapacity = 0;
+
+		uint32_t _transparentInstanceCount = 0;   // across the whole set, placed or not
 
 		bool _dirty = false;   // scene membership changed since the last sync
 	};

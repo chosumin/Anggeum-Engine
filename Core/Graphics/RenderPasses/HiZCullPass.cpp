@@ -167,6 +167,30 @@ void HiZCullPass::SetupMeshes(FrameGraphBuilder& builder, FrameResources& frameR
         builder.Write(_visibleDrawCount, BufferAccess::FillComputeWrite);
     }
 
+    _transparentCounts = FGBuffer{};
+    _transparentInstanceIDs = FGBuffer{};
+    _transparentCommands = FGBuffer{};
+    _transparentDrawCount = FGBuffer{};
+    if (batch.HasTransparentInstances())
+    {
+        const bool first = _phase == Phase::Cull1;
+        _transparentCounts = builder.CreateBuffer(
+            first ? SB_PASS1_TRANSPARENT_COUNTS : SB_PASS2_TRANSPARENT_COUNTS, countsDesc);
+        builder.Write(_transparentCounts, BufferAccess::FillComputeWrite);
+
+        _transparentInstanceIDs = builder.CreateBuffer(
+            first ? SB_PASS1_TRANSPARENT_INSTANCE_IDS : SB_PASS2_TRANSPARENT_INSTANCE_IDS, instanceIDsDesc);
+        builder.Write(_transparentInstanceIDs, BufferAccess::StorageComputeWrite);
+
+        _transparentCommands = builder.CreateBuffer(
+            first ? SB_PASS1_TRANSPARENT_INDIRECT : SB_PASS2_TRANSPARENT_INDIRECT, visibleDesc);
+        builder.Write(_transparentCommands, BufferAccess::StorageComputeWrite);
+
+        _transparentDrawCount = builder.CreateBuffer(
+            first ? SB_PASS1_TRANSPARENT_DRAW_COUNT : SB_PASS2_TRANSPARENT_DRAW_COUNT, drawCountDesc);
+        builder.Write(_transparentDrawCount, BufferAccess::FillComputeWrite);
+    }
+
     _cullData = frameResources.GetOrCreateUniformBuffer<GPUCullData>(
         _phase == Phase::Cull1 ? "OcclusionCull.Pass1CullData" : "OcclusionCull.Pass2CullData");
 
@@ -274,7 +298,11 @@ void HiZCullPass::Execute(FrameGraphPassContext& context, CommandBuffer& command
         CullMeshes(context, commandBuffer, batch, slot);
 
         commandBuffer.BeginDebugMarker("Compact Draw Commands");
-        CompactDrawCommands(context, commandBuffer, batch);
+        CompactDrawCommands(context, commandBuffer, batch,
+            _counts, _visibleCommands, _visibleDrawCount);
+        if (_transparentCounts.IsValid())
+            CompactDrawCommands(context, commandBuffer, batch,
+                _transparentCounts, _transparentCommands, _transparentDrawCount);
         commandBuffer.EndDebugMarker();
     }
 
@@ -324,6 +352,11 @@ void HiZCullPass::CullMeshes(FrameGraphPassContext& context, CommandBuffer& comm
         commandBuffer.FillBuffer(context.GetBuffer(_visibleDrawCount), 0, VK_WHOLE_SIZE, 0);
         if (_phase == Phase::Cull1)
             commandBuffer.FillBuffer(context.GetBuffer(_rejectedCount), 0, VK_WHOLE_SIZE, 0);
+        if (_transparentCounts.IsValid())
+        {
+            commandBuffer.FillBuffer(context.GetBuffer(_transparentCounts), 0, VK_WHOLE_SIZE, 0);
+            commandBuffer.FillBuffer(context.GetBuffer(_transparentDrawCount), 0, VK_WHOLE_SIZE, 0);
+        }
 
         auto barriers = commandBuffer.CreateBarrierBatch();
         barriers.Buffer(context.GetBuffer(_counts),
@@ -339,6 +372,17 @@ void HiZCullPass::CullMeshes(FrameGraphPassContext& context, CommandBuffer& comm
                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        if (_transparentCounts.IsValid())
+        {
+            barriers.Buffer(context.GetBuffer(_transparentCounts),
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+            barriers.Buffer(context.GetBuffer(_transparentDrawCount),
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        }
         barriers.Submit();
     }
 
@@ -371,6 +415,9 @@ void HiZCullPass::CullMeshes(FrameGraphPassContext& context, CommandBuffer& comm
     builder.SetStorageBuffer(4, batch.GetIndirectCommandBuffer());
     builder.SetTextureBuffer(5, _hiZTexture.Get());
     builder.SetStorageBuffer(6, context.GetBuffer(_counts));
+    const bool transparent = _transparentCounts.IsValid();
+    builder.SetStorageBuffer(7, context.GetBuffer(transparent ? _transparentCounts : _counts));
+    builder.SetStorageBuffer(8, context.GetBuffer(transparent ? _transparentInstanceIDs : _instanceIDs));
     builder.SetStorageBuffer(10, context.GetBuffer(_rejectedIndices));
     builder.SetStorageBuffer(11, context.GetBuffer(_rejectedCount));
     auto& resources = builder.Build();
@@ -446,11 +493,12 @@ void HiZCullPass::CullTerrain(FrameGraphPassContext& context, CommandBuffer& com
 }
 
 void HiZCullPass::CompactDrawCommands(FrameGraphPassContext& context,
-    CommandBuffer& commandBuffer, RendererBatch& batch)
+    CommandBuffer& commandBuffer, RendererBatch& batch,
+    FGBuffer counts, FGBuffer outCommands, FGBuffer outDrawCount)
 {
     // Same-pass hazard: the cull dispatch above wrote this phase's counts.
     commandBuffer.CreateBarrierBatch()
-        .Buffer(context.GetBuffer(_counts),
+        .Buffer(context.GetBuffer(counts),
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -464,9 +512,9 @@ void HiZCullPass::CompactDrawCommands(FrameGraphPassContext& context,
     auto& compactShader = _compactShader.Get();
     auto builder = context.CreateDescriptorSetBuilder(compactShader, 0);
     builder.SetStorageBuffer(0, batch.GetIndirectCommandBuffer());
-    builder.SetStorageBuffer(1, context.GetBuffer(_counts));
-    builder.SetStorageBuffer(2, context.GetBuffer(_visibleCommands));
-    builder.SetStorageBuffer(3, context.GetBuffer(_visibleDrawCount));
+    builder.SetStorageBuffer(1, context.GetBuffer(counts));
+    builder.SetStorageBuffer(2, context.GetBuffer(outCommands));
+    builder.SetStorageBuffer(3, context.GetBuffer(outDrawCount));
     auto& resources = builder.Build();
 
     commandBuffer.BindDescriptorSet(_compactPipeline.Get().GetPipelineBindPoint(),

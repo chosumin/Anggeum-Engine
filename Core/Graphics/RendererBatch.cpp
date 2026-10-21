@@ -32,6 +32,12 @@ namespace
         auto* ptr = material.TryGet();
         return ptr && ptr->HasMaterialIndex();
     }
+
+    bool IsTransparent(const Handle<Material>& material)
+    {
+        auto* ptr = material.TryGet();
+        return ptr && ptr->GetAlphaMode() == AlphaMode::Blend;
+    }
 }
 
 Core::RendererBatch::RendererBatch(Device& device, ResourceManager& resourceManager,
@@ -100,6 +106,12 @@ void Core::RendererBatch::SyncDrawBatches(Scene& scene)
 	// New or changed draws: add them to the table and place them if resident.
     for (auto& [key, batch] : incoming)
         _drawBatches.emplace(key, std::move(batch));
+
+    _transparentInstanceCount = 0;
+    for (const auto& [key, batch] : _drawBatches)
+        for (const DrawInstance& instance : batch.Instances)
+            if (IsTransparent(instance.Material))
+                ++_transparentInstanceCount;
 
     SyncTransforms(std::move(entityTransforms));
 }
@@ -215,6 +227,7 @@ vector<GPUInstanceData> Core::RendererBatch::BuildInstances(const DrawBatch& bat
         data.transformIndex = instance.EntityId;
         data.drawCommandIndex = batch.CmdSlot;
         data.materialIndex = instance.Material.Get().GetMaterialIndex();
+        data.flags = IsTransparent(instance.Material) ? INSTANCE_FLAG_TRANSPARENT : 0u;
     }
     return instances;
 }

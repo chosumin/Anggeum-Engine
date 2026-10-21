@@ -13,6 +13,10 @@ layout(set = 0, binding = 4) readonly buffer DrawCommands { DrawIndexedIndirectC
 layout(set = 0, binding = 5) uniform sampler2D hiZBuffer;
 layout(set = 0, binding = 6) buffer InstanceCounts { uint counts[]; };
 
+// Transparent instances: see gpuCulling.comp.
+layout(set = 0, binding = 7) buffer TransparentCounts { uint transparentCounts[]; };
+layout(set = 0, binding = 8) writeonly buffer TransparentInstanceIDBuffer { uint transparentInstanceIDs[]; };
+
 // What pass 1 rejected against the previous frame's depth.
 layout(set = 0, binding = 10) readonly buffer RejectedIndicesBuffer { uint rejectedIndices[]; };
 layout(set = 0, binding = 11) readonly buffer RejectedCountBuffer { uint rejectedCount; };
@@ -39,6 +43,14 @@ void main()
         return;
 
     uint cmdIndex = inst.drawCommandIndex;
-    uint localIdx = atomicAdd(counts[cmdIndex], 1);
-    instanceIDs[commands[cmdIndex].firstInstance + localIdx] = instanceIndex;
+    if ((inst.flags & INSTANCE_FLAG_TRANSPARENT) != 0u)
+    {
+        uint localIdx = atomicAdd(transparentCounts[cmdIndex], 1);
+        transparentInstanceIDs[commands[cmdIndex].firstInstance + localIdx] = instanceIndex;
+    }
+    else
+    {
+        uint localIdx = atomicAdd(counts[cmdIndex], 1);
+        instanceIDs[commands[cmdIndex].firstInstance + localIdx] = instanceIndex;
+    }
 }

@@ -37,7 +37,19 @@ namespace Core
         static constexpr const char* SB_PASS2_INSTANCE_IDS = "OcclusionCull.Pass2InstanceIDs";
         static constexpr const char* SB_PASS2_INDIRECT = "OcclusionCull.Pass2Indirect";
         static constexpr const char* SB_PASS2_DRAW_COUNT = "OcclusionCull.Pass2DrawCount";
-        
+
+        // Transparent (Blend) instances of each phase, declared only while the
+        // draw set has any; drawn by TransparentPass after the opaque geometry.
+        static constexpr const char* SB_PASS1_TRANSPARENT_COUNTS = "OcclusionCull.Pass1TransparentCounts";
+        static constexpr const char* SB_PASS1_TRANSPARENT_INSTANCE_IDS = "OcclusionCull.Pass1TransparentInstanceIDs";
+        static constexpr const char* SB_PASS1_TRANSPARENT_INDIRECT = "OcclusionCull.Pass1TransparentIndirect";
+        static constexpr const char* SB_PASS1_TRANSPARENT_DRAW_COUNT = "OcclusionCull.Pass1TransparentDrawCount";
+
+        static constexpr const char* SB_PASS2_TRANSPARENT_COUNTS = "OcclusionCull.Pass2TransparentCounts";
+        static constexpr const char* SB_PASS2_TRANSPARENT_INSTANCE_IDS = "OcclusionCull.Pass2TransparentInstanceIDs";
+        static constexpr const char* SB_PASS2_TRANSPARENT_INDIRECT = "OcclusionCull.Pass2TransparentIndirect";
+        static constexpr const char* SB_PASS2_TRANSPARENT_DRAW_COUNT = "OcclusionCull.Pass2TransparentDrawCount";
+
         static constexpr const char* SB_REJECTED_INDICES = "OcclusionCull.RejectedIndices";
         static constexpr const char* SB_REJECTED_COUNT = "OcclusionCull.RejectedCount";
 
@@ -95,8 +107,10 @@ namespace Core
             RendererBatch& batch, SlotState& slot);
         void CullTerrain(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
             SlotState& slot);
+        // One list: appends the commands whose `counts` entry is non-zero.
         void CompactDrawCommands(FrameGraphPassContext& context,
-            CommandBuffer& commandBuffer, RendererBatch& batch);
+            CommandBuffer& commandBuffer, RendererBatch& batch,
+            FGBuffer counts, FGBuffer outCommands, FGBuffer outDrawCount);
         void BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
             Texture& depth);
 
@@ -137,6 +151,12 @@ namespace Core
         FGBuffer _visibleDrawCount;
         FGBuffer _rejectedIndices;
         FGBuffer _rejectedCount;
+
+        // The transparent counterparts; invalid while the set has no Blend instance.
+        FGBuffer _transparentCounts;
+        FGBuffer _transparentInstanceIDs;
+        FGBuffer _transparentCommands;
+        FGBuffer _transparentDrawCount;
 
         // Terrain: this phase's cull (Cull1 also feeds the stats readback).
         TerrainPatchCuller::Inputs _terrainInputs;

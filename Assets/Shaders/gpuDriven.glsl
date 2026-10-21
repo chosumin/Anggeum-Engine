@@ -4,6 +4,16 @@
 // instanceData.drawCommandIndex of a freed entry: skip it.
 const uint DEAD_DRAW = 0xFFFFFFFFu;
 
+// InstanceData.flags (GPUInstanceData::flags). A transparent instance is
+// culled into the transparent draw lists and casts no shadow.
+const uint INSTANCE_FLAG_TRANSPARENT = 1u;
+
+// Material table flags (GPUMaterialData::flags).
+const int MATERIAL_FLAG_ENABLED = 1;
+const int MATERIAL_FLAG_ALPHA_MASK = 2;
+const int MATERIAL_FLAG_ALPHA_BLEND = 4;
+const int MATERIAL_FLAG_DOUBLE_SIDED = 8;
+
 // Same layout as VkDrawIndexedIndirectCommand.
 struct DrawIndexedIndirectCommand
 {
@@ -22,7 +32,8 @@ struct InstanceData
     vec3 aabbMax;         // local
     uint drawCommandIndex;
     uint materialIndex;
-    uint padding[3];
+    uint flags;           // INSTANCE_FLAG_* bits
+    uint padding[2];
 };
 
 // The instance's local AABB under its world transform, as a world AABB.

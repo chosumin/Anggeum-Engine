@@ -18,6 +18,7 @@
 #include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 #include "Graphics/RenderPasses/IBLPass.h"
 #include "Graphics/RenderPasses/GeometryPass.h"
+#include "Graphics/RenderPasses/TransparentPass.h"
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
@@ -83,6 +84,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 
 	_frameGraph->AddPass(make_unique<GeometryPass>(
 		device, renderScene, *_terrainRenderer, swapChain, depthFormat, _msaaSamples, tileNums));
+
+	// Blend materials, over the opaque result and under the GUI.
+	_frameGraph->AddPass(make_unique<TransparentPass>(
+		device, renderScene, swapChain, depthFormat, _msaaSamples, tileNums));
 
 	_frameGraph->AddPass(make_unique<GUIRenderPass>(device, swapChain, _msaaSamples,
 		syncContext));
