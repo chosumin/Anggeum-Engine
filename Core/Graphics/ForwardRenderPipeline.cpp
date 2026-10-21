@@ -17,7 +17,7 @@
 #include "Graphics/RenderPasses/SDFShadowPass.h"
 #include "Graphics/RenderPasses/AmbientOcclusionPass.h"
 #include "Graphics/RenderPasses/IBLPass.h"
-#include "Graphics/RenderPasses/GeometryPass.h"
+#include "Graphics/RenderPasses/OpaquePass.h"
 #include "Graphics/RenderPasses/TransparentPass.h"
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
@@ -82,7 +82,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 	// only; after that it declares nothing and the graph culls it.
 	_frameGraph->AddPass(make_unique<IBLPass>(device, resourceManager, renderScene));
 
-	_frameGraph->AddPass(make_unique<GeometryPass>(
+	_frameGraph->AddPass(make_unique<OpaquePass>(
 		device, renderScene, *_terrainRenderer, swapChain, depthFormat, _msaaSamples, tileNums));
 
 	// Blend materials, over the opaque result and under the GUI.

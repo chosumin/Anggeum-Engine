@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "GeometryPass.h"
+#include "OpaquePass.h"
 #include "DepthPrePass.h"
 #include "ShadowPass.h"
 #include "SDFShadowPass.h"
@@ -25,7 +25,7 @@
 
 using namespace Core;
 
-GeometryPass::GeometryPass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
+OpaquePass::OpaquePass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
     SwapChain& swapChain, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples, ivec2 tileNums)
     : _device(device)
     , _renderScene(renderScene)
@@ -45,9 +45,9 @@ GeometryPass::GeometryPass(Device& device, RenderScene& renderScene, TerrainRend
     _pipelineState->GetDepthStencilStateCreateInfo().depthWriteEnable = VK_FALSE;
 }
 
-GeometryPass::~GeometryPass() = default;
+OpaquePass::~OpaquePass() = default;
 
-Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)
+Pipeline* OpaquePass::GetOrCreatePipeline(Shader& shader)
 {
     auto it = _pipelineCache.find(&shader);
     if (it != _pipelineCache.end())
@@ -63,7 +63,7 @@ Pipeline* GeometryPass::GetOrCreatePipeline(Shader& shader)
     return result;
 }
 
-void GeometryPass::PrepareSkybox()
+void OpaquePass::PrepareSkybox()
 {
     if (_skyboxShader != nullptr)
         return;
@@ -106,7 +106,7 @@ void GeometryPass::PrepareSkybox()
     _skyboxPipeline = make_unique<Pipeline>(_device, renderingDesc, *_skyboxShader, pipelineState);
 }
 
-void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
+void OpaquePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
     RenderFrame& renderFrame)
 {
     _pass1Indirect = FGBuffer{};
@@ -227,7 +227,7 @@ void GeometryPass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
     }
 }
 
-void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void OpaquePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     // Entered even with nothing to draw (no camera, no shader, or no batch), so
     // the declared loadOp still clears the colour target the GUI pass composites
@@ -267,7 +267,7 @@ void GeometryPass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
     context.EndRendering(commandBuffer);
 }
 
-void GeometryPass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
+void OpaquePass::RecordSkybox(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
 {
     if (_skyboxShader == nullptr)
         return;

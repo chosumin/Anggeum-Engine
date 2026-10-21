@@ -59,7 +59,7 @@ FrameGraph                                (GPU, per frame)
  ├─ ShadowPass           per cascade: depth-only draw of the cascade list
  ├─ SDFShadowPass        far shadow mask: mesh SDF march + terrain heightfield
  │                       march (TerrainSampleHeight over the quadtree index)
- └─ GeometryPass         both lists, color with depth writes off
+ └─ OpaquePass         both lists, color with depth writes off
 ```
 
 ## Core types
@@ -81,7 +81,7 @@ FrameGraph                                (GPU, per frame)
 | `TerrainRenderer` | The draws a host pass embeds: depth prepass (per phase), color (both lists), shadow (per cascade). Owns the three pipelines; the host owns the attachments |
 
 Host passes: `HiZCullPass` and `ShadowCullPass` call the culler; `DepthPrePass`,
-`GeometryPass` and `ShadowPass` call the renderer. Each host declares the terrain
+`OpaquePass` and `ShadowPass` call the renderer. Each host declares the terrain
 side in its `Setup` and records it in its `Execute` right next to the mesh work.
 The helpers return false / early-out when their list does not exist that frame,
 so a host never branches on terrain itself. Where a host exists once per phase
@@ -218,7 +218,7 @@ the patch entry. Three pipelines rasterize the same patches:
 | Pipeline | Shader set | Where | Notes |
 |----------|------------|-------|-------|
 | Depth | `TerrainDepth` | `DepthPrePass` (phase 1 and 2) | depth + packed normal |
-| Color (+ wireframe) | `Terrain` | `GeometryPass`, both lists | `LESS_OR_EQUAL`, depth writes off; `invariant gl_Position` makes it bit-identical to the prepass so early-z holds |
+| Color (+ wireframe) | `Terrain` | `OpaquePass`, both lists | `LESS_OR_EQUAL`, depth writes off; `invariant gl_Position` makes it bit-identical to the prepass so early-z holds |
 | Shadow | `TerrainShadow` (`terrain.vert` + `shadow.frag`) | `ShadowPass`, per cascade | depth-only, cull none, shares the mesh depth bias |
 
 Backface culling is off everywhere — a heightfield has no closed backside.

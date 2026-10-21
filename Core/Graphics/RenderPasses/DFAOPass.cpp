@@ -41,7 +41,7 @@ void DFAOPass::EnsureRenderTargets(FrameResources& frameResources)
     aoDesc.samples = VK_SAMPLE_COUNT_1_BIT;
     aoDesc.aspect  = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    // GeometryPass (graphics) may sample this before the first compute
+    // OpaquePass (graphics) may sample this before the first compute
     // production, so start it in the layout the consumer expects.
     aoDesc.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     _aoTexture = frameResources.GetOrCreateRenderTarget(AmbientOcclusionPass::RT_AO, aoDesc);

@@ -151,7 +151,7 @@ inline constexpr const char* UB_LIGHTS = "Lights";
 inline constexpr const char* UB_SHADOW = "Shadow";
 
 // Per-tile light lists: written by LightCullingPass (compute), read by
-// GeometryPass (fragment) in the same frame. Owned per frame-in-flight by
+// OpaquePass (fragment) in the same frame. Owned per frame-in-flight by
 // RenderFrame, so producer and consumer must agree on name and size.
 inline constexpr const char* SB_LIGHT_VISIBILITY = "LightVisibility";
 

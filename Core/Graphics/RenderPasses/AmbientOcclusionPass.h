@@ -20,7 +20,7 @@ namespace Core
 
     // Ambient occlusion (compute queue): dispatches to the active method's
     // helper (FFX CACAO or distance-field AO), both writing the shared AOResult
-    // mask that GeometryPass samples.
+    // mask that OpaquePass samples.
     class AmbientOcclusionPass : public FrameGraphPass
     {
     public:

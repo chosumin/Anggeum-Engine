@@ -16,19 +16,19 @@ namespace Core
     class Buffer;
     class TerrainRenderer;
 
-    class GeometryPass : public FrameGraphPass
+    class OpaquePass : public FrameGraphPass
     {
     public:
         static constexpr const char* RT_MAIN_COLOR = "MainColor";
         static constexpr const char* RT_MAIN_DEPTH = "MainDepth";
 
         // Also hosts the terrain color draw.
-        GeometryPass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
+        OpaquePass(Device& device, RenderScene& renderScene, TerrainRenderer& terrainRenderer,
             SwapChain& swapChain, VkFormat depthFormat, VkSampleCountFlagBits msaaSamples,
             ivec2 tileNums);
-        ~GeometryPass();
+        ~OpaquePass();
 
-        const char* GetName() const override { return "GeometryPass"; }
+        const char* GetName() const override { return "OpaquePass"; }
 
         void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
             RenderFrame& renderFrame) override;
