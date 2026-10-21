@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
-project(AnggeumEngine VERSION 1.0.0 LANGUAGES CXX)
+# C is needed because libktx exports c_std_11 to its consumers.
+project(AnggeumEngine VERSION 1.0.0 LANGUAGES C CXX)
 
 # Set C++17 standard
 set(CMAKE_CXX_STANDARD 17)
@@ -41,18 +42,15 @@ else()
     set(GLFW_LIBRARY "${GLFW_DIR}/lib-mingw-w64/libglfw3.a")
 endif()
 
-# KTX library setup
+# KTX built from the submodule: static libktx for the engine, toktx for the
+# asset bake. EXCLUDE_FROM_ALL keeps the other KTX tools out of the build.
 set(KTX_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParties/ktx")
 set(KTX_INCLUDE_DIR "${KTX_DIR}/include")
-
-# Use different KTX libraries for Debug/Release
-if(EXISTS "${KTX_DIR}/Debug/ktx.lib")
-    set(KTX_LIBRARY_DEBUG "${KTX_DIR}/Debug/ktx.lib")
-else()
-    set(KTX_LIBRARY_DEBUG "${KTX_DIR}/Release/ktx.lib")
-    message(WARNING "KTX Debug library not found, using Release version")
-endif()
-set(KTX_LIBRARY_RELEASE "${KTX_DIR}/Release/ktx.lib")
+set(BUILD_SHARED_LIBS OFF)
+set(KTX_FEATURE_TESTS OFF)
+set(KTX_FEATURE_TOOLS ON)
+set(KTX_FEATURE_DOC OFF)
+add_subdirectory(${KTX_DIR} EXCLUDE_FROM_ALL)
 
 # Vulkan SDK library path (Debug/Release)
 set(VULKAN_LIB_DIR "${VULKAN_SDK}/Lib")
@@ -219,8 +217,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Vulkan
     ${GLFW_LIBRARY}
-    debug ${KTX_LIBRARY_DEBUG}
-    optimized ${KTX_LIBRARY_RELEASE}
+    ktx
     debug ${VULKAN_LIB_DIR}/shaderc_sharedd.lib
     optimized ${VULKAN_LIB_DIR}/shaderc_shared.lib
     debug ${VULKAN_LIB_DIR}/spirv-cross-cored.lib
@@ -315,43 +312,10 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND powershell -NoProfile -ExecutionPolicy Bypass
         -File "${CMAKE_SOURCE_DIR}/Tools/BakeTextures.ps1"
         -AssetsDir "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets"
-        -Toktx "${KTX_DIR}/Release/toktx.exe"
+        -Toktx "$<TARGET_FILE:toktx>"
     COMMENT "Syncing Assets folder (changed files only)..."
 )
-
-# Copy KTX DLL (Debug/Release, fallback if missing)
-set(KTX_DLL_DEBUG "${KTX_DIR}/Debug/ktx.dll")
-set(KTX_DLL_RELEASE "${KTX_DIR}/Release/ktx.dll")
-
-if(EXISTS "${KTX_DLL_DEBUG}" AND EXISTS "${KTX_DLL_RELEASE}")
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<IF:$<CONFIG:Debug>,${KTX_DLL_DEBUG},${KTX_DLL_RELEASE}>"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
-        COMMENT "Copying ktx.dll ($<CONFIG>)..."
-    )
-elseif(EXISTS "${KTX_DLL_RELEASE}")
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${KTX_DLL_RELEASE}"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
-        COMMENT "Copying ktx.dll (Release version for all configurations)..."
-    )
-    message(WARNING "KTX Debug DLL not found at ${KTX_DLL_DEBUG}, using Release version for all configurations")
-elseif(EXISTS "${KTX_DLL_DEBUG}")
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${KTX_DLL_DEBUG}"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/"
-        COMMENT "Copying ktx.dll (Debug version for all configurations)..."
-    )
-    message(WARNING "KTX Release DLL not found at ${KTX_DLL_RELEASE}, using Debug version for all configurations")
-else()
-    message(WARNING "ktx.dll not found in ${KTX_DIR}. Application may fail to run.")
-    message(WARNING "  Expected locations:")
-    message(WARNING "    - ${KTX_DLL_DEBUG}")
-    message(WARNING "    - ${KTX_DLL_RELEASE}")
-endif()
+add_dependencies(${PROJECT_NAME} toktx)
 
 # Copy Vulkan SDK DLL (Debug/Release, fallback if missing)
 set(SHADERC_DLL_DEBUG "${VULKAN_SDK}/Bin/shaderc_sharedd.dll")
@@ -426,6 +390,5 @@ endif()
 message(STATUS "Vulkan SDK: ${VULKAN_SDK}")
 message(STATUS "Vulkan Include: ${Vulkan_INCLUDE_DIRS}")
 message(STATUS "GLFW Library: ${GLFW_LIBRARY}")
-message(STATUS "KTX Library (Debug): ${KTX_LIBRARY_DEBUG}")
-message(STATUS "KTX Library (Release): ${KTX_LIBRARY_RELEASE}")
+message(STATUS "KTX: built from ${KTX_DIR}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")

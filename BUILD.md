@@ -96,7 +96,6 @@ Restart Visual Studio required.
 ### Missing DLLs
 
 After building, the following DLLs should be automatically copied to the executable directory:
-- `ktx.dll`
 - `shaderc_shared.dll`
 - `spirv-cross-c-shared.dll`
 
@@ -134,7 +133,7 @@ Combines optimization with debug information - useful for finding Release-only b
 
 - Release mode may crash if variables are not properly initialized
 - Vulkan validation layers require proper `VULKAN_SDK` environment variable
-- KTX library only has Release DLL (Debug builds use Release DLL)
+- KTX (libktx and toktx) is built from the `ThirdParties/ktx` submodule; it needs a `bash` on PATH (Git for Windows provides one)
 
 ## License
 
