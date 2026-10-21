@@ -9,6 +9,7 @@ namespace Core
 		InitMultisampleStateCreateInfo();
 		InitDepthStencilStateCreateInfo();
 		InitInputAssemblyStateCreateInfo();
+		InitColorBlendAttachmentState();
 	}
 	
 	void PipelineState::InitRasterizationStateCreateInfo()
@@ -52,5 +53,17 @@ namespace Core
 		_inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 		_inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		_inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+	}
+
+	void PipelineState::InitColorBlendAttachmentState()
+	{
+		_colorBlendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		_colorBlendAttachmentState.blendEnable = VK_FALSE;
+		_colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		_colorBlendAttachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+		_colorBlendAttachmentState.colorBlendOp = VK_BLEND_OP_ADD;
+		_colorBlendAttachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		_colorBlendAttachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		_colorBlendAttachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
 	}
 }

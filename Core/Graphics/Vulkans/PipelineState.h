@@ -26,15 +26,22 @@ namespace Core
 		{
 			return _inputAssemblyStateCreateInfo;
 		}
+
+		VkPipelineColorBlendAttachmentState& GetColorBlendAttachmentState()
+		{
+			return _colorBlendAttachmentState;
+		}
 	private:
 		void InitRasterizationStateCreateInfo();
 		void InitMultisampleStateCreateInfo();
 		void InitDepthStencilStateCreateInfo();
 		void InitInputAssemblyStateCreateInfo();
+		void InitColorBlendAttachmentState();
 	private:
 		VkPipelineInputAssemblyStateCreateInfo _inputAssemblyStateCreateInfo{};
 		VkPipelineRasterizationStateCreateInfo _rasterizationStateCreateInfo{};
 		VkPipelineMultisampleStateCreateInfo _multisampleStateCreateInfo{};
 		VkPipelineDepthStencilStateCreateInfo _depthStencilStateCreateInfo{};
+		VkPipelineColorBlendAttachmentState _colorBlendAttachmentState{};
 	};
 }

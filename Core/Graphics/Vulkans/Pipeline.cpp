@@ -95,7 +95,7 @@ void Core::Pipeline::CreateGraphicsPipeline(VkRenderPass renderPass,
 	const uint32_t colorAttachmentCount =
 		renderingInfo != nullptr ? renderingInfo->colorAttachmentCount : 1;
 	vector<VkPipelineColorBlendAttachmentState> blendAttachments(
-		colorAttachmentCount, GetColorBlendAttachmentState());
+		colorAttachmentCount, pipelineState.GetColorBlendAttachmentState());
 	auto colorBlendState = GetColorBlendStateCreateInfo(blendAttachments);
 
 	auto dynamicState = GetDynamicStateCreateInfo();
@@ -159,19 +159,4 @@ VkPipelineDynamicStateCreateInfo Core::Pipeline::GetDynamicStateCreateInfo()
 	dynamicState.pDynamicStates = _dynamicStates.data();
 
 	return dynamicState;
-}
-
-VkPipelineColorBlendAttachmentState Core::Pipeline::GetColorBlendAttachmentState()
-{
-	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-	return colorBlendAttachment;
 }

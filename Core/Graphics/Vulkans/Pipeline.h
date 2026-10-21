@@ -41,7 +41,6 @@ namespace Core
 		VkPipelineColorBlendStateCreateInfo GetColorBlendStateCreateInfo(
 			const vector<VkPipelineColorBlendAttachmentState>& blendAttachments);
 		VkPipelineDynamicStateCreateInfo GetDynamicStateCreateInfo();
-		VkPipelineColorBlendAttachmentState GetColorBlendAttachmentState();
 	private:
 		Device& _device;
 
