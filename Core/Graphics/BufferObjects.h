@@ -155,6 +155,8 @@ inline constexpr const char* UB_SHADOW = "Shadow";
 // RenderFrame, so producer and consumer must agree on name and size.
 inline constexpr const char* SB_LIGHT_VISIBILITY = "LightVisibility";
 
+inline constexpr const char* SB_LIGHT_VISIBILITY_TRANSPARENT = "LightVisibilityTransparent";
+
 inline VkDeviceSize GetLightVisibilityBufferSize(ivec2 tileNums)
 {
 	return sizeof(VisibleLightsForTile)

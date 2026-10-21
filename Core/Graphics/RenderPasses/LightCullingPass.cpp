@@ -48,6 +48,10 @@ void LightCullingPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRe
 	_lightVisibility = builder.ImportBuffer(SB_LIGHT_VISIBILITY, lightVisibilityHandle);
 	builder.Write(_lightVisibility, BufferAccess::StorageComputeWrite);
 
+	auto transparentHandle = frameResources.GetOrCreateStorageBuffer(SB_LIGHT_VISIBILITY_TRANSPARENT, desc);
+	_lightVisibilityTransparent = builder.ImportBuffer(SB_LIGHT_VISIBILITY_TRANSPARENT, transparentHandle);
+	builder.Write(_lightVisibilityTransparent, BufferAccess::StorageComputeWrite);
+
 	_camera = builder.ImportBuffer(UB_CAMERA,
 		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
 	builder.Read(_camera, BufferAccess::UniformCompute);
@@ -66,6 +70,7 @@ void LightCullingPass::Execute(FrameGraphPassContext& context, CommandBuffer& co
 	builder.SetStorageBuffer(1, context.GetBuffer(_lightVisibility));
 	builder.SetTextureBuffer(2, context.GetTexture(_depth));
 	builder.SetUniformBuffer(3, context.GetBuffer(_lights));
+	builder.SetStorageBuffer(4, context.GetBuffer(_lightVisibilityTransparent));
 	auto& resources = builder.Build();
 
 	commandBuffer.BindPipeline(&_computePipeline.Get());

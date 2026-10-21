@@ -137,7 +137,7 @@ void TransparentPass::Setup(FrameGraphBuilder& builder, FrameResources& frameRes
     _ao = builder.GetTexture(AmbientOcclusionPass::RT_AO);
     builder.Read(_ao, TextureAccess::SampledFragment);
 
-    _lightVisibility = builder.GetBuffer(SB_LIGHT_VISIBILITY);
+    _lightVisibility = builder.GetBuffer(SB_LIGHT_VISIBILITY_TRANSPARENT);
     builder.Read(_lightVisibility, BufferAccess::StorageFragmentRead);
 
     _camera = builder.ImportBuffer(UB_CAMERA,

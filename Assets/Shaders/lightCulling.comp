@@ -24,6 +24,13 @@ layout(set = 0, binding = 3) uniform Lights
 	uint count;
 } lights;
 
+// Transparent surfaces sit in front of the opaque depth, so their list is
+// culled against the tile from the near plane to the tile's max depth.
+layout(set = 0, binding = 4) writeonly buffer TransparentTileLightVisiblities
+{
+    LightVisiblity transparent_light_visiblities[];
+};
+
 // vulkan ndc, minDepth = 0.0, maxDepth = 1.0
 const vec2 ndc_upper_left = vec2(-1.0, -1.0);
 const float ndc_near_plane = 0.0;
@@ -36,12 +43,14 @@ struct ViewFrustum
 };
 
 shared ViewFrustum frustum;
+shared ViewFrustum transparent_frustum;
 shared uint light_count_for_tile;
+shared uint transparent_light_count_for_tile;
 shared float min_depth;
 shared float max_depth;
 
 // Construct view frustum
-ViewFrustum createFrustum(ivec2 tile_id)
+ViewFrustum createFrustum(ivec2 tile_id, float min_depth, float max_depth)
 {
 	mat4 inv_projview = inverse(camera.proj * camera.view);
 
@@ -150,24 +159,38 @@ void main()
 			min_depth = max_depth;
 		}
 
-		frustum = createFrustum(tileId);
+		frustum = createFrustum(tileId, min_depth, max_depth);
+		transparent_frustum = createFrustum(tileId, ndc_near_plane, max_depth);
 		light_count_for_tile = 0;
+		transparent_light_count_for_tile = 0;
 	}
 
-	for (uint i = 0; i < lights.count && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; ++i)
+	// The opaque frustum lies inside the transparent one, so a light is only
+	// tested against it after passing the wider test.
+	for (uint i = 0; i < lights.count && transparent_light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; ++i)
 	{
-		if (lights.lights[i].position.w == DIRECTIONAL_LIGHT ||
-			isCollided(lights.lights[i], frustum))
+		bool directional = lights.lights[i].position.w == DIRECTIONAL_LIGHT;
+		if (!directional && !isCollided(lights.lights[i], transparent_frustum))
+			continue;
+
+		uint transparentSlot = atomicAdd(transparent_light_count_for_tile, 1);
+		if (transparentSlot >= MAX_POINT_LIGHT_PER_TILE)
+			break;
+		transparent_light_visiblities[tileIndex].lightIndices[transparentSlot] = i;
+
+		if (light_count_for_tile < MAX_POINT_LIGHT_PER_TILE &&
+			(directional || isCollided(lights.lights[i], frustum)))
 		{
 			uint slot = atomicAdd(light_count_for_tile, 1);
-			if (slot >= MAX_POINT_LIGHT_PER_TILE) 
-				break;
-			light_visiblities[tileIndex].lightIndices[slot] = i;
+			if (slot < MAX_POINT_LIGHT_PER_TILE)
+				light_visiblities[tileIndex].lightIndices[slot] = i;
 		}
 	}
 
 	if (gl_LocalInvocationIndex == 0)
 	{
-		light_visiblities[tileIndex].count = light_count_for_tile;
+		light_visiblities[tileIndex].count = min(light_count_for_tile, MAX_POINT_LIGHT_PER_TILE);
+		transparent_light_visiblities[tileIndex].count =
+			min(transparent_light_count_for_tile, MAX_POINT_LIGHT_PER_TILE);
 	}
 }

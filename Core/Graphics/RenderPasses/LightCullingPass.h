@@ -37,6 +37,7 @@ namespace Core
 
 		FGTexture _depth;
 		FGBuffer _lightVisibility;
+		FGBuffer _lightVisibilityTransparent;
 		FGBuffer _camera;
 		FGBuffer _lights;
 	};

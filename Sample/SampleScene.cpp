@@ -34,6 +34,9 @@ void SampleScene::Load(float width, float height, Core::RenderContext* renderCon
 	//string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	//_gltfLoader->LoadScene(path);
 
+	// Alpha-blend test: two glass cubes and a solid one.
+	_gltfLoader->LoadScene("./Assets/Models/GlassCubes.gltf");
+
 	string skyTexture = "./Assets/Textures/skybox.ktx";
 	//string skyTexture = "./Assets/Textures/cubemap_yokohama_rgba.ktx";
 	_gltfLoader->LoadSkybox(skyTexture);

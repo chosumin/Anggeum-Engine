@@ -188,8 +188,9 @@ void main()
 	// Apply shadow to direct lighting only (ambient is unaffected)
 	Lo *= visibility;
 
-	// Sample AO: applied globally across the full screen to the ambient term
-	float ao = texture(aoMap, screenUV).r;
+	// Screen-space AO belongs to the opaque surface under this pixel, so a
+	// blended surface in front of it takes none.
+	float ao = (pbr.flags & MATERIAL_FLAG_ALPHA_BLEND) != 0 ? 1.0 : texture(aoMap, screenUV).r;
 
 	vec3 ambient = AmbientLighting(surface,
 		bindlessTexturesCube[nonuniformEXT(gi.irradiancemapIndex)],
