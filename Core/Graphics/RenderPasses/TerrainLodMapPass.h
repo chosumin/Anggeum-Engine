@@ -24,6 +24,7 @@ namespace Core
 		~TerrainLodMapPass() override;
 
 		const char* GetName() const override { return "TerrainLodMap"; }
+		QueueType GetQueueType() const override { return QueueType::Compute; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;

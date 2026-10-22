@@ -30,6 +30,7 @@ namespace Core
 		~TerrainNodeListPass() override;
 
 		const char* GetName() const override { return "TerrainNodeList"; }
+		QueueType GetQueueType() const override { return QueueType::Compute; }
 
 		void Setup(FrameGraphBuilder& builder, FrameResources& frameResources,
 			RenderFrame& renderFrame) override;
