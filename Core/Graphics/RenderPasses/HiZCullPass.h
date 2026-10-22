@@ -16,13 +16,14 @@ namespace Core
     class Buffer;
     class FrameResources;
     class RendererBatch;
+    class HiZPyramid;
 
-    // Two-pass GPU occlusion culling:
+    // Two-pass GPU occlusion culling of the mesh draw set:
     //
-    // Cull1: cull against the previous frame's Hi-Z, then compact the
-    //  surviving commands for DrawIndexedIndirectCount.
-    // Cull2: cull the objects pass 1 rejected against this frame's Hi-Z
-    //  and compact its own list.
+    // Cull1: cull against the previous frame's final-depth Hi-Z, 
+    // then compact the surviving commands for DrawIndexedIndirectCount.
+    // Cull2: build this frame's Hi-Z from the pass-1 depth, cull the objects
+    //  pass 1 rejected against it and compact its own list.
     class HiZCullPass : public FrameGraphPass
     {
     public:
@@ -53,12 +54,9 @@ namespace Core
         static constexpr const char* SB_REJECTED_INDICES = "OcclusionCull.RejectedIndices";
         static constexpr const char* SB_REJECTED_COUNT = "OcclusionCull.RejectedCount";
 
-        // FrameResources render target.
+        // FrameResources render target: this frame's pass-1 depth pyramid.
         static constexpr const char* RT_HIZ = "OcclusionCull.HiZ";
 
-        static constexpr const char* SB_TERRAIN_PATCH_LIST = "Terrain.PatchList";
-        static constexpr const char* SB_TERRAIN_REJECTED = "Terrain.RejectedPatches";
-        static constexpr const char* SB_TERRAIN_REJECTED_COUNT = "Terrain.RejectedPatchCount";
         static constexpr const char* SB_TERRAIN_PASS2_PATCH_LIST = "Terrain.Pass2PatchList";
         static constexpr const char* SB_TERRAIN_PASS2_DRAW_ARGS = "Terrain.Pass2DrawArgs";
 
@@ -78,41 +76,25 @@ namespace Core
         void Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer) override;
 
     private:
-        // Cross-frame CPU state, per frame slot (each slot owns its own Hi-Z image).
-        struct SlotState
-        {
-            Handle<Texture> hiZImage;
-            bool hiZBuilt = false;
-        };
-
         // Owned by the Cull1 instance, shared with Cull2.
         struct SharedState
         {
             CameraBuffer camera{};
-            VkExtent2D extent{};
-            uint32_t hiZMipLevels = 0;
-            unordered_map<FrameResources*, SlotState> slots;
+            unique_ptr<HiZPyramid> pyramid;
         };
 
-        void EnsureHiZTexture(FrameResources& frameResources);
         void SetupMeshes(FrameGraphBuilder& builder, FrameResources& frameResources,
             RenderFrame& renderFrame);
         void SetupTerrain(FrameGraphBuilder& builder, FrameResources& frameResources,
             const PerspectiveCamera& camera);
 
-        // Builds this phase's pyramid from `depth` (null: none exists yet).
-        void PrepareHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            SlotState& slot, Texture* depth);
         void CullMeshes(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            RendererBatch& batch, SlotState& slot);
-        void CullTerrain(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            SlotState& slot);
+            RendererBatch& batch);
+        void CullTerrain(FrameGraphPassContext& context, CommandBuffer& commandBuffer);
         // One list: appends the commands whose `counts` entry is non-zero.
         void CompactDrawCommands(FrameGraphPassContext& context,
             CommandBuffer& commandBuffer, RendererBatch& batch,
             FGBuffer counts, FGBuffer outCommands, FGBuffer outDrawCount);
-        void BuildHiZ(FrameGraphPassContext& context, CommandBuffer& commandBuffer,
-            Texture& depth);
 
         Device& _device;
         ResourceManager& _resourceManager;
@@ -121,7 +103,7 @@ namespace Core
         Phase _phase;
 
         // Created by the Cull1 instance, shared by reference with Cull2 — both
-        // phases read and write the same camera/slot state.
+        // phases read and write the same camera state.
         shared_ptr<SharedState> _state;
 
         // Cull dispatch of this phase (gpuCulling / gpuCullingPass2).
@@ -132,18 +114,14 @@ namespace Core
         Handle<Shader> _compactShader;
         Handle<Pipeline> _compactPipeline;
 
-        // Hi-Z mip chain build (both phases).
-        Handle<Shader> _hiZShader;
-        Handle<Pipeline> _hiZPipeline;
-
         // Per-frame scratch, set in Setup and consumed by the same frame's
         // Execute. _active gates Execute entirely (no camera, nothing to cull).
         bool _active = false;
         bool _meshActive = false;
         bool _terrainActive = false;
         Handle<Buffer> _cullData;
-        Handle<Texture> _hiZTexture;
-        Handle<Texture> _prevDepth;   // Cull1: previous frame's resolved depth
+        Handle<Texture> _hiZTexture;  // this slot's pass-1 pyramid (Cull2 builds it)
+        Handle<Texture> _sampledHiZ;
         FGTexture _resolvedDepth;     // Cull2: this frame's depth, from ResolvePass
         FGBuffer _counts;             // this phase's per-command instance counts
         FGBuffer _instanceIDs;        // this phase's ID scatter target
@@ -158,10 +136,9 @@ namespace Core
         FGBuffer _transparentCommands;
         FGBuffer _transparentDrawCount;
 
-        // Terrain: this phase's cull (Cull1 also feeds the stats readback).
-        TerrainPatchCuller::Inputs _terrainInputs;
+        // Terrain pass-2 cull (Cull2 only).
         TerrainPatchCuller::Output _terrainOutput;
-        FGBuffer _terrainRejected, _terrainRejectedCount, _terrainReadback;
+        FGBuffer _terrainRejected, _terrainRejectedCount;
         Handle<Buffer> _terrainCullData;
         TerrainTraversalPush _terrainPush{};
     };

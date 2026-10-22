@@ -112,6 +112,10 @@ namespace Core
         // submitted for this frame. Cleared once the wait is injected.
         u64 _pendingResourceWait = 0;
 
+        // Compute timeline value the previous frame's last compute submit
+        // signalled; the next frame's first graphics submit waits on it.
+        u64 _lastFrameComputeValue = 0;
+
         // Per-frame snapshot of the driver completed values, readable anywhere.
         atomic<u64> _graphicsCompletedCache{ 0 };
         atomic<u64> _computeCompletedCache{ 0 };

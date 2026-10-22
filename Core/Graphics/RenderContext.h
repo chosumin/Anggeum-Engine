@@ -108,5 +108,6 @@ namespace Core
 		// Double/Triple buffered depth
 		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameDepthBuffers;
 		Handle<Texture> _previousFrameDepth;
+		array<Handle<Texture>, MAX_FRAMES_IN_FLIGHT> _frameHiZ;
 	};
 }

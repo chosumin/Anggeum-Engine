@@ -22,6 +22,8 @@
 #include "Graphics/RenderPasses/GUIRenderPass.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/TerrainLodMapPass.h"
+#include "Graphics/RenderPasses/HiZGeneratePass.h"
+#include "Graphics/RenderPasses/TerrainPatchCullPass.h"
 #include "Graphics/Terrain/TerrainRenderer.h"
 #include "Graphics/Terrain/TerrainPatchCuller.h"
 #include "Graphics/Terrain/TerrainSystem.h"
@@ -59,6 +61,7 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 
 	_frameGraph->AddPass(make_unique<TerrainNodeListPass>(device, resourceManager, renderScene));
 	_frameGraph->AddPass(make_unique<TerrainLodMapPass>(device, resourceManager, renderScene));
+	_frameGraph->AddPass(make_unique<TerrainPatchCullPass>(renderScene, *_terrainCuller, extent));
 
 	DepthPrePasses depthPrePasses(*_frameGraph, device, resourceManager, renderScene, *_terrainRenderer,
 		*_terrainCuller, extent, depthFormat, _msaaSamples);
@@ -77,6 +80,10 @@ Core::ForwardRenderPipeline::ForwardRenderPipeline(Device& device, ResourceManag
 	_frameGraph->AddPass(make_unique<AmbientOcclusionPass>(
 		device, resourceManager, renderScene, extent, _msaaSamples,
 		fgSdfShadowPassPtr->GetSDFGenerator()));
+
+	// Next frame's Cull1 pyramid from the final depth. Declared last on the
+	// compute queue so it never delays the AO chain the opaque pass waits on.
+	_frameGraph->AddPass(make_unique<HiZGeneratePass>(resourceManager, extent));
 
 	// Generates the IBL maps the geometry pass samples. Runs on the first frame
 	// only; after that it declares nothing and the graph culls it.

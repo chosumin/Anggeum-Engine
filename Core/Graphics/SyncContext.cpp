@@ -245,6 +245,21 @@ void SyncContext::SubmitToQueues(
         _pendingResourceWait = 0;
     }
 
+    // Graphics passes sample what the previous frame's compute passes left, 
+    // and the two timelines are otherwise unordered.
+    if (_lastFrameComputeValue != 0)
+    {
+        for (auto& info : submitInfos)
+        {
+            if (info.GetQueueType() == QueueType::Graphics)
+            {
+                info.AddTimelineWaitSemaphore(_computeSemaphore, _lastFrameComputeValue,
+                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+                break;
+            }
+        }
+    }
+
     // renderFinished binary + graphics timeline signal -> last graphics submit
     for (auto it = submitInfos.rbegin(); it != submitInfos.rend(); ++it)
     {
@@ -299,6 +314,7 @@ void SyncContext::SubmitToQueues(
     // graphics value covers them.
     const u64 graphicsValue = GetCurrentValue(QueueType::Graphics);
     const u64 computeValue = GetCurrentValue(QueueType::Compute);
+    _lastFrameComputeValue = computeValue;
 
     for (auto& info : submitInfos)
     {

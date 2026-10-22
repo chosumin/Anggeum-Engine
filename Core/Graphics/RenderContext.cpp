@@ -8,6 +8,7 @@
 #include "Graphics/Vulkans/CommandBuffer.h"
 #include "Graphics/Vulkans/BindlessTextureManager.h"
 #include "RendererBatch.h"
+#include "RenderPasses/HiZGeneratePass.h"
 using namespace Core;
 
 vector<function<void(SwapChain&)>> RenderContext::_resizeCallbacks;
@@ -104,6 +105,7 @@ void RenderContext::Begin(Scene& scene, VkExtent2D extents)
 	uint32_t prevIndex = (_currentFrame + MAX_FRAMES_IN_FLIGHT - 1) % MAX_FRAMES_IN_FLIGHT;
 	_previousFrameDepth = _frameDepthBuffers[prevIndex];
 	currentFrame.GetResources().SetPreviousDepthBuffer(_previousFrameDepth);
+	currentFrame.GetResources().SetPreviousHiZ(_frameHiZ[prevIndex]);
 
 	// Reset current frame (Descriptor pool, Command buffers, Submit infos)
 	currentFrame.Reset();
@@ -123,6 +125,8 @@ void RenderContext::Submit()
 		auto currentDepth = frameResources.GetRenderTarget("MainDepth");
 		_frameDepthBuffers[_currentFrame] = currentDepth;
 	}
+
+	_frameHiZ[_currentFrame] = frameResources.GetRenderTarget(HiZGeneratePass::RT_HIZ_FINAL);
 
 	auto& submission = currentFrame.GetSubmission();
 

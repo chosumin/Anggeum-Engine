@@ -3,6 +3,7 @@
 #include "TerrainSystem.h"
 #include "Graphics/RenderPasses/TerrainNodeListPass.h"
 #include "Graphics/RenderPasses/HiZCullPass.h"
+#include "Graphics/RenderPasses/TerrainPatchCullPass.h"
 #include "Graphics/RenderPasses/ShadowCullPass.h"
 #include "Graphics/RenderPasses/ShadowPass.h"
 #include "Graphics/RenderPasses/SDFShadowPass.h"
@@ -97,7 +98,7 @@ TerrainRenderer::PatchList TerrainRenderer::SetupPatchList(FrameGraphBuilder& bu
 // Declares every list that exists this frame; false when there is none.
 bool TerrainRenderer::SetupShared(FrameGraphBuilder& builder, FrameResources& frameResources)
 {
-	_lists[0] = SetupPatchList(builder, HiZCullPass::SB_TERRAIN_PATCH_LIST,
+	_lists[0] = SetupPatchList(builder, TerrainPatchCullPass::SB_PATCH_LIST,
 		TerrainNodeListPass::SB_PATCH_DRAW_ARGS);
 	_lists[1] = SetupPatchList(builder, HiZCullPass::SB_TERRAIN_PASS2_PATCH_LIST,
 		HiZCullPass::SB_TERRAIN_PASS2_DRAW_ARGS);
@@ -151,8 +152,23 @@ void TerrainRenderer::DrawList(FrameGraphPassContext& context, CommandBuffer& co
 bool TerrainRenderer::SetupDepth(FrameGraphBuilder& builder, FrameResources& frameResources,
 	Phase phase)
 {
-	SetupShared(builder, frameResources);
-	return _lists[int(phase)].IsValid();
+	// Only this phase's list: declaring the other would make the pass wait
+	// on its producer too.
+	const bool first = phase == Phase::First;
+	_lists[int(phase)] = first
+		? SetupPatchList(builder, TerrainPatchCullPass::SB_PATCH_LIST,
+			TerrainNodeListPass::SB_PATCH_DRAW_ARGS)
+		: SetupPatchList(builder, HiZCullPass::SB_TERRAIN_PASS2_PATCH_LIST,
+			HiZCullPass::SB_TERRAIN_PASS2_DRAW_ARGS);
+	if (!_lists[int(phase)].IsValid())
+		return false;
+
+	_camera = builder.ImportBuffer(UB_CAMERA,
+		frameResources.GetOrCreateUniformBuffer<CameraBuffer>(UB_CAMERA));
+	builder.Read(_camera, BufferAccess::UniformVertex);
+
+	_params = SetupParams(builder, frameResources);
+	return true;
 }
 
 void TerrainRenderer::RecordDepth(FrameGraphPassContext& context, CommandBuffer& commandBuffer,

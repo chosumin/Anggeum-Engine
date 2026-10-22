@@ -121,6 +121,9 @@ namespace Core
 		void SetPreviousDepthBuffer(Handle<Texture> depth) { _previousDepthBuffer = depth; }
 		Handle<Texture> GetPreviousDepthBuffer() const { return _previousDepthBuffer; }
 
+		void SetPreviousHiZ(Handle<Texture> hiZ) { _previousHiZ = hiZ; }
+		Handle<Texture> GetPreviousHiZ() const { return _previousHiZ; }
+
 	private:
 		// Only reachable through the typed overload, so a block's size always comes
 		// from a real C++ type rather than a hand-written byte count.
@@ -157,6 +160,7 @@ namespace Core
 		unordered_map<string, Handle<Buffer>> _uniformBufferHandles;
 
 		Handle<Texture> _previousDepthBuffer;
+		Handle<Texture> _previousHiZ;
 
 		Handle<Sampler> _defaultSampler;
 
