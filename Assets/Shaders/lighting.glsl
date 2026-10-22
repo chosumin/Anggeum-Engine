@@ -175,6 +175,6 @@ vec3 AmbientLighting(Surface s, samplerCube irradianceMap, samplerCube prefilter
     vec3 specular = prefilteredColor * (brdf.x * kS + brdf.y) * specularOcclusion;
 
     // Global factor keeping the ambient term below the direct one.
-    const float AMBIENT_SCALE = 0.1;
+    const float AMBIENT_SCALE = 0.15;
     return (kD * diffuse * ao + specular) * AMBIENT_SCALE;
 }
