@@ -111,8 +111,10 @@ void DepthPrePass::Setup(FrameGraphBuilder& builder, FrameResources& frameResour
 		builder.Read(_instanceIDs, BufferAccess::StorageVertexRead);
 	}
 
-	_terrainRenderer.SetupDepth(builder, frameResources,
-		first ? TerrainRenderer::Phase::First : TerrainRenderer::Phase::Second);
+	// Pass 1's terrain draw is TerrainDepthPrePass (it waits on the compute
+	// terrain chain; the mesh draw need not).
+	if (!first)
+		_terrainRenderer.SetupDepth(builder, frameResources, TerrainRenderer::Phase::Second);
 }
 
 void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& commandBuffer)
@@ -133,8 +135,8 @@ void DepthPrePass::Execute(FrameGraphPassContext& context, CommandBuffer& comman
 			context.GetBuffer(_instanceIDs), builder);
 	}
 
-	_terrainRenderer.RecordDepth(context, commandBuffer,
-		_phase == Phase::First ? TerrainRenderer::Phase::First : TerrainRenderer::Phase::Second);
+	if (_phase == Phase::Second)
+		_terrainRenderer.RecordDepth(context, commandBuffer, TerrainRenderer::Phase::Second);
 
 	context.EndRendering(commandBuffer);
 }

@@ -2,6 +2,7 @@
 #include "DepthPrePasses.h"
 #include "HiZCullPass.h"
 #include "DepthPrePass.h"
+#include "TerrainDepthPrePass.h"
 #include "ResolvePass.h"
 #include "Graphics/FrameGraph/FrameGraph.h"
 
@@ -22,6 +23,7 @@ DepthPrePasses::DepthPrePasses(FrameGraph& graph, Device& device, ResourceManage
 
 	graph.AddPass(make_unique<DepthPrePass>(device, resourceManager, renderScene, terrainRenderer,
 		extent, depthFormat, msaaSamples, DepthPhase::First));
+	graph.AddPass(make_unique<TerrainDepthPrePass>(terrainRenderer));
 	graph.AddPass(make_unique<ResolvePass>(device, resourceManager, extent, msaaSamples, /*resolveNormal*/ false));
 	graph.AddPass(make_unique<HiZCullPass>(device, resourceManager, renderScene, terrainCuller,
 		extent, CullPhase::Cull2, hiZCull1Ptr));
