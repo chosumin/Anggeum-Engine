@@ -152,7 +152,11 @@ namespace Core
 			VkPipelineStageFlags2 visibleStages = VK_PIPELINE_STAGE_2_NONE;
 			VkAccessFlags2 visibleAccess = VK_ACCESS_2_NONE;
 			int32_t lastAccessPass = -1;
+			int32_t lastWritePass = -1;
+			// Latest reader per queue since the last write (graphics, compute).
+			array<int32_t, 2> lastReadPass{ -1, -1 };
 		};
+		auto queueSlot = [](QueueType queue) { return queue == QueueType::Compute ? 1 : 0; };
 		vector<Track> tracks(resourceCount);
 		for (size_t r = 0; r < resourceCount; r++)
 		{
@@ -185,17 +189,25 @@ namespace Core
 				lifetime.lastPass = std::max(lifetime.lastPass, static_cast<uint32_t>(i));
 
 				// Cross-queue dependency: pass order does not order execution
-				// across queues, so this pass must wait on the producer pass's
-				// timeline signal.
-				const bool crossQueue = track.lastAccessPass >= 0 &&
-					passes[track.lastAccessPass].queue != myQueue;
+				// across queues, so this pass must wait on the other queue's
+				// last writer, and a write (or layout transition) also on the
+				// other queue's readers. Reads after reads need no wait.
+				const bool writeLike = accessInfo.isWrite || accessInfo.manualBarriers ||
+					(isImage && accessInfo.layout != track.layout);
+				int32_t producer = -1;
+				if (track.lastWritePass >= 0 && passes[track.lastWritePass].queue != myQueue)
+					producer = track.lastWritePass;
+				if (writeLike)
+					producer = std::max(producer, track.lastReadPass[1 - queueSlot(myQueue)]);
+				const bool crossQueue = producer >= 0;
 				if (crossQueue)
 				{
 					FGPassSync& sync = out.passSync[i];
-					sync.waitPass = std::max(sync.waitPass, track.lastAccessPass);
+					sync.waitPass = std::max(sync.waitPass, producer);
 					sync.waitStages |= ToSync1Stage(accessInfo.stage);
-					lifetime.crossQueue = true;
 				}
+				if (track.lastAccessPass >= 0 && passes[track.lastAccessPass].queue != myQueue)
+					lifetime.crossQueue = true;
 
 				// Manual-barrier accesses: the pass transitions the resource
 				// itself; the graph only adopts the declared final state.
@@ -209,6 +221,8 @@ namespace Core
 					track.visibleStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleAccess = VK_ACCESS_2_NONE;
 					track.lastAccessPass = static_cast<int32_t>(i);
+					track.lastWritePass = static_cast<int32_t>(i);
+					track.lastReadPass = { -1, -1 };
 					continue;
 				}
 
@@ -243,8 +257,11 @@ namespace Core
 					}
 					else
 					{
+						// A layout transition writes the image, so it must also
+						// trail the earlier readers.
+						const bool transitions = isImage && accessInfo.layout != track.layout;
 						plan.srcStage = track.lastWriteStage |
-							(accessInfo.isWrite ? track.readStages : VK_PIPELINE_STAGE_2_NONE);
+							(accessInfo.isWrite || transitions ? track.readStages : VK_PIPELINE_STAGE_2_NONE);
 						plan.srcAccess = track.lastWriteAccess;
 					}
 					plan.dstStage = accessInfo.stage;
@@ -275,6 +292,8 @@ namespace Core
 					track.readStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleStages = VK_PIPELINE_STAGE_2_NONE;
 					track.visibleAccess = VK_ACCESS_2_NONE;
+					track.lastWritePass = static_cast<int32_t>(i);
+					track.lastReadPass = { -1, -1 };
 				}
 				else
 				{
@@ -283,6 +302,7 @@ namespace Core
 					track.readStages |= accessInfo.stage;
 					track.visibleStages |= accessInfo.stage;
 					track.visibleAccess |= accessInfo.access;
+					track.lastReadPass[queueSlot(myQueue)] = static_cast<int32_t>(i);
 				}
 				track.lastAccessPass = static_cast<int32_t>(i);
 			}

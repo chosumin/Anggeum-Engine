@@ -196,6 +196,33 @@ namespace Core
 			assert(out2.culledPasses[0]);
 		}
 
+		// Cross-queue reads chase the writer, not each other; a write on the
+		// other queue waits on the reader there.
+		// Q0 (graphics) writes A; Q1 (compute) reads A; Q2 (graphics) reads A;
+		// Q3 (compute) writes A.
+		{
+			vector<FGPassDecl> passes3(4);
+			passes3[0].queue = QueueType::Graphics;
+			passes3[0].accesses = { makeAccess(0, TextureAccess::ColorWrite) };
+			passes3[1].queue = QueueType::Compute;
+			passes3[1].sideEffect = true;
+			passes3[1].accesses = { makeAccess(0, TextureAccess::SampledCompute) };
+			passes3[2].queue = QueueType::Graphics;
+			passes3[2].sideEffect = true;
+			passes3[2].accesses = { makeAccess(0, TextureAccess::SampledFragment) };
+			passes3[3].queue = QueueType::Compute;
+			passes3[3].sideEffect = true;
+			passes3[3].accesses = { makeAccess(0, TextureAccess::StorageComputeWrite) };
+
+			FGCompileOutput out3;
+			FrameGraph::CompileDeclarations(passes3, resources, entryStates, out3);
+
+			assert(out3.passSync[1].waitPass == 0);
+			assert(out3.passSync[2].waitPass == -1); // same queue as the writer
+			assert(out3.passSync[3].waitPass == 2);  // the graphics reader
+			assert(out3.passSync[2].signals && !out3.passSync[1].signals);
+		}
+
 		printf("[FrameGraph] self-tests passed\n");
 
 		RunPlacementSelfTests();
