@@ -178,6 +178,3 @@ vec3 AmbientLighting(Surface s, samplerCube irradianceMap, samplerCube prefilter
     const float AMBIENT_SCALE = 0.1;
     return (kD * diffuse * ao + specular) * AMBIENT_SCALE;
 }
-
-// Every forward shader tonemaps with the same exposure.
-const float FORWARD_EXPOSURE = 4.5;

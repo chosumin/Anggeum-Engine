@@ -26,6 +26,8 @@ vec4 Tonemap(vec4 color, float exposure, float gamma)
 	return vec4(pow(outcol, vec3(1.0 / gamma)), color.a);
 }
 
+const float FORWARD_EXPOSURE = 4.5;
+
 vec4 SRGBtoLINEAR(vec4 srgbIn)
 {
 #define MANUAL_SRGB 1

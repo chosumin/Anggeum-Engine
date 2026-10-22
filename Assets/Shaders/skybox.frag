@@ -10,9 +10,8 @@ layout(set = 1, binding = 1) uniform samplerCube envmap;
 
 void main()
 {
-	vec3 envColor = SRGBtoLINEAR(textureLod(envmap, pos, 1.2)).rgb;
+	// The cubemap holds linear HDR radiance; no sRGB decode.
+	vec3 envColor = textureLod(envmap, pos, 1.2).rgb;
 
-	envColor = envColor / (envColor + vec3(1.0));
-
-    outColor = vec4(envColor, 1.0);
+	outColor = Tonemap(vec4(envColor, 1.0), FORWARD_EXPOSURE, 1.0);
 }
