@@ -14,6 +14,7 @@ namespace Core
 	class SyncContext;
 	class FrameResources;
 	class BindlessTextureManager;
+	class TerrainHeightSource;
 
 	// Facade over the terrain world structure: loads/bakes the node store at
 	// startup and owns the quadtree GPU face, the streamer and the material
@@ -62,6 +63,8 @@ namespace Core
 		int GetDebugMode() const { return _debugMode; }
 
 	private:
+		static TerrainConfig ResolveConfig();
+		static unique_ptr<TerrainHeightSource> CreateHeightSource(const TerrainConfig& config);
 		void CreateGridIndexBuffer(ResourceManager& resourceManager);
 		void CreatePickReadback();
 		void OnGUIPick(uint32_t slot);

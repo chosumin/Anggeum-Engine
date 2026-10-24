@@ -26,9 +26,15 @@ namespace Core
 		uint32_t splatQuadsPerTexel = 2;
 
 		// Chosen so the average terrain height lands near y = 0 (the Sponza
-		// floor): the FBM mapping averages to the middle of the range.
+		// floor): the FBM mapping averages to the middle of the range. A height
+		// map replaces both with its descriptor's range.
 		float heightMin = -100.0f;
 		float heightMax = 100.0f;
+
+		// Real-world height map descriptor (see ImageTerrainHeightSource);
+		// empty or missing = procedural FBM. ANGGEUM_TERRAIN_HEIGHTMAP overrides it.
+		string heightMapPath = "Assets/Terrain/emmental.json";
+		float heightMapDetailAmplitude = 0.0f; // meters of FBM relief added to a coarse DEM, 0 = off
 
 		// Formats. Uncompressed for now: the engine has no BC encoder yet.
 		VkFormat heightFormat = VK_FORMAT_R16_UNORM;

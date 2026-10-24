@@ -4,15 +4,6 @@
 
 namespace Core
 {
-	// A level pad around a world XZ point, eased into the noise over falloff.
-	struct TerrainFlatSpot
-	{
-		vec2 centerXZ{ 0.0f, 0.0f };
-		float radius = 40.0f;
-		float falloff = 20.0f;
-		float height = 0.0f;
-	};
-
 	class ProceduralTerrainHeightSource : public TerrainHeightSource
 	{
 	public:
@@ -28,9 +19,7 @@ namespace Core
 			float range = _heightMax - _heightMin;
 			float height = _heightMin + (n * 0.5f + 0.5f) * range * 0.85f
 				+ range * 0.075f;
-			float t = glm::smoothstep(_flat.radius, _flat.radius + _flat.falloff,
-				glm::length(worldXZ - _flat.centerXZ));
-			return glm::mix(_flat.height, height, t);
+			return _flat.Apply(worldXZ, height);
 		}
 
 		uint32_t CacheKey() const override

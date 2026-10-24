@@ -1,0 +1,25 @@
+{
+  "data": "emmental.r16",
+  "width": 4097,
+  "height": 4097,
+  "heightMin": -91.984,
+  "heightMax": 108.603,
+  "extentMeters": 2048.0,
+  "centerLonLat": [
+    7.7348616223273075,
+    47.072136329826705
+  ],
+  "elevationOffset": 788.505,
+  "sources": [
+    "swissalti3d_2025_2621-1212_0.5_2056_5728.tif",
+    "swissalti3d_2025_2621-1213_0.5_2056_5728.tif",
+    "swissalti3d_2025_2621-1214_0.5_2056_5728.tif",
+    "swissalti3d_2025_2622-1212_0.5_2056_5728.tif",
+    "swissalti3d_2025_2622-1213_0.5_2056_5728.tif",
+    "swissalti3d_2025_2622-1214_0.5_2056_5728.tif",
+    "swissalti3d_2025_2623-1212_0.5_2056_5728.tif",
+    "swissalti3d_2025_2623-1213_0.5_2056_5728.tif",
+    "swissalti3d_2025_2623-1214_0.5_2056_5728.tif"
+  ],
+  "attribution": "swissALTI3D 2025, 0.5 m, (c) swisstopo, Open Government Data (free use with attribution)"
+}

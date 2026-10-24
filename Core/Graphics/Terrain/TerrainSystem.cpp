@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "TerrainSystem.h"
+#include "ImageTerrainHeightSource.h"
 #include "Procedural/ProceduralTerrainHeightSource.h"
 #include "Procedural/ProceduralTerrainMaterials.h"
 #include "Foundation/Entity.h"
@@ -10,6 +11,7 @@
 #include "Graphics/FrameResources.h"
 #include "Graphics/TransferContext.h"
 #include "Graphics/Vulkans/Buffer.h"
+#include "Utils/Log.h"
 
 namespace Core
 {
@@ -17,10 +19,9 @@ namespace Core
 		SyncContext& syncContext, TransferContext& transfer,
 		BindlessTextureManager* bindless)
 		: _resourceManager(resourceManager)
+		, _config(ResolveConfig())
 		, _materials(CreateProceduralTerrainMaterials(device, resourceManager, bindless))
-		, _store(TerrainNodeStore::Load(_config,
-			ProceduralTerrainHeightSource(TerrainNoiseParams{},
-				_config.heightMin, _config.heightMax),
+		, _store(TerrainNodeStore::Load(_config, *CreateHeightSource(_config),
 			ProceduralTerrainMaterialBakeDescs()))
 	{
 		_quadTree = make_unique<TerrainQuadTree>(device, resourceManager, syncContext, _config);
@@ -40,6 +41,35 @@ namespace Core
 			uint32_t zero = 0;
 			_patchCountReadback[slot].Get().Update(zero);
 		}
+	}
+
+	TerrainConfig TerrainSystem::ResolveConfig()
+	{
+		TerrainConfig config;
+		if (const char* env = getenv("ANGGEUM_TERRAIN_HEIGHTMAP"))
+			config.heightMapPath = env;
+		if (const char* env = getenv("ANGGEUM_TERRAIN_DETAIL"))
+			config.heightMapDetailAmplitude = float(atof(env));
+
+		// The range must be settled here: the bake key and the unorm16
+		// packing both hash it before the source exists.
+		if (!config.heightMapPath.empty() && !ImageTerrainHeightSource::ReadHeightRange(
+			config.heightMapPath, config.heightMin, config.heightMax))
+		{
+			LOG("Terrain: falling back to the procedural height source");
+			config.heightMapPath.clear();
+		}
+		return config;
+	}
+
+	unique_ptr<TerrainHeightSource> TerrainSystem::CreateHeightSource(const TerrainConfig& config)
+	{
+		if (!config.heightMapPath.empty())
+			if (unique_ptr<TerrainHeightSource> image = ImageTerrainHeightSource::Load(config))
+				return image;
+
+		return make_unique<ProceduralTerrainHeightSource>(TerrainNoiseParams{},
+			config.heightMin, config.heightMax);
 	}
 
 	void TerrainSystem::CreatePickReadback()

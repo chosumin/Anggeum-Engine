@@ -68,7 +68,7 @@ FrameGraph                                (GPU, per frame)
 |------|------|
 | `TerrainSystem` | Facade. Owns the config, node store, quadtree and streamer; builds the shared 17x17 patch index buffer and the render params; ImGui panel and mouse pick |
 | `TerrainConfig` | All world/bake/streaming parameters plus the derived math (`NodeSize`, `LevelOffset`, `MaxPatches`, ...). Also holds the GPU-mirrored structs |
-| `TerrainHeightSource` | Where height comes from: `Sample(worldXZ)` + `CacheKey()` for bake invalidation. `ProceduralTerrainHeightSource` implements it over FBM `TerrainNoise` |
+| `TerrainHeightSource` | Where height comes from: `Sample(worldXZ)` + `CacheKey()` for bake invalidation. `ProceduralTerrainHeightSource` implements it over FBM `TerrainNoise`; `ImageTerrainHeightSource` over a real-world DEM (below) |
 | `TerrainBaker` | Bakes one payload per node in parallel (`execution::par`): height, normal, albedo, splat (material ID), min/max height |
 | `TerrainNodeStore` | The baked CPU payloads — the in-memory stand-in for FC5's on-disk tiles. `Load()` reads the `.tbake` cache or bakes and writes it |
 | `TerrainQuadTree` | GPU face: 4 synchronized atlases (height; normal + roughness + AO; albedo; splat material IDs), the mip-mapped quadtree index texture, the node desc buffer, and the atlas slot allocator |

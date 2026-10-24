@@ -15,6 +15,23 @@ namespace Core
 		return hash;
 	}
 
+	// A level pad around a world XZ point, eased into the surrounding height
+	// over falloff: the Sponza floor sits on it.
+	struct TerrainFlatSpot
+	{
+		vec2 centerXZ{ 0.0f, 0.0f };
+		float radius = 40.0f;
+		float falloff = 20.0f;
+		float height = 0.0f;
+
+		float Apply(vec2 worldXZ, float terrainHeight) const
+		{
+			float t = glm::smoothstep(radius, radius + falloff,
+				glm::length(worldXZ - centerXZ));
+			return glm::mix(height, terrainHeight, t);
+		}
+	};
+
 	// Where terrain height comes from.
 	class TerrainHeightSource
 	{
@@ -27,7 +44,7 @@ namespace Core
 
 		// Identity of the produced heights for bake-cache invalidation: two
 		// sources with the same key must produce the same Sample() results.
-		// (An image-based source would hash the file path and write time.)
+		// (ImageTerrainHeightSource hashes the file path and write time.)
 		virtual uint32_t CacheKey() const = 0;
 	};
 }
