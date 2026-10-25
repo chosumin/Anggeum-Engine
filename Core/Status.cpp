@@ -111,14 +111,16 @@ void Status::DrawQueueTimings()
 
 	ImGui::Spacing();
 
-	// Per-pass detail table.
+	// Per-pass detail table. Column widths come from fixed templates so changing values do not resize them.
 	if (ImGui::BeginTable("passes", 4,
-		ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+		ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
 	{
-		ImGui::TableSetupColumn("Queue");
-		ImGui::TableSetupColumn("Pass");
-		ImGui::TableSetupColumn("Range (ms)");
-		ImGui::TableSetupColumn("Duration");
+		auto templateWidth = [](const char* text) { return ImGui::CalcTextSize(text).x; };
+
+		ImGui::TableSetupColumn("Queue", ImGuiTableColumnFlags_WidthFixed, templateWidth("Graphics"));
+		ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("Range (ms)", ImGuiTableColumnFlags_WidthFixed, templateWidth("000.000 - 000.000"));
+		ImGui::TableSetupColumn("Duration", ImGuiTableColumnFlags_WidthFixed, templateWidth("Duration"));
 		ImGui::TableHeadersRow();
 
 		for (const auto& pass : timings.passes)
@@ -129,9 +131,9 @@ void Status::DrawQueueTimings()
 			ImGui::TableNextColumn();
 			ImGui::TextUnformatted(pass.name);
 			ImGui::TableNextColumn();
-			ImGui::Text("%.3f - %.3f", pass.beginMs, pass.endMs);
+			ImGui::Text("%7.3f - %7.3f", pass.beginMs, pass.endMs);
 			ImGui::TableNextColumn();
-			ImGui::Text("%.3f", pass.DurationMs());
+			ImGui::Text("%8.3f", pass.DurationMs());
 		}
 
 		ImGui::EndTable();

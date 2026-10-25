@@ -29,7 +29,15 @@ void SampleScene::Load(float width, float height, Core::RenderContext* renderCon
 	_gltfLoader = &gltfLoader;
 
 	string path = "./Assets/Models/Sponza/glTF/Sponza.gltf";
-	_gltfLoader->LoadScene(path);
+	_gltfLoader->LoadScene(path, [](const LoadedAsset& asset)
+		{
+			// The floor sits at y = -0.02 and the terrain pad at 0: lift it clear of the terrain.
+			for (auto* entity : asset.entities)
+			{
+				auto& transform = entity->GetTransform();
+				transform.SetTranslation(transform.GetTranslation() + vec3(0.0f, 0.1f, 0.0f));
+			}
+		});
 
 	//string path = "./Assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf";
 	//_gltfLoader->LoadScene(path);
